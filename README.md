@@ -34,6 +34,45 @@ The app runs at [http://localhost:3000](http://localhost:3000).
 |---|---|---|
 | `SUPERVISOR_SYSTEM_PATH` | `/home/kuba/.openclaw/SUPERVISOR_SYSTEM` | Absolute path to the SUPERVISOR_SYSTEM directory |
 
+## Deployment
+
+### Build for production
+
+```bash
+npm run build
+```
+
+### Run manually
+
+```bash
+# Starts on port 3100
+npm start -- -p 3100
+```
+
+The production server will be available at [http://localhost:3100](http://localhost:3100).
+
+### Systemd service
+
+A service file is provided for running Mission Control as a system daemon:
+
+```bash
+# Copy the service file
+sudo cp mission-control.service /etc/systemd/system/
+
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable mission-control
+sudo systemctl start mission-control
+
+# Check status
+sudo systemctl status mission-control
+
+# View logs
+journalctl -u mission-control -f
+```
+
+The service runs on port **3100**, restarts on failure, and reads from the configured `SUPERVISOR_SYSTEM_PATH`.
+
 ## Project Structure
 
 ```
