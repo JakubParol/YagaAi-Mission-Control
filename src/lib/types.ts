@@ -4,10 +4,11 @@
  */
 
 /** Possible states a task can be in, matching TASKS/ subdirectory names. */
-export type TaskState = "PLANNED" | "ASSIGNED" | "DONE" | "BLOCKED";
+export type TaskState = "BACKLOG" | "PLANNED" | "ASSIGNED" | "DONE" | "BLOCKED";
 
 /** All valid task states, ordered by lifecycle progression. */
 export const TASK_STATES: readonly TaskState[] = [
+  "BACKLOG",
   "PLANNED",
   "ASSIGNED",
   "DONE",
