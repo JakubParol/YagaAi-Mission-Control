@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 
-export default function ConnectionStatus() {
+export function ConnectionStatus() {
   const [ok, setOk] = useState(true);
 
   useEffect(() => {

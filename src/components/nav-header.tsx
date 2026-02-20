@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import ConnectionStatus from "./connection-status";
+import { ConnectionStatus } from "./connection-status";
 
 export function NavHeader() {
   const pathname = usePathname();

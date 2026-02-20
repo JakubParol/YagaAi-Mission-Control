@@ -29,11 +29,23 @@ export function StoryList({ initialData }: { initialData: Story[] }) {
     initialData,
   });
 
-  if (error) return <ErrorCard title='Connection Error' message={error} suggestion='Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible.' />;
+  if (error) {
+    return (
+      <ErrorCard
+        title="Connection Error"
+        message={error}
+        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+      />
+    );
+  }
 
   if (stories.length === 0) {
     return (
-      <EmptyState icon='📋' title='No stories yet' description='Stories will appear here once they are created in the Supervisor System. Check that SUPERVISOR_SYSTEM_PATH is configured correctly.' />
+      <EmptyState
+        icon="📋"
+        title="No stories yet"
+        description="Stories will appear here once they are created in the Supervisor System. Check that SUPERVISOR_SYSTEM_PATH is configured correctly."
+      />
     );
   }
 
