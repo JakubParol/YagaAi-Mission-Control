@@ -36,6 +36,7 @@ export async function listStories(): Promise<Story[]> {
 
       const tasks = await listTasksForStory(id);
       const task_counts: Record<TaskState, number> = {
+        BACKLOG: 0,
         PLANNED: 0,
         ASSIGNED: 0,
         DONE: 0,
@@ -69,6 +70,7 @@ export async function getStory(id: string): Promise<Story | null> {
 
   const tasks = await listTasksForStory(id);
   const task_counts: Record<TaskState, number> = {
+    BACKLOG: 0,
     PLANNED: 0,
     ASSIGNED: 0,
     DONE: 0,

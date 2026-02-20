@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import type { TaskState } from "@/lib/types";
 
 const STATE_COLORS: Record<TaskState, string> = {
+  BACKLOG: "bg-slate-800 text-slate-300",
   PLANNED: "bg-neutral-700 text-neutral-200",
   ASSIGNED: "bg-blue-900 text-blue-200",
   DONE: "bg-green-900 text-green-200",

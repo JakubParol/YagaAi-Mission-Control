@@ -51,6 +51,7 @@ export function useAutoRefresh<T>({
 
   useEffect(() => {
     mountedRef.current = true;
+    fetchData();
     const id = setInterval(fetchData, interval);
     return () => {
       mountedRef.current = false;

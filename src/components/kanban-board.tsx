@@ -13,6 +13,7 @@ interface BoardData {
 }
 
 const COLUMN_COLORS: Record<TaskState, string> = {
+  BACKLOG: "border-t-slate-600",
   PLANNED: "border-t-neutral-500",
   ASSIGNED: "border-t-blue-500",
   DONE: "border-t-green-500",
@@ -20,6 +21,7 @@ const COLUMN_COLORS: Record<TaskState, string> = {
 };
 
 const COLUMN_HEADER_COLORS: Record<TaskState, string> = {
+  BACKLOG: "text-slate-400",
   PLANNED: "text-neutral-400",
   ASSIGNED: "text-blue-400",
   DONE: "text-green-400",
@@ -63,7 +65,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
   });
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
       {columns.map(({ state, grouped, count }) => (
         <div key={state} className="flex flex-col gap-3">
           <div
