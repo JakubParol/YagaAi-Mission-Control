@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { NavHeader } from "@/components/nav-header";
+import { Inter } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -26,10 +27,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${geistMono.variable} antialiased`}
       >
-        <NavHeader />
-        <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
