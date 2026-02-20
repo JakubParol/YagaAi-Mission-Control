@@ -1,23 +1,23 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, LayoutDashboard, BookOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
-  matchPaths?: string[];
 }
 
 const navItems: NavItem[] = [
   { href: "/board", label: "Board", icon: LayoutDashboard },
-  { href: "/", label: "Stories", icon: BookOpen, matchPaths: ["/stories"] },
+  { href: "/", label: "Stories", icon: BookOpen },
 ];
 
 function isActiveRoute(pathname: string, item: NavItem): boolean {
@@ -27,28 +27,85 @@ function isActiveRoute(pathname: string, item: NavItem): boolean {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
+const DRAWER_ID = "mobile-nav-drawer";
+
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const handleClose = () => setIsOpen(false);
+  const handleClose = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  const handleOpen = useCallback(() => {
+    setIsOpen(true);
+  }, []);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, handleClose]);
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const scrollY = window.scrollY;
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+
+    return () => {
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
+  // Move focus into drawer when opened
+  useEffect(() => {
+    if (isOpen) {
+      closeButtonRef.current?.focus();
+    }
+  }, [isOpen]);
 
   return (
     <>
       {/* Hamburger button */}
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen(true)}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-slate-800 transition-all duration-200 lg:hidden"
-        aria-label="Open menu"
+        onClick={handleOpen}
+        className={cn(
+          "focus-ring flex h-9 w-9 items-center justify-center rounded-lg",
+          "text-muted-foreground hover:text-foreground",
+          "hover:bg-white/[0.04]",
+          "transition-colors duration-150 lg:hidden"
+        )}
+        aria-label="Open navigation menu"
         aria-expanded={isOpen}
+        aria-controls={DRAWER_ID}
       >
-        <Menu className="h-5 w-5" />
+        <Menu aria-hidden="true" className="h-5 w-5" />
       </button>
 
       {/* Portal drawer */}
@@ -56,40 +113,54 @@ export function MobileNav() {
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 z-[9998] bg-black/60 lg:hidden"
+            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm lg:hidden"
             onClick={handleClose}
-            aria-hidden="true"
+            role="presentation"
           />
 
           {/* Drawer */}
           <nav
-            className={[
-              "fixed top-4 bottom-4 left-4 z-[9999] w-72 lg:hidden",
-              "bg-[#0b1220]",
-              "border border-white/10",
+            id={DRAWER_ID}
+            className={cn(
+              "fixed inset-y-4 left-4 z-[9999] w-72 lg:hidden",
+              "bg-card",
+              "border border-white/[0.08]",
               "shadow-2xl",
               "rounded-xl",
-              "flex flex-col p-6 gap-6",
-              "overflow-hidden",
-            ].join(" ")}
-            role="navigation"
-            aria-label="Mobile navigation"
+              "flex flex-col gap-6 overflow-hidden p-6"
+            )}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
-              <Link href="/" onClick={handleClose} className="flex items-center gap-2.5 group">
-                <div className="h-2.5 w-2.5 rounded-full bg-[#ec8522] shadow-[0_0_8px_rgba(236,133,34,0.4)] group-hover:shadow-[0_0_12px_rgba(236,133,34,0.6)] transition-shadow duration-300" />
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e2e8f0]">
+              <Link
+                href="/"
+                onClick={handleClose}
+                className="focus-ring group flex items-center gap-2.5 rounded-lg"
+              >
+                <div
+                  aria-hidden="true"
+                  className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(236,133,34,0.4)] transition-shadow duration-300 group-hover:shadow-[0_0_12px_rgba(236,133,34,0.6)]"
+                />
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground">
                   Mission Control
                 </span>
               </Link>
               <button
+                ref={closeButtonRef}
                 type="button"
                 onClick={handleClose}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-slate-800 transition-all duration-200"
-                aria-label="Close menu"
+                className={cn(
+                  "focus-ring flex h-8 w-8 items-center justify-center rounded-lg",
+                  "text-muted-foreground hover:text-foreground",
+                  "hover:bg-white/[0.04]",
+                  "transition-colors duration-150"
+                )}
+                aria-label="Close navigation menu"
               >
-                <X className="h-5 w-5" />
+                <X aria-hidden="true" className="h-5 w-5" />
               </button>
             </div>
 
@@ -104,18 +175,17 @@ export function MobileNav() {
                     key={item.href}
                     href={item.href}
                     onClick={handleClose}
-                    className={[
-                      "flex items-center gap-3 px-3 py-2.5",
-                      "text-sm font-semibold",
-                      "rounded-lg",
-                      "transition-all duration-200",
-                      active
-                        ? "bg-[#ec8522]/10 text-[#ec8522] shadow-sm"
-                        : "text-[#94a3b8] hover:bg-slate-800 hover:text-[#e2e8f0]",
-                    ].join(" ")}
                     aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "focus-ring flex items-center gap-3 rounded-lg px-3 py-2.5",
+                      "text-sm font-medium",
+                      "transition-colors duration-150",
+                      active
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+                    )}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                     {item.label}
                   </Link>
                 );

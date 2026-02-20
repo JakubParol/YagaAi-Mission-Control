@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Archive, Clock, UserCheck, CheckCircle, AlertTriangle } from "lucide-react";
 import { listStories, listTasksForStory } from "@/lib/adapters";
 import { KanbanBoard } from "@/components/kanban-board";
@@ -6,14 +7,18 @@ import type { Task, TaskState } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+export const metadata: Metadata = {
+  title: "Board",
+};
+
 export default async function BoardPage() {
   const stories = await listStories();
-  const allTasks: Task[] = [];
 
-  for (const story of stories) {
-    const tasks = await listTasksForStory(story.id);
-    allTasks.push(...tasks);
-  }
+  // Fetch tasks for all stories in parallel
+  const tasksPerStory = await Promise.all(
+    stories.map((story) => listTasksForStory(story.id))
+  );
+  const allTasks: Task[] = tasksPerStory.flat();
 
   // Compute counts per state
   const counts: Record<TaskState, number> = {
@@ -26,8 +31,8 @@ export default async function BoardPage() {
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-[#e2e8f0] mb-1">Board</h1>
-        <p className="text-[#94a3b8]">
+        <h1 className="text-3xl font-bold text-foreground mb-1">Board</h1>
+        <p className="text-muted-foreground">
           {allTasks.length} {allTasks.length === 1 ? "task" : "tasks"} across{" "}
           {stories.length} {stories.length === 1 ? "story" : "stories"}
         </p>

@@ -1,15 +1,33 @@
+import { BookOpen, LayoutDashboard, ListTodo, Inbox } from "lucide-react";
+
+const ICON_MAP = {
+  stories: BookOpen,
+  board: LayoutDashboard,
+  tasks: ListTodo,
+  default: Inbox,
+} as const;
+
+type IconKey = keyof typeof ICON_MAP;
+
 interface EmptyStateProps {
-  icon: string;
+  icon: IconKey | (string & {});
   title: string;
   description: string;
 }
 
 export function EmptyState({ icon, title, description }: EmptyStateProps) {
+  const Icon = ICON_MAP[icon as IconKey] ?? ICON_MAP.default;
+
   return (
-    <div className="rounded-xl border border-[#1f2937] bg-[#0b1220]/50 px-6 py-16 text-center">
-      <div className="text-4xl mb-4">{icon}</div>
-      <h3 className="text-lg font-semibold text-[#e2e8f0] mb-2">{title}</h3>
-      <p className="text-sm text-[#94a3b8] max-w-md mx-auto leading-relaxed">
+    <div
+      role="status"
+      className="rounded-lg border border-border bg-card/50 px-6 py-16 text-center"
+    >
+      <div aria-hidden="true" className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+        <Icon className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <h3 className="text-base font-semibold text-foreground mb-2">{title}</h3>
+      <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
     </div>
