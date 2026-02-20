@@ -4,7 +4,8 @@ set -e
 
 cd "$(dirname "$0")"
 
-echo "📦 Pulling latest..."
+echo "📦 Switching to main and pulling..."
+git checkout main
 git pull origin main
 
 echo "🔨 Building..."
