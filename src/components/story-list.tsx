@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { TaskCountBadges } from "@/components/task-count-badges";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
@@ -17,7 +16,6 @@ function extractSummary(content: string): string {
     if (trimmed.startsWith("#")) continue;
     if (trimmed.startsWith("id:") || trimmed.startsWith("owner:") || trimmed.startsWith("created_at:") || trimmed.startsWith("updated_at:")) continue;
     if (trimmed.startsWith("---")) continue;
-    // Return first real content line, truncated
     return trimmed.length > 200 ? trimmed.slice(0, 200) + "…" : trimmed;
   }
   return "No description";
@@ -53,17 +51,19 @@ export function StoryList({ initialData }: { initialData: Story[] }) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {stories.map((story) => (
         <Link key={story.id} href={`/stories/${story.id}`}>
-          <Card className="h-full transition-colors hover:border-primary/50 cursor-pointer">
-            <CardHeader>
-              <CardTitle className="font-mono text-base">{story.id}</CardTitle>
-              <CardDescription className="line-clamp-3">
+          <div className="group h-full rounded-xl border border-[#1f2937] bg-[#0b1220] p-6 transition-all duration-200 hover:border-[#ec8522]/50 hover:shadow-lg hover:shadow-[#ec8522]/5 cursor-pointer flex flex-col gap-4">
+            <div>
+              <h3 className="font-mono text-base font-semibold text-[#e2e8f0] group-hover:text-[#ec8522] transition-colors duration-200">
+                {story.id}
+              </h3>
+              <p className="text-sm text-[#94a3b8] line-clamp-3 mt-1.5 leading-relaxed">
                 {extractSummary(story.content)}
-              </CardDescription>
-            </CardHeader>
-            <CardFooter>
+              </p>
+            </div>
+            <div className="mt-auto pt-2">
               <TaskCountBadges counts={story.task_counts} />
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </Link>
       ))}
     </div>
