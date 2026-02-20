@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
@@ -15,19 +14,27 @@ interface BoardData {
 }
 
 const COLUMN_COLORS: Record<TaskState, string> = {
-  BACKLOG: "border-t-slate-600",
-  PLANNED: "border-t-neutral-500",
-  ASSIGNED: "border-t-blue-500",
+  BACKLOG: "border-t-slate-500",
+  PLANNED: "border-t-gray-400",
+  ASSIGNED: "border-t-amber-500",
   DONE: "border-t-green-500",
   BLOCKED: "border-t-red-500",
 };
 
 const COLUMN_HEADER_COLORS: Record<TaskState, string> = {
   BACKLOG: "text-slate-400",
-  PLANNED: "text-neutral-400",
-  ASSIGNED: "text-blue-400",
+  PLANNED: "text-gray-400",
+  ASSIGNED: "text-amber-400",
   DONE: "text-green-400",
   BLOCKED: "text-red-400",
+};
+
+const COLUMN_LABELS: Record<TaskState, string> = {
+  BACKLOG: "Backlog",
+  PLANNED: "Planned",
+  ASSIGNED: "Assigned",
+  DONE: "Done",
+  BLOCKED: "Blocked",
 };
 
 /** Assign a deterministic color to each story for visual grouping. */
@@ -96,7 +103,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
             <h3
               className={`text-sm font-semibold uppercase tracking-wider ${COLUMN_HEADER_COLORS[state]}`}
             >
-              {state}
+              {COLUMN_LABELS[state]}
             </h3>
             <Badge variant="secondary" className="text-xs">
               {count}
@@ -105,7 +112,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
 
           {Array.from(grouped.entries()).map(([storyId, storyTasks]) => (
             <div key={storyId} className="space-y-2">
-              <p className="text-xs font-mono text-muted-foreground px-1">
+              <p className="text-xs font-mono text-[#94a3b8] px-1">
                 {storyId}
               </p>
               {storyTasks.map((task) => (
@@ -113,35 +120,33 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
                   key={task.task_id}
                   href={`/tasks/${task.story_id}/${task.task_id}`}
                 >
-                  <Card
-                    className={`border-l-2 transition-colors hover:border-primary/50 cursor-pointer ${getStoryColor(
+                  <div
+                    className={`rounded-xl border border-[#1f2937] bg-[#0b1220] p-3 border-l-2 transition-all duration-200 hover:border-[#ec8522]/50 hover:shadow-lg hover:shadow-[#ec8522]/5 cursor-pointer ${getStoryColor(
                       task.story_id,
                       storyIds
                     )}`}
                   >
-                    <CardHeader className="p-3">
-                      <CardTitle className="font-mono text-xs">
-                        {task.task_id}
-                      </CardTitle>
-                      <CardDescription className="text-xs line-clamp-2 mt-1">
-                        {task.objective.split("\n")[0].slice(0, 80)}
-                        {task.objective.split("\n")[0].length > 80 ? "…" : ""}
-                      </CardDescription>
-                      <div className="mt-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          {task.worker_type}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                  </Card>
+                    <p className="font-mono text-xs font-semibold text-[#e2e8f0]">
+                      {task.task_id}
+                    </p>
+                    <p className="text-xs text-[#94a3b8] line-clamp-2 mt-1">
+                      {task.objective.split("\n")[0].slice(0, 80)}
+                      {task.objective.split("\n")[0].length > 80 ? "…" : ""}
+                    </p>
+                    <div className="mt-2">
+                      <span className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2 py-0.5 text-[10px] font-medium text-[#94a3b8]">
+                        {task.worker_type}
+                      </span>
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
           ))}
 
           {count === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-8">
-              No {state.toLowerCase()} tasks
+            <p className="text-xs text-[#94a3b8] text-center py-8">
+              No {COLUMN_LABELS[state].toLowerCase()} tasks
             </p>
           )}
         </div>

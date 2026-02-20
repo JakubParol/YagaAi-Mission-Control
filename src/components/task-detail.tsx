@@ -1,9 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { StateBadge } from "@/components/state-badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { Task, TaskResult } from "@/lib/types";
@@ -32,32 +29,34 @@ export function TaskDetail({
   return (
     <div>
       {/* Breadcrumbs */}
-      <nav className="mb-6 text-sm text-muted-foreground">
-        <Link href="/" className="hover:text-foreground transition-colors">
+      <nav className="mb-6 text-sm text-[#94a3b8]">
+        <Link href="/" className="hover:text-[#e2e8f0] transition-colors duration-200">
           Stories
         </Link>
-        <span className="mx-2">/</span>
+        <span className="mx-2 text-[#1f2937]">/</span>
         <Link
           href={`/stories/${task.story_id}`}
-          className="hover:text-foreground transition-colors font-mono"
+          className="hover:text-[#e2e8f0] transition-colors duration-200 font-mono"
         >
           {task.story_id}
         </Link>
-        <span className="mx-2">/</span>
-        <span className="text-foreground font-mono">{task.task_id}</span>
+        <span className="mx-2 text-[#1f2937]">/</span>
+        <span className="text-[#e2e8f0] font-mono">{task.task_id}</span>
       </nav>
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold font-mono mb-3">{task.task_id}</h1>
+        <h1 className="text-2xl font-bold font-mono text-[#e2e8f0] mb-3">{task.task_id}</h1>
         <div className="flex items-center gap-3 flex-wrap">
           <StateBadge state={task.state} />
-          <Badge variant="outline">{task.worker_type}</Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2.5 py-0.5 text-xs font-medium text-[#94a3b8]">
+            {task.worker_type}
+          </span>
+          <span className="text-sm text-[#94a3b8]">
             Story:{" "}
             <Link
               href={`/stories/${task.story_id}`}
-              className="hover:text-foreground transition-colors font-mono"
+              className="hover:text-[#e2e8f0] transition-colors duration-200 font-mono"
             >
               {task.story_id}
             </Link>
@@ -66,128 +65,127 @@ export function TaskDetail({
       </div>
 
       {/* Objective */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">
+      <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
+        <div className="px-6 py-4 border-b border-[#1f2937]">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
             Objective
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
+          </h2>
+        </div>
+        <div className="px-6 py-4">
+          <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-[#e2e8f0]">
             {task.objective}
           </pre>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Inputs */}
       {task.inputs && task.inputs.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
+          <div className="px-6 py-4 border-b border-[#1f2937]">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
               Inputs
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h2>
+          </div>
+          <div className="px-6 py-4">
             <dl className="space-y-2">
               {task.inputs.map((input) => (
                 <div key={input.name} className="flex gap-2">
-                  <dt className="font-mono text-sm font-medium min-w-[160px]">
+                  <dt className="font-mono text-sm font-medium min-w-[160px] text-[#e2e8f0]">
                     {input.name}:
                   </dt>
-                  <dd className="text-sm text-muted-foreground">
+                  <dd className="text-sm text-[#94a3b8]">
                     {String(input.value)}
                   </dd>
                 </div>
               ))}
             </dl>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Constraints */}
       {task.constraints?.tools_allowed && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
+          <div className="px-6 py-4 border-b border-[#1f2937]">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
               Constraints
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </h2>
+          </div>
+          <div className="px-6 py-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground">
-                Tools allowed:
-              </span>
+              <span className="text-sm text-[#94a3b8]">Tools allowed:</span>
               {task.constraints.tools_allowed.map((tool) => (
-                <Badge key={tool} variant="secondary" className="font-mono">
+                <span
+                  key={tool}
+                  className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2.5 py-0.5 text-xs font-mono font-medium text-[#94a3b8]"
+                >
                   {tool}
-                </Badge>
+                </span>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Output Requirements */}
       {task.output_requirements && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
+          <div className="px-6 py-4 border-b border-[#1f2937]">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
               Output Requirements
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+            </h2>
+          </div>
+          <div className="px-6 py-4 space-y-3">
             {task.output_requirements.format && (
               <div>
-                <span className="text-sm text-muted-foreground">Format: </span>
-                <Badge variant="outline" className="font-mono">
+                <span className="text-sm text-[#94a3b8]">Format: </span>
+                <span className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2.5 py-0.5 text-xs font-mono font-medium text-[#94a3b8]">
                   {task.output_requirements.format}
-                </Badge>
+                </span>
               </div>
             )}
             {task.output_requirements.success_criteria && (
               <div>
-                <p className="text-sm text-muted-foreground mb-1">
-                  Success Criteria:
-                </p>
-                <pre className="whitespace-pre-wrap text-sm font-mono bg-muted/50 rounded-md p-3">
+                <p className="text-sm text-[#94a3b8] mb-1">Success Criteria:</p>
+                <pre className="whitespace-pre-wrap text-sm font-mono bg-[#020617] rounded-lg p-3 text-[#e2e8f0] border border-[#1f2937]">
                   {task.output_requirements.success_criteria}
                 </pre>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {/* Results */}
       {results && results.files.length > 0 && (
         <>
-          <Separator className="my-8" />
-          <h2 className="text-xl font-semibold mb-4">
+          <div className="border-t border-[#1f2937] my-8" />
+          <h2 className="text-xl font-semibold text-[#e2e8f0] mb-4">
             Results ({results.files.length} files)
           </h2>
           <div className="space-y-4">
             {results.files.map((file) => (
-              <Card key={file.path}>
-                <CardHeader className="py-3">
-                  <CardTitle className="font-mono text-sm">
+              <div key={file.path} className="rounded-xl border border-[#1f2937] bg-[#0b1220]">
+                <div className="px-6 py-3 border-b border-[#1f2937]">
+                  <p className="font-mono text-sm font-semibold text-[#e2e8f0]">
                     {file.path}
-                  </CardTitle>
-                </CardHeader>
+                  </p>
+                </div>
                 {file.content !== null && (
-                  <CardContent>
-                    <pre className="whitespace-pre-wrap text-xs font-mono bg-muted/50 rounded-md p-3 max-h-96 overflow-auto">
+                  <div className="px-6 py-4">
+                    <pre className="whitespace-pre-wrap text-xs font-mono bg-[#020617] rounded-lg p-3 max-h-96 overflow-auto text-[#e2e8f0] border border-[#1f2937]">
                       {file.content}
                     </pre>
-                  </CardContent>
+                  </div>
                 )}
                 {file.content === null && (
-                  <CardContent>
-                    <p className="text-xs text-muted-foreground italic">
+                  <div className="px-6 py-4">
+                    <p className="text-xs text-[#94a3b8] italic">
                       Binary file — preview not available
                     </p>
-                  </CardContent>
+                  </div>
                 )}
-              </Card>
+              </div>
             ))}
           </div>
         </>
