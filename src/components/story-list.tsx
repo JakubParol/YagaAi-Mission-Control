@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { TaskCountBadges } from "@/components/task-count-badges";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
+import { EmptyState } from "./empty-state";
+import { ErrorCard } from "./error-card";
 import type { Story } from "@/lib/types";
 
 /** Extract the first meaningful line from markdown as a summary. */
@@ -22,16 +24,28 @@ function extractSummary(content: string): string {
 }
 
 export function StoryList({ initialData }: { initialData: Story[] }) {
-  const { data: stories } = useAutoRefresh<Story[]>({
+  const { data: stories, error } = useAutoRefresh<Story[]>({
     url: "/api/stories",
     initialData,
   });
 
+  if (error) {
+    return (
+      <ErrorCard
+        title="Connection Error"
+        message={error}
+        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+      />
+    );
+  }
+
   if (stories.length === 0) {
     return (
-      <p className="text-muted-foreground">
-        No stories found. Check that SUPERVISOR_SYSTEM_PATH is configured correctly.
-      </p>
+      <EmptyState
+        icon="📋"
+        title="No stories yet"
+        description="Stories will appear here once they are created in the Supervisor System. Check that SUPERVISOR_SYSTEM_PATH is configured correctly."
+      />
     );
   }
 

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
+import { EmptyState } from "./empty-state";
+import { ErrorCard } from "./error-card";
 import type { Story, Task, TaskState } from "@/lib/types";
 import { TASK_STATES } from "@/lib/types";
 
@@ -44,10 +46,20 @@ function getStoryColor(storyId: string, storyIds: string[]): string {
 }
 
 export function KanbanBoard({ initialData }: { initialData: BoardData }) {
-  const { data } = useAutoRefresh<BoardData>({
+  const { data, error } = useAutoRefresh<BoardData>({
     url: "/api/board",
     initialData,
   });
+
+  if (error) {
+    return (
+      <ErrorCard
+        title="Connection Error"
+        message={error}
+        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+      />
+    );
+  }
 
   const { tasks } = data;
   const storyIds = [...new Set(tasks.map((t) => t.story_id))].sort();
@@ -63,6 +75,16 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
     }
     return { state, grouped, count: stateTasks.length };
   });
+
+  if (tasks.length === 0) {
+    return (
+      <EmptyState
+        icon="📊"
+        title="Board is empty"
+        description="Tasks from all stories will appear here organized by state. Create stories and decompose them into tasks to populate the board."
+      />
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
@@ -119,7 +141,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
 
           {count === 0 && (
             <p className="text-xs text-muted-foreground text-center py-8">
-              No tasks
+              No {state.toLowerCase()} tasks
             </p>
           )}
         </div>

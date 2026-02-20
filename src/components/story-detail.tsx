@@ -7,6 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { StateBadge } from "@/components/state-badge";
+import { EmptyState } from "@/components/empty-state";
+import { ErrorCard } from "@/components/error-card";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { Story, Task } from "@/lib/types";
 
@@ -22,10 +24,20 @@ export function StoryDetail({
   storyId: string;
   initialData: StoryDetailData;
 }) {
-  const { data } = useAutoRefresh<StoryDetailData>({
+  const { data, error } = useAutoRefresh<StoryDetailData>({
     url: `/api/stories/${storyId}`,
     initialData,
   });
+
+  if (error) {
+    return (
+      <ErrorCard
+        title="Connection Error"
+        message={error}
+        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+      />
+    );
+  }
 
   const { story, tasks } = data;
 
@@ -52,7 +64,11 @@ export function StoryDetail({
       </h2>
 
       {tasks.length === 0 ? (
-        <p className="text-muted-foreground">No tasks for this story.</p>
+        <EmptyState
+          icon="✅"
+          title="No tasks for this story"
+          description="Tasks will appear here once they are decomposed from the story. The Supervisor creates tasks in the TASKS/ directory."
+        />
       ) : (
         <div className="space-y-3">
           {tasks.map((task) => (
