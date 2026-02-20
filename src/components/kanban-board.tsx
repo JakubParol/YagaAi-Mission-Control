@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
@@ -37,7 +39,6 @@ const COLUMN_LABELS: Record<TaskState, string> = {
   BLOCKED: "Blocked",
 };
 
-/** Assign a deterministic color to each story for visual grouping. */
 const STORY_COLORS = [
   "border-l-violet-500",
   "border-l-cyan-500",
@@ -47,16 +48,35 @@ const STORY_COLORS = [
   "border-l-sky-500",
 ];
 
-function getStoryColor(storyId: string, storyIds: string[]): string {
-  const idx = storyIds.indexOf(storyId);
-  return STORY_COLORS[idx % STORY_COLORS.length];
-}
-
 export function KanbanBoard({ initialData }: { initialData: BoardData }) {
   const { data, error } = useAutoRefresh<BoardData>({
     url: "/api/board",
     initialData,
   });
+
+  const { tasks } = data;
+
+  // Memoize expensive grouping computations — O(n) Map lookup replaces O(n) indexOf
+  const { storyColorMap, columns } = useMemo(() => {
+    const uniqueStoryIds = [...new Set(tasks.map((t) => t.story_id))].sort();
+    const colorMap = new Map<string, string>();
+    for (let i = 0; i < uniqueStoryIds.length; i++) {
+      colorMap.set(uniqueStoryIds[i], STORY_COLORS[i % STORY_COLORS.length]);
+    }
+
+    const cols = TASK_STATES.map((state) => {
+      const stateTasks = tasks.filter((t) => t.state === state);
+      const grouped = new Map<string, Task[]>();
+      for (const task of stateTasks) {
+        const list = grouped.get(task.story_id) ?? [];
+        list.push(task);
+        grouped.set(task.story_id, list);
+      }
+      return { state, grouped, count: stateTasks.length };
+    });
+
+    return { storyColorMap: colorMap, columns: cols };
+  }, [tasks]);
 
   if (error) {
     return (
@@ -68,25 +88,10 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
     );
   }
 
-  const { tasks } = data;
-  const storyIds = [...new Set(tasks.map((t) => t.story_id))].sort();
-
-  // Group tasks by state, then by story
-  const columns = TASK_STATES.map((state) => {
-    const stateTasks = tasks.filter((t) => t.state === state);
-    const grouped = new Map<string, Task[]>();
-    for (const task of stateTasks) {
-      const list = grouped.get(task.story_id) || [];
-      list.push(task);
-      grouped.set(task.story_id, list);
-    }
-    return { state, grouped, count: stateTasks.length };
-  });
-
   if (tasks.length === 0) {
     return (
       <EmptyState
-        icon="📊"
+        icon="board"
         title="Board is empty"
         description="Tasks from all stories will appear here organized by state. Create stories and decompose them into tasks to populate the board."
       />
@@ -94,50 +99,60 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
+    <div
+      role="region"
+      aria-label="Kanban board"
+      className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5"
+    >
       {columns.map(({ state, grouped, count }) => (
-        <div key={state} className="flex flex-col gap-3">
+        <section key={state} aria-label={`${COLUMN_LABELS[state]} column`} className="flex flex-col gap-3">
           <div
-            className={`flex items-center justify-between border-t-2 pt-3 ${COLUMN_COLORS[state]}`}
+            className={cn(
+              "flex items-center justify-between border-t-2 pt-3",
+              COLUMN_COLORS[state]
+            )}
           >
             <h3
-              className={`text-sm font-semibold uppercase tracking-wider ${COLUMN_HEADER_COLORS[state]}`}
+              className={cn(
+                "text-xs font-semibold uppercase tracking-wider",
+                COLUMN_HEADER_COLORS[state]
+              )}
             >
               {COLUMN_LABELS[state]}
             </h3>
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs tabular-nums">
               {count}
             </Badge>
           </div>
 
           {Array.from(grouped.entries()).map(([storyId, storyTasks]) => (
             <div key={storyId} className="space-y-2">
-              <p className="text-xs font-mono text-[#94a3b8] px-1">
+              <p className="truncate px-1 font-mono text-xs text-muted-foreground">
                 {storyId}
               </p>
               {storyTasks.map((task) => (
                 <Link
                   key={task.task_id}
                   href={`/tasks/${task.story_id}/${task.task_id}`}
+                  aria-label={`Task ${task.task_id}: ${task.objective.split("\n")[0].slice(0, 60)}`}
+                  className={cn(
+                    "focus-ring block rounded-lg border border-border bg-card p-3 border-l-2",
+                    "transition-colors duration-150",
+                    "hover:border-primary/40 hover:bg-white/[0.02]",
+                    storyColorMap.get(task.story_id)
+                  )}
                 >
-                  <div
-                    className={`rounded-xl border border-[#1f2937] bg-[#0b1220] p-3 border-l-2 transition-all duration-200 hover:border-[#ec8522]/50 hover:shadow-lg hover:shadow-[#ec8522]/5 cursor-pointer ${getStoryColor(
-                      task.story_id,
-                      storyIds
-                    )}`}
-                  >
-                    <p className="font-mono text-xs font-semibold text-[#e2e8f0]">
-                      {task.task_id}
-                    </p>
-                    <p className="text-xs text-[#94a3b8] line-clamp-2 mt-1">
-                      {task.objective.split("\n")[0].slice(0, 80)}
-                      {task.objective.split("\n")[0].length > 80 ? "…" : ""}
-                    </p>
-                    <div className="mt-2">
-                      <span className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2 py-0.5 text-[10px] font-medium text-[#94a3b8]">
-                        {task.worker_type}
-                      </span>
-                    </div>
+                  <p className="font-mono text-xs font-semibold text-foreground">
+                    {task.task_id}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {task.objective.split("\n")[0].slice(0, 80)}
+                    {task.objective.split("\n")[0].length > 80 ? "\u2026" : ""}
+                  </p>
+                  <div className="mt-2">
+                    <span className="inline-flex items-center rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {task.worker_type}
+                    </span>
                   </div>
                 </Link>
               ))}
@@ -145,11 +160,11 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
           ))}
 
           {count === 0 && (
-            <p className="text-xs text-[#94a3b8] text-center py-8">
+            <p className="py-8 text-center text-xs text-muted-foreground">
               No {COLUMN_LABELS[state].toLowerCase()} tasks
             </p>
           )}
-        </div>
+        </section>
       ))}
     </div>
   );

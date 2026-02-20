@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface StatCardProps {
   label: string;
@@ -12,25 +13,24 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon: Icon, iconColor, iconBg }: StatCardProps) {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-[#1f2937] bg-[#0b1220] p-4">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${iconBg}`}>
-        <Icon className={`h-5 w-5 ${iconColor}`} />
+    <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
+      <div
+        aria-hidden="true"
+        className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", iconBg)}
+      >
+        <Icon className={cn("h-5 w-5", iconColor)} />
       </div>
       <div className="min-w-0">
-        <p className="text-2xl font-bold text-[#e2e8f0]">{value}</p>
-        <p className="text-xs font-medium text-[#94a3b8] truncate">{label}</p>
+        <p className="text-2xl font-bold tabular-nums text-foreground">{value}</p>
+        <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
       </div>
     </div>
   );
 }
 
-interface StatCardsRowProps {
-  children: React.ReactNode;
-}
-
-export function StatCardsRow({ children }: StatCardsRowProps) {
+export function StatCardsRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 mb-8">
+    <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {children}
     </div>
   );

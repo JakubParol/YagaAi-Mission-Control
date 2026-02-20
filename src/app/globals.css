@@ -84,40 +84,8 @@
   --sidebar-ring: #ec8522;
 }
 
-.dark {
-  --background: #020617;
-  --foreground: #e2e8f0;
-  --card: #0b1220;
-  --card-foreground: #e2e8f0;
-  --popover: #0b1220;
-  --popover-foreground: #e2e8f0;
-  --primary: #ec8522;
-  --primary-foreground: #fff;
-  --secondary: #0f172a;
-  --secondary-foreground: #e2e8f0;
-  --muted: #111827;
-  --muted-foreground: #94a3b8;
-  --accent: rgb(249 115 22 / 15%);
-  --accent-foreground: #fed7aa;
-  --destructive: #ef4444;
-  --destructive-foreground: #fff;
-  --border: #1f2937;
-  --input: #1f2937;
-  --ring: #ec8522;
-  --chart-1: #fb923c;
-  --chart-2: #ec8522;
-  --chart-3: #ea580c;
-  --chart-4: #f59e0b;
-  --chart-5: #fbbf24;
-  --sidebar: rgb(255 255 255 / 3%);
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #ec8522;
-  --sidebar-primary-foreground: #fff;
-  --sidebar-accent: rgb(236 133 34 / 15%);
-  --sidebar-accent-foreground: #fed7aa;
-  --sidebar-border: rgb(255 255 255 / 8%);
-  --sidebar-ring: #ec8522;
-}
+/* Dark-only app — :root above defines all theme values.
+   .dark selector kept empty for shadcn compatibility. */
 
 @layer base {
   * {
@@ -125,5 +93,12 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Focus-visible ring for keyboard navigation */
+@layer utilities {
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, BookOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
 
 interface NavItem {
@@ -30,30 +31,33 @@ export function Sidebar() {
 
   return (
     <aside
-      className={[
-        // Positioning — floating with margin
+      aria-label="Main sidebar"
+      className={cn(
         "fixed inset-y-4 left-4 z-50 hidden w-64 lg:flex",
-        // Flexbox
         "flex-col gap-6",
-        // Glass morphism
-        "bg-slate-900 backdrop-blur-xl",
-        "border border-white/10",
+        "bg-slate-900/95 backdrop-blur-xl",
+        "border border-white/[0.08]",
         "rounded-xl",
         "p-6",
-        // Shadow
-        "shadow-xl shadow-black/40",
-      ].join(" ")}
+        "shadow-xl shadow-black/40"
+      )}
     >
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-2.5 group">
-        <div className="h-2.5 w-2.5 rounded-full bg-[#ec8522] shadow-[0_0_8px_rgba(236,133,34,0.4)] group-hover:shadow-[0_0_12px_rgba(236,133,34,0.6)] transition-shadow duration-300" />
-        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e2e8f0]">
+      <Link
+        href="/"
+        className="focus-ring group flex items-center gap-2.5 rounded-lg"
+      >
+        <div
+          aria-hidden="true"
+          className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(236,133,34,0.4)] transition-shadow duration-300 group-hover:shadow-[0_0_12px_rgba(236,133,34,0.6)]"
+        />
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground">
           Mission Control
         </span>
       </Link>
 
       {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-1" role="navigation" aria-label="Main navigation">
+      <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-1">
         {navItems.map((item) => {
           const active = isActiveRoute(pathname, item);
           const Icon = item.icon;
@@ -62,20 +66,17 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={[
-                // Base
-                "flex items-center gap-3 px-3 py-2.5",
-                "text-sm font-semibold",
-                "rounded-lg",
-                "transition-all duration-200",
-                // Active / Inactive
-                active
-                  ? "bg-[#ec8522]/10 text-[#ec8522] shadow-sm"
-                  : "text-[#94a3b8] hover:bg-slate-800 hover:text-[#e2e8f0]",
-              ].join(" ")}
               aria-current={active ? "page" : undefined}
+              className={cn(
+                "focus-ring flex items-center gap-3 rounded-lg px-3 py-2.5",
+                "text-sm font-medium",
+                "transition-colors duration-150",
+                active
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+              )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
               {item.label}
             </Link>
           );

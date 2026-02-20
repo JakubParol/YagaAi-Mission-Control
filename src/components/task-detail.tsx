@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { StateBadge } from "@/components/state-badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { Task, TaskResult } from "@/lib/types";
@@ -8,6 +9,26 @@ import type { Task, TaskResult } from "@/lib/types";
 interface TaskDetailData {
   task: Task;
   results: TaskResult | null;
+}
+
+/** Reusable card section with a label header */
+function DetailSection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section aria-label={label} className="rounded-lg border border-border bg-card mb-6">
+      <div className="border-b border-border px-5 py-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </h2>
+      </div>
+      <div className="px-5 py-4">{children}</div>
+    </section>
+  );
 }
 
 export function TaskDetail({
@@ -29,34 +50,47 @@ export function TaskDetail({
   return (
     <div>
       {/* Breadcrumbs */}
-      <nav className="mb-6 text-sm text-[#94a3b8]">
-        <Link href="/" className="hover:text-[#e2e8f0] transition-colors duration-200">
-          Stories
-        </Link>
-        <span className="mx-2 text-[#1f2937]">/</span>
-        <Link
-          href={`/stories/${task.story_id}`}
-          className="hover:text-[#e2e8f0] transition-colors duration-200 font-mono"
-        >
-          {task.story_id}
-        </Link>
-        <span className="mx-2 text-[#1f2937]">/</span>
-        <span className="text-[#e2e8f0] font-mono">{task.task_id}</span>
+      <nav aria-label="Breadcrumb" className="mb-6">
+        <ol className="flex items-center gap-1.5 text-sm">
+          <li>
+            <Link
+              href="/"
+              className="focus-ring rounded text-muted-foreground transition-colors duration-150 hover:text-foreground"
+            >
+              Stories
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-muted-foreground/40 select-none">/</li>
+          <li>
+            <Link
+              href={`/stories/${task.story_id}`}
+              className="focus-ring rounded font-mono text-muted-foreground transition-colors duration-150 hover:text-foreground"
+            >
+              {task.story_id}
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-muted-foreground/40 select-none">/</li>
+          <li aria-current="page" className="font-mono text-foreground">
+            {task.task_id}
+          </li>
+        </ol>
       </nav>
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold font-mono text-[#e2e8f0] mb-3">{task.task_id}</h1>
+        <h1 className="text-xl font-bold font-mono text-foreground mb-3">
+          {task.task_id}
+        </h1>
         <div className="flex items-center gap-3 flex-wrap">
           <StateBadge state={task.state} />
-          <span className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2.5 py-0.5 text-xs font-medium text-[#94a3b8]">
+          <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
             {task.worker_type}
           </span>
-          <span className="text-sm text-[#94a3b8]">
+          <span className="text-sm text-muted-foreground">
             Story:{" "}
             <Link
               href={`/stories/${task.story_id}`}
-              className="hover:text-[#e2e8f0] transition-colors duration-200 font-mono"
+              className="focus-ring rounded font-mono transition-colors duration-150 hover:text-foreground"
             >
               {task.story_id}
             </Link>
@@ -65,127 +99,103 @@ export function TaskDetail({
       </div>
 
       {/* Objective */}
-      <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
-        <div className="px-6 py-4 border-b border-[#1f2937]">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
-            Objective
-          </h2>
-        </div>
-        <div className="px-6 py-4">
-          <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-[#e2e8f0]">
-            {task.objective}
-          </pre>
-        </div>
-      </div>
+      <DetailSection label="Objective">
+        <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed text-foreground">
+          {task.objective}
+        </pre>
+      </DetailSection>
 
       {/* Inputs */}
       {task.inputs && task.inputs.length > 0 && (
-        <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
-          <div className="px-6 py-4 border-b border-[#1f2937]">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
-              Inputs
-            </h2>
-          </div>
-          <div className="px-6 py-4">
-            <dl className="space-y-2">
-              {task.inputs.map((input) => (
-                <div key={input.name} className="flex gap-2">
-                  <dt className="font-mono text-sm font-medium min-w-[160px] text-[#e2e8f0]">
-                    {input.name}:
-                  </dt>
-                  <dd className="text-sm text-[#94a3b8]">
-                    {String(input.value)}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
+        <DetailSection label="Inputs">
+          <dl className="space-y-2">
+            {task.inputs.map((input) => (
+              <div key={input.name} className="flex gap-2">
+                <dt className="min-w-[160px] font-mono text-sm font-medium text-foreground">
+                  {input.name}:
+                </dt>
+                <dd className="text-sm text-muted-foreground">
+                  {String(input.value)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </DetailSection>
       )}
 
       {/* Constraints */}
       {task.constraints?.tools_allowed && (
-        <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
-          <div className="px-6 py-4 border-b border-[#1f2937]">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
-              Constraints
-            </h2>
+        <DetailSection label="Constraints">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">Tools allowed:</span>
+            {task.constraints.tools_allowed.map((tool) => (
+              <span
+                key={tool}
+                className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-xs font-mono font-medium text-muted-foreground"
+              >
+                {tool}
+              </span>
+            ))}
           </div>
-          <div className="px-6 py-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-[#94a3b8]">Tools allowed:</span>
-              {task.constraints.tools_allowed.map((tool) => (
-                <span
-                  key={tool}
-                  className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2.5 py-0.5 text-xs font-mono font-medium text-[#94a3b8]"
-                >
-                  {tool}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+        </DetailSection>
       )}
 
       {/* Output Requirements */}
       {task.output_requirements && (
-        <div className="rounded-xl border border-[#1f2937] bg-[#0b1220] mb-6">
-          <div className="px-6 py-4 border-b border-[#1f2937]">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">
-              Output Requirements
-            </h2>
-          </div>
-          <div className="px-6 py-4 space-y-3">
+        <DetailSection label="Output Requirements">
+          <div className="space-y-3">
             {task.output_requirements.format && (
               <div>
-                <span className="text-sm text-[#94a3b8]">Format: </span>
-                <span className="inline-flex items-center rounded-full border border-[#1f2937] bg-[#0f172a] px-2.5 py-0.5 text-xs font-mono font-medium text-[#94a3b8]">
+                <span className="text-sm text-muted-foreground">Format: </span>
+                <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-xs font-mono font-medium text-muted-foreground">
                   {task.output_requirements.format}
                 </span>
               </div>
             )}
             {task.output_requirements.success_criteria && (
               <div>
-                <p className="text-sm text-[#94a3b8] mb-1">Success Criteria:</p>
-                <pre className="whitespace-pre-wrap text-sm font-mono bg-[#020617] rounded-lg p-3 text-[#e2e8f0] border border-[#1f2937]">
+                <p className="mb-1 text-sm text-muted-foreground">Success Criteria:</p>
+                <pre className="whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-sm font-mono text-foreground">
                   {task.output_requirements.success_criteria}
                 </pre>
               </div>
             )}
           </div>
-        </div>
+        </DetailSection>
       )}
 
       {/* Results */}
       {results && results.files.length > 0 && (
         <>
-          <div className="border-t border-[#1f2937] my-8" />
-          <h2 className="text-xl font-semibold text-[#e2e8f0] mb-4">
-            Results ({results.files.length} files)
+          <hr className="border-border my-8" />
+          <h2 className="mb-4 text-lg font-semibold text-foreground">
+            Results
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              ({results.files.length} {results.files.length === 1 ? "file" : "files"})
+            </span>
           </h2>
           <div className="space-y-4">
             {results.files.map((file) => (
-              <div key={file.path} className="rounded-xl border border-[#1f2937] bg-[#0b1220]">
-                <div className="px-6 py-3 border-b border-[#1f2937]">
-                  <p className="font-mono text-sm font-semibold text-[#e2e8f0]">
+              <section key={file.path} aria-label={file.path} className="rounded-lg border border-border bg-card">
+                <div className="border-b border-border px-5 py-3">
+                  <p className="font-mono text-sm font-semibold text-foreground">
                     {file.path}
                   </p>
                 </div>
-                {file.content !== null && (
-                  <div className="px-6 py-4">
-                    <pre className="whitespace-pre-wrap text-xs font-mono bg-[#020617] rounded-lg p-3 max-h-96 overflow-auto text-[#e2e8f0] border border-[#1f2937]">
+                {file.content !== null ? (
+                  <div className="px-5 py-4">
+                    <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-xs font-mono text-foreground">
                       {file.content}
                     </pre>
                   </div>
-                )}
-                {file.content === null && (
-                  <div className="px-6 py-4">
-                    <p className="text-xs text-[#94a3b8] italic">
+                ) : (
+                  <div className="px-5 py-4">
+                    <p className="text-xs italic text-muted-foreground">
                       Binary file — preview not available
                     </p>
                   </div>
                 )}
-              </div>
+              </section>
             ))}
           </div>
         </>

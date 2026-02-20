@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { TaskCountBadges } from "@/components/task-count-badges";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
@@ -14,9 +15,15 @@ function extractSummary(content: string): string {
     const trimmed = line.trim();
     if (!trimmed) continue;
     if (trimmed.startsWith("#")) continue;
-    if (trimmed.startsWith("id:") || trimmed.startsWith("owner:") || trimmed.startsWith("created_at:") || trimmed.startsWith("updated_at:")) continue;
+    if (
+      trimmed.startsWith("id:") ||
+      trimmed.startsWith("owner:") ||
+      trimmed.startsWith("created_at:") ||
+      trimmed.startsWith("updated_at:")
+    )
+      continue;
     if (trimmed.startsWith("---")) continue;
-    return trimmed.length > 200 ? trimmed.slice(0, 200) + "…" : trimmed;
+    return trimmed.length > 200 ? trimmed.slice(0, 200) + "\u2026" : trimmed;
   }
   return "No description";
 }
@@ -26,6 +33,15 @@ export function StoryList({ initialData }: { initialData: Story[] }) {
     url: "/api/stories",
     initialData,
   });
+
+  // Memoize summaries so extractSummary doesn't re-run on every render
+  const summaries = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const story of stories) {
+      map.set(story.id, extractSummary(story.content));
+    }
+    return map;
+  }, [stories]);
 
   if (error) {
     return (
@@ -40,7 +56,7 @@ export function StoryList({ initialData }: { initialData: Story[] }) {
   if (stories.length === 0) {
     return (
       <EmptyState
-        icon="📋"
+        icon="stories"
         title="No stories yet"
         description="Stories will appear here once they are created in the Supervisor System. Check that SUPERVISOR_SYSTEM_PATH is configured correctly."
       />
@@ -48,21 +64,28 @@ export function StoryList({ initialData }: { initialData: Story[] }) {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      role="list"
+      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+    >
       {stories.map((story) => (
-        <Link key={story.id} href={`/stories/${story.id}`}>
-          <div className="group h-full rounded-xl border border-[#1f2937] bg-[#0b1220] p-6 transition-all duration-200 hover:border-[#ec8522]/50 hover:shadow-lg hover:shadow-[#ec8522]/5 cursor-pointer flex flex-col gap-4">
-            <div>
-              <h3 className="font-mono text-base font-semibold text-[#e2e8f0] group-hover:text-[#ec8522] transition-colors duration-200">
-                {story.id}
-              </h3>
-              <p className="text-sm text-[#94a3b8] line-clamp-3 mt-1.5 leading-relaxed">
-                {extractSummary(story.content)}
-              </p>
-            </div>
-            <div className="mt-auto pt-2">
-              <TaskCountBadges counts={story.task_counts} />
-            </div>
+        <Link
+          key={story.id}
+          href={`/stories/${story.id}`}
+          role="listitem"
+          aria-label={`Story ${story.id}`}
+          className="focus-ring group flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-colors duration-150 hover:border-primary/40 hover:bg-white/[0.02]"
+        >
+          <div className="min-w-0">
+            <h3 className="truncate font-mono text-sm font-semibold text-foreground transition-colors duration-150 group-hover:text-primary">
+              {story.id}
+            </h3>
+            <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+              {summaries.get(story.id)}
+            </p>
+          </div>
+          <div className="mt-auto pt-2">
+            <TaskCountBadges counts={story.task_counts} />
           </div>
         </Link>
       ))}
