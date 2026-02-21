@@ -88,6 +88,29 @@ export class LangfuseRepository {
       .all() as ImportRecord[];
   }
 
+  /** Returns the most recent import of any status, or null if none exist. */
+  getLatestImport(): ImportRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM imports
+         ORDER BY started_at DESC
+         LIMIT 1`,
+      )
+      .get() as ImportRecord | undefined;
+    return row ?? null;
+  }
+
+  /** Returns total row counts for metrics and requests tables. */
+  getCounts(): { metrics: number; requests: number } {
+    const metricsRow = this.db
+      .prepare(`SELECT COUNT(*) as count FROM langfuse_daily_metrics`)
+      .get() as { count: number };
+    const requestsRow = this.db
+      .prepare(`SELECT COUNT(*) as count FROM langfuse_requests`)
+      .get() as { count: number };
+    return { metrics: metricsRow.count, requests: requestsRow.count };
+  }
+
   // ─── Daily Metrics ──────────────────────────────────────────────────
 
   /**
@@ -173,46 +196,50 @@ export class LangfuseRepository {
   }
 
   /**
-   * Queries requests with pagination and optional model filter.
+   * Queries requests with pagination, optional model filter, and optional date range.
    * Returns data and total count for pagination metadata.
    */
   getRequests(
     page: number,
     limit: number,
     model?: string,
+    fromDate?: string,
+    toDate?: string,
   ): PaginatedRequests {
     const offset = (page - 1) * limit;
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
 
     if (model) {
-      const data = this.db
-        .prepare(
-          `SELECT * FROM langfuse_requests
-           WHERE model = ?
-           ORDER BY started_at DESC
-           LIMIT ? OFFSET ?`,
-        )
-        .all(model, limit, offset) as LangfuseRequest[];
-
-      const countRow = this.db
-        .prepare(
-          `SELECT COUNT(*) as count FROM langfuse_requests WHERE model = ?`,
-        )
-        .get(model) as { count: number };
-
-      return { data, total: countRow.count };
+      conditions.push("model = ?");
+      params.push(model);
     }
+    if (fromDate) {
+      conditions.push("started_at >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conditions.push("started_at <= ?");
+      params.push(toDate);
+    }
+
+    const where =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const data = this.db
       .prepare(
         `SELECT * FROM langfuse_requests
+         ${where}
          ORDER BY started_at DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(limit, offset) as LangfuseRequest[];
+      .all(...params, limit, offset) as LangfuseRequest[];
 
     const countRow = this.db
-      .prepare(`SELECT COUNT(*) as count FROM langfuse_requests`)
-      .get() as { count: number };
+      .prepare(
+        `SELECT COUNT(*) as count FROM langfuse_requests ${where}`,
+      )
+      .get(...params) as { count: number };
 
     return { data, total: countRow.count };
   }

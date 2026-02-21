@@ -1,48 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LangfuseRepository } from "@/lib/langfuse-import";
+import type { DailyCost, LangfuseModelUsage } from "@/lib/dashboard-types";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const host = process.env.LANGFUSE_HOST;
-  const publicKey = process.env.LANGFUSE_PUBLIC_KEY;
-  const secretKey = process.env.LANGFUSE_SECRET_KEY;
-
-  if (!host || !publicKey || !secretKey) {
-    return NextResponse.json(
-      { error: "Langfuse environment variables not configured" },
-      { status: 500 },
-    );
-  }
-
   const days = Number(request.nextUrl.searchParams.get("days") ?? "7");
   const validDays = [1, 7, 30].includes(days) ? days : 7;
 
-  // Calculate date range
   const now = new Date();
   const fromDate = new Date(now);
   fromDate.setDate(fromDate.getDate() - validDays);
   const fromStr = fromDate.toISOString().split("T")[0];
   const toStr = now.toISOString().split("T")[0];
 
-  const auth = Buffer.from(`${publicKey}:${secretKey}`).toString("base64");
-  const url = `${host}/api/public/metrics/daily?tracesGroupedByName=false&fromTimestamp=${fromStr}T00:00:00Z&toTimestamp=${toStr}T23:59:59Z`;
-
   try {
-    const res = await fetch(url, {
-      headers: { Authorization: `Basic ${auth}` },
-    });
+    const repo = new LangfuseRepository();
+    const metrics = repo.getDailyMetrics(fromStr, toStr);
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error("Langfuse metrics/daily error:", res.status, text);
-      return NextResponse.json(
-        { error: `Langfuse API error: ${res.status}` },
-        { status: 502 },
-      );
+    // Group DailyMetric[] (one row per date+model) into DailyCost[] (one row per date)
+    const dateMap = new Map<string, DailyCost>();
+
+    for (const m of metrics) {
+      let entry = dateMap.get(m.date);
+      if (!entry) {
+        entry = {
+          date: m.date,
+          totalCost: 0,
+          countObservations: 0,
+          usage: [],
+        };
+        dateMap.set(m.date, entry);
+      }
+
+      entry.totalCost += m.total_cost;
+      entry.countObservations += m.request_count;
+
+      const usage: LangfuseModelUsage = {
+        model: m.model,
+        inputUsage: m.input_tokens,
+        outputUsage: m.output_tokens,
+        totalUsage: m.total_tokens,
+        totalCost: m.total_cost,
+        countObservations: m.request_count,
+      };
+      entry.usage.push(usage);
     }
 
-    const json = await res.json();
-    return NextResponse.json({ daily: json.data ?? [] });
+    const daily = Array.from(dateMap.values()).sort(
+      (a, b) => a.date.localeCompare(b.date),
+    );
+
+    return NextResponse.json({ daily });
   } catch (err) {
     console.error("GET /api/dashboard/costs failed:", err);
     return NextResponse.json(
