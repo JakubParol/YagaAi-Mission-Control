@@ -15,8 +15,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/board", label: "Board", icon: LayoutDashboard },
   { href: "/dashboard", label: "Dashboard", icon: Activity },
+  { href: "/board", label: "Board", icon: LayoutDashboard },
   { href: "/", label: "Stories", icon: BookOpen, matchPaths: ["/stories"] },
 ];
 
