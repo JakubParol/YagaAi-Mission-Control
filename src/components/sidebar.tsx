@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, BookOpen } from "lucide-react";
+import { LayoutDashboard, Activity, BookOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
@@ -16,6 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/board", label: "Board", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: Activity },
   { href: "/", label: "Stories", icon: BookOpen, matchPaths: ["/stories"] },
 ];
 

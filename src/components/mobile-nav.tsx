@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, BookOpen } from "lucide-react";
+import { Menu, X, LayoutDashboard, Activity, BookOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
@@ -17,6 +17,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/board", label: "Board", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: Activity },
   { href: "/", label: "Stories", icon: BookOpen },
 ];
 
