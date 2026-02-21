@@ -64,3 +64,18 @@ export interface LLMRequestsResponse {
     totalPages: number;
   };
 }
+
+export interface ImportStatusInfo {
+  lastImport: {
+    id: number;
+    started_at: string;
+    finished_at: string | null;
+    mode: string;
+    from_timestamp: string | null;
+    to_timestamp: string;
+    status: "running" | "success" | "failed";
+    error_message: string | null;
+  } | null;
+  lastStatus: "running" | "success" | "failed" | null;
+  counts: { metrics: number; requests: number };
+}

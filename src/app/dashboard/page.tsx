@@ -5,6 +5,7 @@ import { LangfuseRepository } from "@/lib/langfuse-import";
 import type {
   CostMetrics,
   LLMRequestsResponse,
+  ImportStatusInfo,
   DailyCost,
   LangfuseModelUsage,
   LLMRequest,
@@ -56,6 +57,21 @@ function getCosts(): CostMetrics {
   }
 }
 
+function getImportStatus(): ImportStatusInfo {
+  try {
+    const repo = new LangfuseRepository();
+    const lastImport = repo.getLatestImport();
+    const counts = repo.getCounts();
+    return {
+      lastImport,
+      lastStatus: lastImport?.status ?? null,
+      counts,
+    };
+  } catch {
+    return { lastImport: null, lastStatus: null, counts: { metrics: 0, requests: 0 } };
+  }
+}
+
 function getRequests(): LLMRequestsResponse {
   const empty: LLMRequestsResponse = {
     data: [],
@@ -96,26 +112,19 @@ function getRequests(): LLMRequestsResponse {
 }
 
 export default async function DashboardPage() {
-  const [agents, costs, requests] = await Promise.all([
+  const [agents, costs, requests, importStatus] = await Promise.all([
     getAgentStatuses(),
     Promise.resolve(getCosts()),
     Promise.resolve(getRequests()),
+    Promise.resolve(getImportStatus()),
   ]);
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="mb-1 text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Agent status, LLM costs, and recent requests
-        </p>
-      </div>
-
-      <Dashboard
-        initialAgents={agents}
-        initialCosts={costs}
-        initialRequests={requests}
-      />
-    </>
+    <Dashboard
+      initialAgents={agents}
+      initialCosts={costs}
+      initialRequests={requests}
+      initialImportStatus={importStatus}
+    />
   );
 }

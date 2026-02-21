@@ -1,3 +1,4 @@
+import type React from "react";
 import { BookOpen, LayoutDashboard, ListTodo, Inbox } from "lucide-react";
 
 const ICON_MAP = {
@@ -13,9 +14,10 @@ interface EmptyStateProps {
   icon: IconKey | (string & {});
   title: string;
   description: string;
+  children?: React.ReactNode;
 }
 
-export function EmptyState({ icon, title, description }: EmptyStateProps) {
+export function EmptyState({ icon, title, description, children }: EmptyStateProps) {
   const Icon = ICON_MAP[icon as IconKey] ?? ICON_MAP.default;
 
   return (
@@ -30,6 +32,7 @@ export function EmptyState({ icon, title, description }: EmptyStateProps) {
       <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
         {description}
       </p>
+      {children && <div className="mt-6">{children}</div>}
     </div>
   );
 }
