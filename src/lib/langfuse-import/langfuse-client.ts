@@ -18,6 +18,44 @@ interface LangfuseClientConfig {
 /** Maximum observations per page (Langfuse default max is 100). */
 const OBSERVATIONS_PAGE_SIZE = 100;
 
+/** Maximum retry attempts for rate-limited (429) requests. */
+const MAX_RETRIES = 3;
+
+/** Base delay in ms for exponential backoff (1s, 2s, 4s). */
+const BASE_RETRY_DELAY_MS = 1000;
+
+/**
+ * Fetches a URL with retry logic for 429 (rate-limited) responses.
+ * Uses the Retry-After header if present, otherwise exponential backoff.
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  label: string,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(url, init);
+
+    if (res.status !== 429 || attempt === MAX_RETRIES) {
+      return res;
+    }
+
+    const retryAfter = res.headers.get("Retry-After");
+    const delayMs = retryAfter
+      ? Number(retryAfter) * 1000
+      : BASE_RETRY_DELAY_MS * 2 ** attempt;
+
+    console.log(
+      `[Langfuse] ${label} returned 429, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  // Unreachable, but satisfies TypeScript
+  throw new Error(`[Langfuse] ${label} exceeded max retries`);
+}
+
 export class LangfuseClient {
   private config: LangfuseClientConfig;
   private authHeader: string;
@@ -38,7 +76,8 @@ export class LangfuseClient {
   }
 
   /**
-   * Fetches daily metrics from Langfuse for the given date range.
+   * Fetches daily metrics from Langfuse for the given date range
+   * using the v1 Metrics API (/api/public/metrics).
    * @param from - Start date (ISO date string, e.g. "2026-01-01")
    * @param to - End date (ISO date string, e.g. "2026-02-21")
    */
@@ -46,22 +85,35 @@ export class LangfuseClient {
     from: string,
     to: string,
   ): Promise<LangfuseApiDailyData[]> {
-    const url = new URL(
-      "/api/public/metrics/daily",
-      this.config.host,
-    );
-    url.searchParams.set("tracesGroupedByName", "false");
-    url.searchParams.set("fromTimestamp", `${from}T00:00:00Z`);
-    url.searchParams.set("toTimestamp", `${to}T23:59:59Z`);
+    const query = {
+      view: "observations",
+      metrics: [
+        { measure: "totalCost", aggregation: "sum" },
+        { measure: "inputTokens", aggregation: "sum" },
+        { measure: "outputTokens", aggregation: "sum" },
+        { measure: "totalTokens", aggregation: "sum" },
+        { measure: "count", aggregation: "count" },
+      ],
+      dimensions: [{ field: "providedModelName" }],
+      timeDimension: { granularity: "day" },
+      fromTimestamp: `${from}T00:00:00Z`,
+      toTimestamp: `${to}T23:59:59Z`,
+      filters: [],
+    };
 
-    const res = await fetch(url.toString(), {
-      headers: { Authorization: this.authHeader },
-    });
+    const url = new URL("/api/public/metrics", this.config.host);
+    url.searchParams.set("query", JSON.stringify(query));
+
+    const res = await fetchWithRetry(
+      url.toString(),
+      { headers: { Authorization: this.authHeader } },
+      "metrics",
+    );
 
     if (!res.ok) {
       const text = await res.text();
       throw new Error(
-        `Langfuse metrics/daily failed (${res.status}): ${text}`,
+        `Langfuse metrics failed (${res.status}): ${text}`,
       );
     }
 
@@ -93,9 +145,11 @@ export class LangfuseClient {
       }
 
       const url = `${this.config.host}/api/public/observations?${params}`;
-      const res = await fetch(url, {
-        headers: { Authorization: this.authHeader },
-      });
+      const res = await fetchWithRetry(
+        url,
+        { headers: { Authorization: this.authHeader } },
+        `observations (page ${page})`,
+      );
 
       if (!res.ok) {
         const text = await res.text();
