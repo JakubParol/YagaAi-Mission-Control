@@ -4,7 +4,7 @@
 import "server-only";
 
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import yaml from "js-yaml";
 
 import { STORIES_PATH } from "./config";
@@ -36,7 +36,7 @@ export async function listTasksForStory(storyId: string): Promise<Task[]> {
     );
 
     for (const task of parsed) {
-      if (task) tasks.push(task);
+      tasks.push(task);
     }
   }
 
@@ -76,19 +76,49 @@ export async function getTask(
 }
 
 /**
+ * Build a placeholder Task for files that failed to parse or validate.
+ */
+function errorTask(
+  filePath: string,
+  state: TaskState,
+  storyId: string,
+  error: string
+): Task {
+  const filename = basename(filePath, ".yaml").replace(/\.yml$/, "");
+  return {
+    task_id: filename || "unknown",
+    objective: "",
+    worker_type: "unknown",
+    state,
+    story_id: storyId,
+    parseError: error,
+  };
+}
+
+/**
  * Parse a single task YAML file into a Task object.
+ * On failure, logs a warning and returns a placeholder with parseError set
+ * so the UI can display an error badge instead of silently hiding the task.
  */
 async function parseTaskFile(
   filePath: string,
   state: TaskState,
   storyId: string
-): Promise<Task | null> {
+): Promise<Task> {
   try {
     const raw = await readFile(filePath, "utf-8");
     const data = yaml.load(raw) as Record<string, unknown>;
 
-    if (!data || typeof data !== "object" || !data.task_id) {
-      return null;
+    if (!data || typeof data !== "object") {
+      const msg = "YAML parsed to non-object value";
+      console.warn(`[parseTaskFile] ${basename(filePath)}: ${msg}`);
+      return errorTask(filePath, state, storyId, msg);
+    }
+
+    if (!data.task_id) {
+      const msg = "Missing required field: task_id";
+      console.warn(`[parseTaskFile] ${basename(filePath)}: ${msg}`);
+      return errorTask(filePath, state, storyId, msg);
     }
 
     return {
@@ -101,7 +131,10 @@ async function parseTaskFile(
       state,
       story_id: storyId,
     };
-  } catch {
-    return null;
+  } catch (err: unknown) {
+    const msg =
+      err instanceof Error ? err.message : "Unknown parse error";
+    console.warn(`[parseTaskFile] ${basename(filePath)}: ${msg}`);
+    return errorTask(filePath, state, storyId, msg);
   }
 }

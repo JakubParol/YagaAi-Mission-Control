@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
+import { ParseErrorBadge } from "./state-badge";
 import type { Story, Task, TaskState } from "@/lib/types";
 import { TASK_STATES } from "@/lib/types";
 
@@ -134,26 +135,35 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
                 <Link
                   key={task.task_id}
                   href={`/tasks/${task.story_id}/${task.task_id}`}
-                  aria-label={`Task ${task.task_id}: ${task.objective.split("\n")[0].slice(0, 60)}`}
+                  aria-label={`Task ${task.task_id}: ${task.parseError ? "Parse error" : task.objective.split("\n")[0].slice(0, 60)}`}
                   className={cn(
                     "focus-ring block rounded-lg border border-border bg-card p-3 border-l-2",
                     "transition-colors duration-150",
                     "hover:border-primary/40 hover:bg-white/[0.02]",
+                    task.parseError && "border-red-500/30",
                     storyColorMap.get(task.story_id)
                   )}
                 >
                   <p className="font-mono text-xs font-semibold text-foreground">
                     {task.task_id}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                    {task.objective.split("\n")[0].slice(0, 80)}
-                    {task.objective.split("\n")[0].length > 80 ? "\u2026" : ""}
-                  </p>
-                  <div className="mt-2">
-                    <span className="inline-flex items-center rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {task.worker_type}
-                    </span>
-                  </div>
+                  {task.parseError ? (
+                    <div className="mt-1">
+                      <ParseErrorBadge error={task.parseError} />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                        {task.objective.split("\n")[0].slice(0, 80)}
+                        {task.objective.split("\n")[0].length > 80 ? "\u2026" : ""}
+                      </p>
+                      <div className="mt-2">
+                        <span className="inline-flex items-center rounded-md border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {task.worker_type}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </Link>
               ))}
             </div>

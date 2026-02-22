@@ -44,6 +44,8 @@ export interface Task {
   state: TaskState;
   /** Runtime: which story this task belongs to. */
   story_id: string;
+  /** Set when the task YAML failed to parse or validate. */
+  parseError?: string;
 }
 
 /** A story, parsed from STORIES/<id>/STORY.md plus metadata. */

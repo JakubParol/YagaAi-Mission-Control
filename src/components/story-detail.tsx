@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ListTodo, Archive, Clock, UserCheck, CheckCircle, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StateBadge } from "@/components/state-badge";
+import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorCard } from "@/components/error-card";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
@@ -109,11 +109,12 @@ export function StoryDetail({
               key={task.task_id}
               href={`/tasks/${task.story_id}/${task.task_id}`}
               role="listitem"
-              aria-label={`Task ${task.task_id}, state: ${task.state}`}
+              aria-label={`Task ${task.task_id}, state: ${task.state}${task.parseError ? ", parse error" : ""}`}
               className={cn(
                 "focus-ring block rounded-lg border border-border bg-card p-4",
                 "transition-colors duration-150",
-                "hover:border-primary/40 hover:bg-white/[0.02]"
+                "hover:border-primary/40 hover:bg-white/[0.02]",
+                task.parseError && "border-red-500/30"
               )}
             >
               <div className="flex items-center gap-3 flex-wrap">
@@ -121,13 +122,23 @@ export function StoryDetail({
                   {task.task_id}
                 </span>
                 <StateBadge state={task.state} />
-                <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  {task.worker_type}
-                </span>
+                {task.parseError ? (
+                  <ParseErrorBadge error={task.parseError} />
+                ) : (
+                  <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    {task.worker_type}
+                  </span>
+                )}
               </div>
-              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                {task.objective.split("\n")[0]}
-              </p>
+              {task.parseError ? (
+                <p className="mt-2 line-clamp-2 text-sm text-red-400/80">
+                  {task.parseError}
+                </p>
+              ) : (
+                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                  {task.objective.split("\n")[0]}
+                </p>
+              )}
             </Link>
           ))}
         </div>
