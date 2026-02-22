@@ -114,32 +114,21 @@ export class LangfuseImportService {
   }
 
   /**
-   * Transforms raw Langfuse daily metrics API data into flat DailyMetric rows.
-   * Each day may have multiple models, each becoming its own row.
+   * Transforms raw Langfuse v1 Metrics API data into flat DailyMetric rows.
+   * Each row in the API response is already one (date, model) combination.
    */
   private transformDailyMetrics(
     raw: LangfuseApiDailyData[],
   ): DailyMetric[] {
-    const metrics: DailyMetric[] = [];
-
-    for (const day of raw) {
-      // Extract just the date part (YYYY-MM-DD)
-      const date = day.date.split("T")[0];
-
-      for (const usage of day.usage ?? []) {
-        metrics.push({
-          date,
-          model: usage.model ?? "unknown",
-          input_tokens: usage.inputUsage ?? 0,
-          output_tokens: usage.outputUsage ?? 0,
-          total_tokens: usage.totalUsage ?? 0,
-          request_count: usage.countObservations ?? 0,
-          total_cost: usage.totalCost ?? 0,
-        });
-      }
-    }
-
-    return metrics;
+    return raw.map((row) => ({
+      date: row.time_dimension.split("T")[0],
+      model: row.providedModelName ?? "unknown",
+      input_tokens: Number(row.sum_inputTokens) || 0,
+      output_tokens: Number(row.sum_outputTokens) || 0,
+      total_tokens: Number(row.sum_totalTokens) || 0,
+      request_count: Number(row.count_count) || 0,
+      total_cost: row.sum_totalCost ?? 0,
+    }));
   }
 
   /**

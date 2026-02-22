@@ -52,20 +52,15 @@ export interface PaginatedRequests {
   total: number;
 }
 
-/** Result shape from the Langfuse /api/public/metrics/daily endpoint. */
+/** Result shape from the Langfuse /api/public/metrics endpoint (v1 Metrics API). */
 export interface LangfuseApiDailyData {
-  date: string;
-  countTraces: number;
-  countObservations: number;
-  totalCost: number;
-  usage: Array<{
-    model: string;
-    inputUsage: number;
-    outputUsage: number;
-    totalUsage: number;
-    totalCost: number;
-    countObservations: number;
-  }>;
+  providedModelName: string;
+  time_dimension: string;
+  sum_totalCost: number;
+  sum_inputTokens: string;
+  sum_outputTokens: string;
+  sum_totalTokens: string;
+  count_count: string;
 }
 
 /** Result shape from the Langfuse /api/public/observations endpoint. */
