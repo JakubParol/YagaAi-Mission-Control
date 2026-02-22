@@ -15,8 +15,8 @@ interface LangfuseClientConfig {
   secretKey: string;
 }
 
-/** Maximum observations per page (Langfuse default max is 100). */
-const OBSERVATIONS_PAGE_SIZE = 100;
+/** Maximum observations per page (v2 API supports up to 1000). */
+const OBSERVATIONS_PAGE_SIZE = 1000;
 
 /** Maximum retry attempts for rate-limited (429) requests. */
 const MAX_RETRIES = 3;
@@ -122,33 +122,38 @@ export class LangfuseClient {
   }
 
   /**
-   * Fetches all GENERATION observations from Langfuse, paginating through all pages.
-   * Optionally filters by fromTimestamp for incremental imports.
+   * Fetches all GENERATION observations from Langfuse using the v2 cursor-based API.
+   * Requests only core, basic, usage, and model fields to avoid fetching full input/output JSON.
+   * Optionally filters by fromStartTime for incremental imports.
    *
-   * @param fromTimestamp - If provided, only fetch observations updated after this ISO timestamp.
+   * @param fromTimestamp - If provided, only fetch observations after this ISO timestamp.
    */
   async fetchAllObservations(
     fromTimestamp?: string,
   ): Promise<LangfuseApiObservation[]> {
     const allObservations: LangfuseApiObservation[] = [];
-    let page = 1;
-    let hasMore = true;
+    let cursor: string | null = null;
+    let pageNum = 0;
 
-    while (hasMore) {
+    for (;;) {
       const params = new URLSearchParams({
         type: "GENERATION",
         limit: String(OBSERVATIONS_PAGE_SIZE),
-        page: String(page),
+        fields: "core,basic,usage,model",
       });
       if (fromTimestamp) {
         params.set("fromStartTime", fromTimestamp);
       }
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
 
-      const url = `${this.config.host}/api/public/observations?${params}`;
+      pageNum++;
+      const url = `${this.config.host}/api/public/v2/observations?${params}`;
       const res = await fetchWithRetry(
         url,
         { headers: { Authorization: this.authHeader } },
-        `observations (page ${page})`,
+        `observations (page ${pageNum})`,
       );
 
       if (!res.ok) {
@@ -162,14 +167,11 @@ export class LangfuseClient {
       const data = (json.data ?? []) as LangfuseApiObservation[];
       allObservations.push(...data);
 
-      const meta = json.meta as
-        | { page: number; totalPages: number }
-        | undefined;
-      if (!meta || page >= meta.totalPages || data.length === 0) {
-        hasMore = false;
-      } else {
-        page++;
+      const meta = json.meta as { cursor: string | null } | undefined;
+      if (!meta?.cursor || data.length === 0) {
+        break;
       }
+      cursor = meta.cursor;
     }
 
     return allObservations;
