@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { StateBadge } from "@/components/state-badge";
+import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { Task, TaskResult } from "@/lib/types";
 
@@ -83,6 +83,7 @@ export function TaskDetail({
         </h1>
         <div className="flex items-center gap-3 flex-wrap">
           <StateBadge state={task.state} />
+          {task.parseError && <ParseErrorBadge error={task.parseError} />}
           <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
             {task.worker_type}
           </span>
@@ -97,6 +98,16 @@ export function TaskDetail({
           </span>
         </div>
       </div>
+
+      {/* Parse Error */}
+      {task.parseError && (
+        <DetailSection label="Parse Error">
+          <p className="text-sm text-red-400">{task.parseError}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            This task file could not be parsed. Fix the YAML source to resolve this error.
+          </p>
+        </DetailSection>
+      )}
 
       {/* Objective */}
       <DetailSection label="Objective">

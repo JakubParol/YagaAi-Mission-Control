@@ -63,7 +63,7 @@ export interface LangfuseApiDailyData {
   count_count: string;
 }
 
-/** Result shape from the Langfuse /api/public/observations endpoint. */
+/** Result shape from the Langfuse /api/public/v2/observations endpoint. */
 export interface LangfuseApiObservation {
   id: string;
   traceId: string | null;
@@ -71,12 +71,9 @@ export interface LangfuseApiObservation {
   model: string | null;
   startTime: string | null;
   endTime: string | null;
-  completionStartTime: string | null;
-  usage: {
-    input?: number;
-    output?: number;
-    total?: number;
-  } | null;
-  calculatedTotalCost: number | null;
-  metadata: Record<string, unknown> | null;
+  inputUsage: number | null;
+  outputUsage: number | null;
+  totalUsage: number | null;
+  totalCost: number | null;
+  latency: number | null;
 }

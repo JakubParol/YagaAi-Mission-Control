@@ -132,18 +132,16 @@ export class LangfuseImportService {
   }
 
   /**
-   * Transforms raw Langfuse observation API data into LangfuseRequest rows.
+   * Transforms raw Langfuse v2 observation API data into LangfuseRequest rows.
    */
   private transformObservations(
     raw: LangfuseApiObservation[],
   ): LangfuseRequest[] {
     return raw.map((obs) => {
-      const inputTokens = obs.usage?.input ?? 0;
-      const outputTokens = obs.usage?.output ?? 0;
-      const totalTokens = obs.usage?.total ?? 0;
-
       let latencyMs: number | null = null;
-      if (obs.startTime && obs.endTime) {
+      if (obs.latency != null) {
+        latencyMs = Math.round(obs.latency * 1000);
+      } else if (obs.startTime && obs.endTime) {
         latencyMs =
           new Date(obs.endTime).getTime() -
           new Date(obs.startTime).getTime();
@@ -156,10 +154,10 @@ export class LangfuseImportService {
         model: obs.model ?? null,
         started_at: obs.startTime ?? null,
         finished_at: obs.endTime ?? null,
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        total_tokens: totalTokens,
-        cost: obs.calculatedTotalCost ?? null,
+        input_tokens: obs.inputUsage ?? 0,
+        output_tokens: obs.outputUsage ?? 0,
+        total_tokens: obs.totalUsage ?? 0,
+        cost: obs.totalCost ?? null,
         latency_ms: latencyMs,
       };
     });

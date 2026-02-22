@@ -29,3 +29,18 @@ export function StateBadge({ state }: { state: TaskState }) {
     </span>
   );
 }
+
+/**
+ * Badge shown on tasks that failed to parse.
+ * Displays a red "Parse Error" pill with the error message as a tooltip.
+ */
+export function ParseErrorBadge({ error }: { error: string }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-400"
+      title={error}
+    >
+      ⚠ Parse Error
+    </span>
+  );
+}
