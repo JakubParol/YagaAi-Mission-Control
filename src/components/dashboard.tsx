@@ -481,6 +481,25 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t border-border bg-card/50">
+                <td className="px-4 py-3 text-xs font-semibold text-foreground">
+                  Total
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
+                  {models.reduce((s, m) => s + m.countObservations, 0)}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
+                  {formatTokens(models.reduce((s, m) => s + m.inputTokens, 0))}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
+                  {formatTokens(models.reduce((s, m) => s + m.outputTokens, 0))}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
+                  {formatUSD(models.reduce((s, m) => s + m.totalCost, 0))}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
