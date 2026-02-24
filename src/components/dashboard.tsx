@@ -229,7 +229,8 @@ function mapUsage(u: LangfuseModelUsage): ModelUsage {
   };
 }
 
-function aggregateCosts(daily: DailyCost[]) {
+/** Compute stat card values — always based on today/yesterday regardless of filter. */
+function aggregateStatCards(daily: DailyCost[]) {
   const now = new Date();
   const today = toDateStr(now);
   const yesterdayDate = new Date(now);
@@ -239,16 +240,9 @@ function aggregateCosts(daily: DailyCost[]) {
   let todaySpend = 0;
   let yesterdaySpend = 0;
   let todayRequests = 0;
-  let totalCost = 0;
-  let totalRequests = 0;
-
-  const modelMap = new Map<string, ModelUsage>();
 
   for (const day of daily) {
     const date = day.date?.split("T")[0];
-    totalCost += day.totalCost ?? 0;
-    totalRequests += day.countObservations ?? 0;
-
     if (date === today) {
       todaySpend += day.totalCost ?? 0;
       todayRequests += day.countObservations ?? 0;
@@ -256,7 +250,17 @@ function aggregateCosts(daily: DailyCost[]) {
     if (date === yesterday) {
       yesterdaySpend += day.totalCost ?? 0;
     }
+  }
 
+  const avgCost = todayRequests > 0 ? todaySpend / todayRequests : 0;
+  return { todaySpend, yesterdaySpend, todayRequests, avgCost };
+}
+
+/** Aggregate per-model breakdown from filtered daily data. */
+function aggregateModels(daily: DailyCost[]): ModelUsage[] {
+  const modelMap = new Map<string, ModelUsage>();
+
+  for (const day of daily) {
     for (const u of day.usage ?? []) {
       const existing = modelMap.get(u.model);
       if (existing) {
@@ -270,12 +274,9 @@ function aggregateCosts(daily: DailyCost[]) {
     }
   }
 
-  const avgCost = totalRequests > 0 ? totalCost / totalRequests : 0;
-  const models = Array.from(modelMap.values()).sort(
+  return Array.from(modelMap.values()).sort(
     (a, b) => b.totalCost - a.totalCost,
   );
-
-  return { todaySpend, yesterdaySpend, todayRequests, avgCost, models };
 }
 
 function CostsSection({ initialData }: { initialData: CostMetrics }) {
@@ -291,8 +292,17 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
     initialData,
   });
 
-  const { todaySpend, yesterdaySpend, todayRequests, avgCost, models } =
-    useMemo(() => aggregateCosts(costs.daily), [costs.daily]);
+  // Stat cards always use the initial 7-day data (includes today + yesterday)
+  const { todaySpend, yesterdaySpend, todayRequests, avgCost } = useMemo(
+    () => aggregateStatCards(initialData.daily),
+    [initialData.daily],
+  );
+
+  // Model breakdown responds to the active date filter
+  const models = useMemo(
+    () => aggregateModels(costs.daily),
+    [costs.daily],
+  );
 
   const handlePresetClick = (key: string) => {
     setActiveFilter(key);
