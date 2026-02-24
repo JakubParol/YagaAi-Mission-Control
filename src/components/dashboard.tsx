@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   DollarSign,
   Hash,
@@ -640,14 +640,14 @@ function RequestsSection({
     initialData,
   });
 
-  // Extract unique models from current data for filter dropdown
-  const models = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of response.data) {
-      if (r.model) set.add(r.model);
-    }
-    return Array.from(set).sort();
-  }, [response.data]);
+  // Fetch all distinct models from the full dataset (not just current page)
+  const [models, setModels] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/dashboard/requests/models")
+      .then((res) => res.json())
+      .then((data) => setModels(data.models ?? []))
+      .catch(() => {});
+  }, []);
 
   return (
     <section aria-label="Recent LLM requests">
