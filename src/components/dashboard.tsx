@@ -14,12 +14,22 @@ import {
   Clock,
   Database,
   CalendarRange,
+  CalendarDays,
+  X,
 } from "lucide-react";
+import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { EmptyState } from "@/components/empty-state";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
+import type { DateRange } from "react-day-picker";
 import type {
   AgentStatus,
   CostMetrics,
@@ -150,10 +160,61 @@ function AgentsSection({ initialData }: { initialData: AgentStatus[] }) {
 // ---------------------------------------------------------------------------
 
 const TIME_RANGES = [
-  { label: "Today", days: 1 },
-  { label: "7 Days", days: 7 },
-  { label: "30 Days", days: 30 },
+  { label: "Today", key: "today" },
+  { label: "Yesterday", key: "yesterday" },
+  { label: "7 Days", key: "7d" },
+  { label: "30 Days", key: "30d" },
 ] as const;
+
+function toDateStr(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
+function buildCostUrl(
+  activeFilter: string,
+  customRange?: DateRange,
+): string {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  let from: string;
+  let to: string;
+
+  if (activeFilter === "custom" && customRange?.from) {
+    from = toDateStr(customRange.from);
+    to = toDateStr(customRange.to ?? customRange.from);
+  } else {
+    switch (activeFilter) {
+      case "today":
+        // Match existing days=1 behavior (yesterday through today)
+        from = toDateStr(yesterday);
+        to = toDateStr(today);
+        break;
+      case "yesterday":
+        from = toDateStr(yesterday);
+        to = toDateStr(yesterday);
+        break;
+      case "30d": {
+        const d = new Date(today);
+        d.setDate(d.getDate() - 30);
+        from = toDateStr(d);
+        to = toDateStr(today);
+        break;
+      }
+      default: {
+        // "7d"
+        const d = new Date(today);
+        d.setDate(d.getDate() - 7);
+        from = toDateStr(d);
+        to = toDateStr(today);
+        break;
+      }
+    }
+  }
+
+  return `/api/dashboard/costs?from=${from}&to=${to}`;
+}
 
 function mapUsage(u: LangfuseModelUsage): ModelUsage {
   return {
@@ -212,10 +273,14 @@ function aggregateCosts(daily: DailyCost[]) {
 }
 
 function CostsSection({ initialData }: { initialData: CostMetrics }) {
-  const [days, setDays] = useState<1 | 7 | 30>(7);
+  const [activeFilter, setActiveFilter] = useState<string>("7d");
+  const [customRange, setCustomRange] = useState<DateRange | undefined>();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const url = buildCostUrl(activeFilter, customRange);
 
   const { data: costs } = useAutoRefresh<CostMetrics>({
-    url: `/api/dashboard/costs?days=${days}`,
+    url,
     interval: 30000,
     initialData,
   });
@@ -223,26 +288,101 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
   const { todaySpend, yesterdaySpend, todayRequests, avgCost, models } =
     useMemo(() => aggregateCosts(costs.daily), [costs.daily]);
 
+  const handlePresetClick = (key: string) => {
+    setActiveFilter(key);
+    setCustomRange(undefined);
+  };
+
+  const handleCalendarSelect = (range: DateRange | undefined) => {
+    setCustomRange(range);
+    if (range?.from) {
+      setActiveFilter("custom");
+    }
+  };
+
+  const handleClearCustom = () => {
+    setCustomRange(undefined);
+    setActiveFilter("7d");
+    setCalendarOpen(false);
+  };
+
+  const customRangeLabel = customRange?.from
+    ? customRange.to &&
+      customRange.to.getTime() !== customRange.from.getTime()
+      ? `${format(customRange.from, "MMM d")} – ${format(customRange.to, "MMM d")}`
+      : format(customRange.from, "MMM d, yyyy")
+    : null;
+
   return (
     <section aria-label="LLM costs">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-foreground">LLM Costs</h2>
-        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-          {TIME_RANGES.map((range) => (
-            <button
-              key={range.days}
-              type="button"
-              onClick={() => setDays(range.days as 1 | 7 | 30)}
-              className={cn(
-                "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                days === range.days
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground",
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+            {TIME_RANGES.map((range) => (
+              <button
+                key={range.key}
+                type="button"
+                onClick={() => handlePresetClick(range.key)}
+                className={cn(
+                  "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  activeFilter === range.key
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "focus-ring flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  activeFilter === "custom"
+                    ? "border-primary/30 bg-primary/15 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                {customRangeLabel ?? "Custom"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-auto p-0">
+              <Calendar
+                mode="range"
+                selected={customRange}
+                onSelect={handleCalendarSelect}
+                numberOfMonths={1}
+                disabled={{ after: new Date() }}
+              />
+              {customRange?.from && (
+                <div className="border-t border-border px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={handleClearCustom}
+                    className="focus-ring w-full rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Clear selection
+                  </button>
+                </div>
               )}
+            </PopoverContent>
+          </Popover>
+
+          {activeFilter === "custom" && (
+            <button
+              type="button"
+              onClick={handleClearCustom}
+              className="focus-ring rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Clear date selection"
             >
-              {range.label}
+              <X className="h-3.5 w-3.5" />
             </button>
-          ))}
+          )}
         </div>
       </div>
 
