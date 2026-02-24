@@ -167,7 +167,10 @@ const TIME_RANGES = [
 ] as const;
 
 function toDateStr(d: Date): string {
-  return d.toISOString().split("T")[0];
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function buildCostUrl(
@@ -227,8 +230,11 @@ function mapUsage(u: LangfuseModelUsage): ModelUsage {
 }
 
 function aggregateCosts(daily: DailyCost[]) {
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const now = new Date();
+  const today = toDateStr(now);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = toDateStr(yesterdayDate);
 
   let todaySpend = 0;
   let yesterdaySpend = 0;
