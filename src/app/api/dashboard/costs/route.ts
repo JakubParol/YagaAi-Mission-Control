@@ -27,7 +27,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const repo = new LangfuseRepository();
-    const metrics = repo.getDailyMetrics(fromStr, toStr);
+
+    // ISO timestamps (contain "T") → query individual requests for
+    // timezone-aware boundaries; plain dates → pre-aggregated daily metrics.
+    const useTimestamps = fromStr.includes("T") && toStr.includes("T");
+    const metrics = useTimestamps
+      ? repo.getMetricsByTimeRange(fromStr, toStr)
+      : repo.getDailyMetrics(fromStr, toStr);
 
     // Group DailyMetric[] (one row per date+model) into DailyCost[] (one row per date)
     const dateMap = new Map<string, DailyCost>();

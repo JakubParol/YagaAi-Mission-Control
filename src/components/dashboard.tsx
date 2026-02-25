@@ -173,73 +173,64 @@ function toDateStr(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Build local-midnight Date for a given Date (strips time portion). */
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * All filters use ISO timestamps so the API queries individual requests
+ * with timezone-aware boundaries (local midnight → now / next midnight).
+ */
 function buildCostUrl(
   activeFilter: string,
   customRange?: DateRange,
 ): string {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  const now = new Date();
+  const todayStart = startOfDay(now);
 
   let from: string;
   let to: string;
 
   if (activeFilter === "custom" && customRange?.from) {
-    from = toDateStr(customRange.from);
-    to = toDateStr(customRange.to ?? customRange.from);
+    const fromDay = startOfDay(customRange.from);
+    const toDay = customRange.to ? startOfDay(customRange.to) : fromDay;
+    const toNextDay = new Date(toDay);
+    toNextDay.setDate(toNextDay.getDate() + 1);
+    from = fromDay.toISOString();
+    to = toNextDay.toISOString();
   } else {
     switch (activeFilter) {
       case "today":
-        from = toDateStr(today);
-        to = toDateStr(today);
+        from = todayStart.toISOString();
+        to = now.toISOString();
         break;
-      case "yesterday":
-        from = toDateStr(yesterday);
-        to = toDateStr(yesterday);
+      case "yesterday": {
+        const yesterdayStart = new Date(todayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        from = yesterdayStart.toISOString();
+        to = todayStart.toISOString();
         break;
+      }
       case "30d": {
-        const d = new Date(today);
+        const d = new Date(todayStart);
         d.setDate(d.getDate() - 30);
-        from = toDateStr(d);
-        to = toDateStr(today);
+        from = d.toISOString();
+        to = now.toISOString();
         break;
       }
       default: {
         // "7d"
-        const d = new Date(today);
+        const d = new Date(todayStart);
         d.setDate(d.getDate() - 7);
-        from = toDateStr(d);
-        to = toDateStr(today);
+        from = d.toISOString();
+        to = now.toISOString();
         break;
       }
     }
   }
 
   return `/api/dashboard/costs?from=${from}&to=${to}`;
-}
-
-function getFilterDateRange(activeFilter: string): { from: string; to: string } {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  switch (activeFilter) {
-    case "today":
-      return { from: toDateStr(today), to: toDateStr(today) };
-    case "yesterday":
-      return { from: toDateStr(yesterday), to: toDateStr(yesterday) };
-    case "30d": {
-      const d = new Date(today);
-      d.setDate(d.getDate() - 30);
-      return { from: toDateStr(d), to: toDateStr(today) };
-    }
-    default: {
-      // "7d"
-      const d = new Date(today);
-      d.setDate(d.getDate() - 7);
-      return { from: toDateStr(d), to: toDateStr(today) };
-    }
-  }
 }
 
 function mapUsage(u: LangfuseModelUsage): ModelUsage {
@@ -309,11 +300,19 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
 
   const url = buildCostUrl(activeFilter, customRange);
 
-  const { data: costs } = useAutoRefresh<CostMetrics>({
-    url,
-    interval: 30000,
-    initialData,
-  });
+  // Fetch filtered cost data. Unlike useAutoRefresh (which skips the initial
+  // fetch), this always fetches on mount so the "today" timestamp-based query
+  // runs immediately instead of showing stale SSR data.
+  const [costs, setCosts] = useState<CostMetrics>(initialData);
+  useEffect(() => {
+    fetch(url)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => setCosts(data))
+      .catch(() => {});
+  }, [url]);
 
   // Stat cards always use the initial 7-day data (includes today + yesterday)
   const { todaySpend, yesterdaySpend, todayRequests, avgCost } = useMemo(
@@ -321,20 +320,11 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
     [initialData.daily],
   );
 
-  // Model breakdown responds to the active date filter.
-  // Client-side filter ensures the SSR 7-day data is narrowed to match the
-  // active preset on the initial render (before the first client fetch).
-  const models = useMemo(() => {
-    let daily = costs.daily;
-    if (activeFilter !== "custom") {
-      const { from, to } = getFilterDateRange(activeFilter);
-      daily = daily.filter((d) => {
-        const date = d.date?.split("T")[0];
-        return date != null && date >= from && date <= to;
-      });
-    }
-    return aggregateModels(daily);
-  }, [costs.daily, activeFilter]);
+  // Model breakdown responds to the active date filter
+  const models = useMemo(
+    () => aggregateModels(costs.daily),
+    [costs.daily],
+  );
 
   const handlePresetClick = (key: string) => {
     setActiveFilter(key);
