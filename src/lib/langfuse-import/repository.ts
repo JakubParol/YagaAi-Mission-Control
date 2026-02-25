@@ -158,6 +158,32 @@ export class LangfuseRepository {
       .all(from, to) as DailyMetric[];
   }
 
+  /**
+   * Aggregates per-model costs from the requests table using ISO timestamps.
+   * Unlike getDailyMetrics (which uses pre-aggregated UTC-date buckets), this
+   * method works on raw request timestamps so the caller can pass
+   * timezone-aware boundaries (e.g. local midnight → now).
+   */
+  getMetricsByTimeRange(fromTs: string, toTs: string): DailyMetric[] {
+    return this.db
+      .prepare(
+        `SELECT
+           SUBSTR(?, 1, 10) AS date,
+           model,
+           SUM(input_tokens)      AS input_tokens,
+           SUM(output_tokens)     AS output_tokens,
+           SUM(total_tokens)      AS total_tokens,
+           COUNT(*)               AS request_count,
+           COALESCE(SUM(cost), 0) AS total_cost
+         FROM langfuse_requests
+         WHERE started_at >= ? AND started_at < ?
+           AND model IS NOT NULL
+         GROUP BY model
+         ORDER BY total_cost DESC`,
+      )
+      .all(fromTs, fromTs, toTs) as DailyMetric[];
+  }
+
   /** Returns all distinct model names from the requests table. */
   getDistinctModels(): string[] {
     const rows = this.db
