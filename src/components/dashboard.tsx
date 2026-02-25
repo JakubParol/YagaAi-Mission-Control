@@ -173,51 +173,58 @@ function toDateStr(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Build local-midnight Date for a given Date (strips time portion). */
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
+ * All filters use ISO timestamps so the API queries individual requests
+ * with timezone-aware boundaries (local midnight → now / next midnight).
+ */
 function buildCostUrl(
   activeFilter: string,
   customRange?: DateRange,
 ): string {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  const now = new Date();
+  const todayStart = startOfDay(now);
 
   let from: string;
   let to: string;
 
   if (activeFilter === "custom" && customRange?.from) {
-    from = toDateStr(customRange.from);
-    to = toDateStr(customRange.to ?? customRange.from);
+    const fromDay = startOfDay(customRange.from);
+    const toDay = customRange.to ? startOfDay(customRange.to) : fromDay;
+    const toNextDay = new Date(toDay);
+    toNextDay.setDate(toNextDay.getDate() + 1);
+    from = fromDay.toISOString();
+    to = toNextDay.toISOString();
   } else {
     switch (activeFilter) {
-      case "today": {
-        // Use ISO timestamps so the API queries individual requests
-        // with timezone-aware boundaries (local midnight → now).
-        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        from = startOfToday.toISOString();
-        to = today.toISOString();
+      case "today":
+        from = todayStart.toISOString();
+        to = now.toISOString();
         break;
-      }
       case "yesterday": {
-        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const startOfYesterday = new Date(startOfToday);
-        startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-        from = startOfYesterday.toISOString();
-        to = startOfToday.toISOString();
+        const yesterdayStart = new Date(todayStart);
+        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        from = yesterdayStart.toISOString();
+        to = todayStart.toISOString();
         break;
       }
       case "30d": {
-        const d = new Date(today);
+        const d = new Date(todayStart);
         d.setDate(d.getDate() - 30);
-        from = toDateStr(d);
-        to = toDateStr(today);
+        from = d.toISOString();
+        to = now.toISOString();
         break;
       }
       default: {
         // "7d"
-        const d = new Date(today);
+        const d = new Date(todayStart);
         d.setDate(d.getDate() - 7);
-        from = toDateStr(d);
-        to = toDateStr(today);
+        from = d.toISOString();
+        to = now.toISOString();
         break;
       }
     }
