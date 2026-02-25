@@ -8,8 +8,14 @@ echo "📦 Switching to main and pulling..."
 git checkout main
 git pull origin main
 
+echo "🧹 Cleaning .next..."
+rm -rf .next
+
 echo "🔨 Building..."
 npm run build
+
+echo "⏳ Waiting for build artifacts..."
+test -f .next/server/pages-manifest.json
 
 echo "🔄 Restarting service..."
 sudo systemctl restart mission-control
