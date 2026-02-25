@@ -27,11 +27,14 @@ export function useAutoRefresh<T>({
   const [data, setData] = useState<T>(initialData);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const initialUrlRef = useRef(url);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    // Server already provided data for the initial URL — skip fetch
-    if (url === initialUrlRef.current) return;
+    // Server already provided data for the initial render — skip fetch
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
 
     let cancelled = false;
     setIsLoading(true);

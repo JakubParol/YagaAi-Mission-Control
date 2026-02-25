@@ -158,6 +158,18 @@ export class LangfuseRepository {
       .all(from, to) as DailyMetric[];
   }
 
+  /** Returns all distinct model names from the requests table. */
+  getDistinctModels(): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT model FROM langfuse_requests
+         WHERE model IS NOT NULL
+         ORDER BY model ASC`,
+      )
+      .all() as { model: string }[];
+    return rows.map((r) => r.model);
+  }
+
   // ─── Requests / Observations ────────────────────────────────────────
 
   /**

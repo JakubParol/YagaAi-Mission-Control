@@ -17,14 +17,21 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
+function toDateStr(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getCosts(): CostMetrics {
   try {
     const repo = new LangfuseRepository();
     const now = new Date();
     const from = new Date(now);
     from.setDate(from.getDate() - 7);
-    const fromStr = from.toISOString().split("T")[0];
-    const toStr = now.toISOString().split("T")[0];
+    const fromStr = toDateStr(from);
+    const toStr = toDateStr(now);
 
     const metrics = repo.getDailyMetrics(fromStr, toStr);
 
