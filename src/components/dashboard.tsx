@@ -190,8 +190,7 @@ function buildCostUrl(
   } else {
     switch (activeFilter) {
       case "today":
-        // Match existing days=1 behavior (yesterday through today)
-        from = toDateStr(yesterday);
+        from = toDateStr(today);
         to = toDateStr(today);
         break;
       case "yesterday":
@@ -217,6 +216,30 @@ function buildCostUrl(
   }
 
   return `/api/dashboard/costs?from=${from}&to=${to}`;
+}
+
+function getFilterDateRange(activeFilter: string): { from: string; to: string } {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  switch (activeFilter) {
+    case "today":
+      return { from: toDateStr(today), to: toDateStr(today) };
+    case "yesterday":
+      return { from: toDateStr(yesterday), to: toDateStr(yesterday) };
+    case "30d": {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 30);
+      return { from: toDateStr(d), to: toDateStr(today) };
+    }
+    default: {
+      // "7d"
+      const d = new Date(today);
+      d.setDate(d.getDate() - 7);
+      return { from: toDateStr(d), to: toDateStr(today) };
+    }
+  }
 }
 
 function mapUsage(u: LangfuseModelUsage): ModelUsage {
@@ -280,7 +303,7 @@ function aggregateModels(daily: DailyCost[]): ModelUsage[] {
 }
 
 function CostsSection({ initialData }: { initialData: CostMetrics }) {
-  const [activeFilter, setActiveFilter] = useState<string>("7d");
+  const [activeFilter, setActiveFilter] = useState<string>("today");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -298,11 +321,20 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
     [initialData.daily],
   );
 
-  // Model breakdown responds to the active date filter
-  const models = useMemo(
-    () => aggregateModels(costs.daily),
-    [costs.daily],
-  );
+  // Model breakdown responds to the active date filter.
+  // Client-side filter ensures the SSR 7-day data is narrowed to match the
+  // active preset on the initial render (before the first client fetch).
+  const models = useMemo(() => {
+    let daily = costs.daily;
+    if (activeFilter !== "custom") {
+      const { from, to } = getFilterDateRange(activeFilter);
+      daily = daily.filter((d) => {
+        const date = d.date?.split("T")[0];
+        return date != null && date >= from && date <= to;
+      });
+    }
+    return aggregateModels(daily);
+  }, [costs.daily, activeFilter]);
 
   const handlePresetClick = (key: string) => {
     setActiveFilter(key);
