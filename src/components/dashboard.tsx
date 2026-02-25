@@ -317,11 +317,40 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
       .catch(() => {});
   }, [url]);
 
-  // Stat cards always use the initial 7-day data (includes today + yesterday)
-  const { todaySpend, yesterdaySpend, todayRequests, avgCost } = useMemo(
-    () => aggregateStatCards(initialData.daily),
-    [initialData.daily],
+  // Stat cards — independent of the date filter. Fetch today + yesterday
+  // using timezone-aware timestamps so nighttime requests are included.
+  const [statCards, setStatCards] = useState(() =>
+    aggregateStatCards(initialData.daily),
   );
+  useEffect(() => {
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const yesterdayStart = new Date(todayStart);
+    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+    const todayUrl = `/api/dashboard/costs?from=${todayStart.toISOString()}&to=${now.toISOString()}`;
+    const yesterdayUrl = `/api/dashboard/costs?from=${yesterdayStart.toISOString()}&to=${todayStart.toISOString()}`;
+
+    Promise.all([
+      fetch(todayUrl).then((r) => r.json()),
+      fetch(yesterdayUrl).then((r) => r.json()),
+    ])
+      .then(([todayData, yesterdayData]) => {
+        const tDaily: DailyCost[] = todayData.daily ?? [];
+        const yDaily: DailyCost[] = yesterdayData.daily ?? [];
+        const todaySpend = tDaily.reduce((s, d) => s + (d.totalCost ?? 0), 0);
+        const todayReqs = tDaily.reduce((s, d) => s + (d.countObservations ?? 0), 0);
+        const yesterdaySpend = yDaily.reduce((s, d) => s + (d.totalCost ?? 0), 0);
+        setStatCards({
+          todaySpend,
+          yesterdaySpend,
+          todayRequests: todayReqs,
+          avgCost: todayReqs > 0 ? todaySpend / todayReqs : 0,
+        });
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const { todaySpend, yesterdaySpend, todayRequests, avgCost } = statCards;
 
   // Model breakdown responds to the active date filter
   const models = useMemo(
