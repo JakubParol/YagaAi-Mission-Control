@@ -298,7 +298,10 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const url = buildCostUrl(activeFilter, customRange);
+  // Memoize so the URL only changes when the filter/range changes, not on
+  // every render (buildCostUrl uses new Date() internally).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const url = useMemo(() => buildCostUrl(activeFilter, customRange), [activeFilter, customRange]);
 
   // Fetch filtered cost data. Unlike useAutoRefresh (which skips the initial
   // fetch), this always fetches on mount so the "today" timestamp-based query
