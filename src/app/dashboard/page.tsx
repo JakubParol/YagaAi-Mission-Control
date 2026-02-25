@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getAgentStatuses } from "@/lib/adapters";
 import { Dashboard } from "@/components/dashboard";
-import { LangfuseRepository } from "@/lib/langfuse-import";
+import { LangfuseRepository, getDbStatus } from "@/lib/langfuse-import";
 import type {
   CostMetrics,
   LLMRequestsResponse,
@@ -119,6 +119,8 @@ function getRequests(): LLMRequestsResponse {
 }
 
 export default async function DashboardPage() {
+  const dbStatus = getDbStatus();
+
   const [agents, costs, requests, importStatus] = await Promise.all([
     getAgentStatuses(),
     Promise.resolve(getCosts()),
@@ -132,6 +134,7 @@ export default async function DashboardPage() {
       initialCosts={costs}
       initialRequests={requests}
       initialImportStatus={importStatus}
+      dbError={dbStatus.ok ? undefined : dbStatus.error}
     />
   );
 }

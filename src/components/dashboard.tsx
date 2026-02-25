@@ -933,6 +933,7 @@ export interface DashboardProps {
   initialCosts: CostMetrics;
   initialRequests: LLMRequestsResponse;
   initialImportStatus: ImportStatusInfo;
+  dbError?: string;
 }
 
 export function Dashboard({
@@ -940,6 +941,7 @@ export function Dashboard({
   initialCosts,
   initialRequests,
   initialImportStatus,
+  dbError,
 }: DashboardProps) {
   const [importStatus, setImportStatus] =
     useState<ImportStatusInfo>(initialImportStatus);
@@ -977,6 +979,20 @@ export function Dashboard({
         </div>
         <ImportButton onImportComplete={handleImportComplete} />
       </div>
+
+      {/* Database error alert */}
+      {dbError && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">Database not found</p>
+            <p className="mt-0.5 text-xs opacity-80">{dbError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Import status bar */}
       <ImportStatusBar status={importStatus} />
