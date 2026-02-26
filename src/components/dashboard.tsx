@@ -387,6 +387,73 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
     <section aria-label="LLM costs">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-foreground">LLM Costs</h2>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
+            {TIME_RANGES.map((range) => (
+              <button
+                key={range.key}
+                type="button"
+                onClick={() => handlePresetClick(range.key)}
+                className={cn(
+                  "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
+                  activeFilter === range.key
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {range.label}
+              </button>
+            ))}
+          </div>
+
+          <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "focus-ring flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  activeFilter === "custom"
+                    ? "border-primary/30 bg-primary/15 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                {customRangeLabel ?? "Custom"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-auto p-0">
+              <Calendar
+                mode="range"
+                selected={customRange}
+                onSelect={handleCalendarSelect}
+                numberOfMonths={1}
+                disabled={{ after: new Date() }}
+              />
+              {customRange?.from && (
+                <div className="border-t border-border px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={handleClearCustom}
+                    className="focus-ring w-full rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Clear selection
+                  </button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          {activeFilter === "custom" && (
+            <button
+              type="button"
+              onClick={handleClearCustom}
+              className="focus-ring rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Clear date selection"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stat cards */}
@@ -419,74 +486,6 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
           iconColor="text-purple-400"
           iconBg="bg-purple-500/10"
         />
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
-          {TIME_RANGES.map((range) => (
-            <button
-              key={range.key}
-              type="button"
-              onClick={() => handlePresetClick(range.key)}
-              className={cn(
-                "focus-ring rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                activeFilter === range.key
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {range.label}
-            </button>
-          ))}
-        </div>
-
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                "focus-ring flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
-                activeFilter === "custom"
-                  ? "border-primary/30 bg-primary/15 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <CalendarDays className="h-3.5 w-3.5" />
-              {customRangeLabel ?? "Custom"}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-auto p-0">
-            <Calendar
-              mode="range"
-              selected={customRange}
-              onSelect={handleCalendarSelect}
-              numberOfMonths={1}
-              disabled={{ after: new Date() }}
-            />
-            {customRange?.from && (
-              <div className="border-t border-border px-3 py-2">
-                <button
-                  type="button"
-                  onClick={handleClearCustom}
-                  className="focus-ring w-full rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Clear selection
-                </button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
-
-        {activeFilter === "custom" && (
-          <button
-            type="button"
-            onClick={handleClearCustom}
-            className="focus-ring rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
-            aria-label="Clear date selection"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
 
       {/* Per-model table */}
