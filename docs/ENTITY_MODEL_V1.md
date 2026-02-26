@@ -1,6 +1,6 @@
 # Entity Model — Mission Control Work Planning (Jira-like, v1 draft)
 
-**Status:** Draft (for scope alignment)  
+**Status:** Draft v1.1 (entity scope aligned)  
 **Date:** 2026-02-26  
 **Applies to:** Mission Control DB refactor
 
@@ -53,7 +53,7 @@ Backlog can be:
 - `VERIFY`
 - `DONE`
 
-### Epic status (simplified)
+### Epic status (summary/derived)
 
 - `TODO`
 - `IN_PROGRESS`
@@ -64,7 +64,7 @@ Backlog can be:
 - `ACTIVE`
 - `CLOSED`
 
-> Note: legacy filesystem state `BLOCKED` is not part of the new status list. In v1 we model blocking via `is_blocked` + `blocked_reason` on Stories/Tasks.
+> Note: legacy filesystem state `BLOCKED` is not part of the new status list. In v1, blocking is represented as a separate flag: `is_blocked` (+ optional `blocked_reason`).
 
 ---
 
@@ -81,6 +81,7 @@ Backlog can be:
 | `backlog_tasks` | Task membership in backlog |
 | `agents` | Runtime/planning representation of OpenClaw agents |
 | `task_assignments` | Assignment history task -> agent |
+| `epic_status_history` | Epic status audit trail |
 | `story_status_history` | Story status audit trail |
 | `task_status_history` | Task status audit trail |
 
@@ -111,7 +112,12 @@ Backlog can be:
 | `key` | `TEXT` | yes | unique per project |
 | `title` | `TEXT` | yes | epic name |
 | `description` | `TEXT` | no | optional |
-| `status` | `TEXT` | yes | `TODO` / `IN_PROGRESS` / `DONE` |
+| `status` | `TEXT` | yes | effective status: `TODO` / `IN_PROGRESS` / `DONE` |
+| `status_mode` | `TEXT` | yes | `MANUAL` or `DERIVED` |
+| `status_override` | `TEXT` | no | optional temporary override value |
+| `status_override_set_at` | `TEXT` | no | override timestamp |
+| `is_blocked` | `INTEGER` | yes | boolean (0/1), propagated from stories |
+| `blocked_reason` | `TEXT` | no | optional summarized reason |
 | `priority` | `INTEGER` | no | optional ordering |
 | `created_at` | `TEXT` | yes | ISO datetime |
 | `updated_at` | `TEXT` | yes | ISO datetime |
@@ -126,14 +132,17 @@ Constraints:
 | Field | Type | Req | Notes |
 |---|---|---|---|
 | `id` | `TEXT` (UUID) | yes | PK |
-| `project_id` | `TEXT` | no | nullable for pre-project ideas |
+| `project_id` | `TEXT` | no | nullable (project-less stories are allowed) |
 | `epic_id` | `TEXT` | no | FK -> `epics.id` |
 | `key` | `TEXT` | no | optional key, unique inside project when present |
 | `title` | `TEXT` | yes | short summary |
 | `intent` | `TEXT` | no | why this matters |
 | `description` | `TEXT` | no | detailed scope |
 | `story_type` | `TEXT` | yes | e.g. `feature`,`research`,`marketing`,`ops` |
-| `status` | `TEXT` | yes | shared workflow status |
+| `status` | `TEXT` | yes | effective status from shared workflow |
+| `status_mode` | `TEXT` | yes | `MANUAL` or `DERIVED` |
+| `status_override` | `TEXT` | no | optional temporary override value |
+| `status_override_set_at` | `TEXT` | no | override timestamp |
 | `is_blocked` | `INTEGER` | yes | boolean (0/1), default 0 |
 | `blocked_reason` | `TEXT` | no | optional |
 | `priority` | `INTEGER` | no | optional ordering |
@@ -143,7 +152,7 @@ Constraints:
 
 Constraints/Rules:
 - If `epic_id` is set, story should belong to same project as epic.
-- Story may exist without project while still in global ideas backlog.
+- Stories may exist without project permanently.
 
 ---
 
@@ -152,7 +161,7 @@ Constraints/Rules:
 | Field | Type | Req | Notes |
 |---|---|---|---|
 | `id` | `TEXT` (UUID) | yes | PK |
-| `project_id` | `TEXT` | no | nullable for global ideas |
+| `project_id` | `TEXT` | no | nullable (project-less tasks are allowed) |
 | `story_id` | `TEXT` | no | optional FK -> `stories.id` |
 | `key` | `TEXT` | no | optional key, unique inside project when present |
 | `title` | `TEXT` | yes | short summary |
@@ -172,7 +181,8 @@ Constraints/Rules:
 
 Decision:
 - **Task -> Story is optional in v1** (`story_id` nullable).
-- This allows project-level operational tasks and ad-hoc execution tasks.
+- Tasks may exist without project permanently.
+- This allows project-level operational tasks, ad-hoc execution tasks, and global idea capture.
 
 ---
 
@@ -185,6 +195,7 @@ Decision:
 | `name` | `TEXT` | yes | e.g. `Backlog`, `Sprint 12`, `Future Ideas` |
 | `kind` | `TEXT` | yes | `BACKLOG`,`SPRINT`,`IDEAS` |
 | `status` | `TEXT` | yes | `ACTIVE` / `CLOSED` |
+| `is_default` | `INTEGER` | yes | boolean (0/1), default 0 |
 | `goal` | `TEXT` | no | sprint/backlog goal |
 | `start_date` | `TEXT` | no | date for sprint |
 | `end_date` | `TEXT` | no | date for sprint |
@@ -193,7 +204,9 @@ Decision:
 
 Rules:
 - A project can have many backlogs.
+- Every new project should auto-create one default backlog (`is_default = 1`).
 - Global backlog (`project_id = NULL`) supports ideas for future projects.
+- Enforce at most one default backlog per project (partial unique index on `project_id` where `is_default = 1`).
 
 ---
 
@@ -267,7 +280,21 @@ Constraints:
 
 ---
 
-## 10) `story_status_history`
+## 10) `epic_status_history`
+
+| Field | Type | Req | Notes |
+|---|---|---|---|
+| `id` | `TEXT` (UUID) | yes | PK |
+| `epic_id` | `TEXT` | yes | FK -> `epics.id` |
+| `from_status` | `TEXT` | no | nullable for first state |
+| `to_status` | `TEXT` | yes | target state |
+| `changed_at` | `TEXT` | yes | ISO datetime |
+| `changed_by` | `TEXT` | no | actor/system |
+| `note` | `TEXT` | no | reason/comment |
+
+---
+
+## 11) `story_status_history`
 
 | Field | Type | Req | Notes |
 |---|---|---|---|
@@ -281,7 +308,7 @@ Constraints:
 
 ---
 
-## 11) `task_status_history`
+## 12) `task_status_history`
 
 | Field | Type | Req | Notes |
 |---|---|---|---|
@@ -316,6 +343,7 @@ erDiagram
   agents ||--o{ task_assignments : assigned
   tasks ||--o{ task_assignments : has
 
+  epics ||--o{ epic_status_history : status_changes
   stories ||--o{ story_status_history : status_changes
   tasks ||--o{ task_status_history : status_changes
 ```
@@ -324,21 +352,26 @@ erDiagram
 
 ## Domain Rules / Invariants
 
-1. Story and Task may exist without `project_id` only for early-stage/global-ideas flow.
+1. Stories and tasks may exist without `project_id` permanently.
 2. If an item is in a project backlog, its `project_id` must match the backlog project.
-3. If task has `story_id`, task and story should share same `project_id` (or task inherits story project).
-4. Task has at most one active assignee at a time.
-5. Story/task are each in at most one backlog at a time (v1 simplification).
-6. Every status change and assignment change must be persisted in history tables.
+3. If an item is in a global backlog (`project_id = NULL` on backlog), the item must also have `project_id = NULL`.
+4. Story/task are each in at most one backlog at a time (v1 simplification).
+5. Backlog membership is optional for both stories and tasks.
+6. If task has `story_id`, task and story should share same `project_id` (or task inherits story project).
+7. Task has at most one active assignee at a time.
+8. Every status change and assignment change must be persisted in history tables.
+9. Every project should have exactly one default backlog (`is_default = 1`).
+10. Entity schema must support derived status and temporary status override on stories/epics.
 
 ---
 
-## Open Questions (for next iteration)
+## Open Questions (remaining)
 
-1. Should "project-less" stories/tasks be allowed permanently, or auto-forced into a project at execution time?
-2. Should Epic status be derived from child stories or editable manually?
-3. Do we need WIP limits per backlog/sprint in v1 or v2?
-4. Should we support multi-assignee tasks later (currently single active assignee)?
+1. Should we add WIP limits per backlog/sprint in v2?
+2. Should we support multi-assignee tasks in a later version?
+3. Do we need dedicated blocked-history tables (beyond current status/assignment history)?
+
+For currently agreed workflow behavior, see [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md).
 
 ---
 
