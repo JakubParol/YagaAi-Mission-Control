@@ -8,6 +8,7 @@
 | [README.md § Deployment](../README.md#deployment) | Production build, port 3100, systemd service |
 | [mission-control.service](../mission-control.service) | Systemd unit file for running as a daemon |
 | [AGENTS.md](../AGENTS.md) | AI agent context and coding rules |
+| [ENTITY_MODEL_V1.md](./ENTITY_MODEL_V1.md) | Draft v1 Jira-like entity model (projects, epics, stories, tasks, backlogs, agents, assignments) |
 
 ## Navigation
 
