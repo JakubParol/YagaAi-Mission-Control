@@ -11,6 +11,7 @@ import Database from "better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
 import { SCHEMA_STATEMENTS } from "./schema";
+import { PLANNING_SCHEMA_STATEMENTS } from "../planning/schema";
 
 const DEFAULT_DB_PATH = path.resolve(
   process.cwd(),
@@ -72,6 +73,11 @@ export function getDb(): Database.Database {
 
   // Initialize schema
   for (const sql of SCHEMA_STATEMENTS) {
+    _db.exec(sql);
+  }
+
+  // Initialize planning schema (v1 work-planning tables)
+  for (const sql of PLANNING_SCHEMA_STATEMENTS) {
     _db.exec(sql);
   }
 
