@@ -1,392 +1,413 @@
-# Entity Model — Mission Control Work Planning (Jira-like, v1 draft)
+# Entity Model — Mission Control Work Planning (Jira-like, v1)
 
-**Status:** Draft v1.1 (entity scope aligned)  
+**Status:** Draft v1.2 (aligned with current decisions)  
 **Date:** 2026-02-26  
 **Applies to:** Mission Control DB refactor
 
 ## Purpose
 
-This document defines a practical v1 entity model for planning and executing agent work in OpenClaw.
+This document defines the v1 database entity model for planning and executing agent work in OpenClaw.
 
-The model must support:
+It supports:
 - many projects,
 - work beyond coding (research, marketing, operations, etc.),
-- task assignment to multiple agents over time,
-- backlogs that group both **stories** and **tasks**,
-- both project-scoped and global backlog use cases.
+- assignment of tasks to agents,
+- backlogs grouping both stories and tasks,
+- global (project-less) work items and project-scoped work items.
 
 ---
 
-## Design Principles (v1)
+## Confirmed v1 Decisions (Entity-Level)
 
-1. **Generic work model** — not coding-only.
-2. **Incremental complexity** — Jira-like structure, but "Epic Lite" first.
-3. **Auditability first** — status/assignment history persisted.
-4. **OpenClaw integration** — agents represented in DB, synced from `openclaw.json`.
-5. **Backlog as a container** — backlog is not a task status.
-
----
-
-## Core Hierarchy
-
-Primary planning hierarchy:
-
-`Project -> Epic (optional) -> Story -> Task`
-
-Operational containers:
-
-`Backlog -> {Stories, Tasks}`
-
-Backlog can be:
-- project-scoped (`project_id != NULL`), or
-- global (`project_id = NULL`) for ideas/future projects.
+- Core hierarchy: `Project -> Epic (optional) -> Story -> Task`.
+- Backlog is a container (not a status): can group stories and tasks.
+- Stories/tasks may exist permanently without `project_id`.
+- `Task -> Story` relation is optional.
+- One active assignee per task.
+- Shared status set for stories/tasks: `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE`.
+- `is_blocked` is a separate flag, not a status.
+- Human-readable keys exist, with one shared counter per project.
+- For project-less story/task, `key = NULL`.
+- Hard delete on core entities; audit data should remain.
 
 ---
 
-## Status Model
+## Status Model (Stored Values)
 
-### Shared workflow status (Stories + Tasks)
-
+### Stories + Tasks
 - `TODO`
 - `IN_PROGRESS`
 - `CODE_REVIEW`
 - `VERIFY`
 - `DONE`
 
-### Epic status (summary/derived)
-
+### Epics
 - `TODO`
 - `IN_PROGRESS`
 - `DONE`
 
-### Backlog status (container lifecycle)
-
+### Backlogs
 - `ACTIVE`
 - `CLOSED`
 
-> Note: legacy filesystem state `BLOCKED` is not part of the new status list. In v1, blocking is represented as a separate flag: `is_blocked` (+ optional `blocked_reason`).
+> Workflow behavior (derived status, override behavior, etc.) is defined in [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md).
 
 ---
 
-## Entity Overview
+## Entities (v1)
 
-| Entity | Purpose |
+| Table | Purpose |
 |---|---|
-| `projects` | Top-level domain/workspace container |
-| `epics` | Optional grouping of related stories in a project |
-| `stories` | User-story level intent and scope |
-| `tasks` | Executable work items (atomic-ish units) |
-| `backlogs` | Named containers (backlog/sprint/ideas) |
+| `projects` | Top-level planning container |
+| `project_counters` | Shared key counter per project |
+| `epics` | Optional grouping of stories |
+| `stories` | User-story level intent/work |
+| `tasks` | Executable work items |
+| `backlogs` | Named containers (`BACKLOG`, `SPRINT`, `IDEAS`) |
 | `backlog_stories` | Story membership in backlog |
 | `backlog_tasks` | Task membership in backlog |
-| `agents` | Runtime/planning representation of OpenClaw agents |
-| `task_assignments` | Assignment history task -> agent |
-| `epic_status_history` | Epic status audit trail |
-| `story_status_history` | Story status audit trail |
-| `task_status_history` | Task status audit trail |
+| `agents` | Agent catalog synced from `openclaw.json` (+ manual entries) |
+| `task_assignments` | Task -> agent assignment history |
+| `labels` | Label definitions (global or project-scoped) |
+| `story_labels` | Story-label mapping |
+| `task_labels` | Task-label mapping |
+| `comments` | Comments for project/backlog/epic/story/task |
+| `attachments` | File/link metadata for project/backlog/epic/story/task |
+| `activity_log` | Append-only key event log for core planning entities |
+| `epic_status_history` | Epic status audit history |
+| `story_status_history` | Story status audit history |
+| `task_status_history` | Task status audit history |
 
 ---
 
-## Table-Level Model (v1)
+## Table Specifications
 
 ## 1) `projects`
 
-| Field | Type (SQLite) | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `key` | `TEXT` | yes | unique short key, e.g. `MC` |
-| `name` | `TEXT` | yes | display name |
-| `description` | `TEXT` | no | optional |
-| `status` | `TEXT` | yes | `ACTIVE` / `ARCHIVED` |
-| `created_at` | `TEXT` | yes | ISO datetime |
-| `updated_at` | `TEXT` | yes | ISO datetime |
+- `id` TEXT PK (UUID)
+- `key` TEXT NOT NULL UNIQUE (e.g. `MC`)
+- `name` TEXT NOT NULL
+- `description` TEXT NULL
+- `status` TEXT NOT NULL (`ACTIVE`/`ARCHIVED`)
+- `created_by` TEXT NULL
+- `updated_by` TEXT NULL
+- `created_at` TEXT NOT NULL (ISO datetime)
+- `updated_at` TEXT NOT NULL (ISO datetime)
 
----
+## 2) `project_counters`
 
-## 2) `epics` (Epic Lite)
+- `project_id` TEXT PK (logical ref to `projects.id`)
+- `next_number` INTEGER NOT NULL
+- `updated_at` TEXT NOT NULL
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `project_id` | `TEXT` | yes | FK -> `projects.id` |
-| `key` | `TEXT` | yes | unique per project |
-| `title` | `TEXT` | yes | epic name |
-| `description` | `TEXT` | no | optional |
-| `status` | `TEXT` | yes | effective status: `TODO` / `IN_PROGRESS` / `DONE` |
-| `status_mode` | `TEXT` | yes | `MANUAL` or `DERIVED` |
-| `status_override` | `TEXT` | no | optional temporary override value |
-| `status_override_set_at` | `TEXT` | no | override timestamp |
-| `is_blocked` | `INTEGER` | yes | boolean (0/1), propagated from stories |
-| `blocked_reason` | `TEXT` | no | optional summarized reason |
-| `priority` | `INTEGER` | no | optional ordering |
-| `created_at` | `TEXT` | yes | ISO datetime |
-| `updated_at` | `TEXT` | yes | ISO datetime |
+Purpose: one shared numeric counter for generating story/task/epic keys per project.
 
-Constraints:
+## 3) `epics`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NOT NULL
+- `key` TEXT NOT NULL (project-scoped human key)
+- `title` TEXT NOT NULL
+- `description` TEXT NULL
+- `status` TEXT NOT NULL (`TODO`/`IN_PROGRESS`/`DONE`)
+- `status_mode` TEXT NOT NULL (`MANUAL`/`DERIVED`)
+- `status_override` TEXT NULL
+- `status_override_set_at` TEXT NULL
+- `is_blocked` INTEGER NOT NULL DEFAULT 0
+- `blocked_reason` TEXT NULL
+- `priority` INTEGER NULL
+- `metadata_json` TEXT NULL
+- `created_by` TEXT NULL
+- `updated_by` TEXT NULL
+- `created_at` TEXT NOT NULL
+- `updated_at` TEXT NOT NULL
+
+Constraint:
 - `UNIQUE(project_id, key)`
 
----
+## 4) `stories`
 
-## 3) `stories`
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (project-less allowed)
+- `epic_id` TEXT NULL
+- `key` TEXT NULL (must be NULL when `project_id` is NULL)
+- `title` TEXT NOT NULL
+- `intent` TEXT NULL
+- `description` TEXT NULL
+- `story_type` TEXT NOT NULL
+- `status` TEXT NOT NULL
+- `status_mode` TEXT NOT NULL (`MANUAL`/`DERIVED`)
+- `status_override` TEXT NULL
+- `status_override_set_at` TEXT NULL
+- `is_blocked` INTEGER NOT NULL DEFAULT 0
+- `blocked_reason` TEXT NULL
+- `priority` INTEGER NULL
+- `metadata_json` TEXT NULL
+- `created_by` TEXT NULL
+- `updated_by` TEXT NULL
+- `created_at` TEXT NOT NULL
+- `updated_at` TEXT NOT NULL
+- `completed_at` TEXT NULL
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `project_id` | `TEXT` | no | nullable (project-less stories are allowed) |
-| `epic_id` | `TEXT` | no | FK -> `epics.id` |
-| `key` | `TEXT` | no | optional key, unique inside project when present |
-| `title` | `TEXT` | yes | short summary |
-| `intent` | `TEXT` | no | why this matters |
-| `description` | `TEXT` | no | detailed scope |
-| `story_type` | `TEXT` | yes | e.g. `feature`,`research`,`marketing`,`ops` |
-| `status` | `TEXT` | yes | effective status from shared workflow |
-| `status_mode` | `TEXT` | yes | `MANUAL` or `DERIVED` |
-| `status_override` | `TEXT` | no | optional temporary override value |
-| `status_override_set_at` | `TEXT` | no | override timestamp |
-| `is_blocked` | `INTEGER` | yes | boolean (0/1), default 0 |
-| `blocked_reason` | `TEXT` | no | optional |
-| `priority` | `INTEGER` | no | optional ordering |
-| `created_at` | `TEXT` | yes | ISO datetime |
-| `updated_at` | `TEXT` | yes | ISO datetime |
-| `completed_at` | `TEXT` | no | set on done |
+Constraints:
+- partial unique: `UNIQUE(project_id, key)` where `key IS NOT NULL`
+- check: `project_id IS NOT NULL OR key IS NULL`
 
-Constraints/Rules:
-- If `epic_id` is set, story should belong to same project as epic.
-- Stories may exist without project permanently.
+## 5) `tasks`
 
----
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (project-less allowed)
+- `story_id` TEXT NULL (optional)
+- `key` TEXT NULL (must be NULL when `project_id` is NULL)
+- `title` TEXT NOT NULL
+- `objective` TEXT NULL
+- `task_type` TEXT NOT NULL
+- `status` TEXT NOT NULL
+- `is_blocked` INTEGER NOT NULL DEFAULT 0
+- `blocked_reason` TEXT NULL
+- `priority` INTEGER NULL
+- `estimate_points` REAL NULL
+- `due_at` TEXT NULL
+- `current_assignee_agent_id` TEXT NULL
+- `metadata_json` TEXT NULL
+- `created_by` TEXT NULL
+- `updated_by` TEXT NULL
+- `created_at` TEXT NOT NULL
+- `updated_at` TEXT NOT NULL
+- `started_at` TEXT NULL
+- `completed_at` TEXT NULL
 
-## 4) `tasks`
+Constraints:
+- partial unique: `UNIQUE(project_id, key)` where `key IS NOT NULL`
+- check: `project_id IS NOT NULL OR key IS NULL`
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `project_id` | `TEXT` | no | nullable (project-less tasks are allowed) |
-| `story_id` | `TEXT` | no | optional FK -> `stories.id` |
-| `key` | `TEXT` | no | optional key, unique inside project when present |
-| `title` | `TEXT` | yes | short summary |
-| `objective` | `TEXT` | no | detailed goal |
-| `task_type` | `TEXT` | yes | `coding`,`research`,`marketing`,`ops`,... |
-| `status` | `TEXT` | yes | shared workflow status |
-| `is_blocked` | `INTEGER` | yes | boolean (0/1), default 0 |
-| `blocked_reason` | `TEXT` | no | optional |
-| `priority` | `INTEGER` | no | optional ordering |
-| `estimate_points` | `REAL` | no | optional estimate |
-| `due_at` | `TEXT` | no | optional deadline |
-| `current_assignee_agent_id` | `TEXT` | no | denormalized quick lookup |
-| `created_at` | `TEXT` | yes | ISO datetime |
-| `updated_at` | `TEXT` | yes | ISO datetime |
-| `started_at` | `TEXT` | no | optional |
-| `completed_at` | `TEXT` | no | set on done |
+## 6) `backlogs`
 
-Decision:
-- **Task -> Story is optional in v1** (`story_id` nullable).
-- Tasks may exist without project permanently.
-- This allows project-level operational tasks, ad-hoc execution tasks, and global idea capture.
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (`NULL` => global backlog)
+- `name` TEXT NOT NULL
+- `kind` TEXT NOT NULL (`BACKLOG`/`SPRINT`/`IDEAS`)
+- `status` TEXT NOT NULL (`ACTIVE`/`CLOSED`)
+- `is_default` INTEGER NOT NULL DEFAULT 0
+- `goal` TEXT NULL
+- `start_date` TEXT NULL
+- `end_date` TEXT NULL
+- `metadata_json` TEXT NULL
+- `created_by` TEXT NULL
+- `updated_by` TEXT NULL
+- `created_at` TEXT NOT NULL
+- `updated_at` TEXT NOT NULL
 
----
+Constraint:
+- one default backlog per project: partial unique on `project_id` where `is_default = 1`
 
-## 5) `backlogs`
+## 7) `backlog_stories`
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `project_id` | `TEXT` | no | nullable => global backlog |
-| `name` | `TEXT` | yes | e.g. `Backlog`, `Sprint 12`, `Future Ideas` |
-| `kind` | `TEXT` | yes | `BACKLOG`,`SPRINT`,`IDEAS` |
-| `status` | `TEXT` | yes | `ACTIVE` / `CLOSED` |
-| `is_default` | `INTEGER` | yes | boolean (0/1), default 0 |
-| `goal` | `TEXT` | no | sprint/backlog goal |
-| `start_date` | `TEXT` | no | date for sprint |
-| `end_date` | `TEXT` | no | date for sprint |
-| `created_at` | `TEXT` | yes | ISO datetime |
-| `updated_at` | `TEXT` | yes | ISO datetime |
-
-Rules:
-- A project can have many backlogs.
-- Every new project should auto-create one default backlog (`is_default = 1`).
-- Global backlog (`project_id = NULL`) supports ideas for future projects.
-- Enforce at most one default backlog per project (partial unique index on `project_id` where `is_default = 1`).
-
----
-
-## 6) `backlog_stories`
-
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `backlog_id` | `TEXT` | yes | FK -> `backlogs.id` |
-| `story_id` | `TEXT` | yes | FK -> `stories.id` |
-| `position` | `INTEGER` | yes | ordering inside backlog |
-| `added_at` | `TEXT` | yes | ISO datetime |
+- `backlog_id` TEXT NOT NULL
+- `story_id` TEXT NOT NULL
+- `position` INTEGER NOT NULL
+- `added_at` TEXT NOT NULL
 
 Constraints:
 - `PRIMARY KEY(backlog_id, story_id)`
 - `UNIQUE(story_id)` (story in max one backlog at a time)
 
----
+## 8) `backlog_tasks`
 
-## 7) `backlog_tasks`
-
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `backlog_id` | `TEXT` | yes | FK -> `backlogs.id` |
-| `task_id` | `TEXT` | yes | FK -> `tasks.id` |
-| `position` | `INTEGER` | yes | ordering inside backlog |
-| `added_at` | `TEXT` | yes | ISO datetime |
+- `backlog_id` TEXT NOT NULL
+- `task_id` TEXT NOT NULL
+- `position` INTEGER NOT NULL
+- `added_at` TEXT NOT NULL
 
 Constraints:
 - `PRIMARY KEY(backlog_id, task_id)`
 - `UNIQUE(task_id)` (task in max one backlog at a time)
 
----
+## 9) `agents`
 
-## 8) `agents`
+- `id` TEXT PK (UUID)
+- `openclaw_key` TEXT NOT NULL UNIQUE
+- `name` TEXT NOT NULL
+- `role` TEXT NULL
+- `worker_type` TEXT NULL
+- `is_active` INTEGER NOT NULL
+- `source` TEXT NOT NULL (`openclaw_json`/`manual`)
+- `metadata_json` TEXT NULL
+- `last_synced_at` TEXT NULL
+- `created_at` TEXT NOT NULL
+- `updated_at` TEXT NOT NULL
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `openclaw_key` | `TEXT` | yes | unique id/key from `openclaw.json` |
-| `name` | `TEXT` | yes | display name |
-| `role` | `TEXT` | no | e.g. `Principal Developer` |
-| `worker_type` | `TEXT` | no | e.g. `coder`,`research`,`qa` |
-| `is_active` | `INTEGER` | yes | boolean |
-| `source` | `TEXT` | yes | `openclaw_json` or `manual` |
-| `metadata_json` | `TEXT` | no | raw extra config |
-| `last_synced_at` | `TEXT` | no | sync timestamp |
-| `created_at` | `TEXT` | yes | ISO datetime |
-| `updated_at` | `TEXT` | yes | ISO datetime |
+## 10) `task_assignments`
 
-Integration note:
-- `openclaw.json` remains runtime config source.
-- DB `agents` table is operational planning source (assignments, analytics, history).
-- Sync job upserts agents by `openclaw_key`.
+- `id` TEXT PK (UUID)
+- `task_id` TEXT NOT NULL
+- `agent_id` TEXT NOT NULL
+- `assigned_at` TEXT NOT NULL
+- `unassigned_at` TEXT NULL
+- `assigned_by` TEXT NULL
+- `reason` TEXT NULL
 
----
+Constraint:
+- one active assignment per task: partial unique on `task_id` where `unassigned_at IS NULL`
 
-## 9) `task_assignments`
+## 11) `labels`
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `task_id` | `TEXT` | yes | FK -> `tasks.id` |
-| `agent_id` | `TEXT` | yes | FK -> `agents.id` |
-| `assigned_at` | `TEXT` | yes | ISO datetime |
-| `unassigned_at` | `TEXT` | no | null while active |
-| `assigned_by` | `TEXT` | no | actor/system |
-| `reason` | `TEXT` | no | optional note |
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (`NULL` => global label)
+- `name` TEXT NOT NULL
+- `color` TEXT NULL
+- `created_at` TEXT NOT NULL
 
 Constraints:
-- one active assignment per task (`UNIQUE(task_id)` where `unassigned_at IS NULL` via partial index)
+- unique project label name: `UNIQUE(project_id, name)` when `project_id IS NOT NULL`
+- unique global label name: `UNIQUE(name)` when `project_id IS NULL`
+
+## 12) `story_labels`
+
+- `story_id` TEXT NOT NULL
+- `label_id` TEXT NOT NULL
+- `added_at` TEXT NOT NULL
+
+Constraint:
+- `PRIMARY KEY(story_id, label_id)`
+
+## 13) `task_labels`
+
+- `task_id` TEXT NOT NULL
+- `label_id` TEXT NOT NULL
+- `added_at` TEXT NOT NULL
+
+Constraint:
+- `PRIMARY KEY(task_id, label_id)`
+
+## 14) `comments`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (denormalized context)
+- `entity_type` TEXT NOT NULL (`project`/`backlog`/`epic`/`story`/`task`)
+- `entity_id` TEXT NOT NULL
+- `body` TEXT NOT NULL
+- `created_by` TEXT NULL
+- `created_at` TEXT NOT NULL
+- `edited_by` TEXT NULL
+- `edited_at` TEXT NULL
+
+Notes:
+- flat comments (no threading in v1)
+- hard delete (no soft-delete columns)
+
+## 15) `attachments`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (denormalized context)
+- `entity_type` TEXT NOT NULL (`project`/`backlog`/`epic`/`story`/`task`)
+- `entity_id` TEXT NOT NULL
+- `filename` TEXT NOT NULL
+- `content_type` TEXT NULL
+- `size_bytes` INTEGER NULL
+- `storage_url` TEXT NULL
+- `file_path` TEXT NULL
+- `metadata_json` TEXT NULL
+- `created_by` TEXT NULL
+- `created_at` TEXT NOT NULL
+
+Notes:
+- one attachment belongs to exactly one entity
+- DB stores metadata/path only (no BLOB in v1)
+
+## 16) `activity_log`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL (required for project-scoped events, NULL only for global)
+- `entity_type` TEXT NOT NULL (primary subject type)
+- `entity_id` TEXT NOT NULL (primary subject id)
+- `epic_id` TEXT NULL
+- `story_id` TEXT NULL
+- `task_id` TEXT NULL
+- `backlog_id` TEXT NULL
+- `actor_type` TEXT NOT NULL (`human`/`agent`/`system`)
+- `actor_id` TEXT NULL
+- `session_id` TEXT NULL
+- `run_id` TEXT NULL
+- `event_name` TEXT NOT NULL (e.g. `task.status.changed`)
+- `message` TEXT NULL
+- `event_data_json` TEXT NULL (schema-less JSON)
+- `created_at` TEXT NOT NULL
+
+Notes:
+- append-only
+- v1 scope: key events for core planning entities only (not comments/attachments)
+
+## 17) `epic_status_history`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL
+- `epic_id` TEXT NOT NULL (logical reference)
+- `from_status` TEXT NULL
+- `to_status` TEXT NOT NULL
+- `changed_by` TEXT NULL
+- `changed_at` TEXT NOT NULL
+- `note` TEXT NULL
+
+## 18) `story_status_history`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL
+- `story_id` TEXT NOT NULL (logical reference)
+- `from_status` TEXT NULL
+- `to_status` TEXT NOT NULL
+- `changed_by` TEXT NULL
+- `changed_at` TEXT NOT NULL
+- `note` TEXT NULL
+
+## 19) `task_status_history`
+
+- `id` TEXT PK (UUID)
+- `project_id` TEXT NULL
+- `task_id` TEXT NOT NULL (logical reference)
+- `from_status` TEXT NULL
+- `to_status` TEXT NOT NULL
+- `changed_by` TEXT NULL
+- `changed_at` TEXT NOT NULL
+- `note` TEXT NULL
 
 ---
 
-## 10) `epic_status_history`
+## Relationship Highlights
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `epic_id` | `TEXT` | yes | FK -> `epics.id` |
-| `from_status` | `TEXT` | no | nullable for first state |
-| `to_status` | `TEXT` | yes | target state |
-| `changed_at` | `TEXT` | yes | ISO datetime |
-| `changed_by` | `TEXT` | no | actor/system |
-| `note` | `TEXT` | no | reason/comment |
+- `project` has many `epics`, `stories`, `tasks`, `backlogs`.
+- `epic` has many `stories`.
+- `story` has many `tasks` (optional relation).
+- `backlog` can include many stories and many tasks.
+- one story/task can belong to at most one backlog at a time.
+- one task can have at most one active assignment.
+- labels apply to stories/tasks only in v1.
 
 ---
 
-## 11) `story_status_history`
+## Deletion & Audit Policy
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `story_id` | `TEXT` | yes | FK -> `stories.id` |
-| `from_status` | `TEXT` | no | nullable for first state |
-| `to_status` | `TEXT` | yes | target state |
-| `changed_at` | `TEXT` | yes | ISO datetime |
-| `changed_by` | `TEXT` | no | actor/system |
-| `note` | `TEXT` | no | reason/comment |
+### Core entities
+- hard delete is allowed.
+- cascade is allowed on core hierarchy/mapping tables.
+
+### Audit entities (`activity_log`, `*_status_history`)
+- audit records should remain after core entity deletion.
+- therefore, audit tables use logical references (`entity_id` fields) and should avoid destructive FK cascades to core records.
 
 ---
 
-## 12) `task_status_history`
+## Remaining Open Questions
 
-| Field | Type | Req | Notes |
-|---|---|---|---|
-| `id` | `TEXT` (UUID) | yes | PK |
-| `task_id` | `TEXT` | yes | FK -> `tasks.id` |
-| `from_status` | `TEXT` | no | nullable for first state |
-| `to_status` | `TEXT` | yes | target state |
-| `changed_at` | `TEXT` | yes | ISO datetime |
-| `changed_by` | `TEXT` | no | actor/system |
-| `note` | `TEXT` | no | reason/comment |
-
----
-
-## Relationship Map
-
-```mermaid
-erDiagram
-  projects ||--o{ epics : contains
-  projects ||--o{ stories : contains
-  projects ||--o{ tasks : contains
-  projects ||--o{ backlogs : owns
-
-  epics ||--o{ stories : groups
-  stories ||--o{ tasks : optional_parent
-
-  backlogs ||--o{ backlog_stories : includes
-  stories ||--o{ backlog_stories : member_of
-
-  backlogs ||--o{ backlog_tasks : includes
-  tasks ||--o{ backlog_tasks : member_of
-
-  agents ||--o{ task_assignments : assigned
-  tasks ||--o{ task_assignments : has
-
-  epics ||--o{ epic_status_history : status_changes
-  stories ||--o{ story_status_history : status_changes
-  tasks ||--o{ task_status_history : status_changes
-```
-
----
-
-## Domain Rules / Invariants
-
-1. Stories and tasks may exist without `project_id` permanently.
-2. If an item is in a project backlog, its `project_id` must match the backlog project.
-3. If an item is in a global backlog (`project_id = NULL` on backlog), the item must also have `project_id = NULL`.
-4. Story/task are each in at most one backlog at a time (v1 simplification).
-5. Backlog membership is optional for both stories and tasks.
-6. If task has `story_id`, task and story should share same `project_id` (or task inherits story project).
-7. Task has at most one active assignee at a time.
-8. Every status change and assignment change must be persisted in history tables.
-9. Every project should have exactly one default backlog (`is_default = 1`).
-10. Entity schema must support derived status and temporary status override on stories/epics.
-
----
-
-## Open Questions (remaining)
-
-1. Should we add WIP limits per backlog/sprint in v2?
-2. Should we support multi-assignee tasks in a later version?
-3. Do we need dedicated blocked-history tables (beyond current status/assignment history)?
-
-For currently agreed workflow behavior, see [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md).
-
----
-
-## Suggested Migration Path (high-level)
-
-1. Create new tables in `mission-control.db` for planning domain.
-2. Build importer from filesystem (`STORY.md`, task YAML, task folders) into DB entities.
-3. Run dual-read validation (filesystem vs DB views).
-4. Switch UI/API reads to DB.
-5. Keep optional filesystem export for Supervisor compatibility until full cutover.
+1. Add WIP limits in v2?
+2. Add multi-assignee tasks in future versions?
+3. Expand `activity_log` from key events to full field-level logging?
 
 ---
 
 ## Navigation
 
 - ↑ [Documentation Index](./INDEX.md)
+- → [Workflow Logic v1](./WORKFLOW_LOGIC_V1.md)
 - ↑ [README.md](../README.md)
 - ↑ [AGENTS.md](../AGENTS.md)
