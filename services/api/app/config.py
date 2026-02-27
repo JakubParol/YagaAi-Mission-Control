@@ -1,7 +1,14 @@
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env into os.environ so both MC_API_* (pydantic prefix) and
+# shared vars (MC_DB_PATH, LANGFUSE_*, SUPERVISOR_SYSTEM_PATH) are available.
+_env_file = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_env_file, override=False)
 
 
 class Settings(BaseSettings):
@@ -16,7 +23,7 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3100"]
 
-    model_config = SettingsConfigDict(env_prefix="MC_API_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="MC_API_")
 
     @model_validator(mode="after")
     def resolve_shared_env_vars(self) -> "Settings":
@@ -32,6 +39,13 @@ class Settings(BaseSettings):
             self.langfuse_public_key = os.environ.get("LANGFUSE_PUBLIC_KEY", "")
         if not self.langfuse_secret_key:
             self.langfuse_secret_key = os.environ.get("LANGFUSE_SECRET_KEY", "")
+
+        if not self.db_path:
+            msg = "MC_API_DB_PATH or MC_DB_PATH must be set"
+            raise ValueError(msg)
+        if not self.supervisor_system_path:
+            msg = "MC_API_SUPERVISOR_SYSTEM_PATH or SUPERVISOR_SYSTEM_PATH must be set"
+            raise ValueError(msg)
         return self
 
 

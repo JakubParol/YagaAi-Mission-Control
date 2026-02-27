@@ -71,6 +71,9 @@ class SupervisorAdapterPort(ABC):
     async def list_stories(self) -> list[SupervisorStory]: ...
 
     @abstractmethod
+    async def get_board(self) -> tuple[list[SupervisorStory], list[SupervisorTask]]: ...
+
+    @abstractmethod
     async def get_story(self, story_id: str) -> SupervisorStory | None: ...
 
     @abstractmethod

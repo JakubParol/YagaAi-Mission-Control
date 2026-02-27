@@ -9,7 +9,7 @@ export function ConnectionStatus() {
   const mountedRef = useRef(true);
 
   const check = useCallback(() => {
-    fetch(apiUrl('/v1/observability/supervisor/stories'))
+    fetch(apiUrl('/healthz'))
       .then((res) => {
         if (mountedRef.current) setOk(res.ok);
       })

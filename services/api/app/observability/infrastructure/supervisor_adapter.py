@@ -51,6 +51,14 @@ _AGENT_CONFIGS = [
 ]
 
 
+def _validate_path_segment(segment: str) -> str:
+    """Reject path traversal attempts in URL path segments."""
+    if ".." in segment or os.sep in segment or "/" in segment:
+        msg = f"Invalid path segment: {segment}"
+        raise ValueError(msg)
+    return segment
+
+
 class FilesystemSupervisorAdapter(SupervisorAdapterPort):
     def __init__(self, supervisor_system_path: str) -> None:
         self._root = supervisor_system_path
@@ -84,7 +92,41 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
             stories.append(SupervisorStory(id=story_id, content=content, task_counts=task_counts))
         return stories
 
+    async def get_board(self) -> tuple[list[SupervisorStory], list[SupervisorTask]]:
+        """Return stories and all tasks in a single pass (no N+1)."""
+        try:
+            entries = await asyncio.to_thread(os.listdir, self._stories_path)
+        except FileNotFoundError:
+            return [], []
+
+        stories: list[SupervisorStory] = []
+        all_tasks: list[SupervisorTask] = []
+
+        for story_id in entries:
+            story_dir = os.path.join(self._stories_path, story_id)
+            if not await asyncio.to_thread(os.path.isdir, story_dir):
+                continue
+
+            content = ""
+            story_file = os.path.join(story_dir, "STORY.md")
+            try:
+                content = await asyncio.to_thread(Path(story_file).read_text, "utf-8")
+            except (FileNotFoundError, OSError):
+                pass
+
+            tasks = await self.list_tasks_for_story(story_id)
+            task_counts: dict[str, int] = {s: 0 for s in TASK_STATES}
+            for task in tasks:
+                if task.state in task_counts:
+                    task_counts[task.state] += 1
+
+            stories.append(SupervisorStory(id=story_id, content=content, task_counts=task_counts))
+            all_tasks.extend(tasks)
+
+        return stories, all_tasks
+
     async def get_story(self, story_id: str) -> SupervisorStory | None:
+        _validate_path_segment(story_id)
         story_file = os.path.join(self._stories_path, story_id, "STORY.md")
         try:
             content = await asyncio.to_thread(Path(story_file).read_text, "utf-8")
@@ -100,6 +142,7 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
         return SupervisorStory(id=story_id, content=content, task_counts=task_counts)
 
     async def list_tasks_for_story(self, story_id: str) -> list[SupervisorTask]:
+        _validate_path_segment(story_id)
         tasks_dir = os.path.join(self._stories_path, story_id, "TASKS")
         tasks: list[SupervisorTask] = []
 
@@ -119,6 +162,8 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
         return tasks
 
     async def get_task(self, story_id: str, task_id: str) -> SupervisorTask | None:
+        _validate_path_segment(story_id)
+        _validate_path_segment(task_id)
         tasks_dir = os.path.join(self._stories_path, story_id, "TASKS")
 
         for state in TASK_STATES:
@@ -137,6 +182,8 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
         return None
 
     async def get_task_results(self, story_id: str, task_id: str) -> TaskResult | None:
+        _validate_path_segment(story_id)
+        _validate_path_segment(task_id)
         results_dir = os.path.join(self._stories_path, story_id, "RESULTS", task_id)
         try:
             is_dir = await asyncio.to_thread(os.path.isdir, results_dir)

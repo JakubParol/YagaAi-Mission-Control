@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 from app.observability.application.ports import LangfuseClientPort, LangfuseRepositoryPort
 from app.observability.domain.models import DailyMetric, ImportRecord, LangfuseRequest
+
+logger = logging.getLogger(__name__)
 
 FULL_IMPORT_LOOKBACK_DAYS = 90
 
@@ -48,14 +51,10 @@ class ImportService:
                 "status": "success",
             }
         except Exception as err:
+            logger.exception("Langfuse import failed")
             error_message = str(err)
             await self._repo.complete_import_run(import_run.id, "failed", error_message)
-            return {
-                **_import_record_to_dict(import_run),
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "status": "failed",
-                "error_message": error_message,
-            }
+            raise
 
     @staticmethod
     def _transform_daily_metrics(raw: list[dict]) -> list[DailyMetric]:

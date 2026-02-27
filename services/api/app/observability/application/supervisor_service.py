@@ -22,12 +22,7 @@ class SupervisorService:
         return story, tasks
 
     async def get_board(self) -> tuple[list[SupervisorStory], list[SupervisorTask]]:
-        stories = await self._adapter.list_stories()
-        all_tasks: list[SupervisorTask] = []
-        for story in stories:
-            tasks = await self._adapter.list_tasks_for_story(story.id)
-            all_tasks.extend(tasks)
-        return stories, all_tasks
+        return await self._adapter.get_board()
 
     async def get_task(
         self, story_id: str, task_id: str

@@ -101,7 +101,7 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
     async def get_metrics_by_time_range(self, from_ts: str, to_ts: str) -> list[DailyMetric]:
         cursor = await self._db.execute(
             "SELECT "
-            "  SUBSTR(?, 1, 10) AS date, "
+            "  SUBSTR(started_at, 1, 10) AS date, "
             "  model, "
             "  SUM(input_tokens) AS input_tokens, "
             "  SUM(output_tokens) AS output_tokens, "
@@ -110,9 +110,9 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
             "  COALESCE(SUM(cost), 0) AS total_cost "
             "FROM langfuse_requests "
             "WHERE started_at >= ? AND started_at < ? AND model IS NOT NULL "
-            "GROUP BY model "
-            "ORDER BY total_cost DESC",
-            (from_ts, from_ts, to_ts),
+            "GROUP BY date, model "
+            "ORDER BY date ASC, total_cost DESC",
+            (from_ts, to_ts),
         )
         rows = await cursor.fetchall()
         return [_row_to_daily_metric(r) for r in rows]

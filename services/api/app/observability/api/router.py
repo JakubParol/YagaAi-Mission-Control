@@ -11,9 +11,17 @@ from app.observability.dependencies import (
     get_import_service,
     get_supervisor_service,
 )
+from app.observability.domain.models import SupervisorTask
 from app.shared.api.errors import NotFoundError
 
 router = APIRouter(tags=["observability"])
+
+
+def _task_to_dict(task: SupervisorTask) -> dict:
+    """Serialize SupervisorTask with camelCase keys matching the frontend."""
+    d = asdict(task)
+    d["parseError"] = d.pop("parse_error")
+    return d
 
 
 # --- Agents ---
@@ -115,7 +123,7 @@ async def get_story(
     story, tasks = await service.get_story(story_id)
     if not story:
         raise NotFoundError("Story not found")
-    return {"story": asdict(story), "tasks": [asdict(t) for t in tasks]}
+    return {"story": asdict(story), "tasks": [_task_to_dict(t) for t in tasks]}
 
 
 @router.get("/supervisor/board")
@@ -125,7 +133,7 @@ async def get_board(
     stories, tasks = await service.get_board()
     return {
         "stories": [asdict(s) for s in stories],
-        "tasks": [asdict(t) for t in tasks],
+        "tasks": [_task_to_dict(t) for t in tasks],
     }
 
 
@@ -139,6 +147,6 @@ async def get_task(
     if not task:
         raise NotFoundError("Task not found")
     return {
-        "task": asdict(task),
+        "task": _task_to_dict(task),
         "results": asdict(results) if results else None,
     }
