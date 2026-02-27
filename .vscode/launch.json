@@ -2,9 +2,10 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Next.js: debug server-side",
+      "name": "Web (Next.js)",
       "type": "node",
       "request": "launch",
+      "cwd": "${workspaceFolder}/apps/web",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "env": {
@@ -19,36 +20,22 @@
       }
     },
     {
-      "name": "Next.js: debug client-side",
-      "type": "chrome",
+      "name": "API (FastAPI)",
+      "type": "debugpy",
       "request": "launch",
-      "url": "http://localhost:3000"
-    },
-    {
-      "name": "Next.js: debug full stack",
-      "type": "node",
-      "request": "launch",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/services/api",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--port", "8080"],
       "env": {
-        "NODE_OPTIONS": "--inspect"
+        "MC_API_ENV": "dev"
       },
-      "restart": true,
-      "console": "integratedTerminal",
-      "serverReadyAction": {
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s",
-        "action": "debugWithChrome"
-      },
-      "compounds": []
-    },
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
     {
-      "name": "Next.js: attach to running dev server",
-      "type": "node",
-      "request": "attach",
-      "port": 9229,
-      "restart": true,
-      "skipFiles": ["<node_internals>/**"]
+      "name": "Full Stack (Web + API)",
+      "configurations": ["Web (Next.js)", "API (FastAPI)"]
     }
   ]
 }
