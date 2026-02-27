@@ -1,15 +1,34 @@
 # Documentation Index — Mission Control
 
-## Documents
+## Mandatory
+
+These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 
 | Document | Description |
 |---|---|
-| [README.md](../README.md) | Project overview, setup, configuration, and architecture |
-| [README.md § Deployment](../README.md#deployment) | Production build, port 3100, systemd service |
-| [mission-control.service](../mission-control.service) | Systemd unit file for running as a daemon |
-| [AGENTS.md](../AGENTS.md) | AI agent context and coding rules |
-| [ENTITY_MODEL_V1.md](./ENTITY_MODEL_V1.md) | Draft v1 Jira-like entity model (projects, epics, stories, tasks, backlogs, agents, assignments) |
-| [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md) | Agreed v1 workflow logic (derived statuses, blocking propagation, assignment and backlog rules) |
+| [REPO_MAP.md](./REPO_MAP.md) | All projects in this monorepo — what, where, how to navigate |
+
+## Domain Design
+
+| Document | Description |
+|---|---|
+| [ENTITY_MODEL_V1.md](./ENTITY_MODEL_V1.md) | V1 entity model — projects, epics, stories, tasks, backlogs, agents |
+| [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md) | V1 workflow logic — status derivation, blocking, assignments, backlogs |
+
+## Project Docs
+
+| Project | Docs |
+|---|---|
+| Web | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
+| CLI | [`apps/cli/AGENTS.md`](../apps/cli/AGENTS.md) (placeholder) |
+| API | [`services/api/AGENTS.md`](../services/api/AGENTS.md), [`services/api/docs/INDEX.md`](../services/api/docs/INDEX.md) |
+
+## Other
+
+| Document | Description |
+|---|---|
+| [README.md](../README.md) | Project overview, setup, deployment |
+| [AGENTS.md](../AGENTS.md) | AI agent context, rules, required reading |
 
 ## Navigation
 

@@ -2,58 +2,67 @@
 
 ## What This Is
 
-Mission Control is a read-only web dashboard for the Supervisor System. It reads stories, tasks, and results from the SUPERVISOR_SYSTEM filesystem and displays them in a navigable UI.
+Mission Control is a monorepo for managing AI agent workflows. It contains a web dashboard, a REST API, and a CLI (planned).
 
 ## Scope
 
-- **In scope:** Read-only views of stories, tasks (by state), task details, results
-- **Out of scope:** Write operations, authentication, database, websockets, worker management
+- **In scope:** Dashboard UI, REST API (planning + observability modules), CLI (planned), SQLite persistence, Langfuse integration, Supervisor System filesystem reads
+- **Out of scope:** Authentication enforcement (v2), real-time WebSocket events (v2), multi-tenancy (v2)
 
-## Required Reading
+## Required Reading (Mandatory)
 
-Before making changes, read:
+Before making any changes, read **all** of the following:
 
 1. This file
-2. [README.md](./README.md) — project overview, setup, architecture
-3. [docs/INDEX.md](./docs/INDEX.md) — documentation index
-4. `src/lib/types.ts` — domain model
-5. `src/lib/adapters/` — understand the read layer before adding features
+2. [Workspace coding standards](/home/kuba/.openclaw/standards/coding-standards.md)
+3. [Workspace documentation standard](/home/kuba/.openclaw/standards/documentation.md)
+4. [docs/INDEX.md](./docs/INDEX.md) — documentation index (includes mandatory link to Repo Map)
 
-## Tech Decisions
+## Drill-Down Rule
 
-| Decision | Rationale |
+The documents above give you the full repo context. When working on a **specific project**, drill down:
+
+1. Read the project's `AGENTS.md` (e.g. `services/api/AGENTS.md`)
+2. Read its mandatory references (if any)
+3. Read the project's `docs/INDEX.md`
+4. From there, read what's relevant to the task at hand
+
+Use [docs/REPO_MAP.md](./docs/REPO_MAP.md) to find project paths and their entry points.
+
+## Startup Report
+
+At the start of every session, **report which documents you read** before proceeding. Format:
+
+```
+Read on startup:
+- /AGENTS.md
+- standards/coding-standards.md
+- standards/documentation.md
+- docs/INDEX.md
+- docs/REPO_MAP.md
+```
+
+If you then drill into a project, report that too.
+
+## Tech Stack
+
+| Layer | Tech |
 |---|---|
-| Server Components for data | Adapters use `fs` — must be server-only |
-| `server-only` package | Enforces adapters never leak to client bundles |
-| `js-yaml` for YAML parsing | Lightweight, widely used, handles task YAML well |
-| No API routes for reads | Server Components can call adapters directly |
-| `force-dynamic` on pages | Data comes from filesystem — must be fresh |
-| Dark mode default | `<html className="dark">` — operator dashboard aesthetic |
+| Frontend | Next.js 15, TypeScript, Tailwind CSS v4, shadcn/ui |
+| API | FastAPI, Python 3.12, async, pydantic |
+| CLI | Planned |
+| Database | SQLite (aiosqlite for API, better-sqlite3 for frontend) |
+| External | Langfuse (LLM observability), Supervisor System (filesystem) |
 
 ## Rules
 
-- **Adapters are the only filesystem interface.** No `fs` imports outside `src/lib/adapters/`.
-- **Types are the contract.** UI components depend on types from `src/lib/types.ts`, not raw data shapes.
-- **Server-only enforcement.** Every adapter file must `import "server-only"` at the top.
-- **No write operations.** This is strictly read-only in v1.
-- **Follow workspace standards.** See `standards/coding-standards.md` and `standards/documentation.md` in the parent workspace.
-
-## Data Source
-
-The app reads from the SUPERVISOR_SYSTEM filesystem:
-
-```
-SUPERVISOR_SYSTEM/
-├── STORIES/<id>/
-│   ├── STORY.md
-│   ├── TASKS/{PLANNED,ASSIGNED,DONE,BLOCKED}/*.yaml
-│   └── RESULTS/<task-id>/
-└── supervisor/state/last-tick.md
-```
-
-Path is configurable via `SUPERVISOR_SYSTEM_PATH` env var.
+- **Follow workspace standards.** [coding-standards.md](/home/kuba/.openclaw/standards/coding-standards.md) and [documentation.md](/home/kuba/.openclaw/standards/documentation.md) apply everywhere.
+- **Package by feature.** Group by domain concept, not by technical layer.
+- **Async-first.** API endpoints, DB access, and external IO are async.
+- **No cross-project imports.** Apps and services do not import from each other.
 
 ## Navigation
 
-- ↑ [README.md](./README.md)
+- → [README.md](./README.md)
 - → [docs/INDEX.md](./docs/INDEX.md)
+- → [docs/REPO_MAP.md](./docs/REPO_MAP.md)

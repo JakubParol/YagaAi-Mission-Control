@@ -2,11 +2,13 @@
 # Mission Control — deploy after merge to main
 set -e
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 echo "📦 Switching to main and pulling..."
 git checkout main
 git pull origin main
+
+cd apps/web
 
 echo "🧹 Cleaning .next..."
 rm -rf .next
