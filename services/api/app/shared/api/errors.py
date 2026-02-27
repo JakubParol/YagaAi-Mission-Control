@@ -24,6 +24,16 @@ class ValidationError(AppError):
         super().__init__(400, message, "VALIDATION_ERROR")
 
 
+class BusinessRuleError(AppError):
+    def __init__(self, message: str = "Business rule violation") -> None:
+        super().__init__(400, message, "BUSINESS_RULE_VIOLATION")
+
+
+class ConflictError(AppError):
+    def __init__(self, message: str = "Conflict") -> None:
+        super().__init__(409, message, "CONFLICT")
+
+
 async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,

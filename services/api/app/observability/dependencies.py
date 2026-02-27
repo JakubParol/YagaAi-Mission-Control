@@ -1,6 +1,3 @@
-import sqlite3
-from collections.abc import AsyncGenerator
-
 import aiosqlite
 from fastapi import Depends
 
@@ -9,12 +6,7 @@ from app.observability.application.import_service import ImportService
 from app.observability.application.metrics_service import MetricsService
 from app.observability.infrastructure.langfuse_client import HttpLangfuseClient
 from app.observability.infrastructure.langfuse_repository import SqliteLangfuseRepository
-
-
-async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = sqlite3.Row
-        yield db
+from app.shared.api.deps import get_db
 
 
 async def get_metrics_service(

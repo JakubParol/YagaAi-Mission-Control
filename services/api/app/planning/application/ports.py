@@ -1,0 +1,118 @@
+from abc import ABC, abstractmethod
+
+from app.planning.domain.models import Agent, Backlog, Label, Project
+
+
+class ProjectRepository(ABC):
+    @abstractmethod
+    async def list(
+        self,
+        *,
+        status: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[Project], int]: ...
+
+    @abstractmethod
+    async def get_by_id(self, project_id: str) -> Project | None: ...
+
+    @abstractmethod
+    async def key_exists(self, key: str) -> bool: ...
+
+    @abstractmethod
+    async def create(self, project: Project) -> Project: ...
+
+    @abstractmethod
+    async def update(self, project_id: str, data: dict) -> Project | None: ...
+
+    @abstractmethod
+    async def delete(self, project_id: str) -> bool: ...
+
+    @abstractmethod
+    async def create_project_counter(self, project_id: str) -> None: ...
+
+
+class AgentRepository(ABC):
+    @abstractmethod
+    async def list(
+        self,
+        *,
+        is_active: bool | None = None,
+        source: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[Agent], int]: ...
+
+    @abstractmethod
+    async def get_by_id(self, agent_id: str) -> Agent | None: ...
+
+    @abstractmethod
+    async def create(self, agent: Agent) -> Agent: ...
+
+    @abstractmethod
+    async def update(self, agent_id: str, data: dict) -> Agent | None: ...
+
+    @abstractmethod
+    async def delete(self, agent_id: str) -> bool: ...
+
+
+class LabelRepository(ABC):
+    @abstractmethod
+    async def list(
+        self,
+        *,
+        project_id: str | None = None,
+        filter_global: bool = False,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[Label], int]: ...
+
+    @abstractmethod
+    async def get_by_id(self, label_id: str) -> Label | None: ...
+
+    @abstractmethod
+    async def name_exists(self, name: str, project_id: str | None) -> bool: ...
+
+    @abstractmethod
+    async def create(self, label: Label) -> Label: ...
+
+    @abstractmethod
+    async def delete(self, label_id: str) -> bool: ...
+
+
+class BacklogRepository(ABC):
+    @abstractmethod
+    async def list(
+        self,
+        *,
+        project_id: str | None = None,
+        filter_global: bool = False,
+        status: str | None = None,
+        kind: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[Backlog], int]: ...
+
+    @abstractmethod
+    async def get_by_id(self, backlog_id: str) -> Backlog | None: ...
+
+    @abstractmethod
+    async def create(self, backlog: Backlog) -> Backlog: ...
+
+    @abstractmethod
+    async def update(self, backlog_id: str, data: dict) -> Backlog | None: ...
+
+    @abstractmethod
+    async def delete(self, backlog_id: str) -> bool: ...
+
+    @abstractmethod
+    async def has_default(self, project_id: str | None) -> bool: ...
+
+    @abstractmethod
+    async def get_story_count(self, backlog_id: str) -> int: ...
+
+    @abstractmethod
+    async def get_task_count(self, backlog_id: str) -> int: ...
