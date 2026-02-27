@@ -6,13 +6,13 @@ from pathlib import Path
 
 import yaml
 
-from app.observability.application.ports import SupervisorAdapterPort
+from app.observability.application.ports import WorkflowAdapterPort
 from app.observability.domain.models import (
     AgentStatus,
     ResultFile,
-    SupervisorStory,
-    SupervisorTask,
     TaskResult,
+    WorkflowStory,
+    WorkflowTask,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,12 +59,12 @@ def _validate_path_segment(segment: str) -> str:
     return segment
 
 
-class FilesystemSupervisorAdapter(SupervisorAdapterPort):
-    def __init__(self, supervisor_system_path: str) -> None:
-        self._root = supervisor_system_path
-        self._stories_path = os.path.join(supervisor_system_path, "STORIES")
+class FilesystemWorkflowAdapter(WorkflowAdapterPort):
+    def __init__(self, workflow_system_path: str) -> None:
+        self._root = workflow_system_path
+        self._stories_path = os.path.join(workflow_system_path, "STORIES")
 
-    async def list_stories(self) -> list[SupervisorStory]:
+    async def list_stories(self) -> list[WorkflowStory]:
         try:
             entries = await asyncio.to_thread(os.listdir, self._stories_path)
         except FileNotFoundError:
@@ -89,18 +89,18 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
                 if task.state in task_counts:
                     task_counts[task.state] += 1
 
-            stories.append(SupervisorStory(id=story_id, content=content, task_counts=task_counts))
+            stories.append(WorkflowStory(id=story_id, content=content, task_counts=task_counts))
         return stories
 
-    async def get_board(self) -> tuple[list[SupervisorStory], list[SupervisorTask]]:
+    async def get_board(self) -> tuple[list[WorkflowStory], list[WorkflowTask]]:
         """Return stories and all tasks in a single pass (no N+1)."""
         try:
             entries = await asyncio.to_thread(os.listdir, self._stories_path)
         except FileNotFoundError:
             return [], []
 
-        stories: list[SupervisorStory] = []
-        all_tasks: list[SupervisorTask] = []
+        stories: list[WorkflowStory] = []
+        all_tasks: list[WorkflowTask] = []
 
         for story_id in entries:
             story_dir = os.path.join(self._stories_path, story_id)
@@ -120,12 +120,12 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
                 if task.state in task_counts:
                     task_counts[task.state] += 1
 
-            stories.append(SupervisorStory(id=story_id, content=content, task_counts=task_counts))
+            stories.append(WorkflowStory(id=story_id, content=content, task_counts=task_counts))
             all_tasks.extend(tasks)
 
         return stories, all_tasks
 
-    async def get_story(self, story_id: str) -> SupervisorStory | None:
+    async def get_story(self, story_id: str) -> WorkflowStory | None:
         _validate_path_segment(story_id)
         story_file = os.path.join(self._stories_path, story_id, "STORY.md")
         try:
@@ -139,12 +139,12 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
             if task.state in task_counts:
                 task_counts[task.state] += 1
 
-        return SupervisorStory(id=story_id, content=content, task_counts=task_counts)
+        return WorkflowStory(id=story_id, content=content, task_counts=task_counts)
 
-    async def list_tasks_for_story(self, story_id: str) -> list[SupervisorTask]:
+    async def list_tasks_for_story(self, story_id: str) -> list[WorkflowTask]:
         _validate_path_segment(story_id)
         tasks_dir = os.path.join(self._stories_path, story_id, "TASKS")
-        tasks: list[SupervisorTask] = []
+        tasks: list[WorkflowTask] = []
 
         for state in TASK_STATES:
             state_dir = os.path.join(tasks_dir, state)
@@ -161,7 +161,7 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
 
         return tasks
 
-    async def get_task(self, story_id: str, task_id: str) -> SupervisorTask | None:
+    async def get_task(self, story_id: str, task_id: str) -> WorkflowTask | None:
         _validate_path_segment(story_id)
         _validate_path_segment(task_id)
         tasks_dir = os.path.join(self._stories_path, story_id, "TASKS")
@@ -270,7 +270,7 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
 
         return assigned
 
-    async def _parse_task_file(self, file_path: str, state: str, story_id: str) -> SupervisorTask:
+    async def _parse_task_file(self, file_path: str, state: str, story_id: str) -> WorkflowTask:
         filename = os.path.basename(file_path)
         base_name = filename.rsplit(".", 1)[0] if "." in filename else filename
 
@@ -288,7 +288,7 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
                 logger.warning("[parseTaskFile] %s: %s", filename, msg)
                 return self._error_task(base_name, state, story_id, msg)
 
-            return SupervisorTask(
+            return WorkflowTask(
                 task_id=str(data["task_id"]),
                 objective=str(data.get("objective", "")),
                 worker_type=str(data.get("worker_type", "unknown")),
@@ -304,8 +304,8 @@ class FilesystemSupervisorAdapter(SupervisorAdapterPort):
             return self._error_task(base_name, state, story_id, msg)
 
     @staticmethod
-    def _error_task(task_id: str, state: str, story_id: str, error: str) -> SupervisorTask:
-        return SupervisorTask(
+    def _error_task(task_id: str, state: str, story_id: str, error: str) -> WorkflowTask:
+        return WorkflowTask(
             task_id=task_id or "unknown",
             objective="",
             worker_type="unknown",

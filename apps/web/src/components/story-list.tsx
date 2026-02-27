@@ -7,7 +7,7 @@ import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
-import type { SupervisorStory } from "@/lib/types";
+import type { WorkflowStory } from "@/lib/types";
 
 /** Extract the first meaningful line from markdown as a summary. */
 function extractSummary(content: string): string {
@@ -29,9 +29,9 @@ function extractSummary(content: string): string {
   return "No description";
 }
 
-export function StoryList({ initialData }: { initialData: SupervisorStory[] }) {
-  const { data: stories, error } = useAutoRefresh<SupervisorStory[]>({
-    url: apiUrl("/v1/observability/supervisor/stories"),
+export function StoryList({ initialData }: { initialData: WorkflowStory[] }) {
+  const { data: stories, error } = useAutoRefresh<WorkflowStory[]>({
+    url: apiUrl("/v1/observability/workflow/stories"),
     initialData,
   });
 
@@ -49,7 +49,7 @@ export function StoryList({ initialData }: { initialData: SupervisorStory[] }) {
       <ErrorCard
         title="Connection Error"
         message={error}
-        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+        suggestion="Verify that WORKFLOW_SYSTEM_PATH is set correctly and the path is accessible."
       />
     );
   }
@@ -59,7 +59,7 @@ export function StoryList({ initialData }: { initialData: SupervisorStory[] }) {
       <EmptyState
         icon="stories"
         title="No stories yet"
-        description="Stories will appear here once they are created in the Supervisor System. Check that SUPERVISOR_SYSTEM_PATH is configured correctly."
+        description="Stories will appear here once they are created in the Workflow System. Check that WORKFLOW_SYSTEM_PATH is configured correctly."
       />
     );
   }

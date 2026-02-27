@@ -9,12 +9,12 @@ import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
 import { ParseErrorBadge } from "./state-badge";
-import type { SupervisorStory, SupervisorTask, TaskState } from "@/lib/types";
+import type { WorkflowStory, WorkflowTask, TaskState } from "@/lib/types";
 import { TASK_STATES } from "@/lib/types";
 
 interface BoardData {
-  stories: SupervisorStory[];
-  tasks: SupervisorTask[];
+  stories: WorkflowStory[];
+  tasks: WorkflowTask[];
 }
 
 const COLUMN_COLORS: Record<TaskState, string> = {
@@ -52,7 +52,7 @@ const STORY_COLORS = [
 
 export function KanbanBoard({ initialData }: { initialData: BoardData }) {
   const { data, error } = useAutoRefresh<BoardData>({
-    url: apiUrl("/v1/observability/supervisor/board"),
+    url: apiUrl("/v1/observability/workflow/board"),
     initialData,
   });
 
@@ -68,7 +68,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
 
     const cols = TASK_STATES.map((state) => {
       const stateTasks = tasks.filter((t) => t.state === state);
-      const grouped = new Map<string, SupervisorTask[]>();
+      const grouped = new Map<string, WorkflowTask[]>();
       for (const task of stateTasks) {
         const list = grouped.get(task.story_id) ?? [];
         list.push(task);
@@ -85,7 +85,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
       <ErrorCard
         title="Connection Error"
         message={error}
-        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+        suggestion="Verify that WORKFLOW_SYSTEM_PATH is set correctly and the path is accessible."
       />
     );
   }

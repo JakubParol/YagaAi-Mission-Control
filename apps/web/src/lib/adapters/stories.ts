@@ -1,5 +1,5 @@
 /**
- * Server-only adapter for reading stories from the SUPERVISOR_SYSTEM filesystem.
+ * Server-only adapter for reading stories from the Workflow System filesystem.
  */
 import "server-only";
 
@@ -8,13 +8,13 @@ import { join } from "node:path";
 
 import { STORIES_PATH } from "./config";
 import { listTasksForStory } from "./tasks";
-import type { SupervisorStory, TaskState } from "../types";
+import type { WorkflowStory, TaskState } from "../types";
 
 /**
- * List all stories in the SUPERVISOR_SYSTEM.
+ * List all stories in the Workflow System.
  * Reads each story's STORY.md and counts tasks per state.
  */
-export async function listStories(): Promise<SupervisorStory[]> {
+export async function listStories(): Promise<WorkflowStory[]> {
   let entries: string[];
   try {
     entries = await readdir(STORIES_PATH);
@@ -57,7 +57,7 @@ export async function listStories(): Promise<SupervisorStory[]> {
  * Get a single story by ID.
  * Returns null if the story directory doesn't exist.
  */
-export async function getStory(id: string): Promise<SupervisorStory | null> {
+export async function getStory(id: string): Promise<WorkflowStory | null> {
   const storyDir = join(STORIES_PATH, id);
   const storyFile = join(storyDir, "STORY.md");
 

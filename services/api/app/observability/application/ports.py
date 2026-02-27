@@ -6,9 +6,9 @@ from app.observability.domain.models import (
     ImportRecord,
     LangfuseRequest,
     PaginatedRequests,
-    SupervisorStory,
-    SupervisorTask,
     TaskResult,
+    WorkflowStory,
+    WorkflowTask,
 )
 
 
@@ -66,21 +66,21 @@ class LangfuseClientPort(ABC):
     async def fetch_all_observations(self, from_timestamp: str | None = None) -> list[dict]: ...
 
 
-class SupervisorAdapterPort(ABC):
+class WorkflowAdapterPort(ABC):
     @abstractmethod
-    async def list_stories(self) -> list[SupervisorStory]: ...
+    async def list_stories(self) -> list[WorkflowStory]: ...
 
     @abstractmethod
-    async def get_board(self) -> tuple[list[SupervisorStory], list[SupervisorTask]]: ...
+    async def get_board(self) -> tuple[list[WorkflowStory], list[WorkflowTask]]: ...
 
     @abstractmethod
-    async def get_story(self, story_id: str) -> SupervisorStory | None: ...
+    async def get_story(self, story_id: str) -> WorkflowStory | None: ...
 
     @abstractmethod
-    async def list_tasks_for_story(self, story_id: str) -> list[SupervisorTask]: ...
+    async def list_tasks_for_story(self, story_id: str) -> list[WorkflowTask]: ...
 
     @abstractmethod
-    async def get_task(self, story_id: str, task_id: str) -> SupervisorTask | None: ...
+    async def get_task(self, story_id: str, task_id: str) -> WorkflowTask | None: ...
 
     @abstractmethod
     async def get_task_results(self, story_id: str, task_id: str) -> TaskResult | None: ...

@@ -4,10 +4,10 @@ import Link from "next/link";
 import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
-import type { SupervisorTask, TaskResult } from "@/lib/types";
+import type { WorkflowTask, TaskResult } from "@/lib/types";
 
 interface TaskDetailData {
-  task: SupervisorTask;
+  task: WorkflowTask;
   results: TaskResult | null;
 }
 
@@ -41,7 +41,7 @@ export function TaskDetail({
   initialData: TaskDetailData;
 }) {
   const { data } = useAutoRefresh<TaskDetailData>({
-    url: apiUrl(`/v1/observability/supervisor/tasks/${storyId}/${taskId}`),
+    url: apiUrl(`/v1/observability/workflow/tasks/${storyId}/${taskId}`),
     initialData,
   });
 

@@ -3,7 +3,7 @@ import { BookOpen, ListTodo, CheckCircle, AlertTriangle } from "lucide-react";
 import { apiUrl } from "@/lib/api-client";
 import { StoryList } from "@/components/story-list";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
-import type { SupervisorStory } from "@/lib/types";
+import type { WorkflowStory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function StoriesPage() {
-  let stories: SupervisorStory[] = [];
+  let stories: WorkflowStory[] = [];
   try {
-    const res = await fetch(apiUrl("/v1/observability/supervisor/stories"), {
+    const res = await fetch(apiUrl("/v1/observability/workflow/stories"), {
       cache: "no-store",
     });
     if (res.ok) stories = await res.json();
@@ -40,7 +40,7 @@ export default async function StoriesPage() {
         <h1 className="text-3xl font-bold text-foreground mb-1">Stories</h1>
         <p className="text-muted-foreground">
           {stories.length} {stories.length === 1 ? "story" : "stories"} in the
-          Supervisor System
+          Workflow System
         </p>
       </div>
 

@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function StoryPage({ params }: PageProps) {
   const { id } = await params;
 
-  const res = await fetch(apiUrl(`/v1/observability/supervisor/stories/${id}`), {
+  const res = await fetch(apiUrl(`/v1/observability/workflow/stories/${id}`), {
     cache: "no-store",
   });
   if (!res.ok) notFound();

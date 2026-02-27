@@ -446,7 +446,7 @@ Migrated from the existing Next.js dashboard API routes. Provides agent monitori
 
 - Observability endpoints are mostly read-only (GET), except for the import trigger (POST).
 - Cost/request data originates from Langfuse and is cached locally in SQLite.
-- Agent status is derived from the Supervisor System filesystem.
+- Agent status is derived from the Workflow System filesystem.
 
 ---
 

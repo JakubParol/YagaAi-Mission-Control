@@ -1,5 +1,5 @@
 /**
- * Server-only adapter for reading agent status from the SUPERVISOR_SYSTEM filesystem.
+ * Server-only adapter for reading agent status from the Workflow System filesystem.
  */
 import "server-only";
 
@@ -7,7 +7,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import yaml from "js-yaml";
 
-import { SUPERVISOR_SYSTEM_PATH, STORIES_PATH } from "./config";
+import { WORKFLOW_SYSTEM_PATH, STORIES_PATH } from "./config";
 import type { AgentStatus } from "../dashboard-types";
 
 interface AgentConfig {
@@ -29,7 +29,7 @@ const AGENTS: AgentConfig[] = [
 async function getSupervisorStatus(): Promise<{ decision: string | null }> {
   try {
     const tickPath = join(
-      SUPERVISOR_SYSTEM_PATH,
+      WORKFLOW_SYSTEM_PATH,
       "supervisor",
       "state",
       "last-tick.md",

@@ -11,11 +11,11 @@ import { ErrorCard } from "@/components/error-card";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
 import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
-import type { SupervisorStory, SupervisorTask, TaskState } from "@/lib/types";
+import type { WorkflowStory, WorkflowTask, TaskState } from "@/lib/types";
 
 interface StoryDetailData {
-  story: SupervisorStory;
-  tasks: SupervisorTask[];
+  story: WorkflowStory;
+  tasks: WorkflowTask[];
 }
 
 export function StoryDetail({
@@ -26,7 +26,7 @@ export function StoryDetail({
   initialData: StoryDetailData;
 }) {
   const { data, error } = useAutoRefresh<StoryDetailData>({
-    url: apiUrl(`/v1/observability/supervisor/stories/${storyId}`),
+    url: apiUrl(`/v1/observability/workflow/stories/${storyId}`),
     initialData,
   });
 
@@ -35,7 +35,7 @@ export function StoryDetail({
       <ErrorCard
         title="Connection Error"
         message={error}
-        suggestion="Verify that SUPERVISOR_SYSTEM_PATH is set correctly and the path is accessible."
+        suggestion="Verify that WORKFLOW_SYSTEM_PATH is set correctly and the path is accessible."
       />
     );
   }
@@ -101,7 +101,7 @@ export function StoryDetail({
         <EmptyState
           icon="tasks"
           title="No tasks for this story"
-          description="Tasks will appear here once they are decomposed from the story. The Supervisor creates tasks in the TASKS/ directory."
+          description="Tasks will appear here once they are decomposed from the story. Tasks are created in the TASKS/ directory."
         />
       ) : (
         <div role="list" className="space-y-2">

@@ -18,7 +18,7 @@ export default async function TaskPage({ params }: PageProps) {
   const { storyId, taskId } = await params;
 
   const res = await fetch(
-    apiUrl(`/v1/observability/supervisor/tasks/${storyId}/${taskId}`),
+    apiUrl(`/v1/observability/workflow/tasks/${storyId}/${taskId}`),
     { cache: "no-store" },
   );
   if (!res.ok) notFound();

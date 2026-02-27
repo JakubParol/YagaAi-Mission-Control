@@ -36,7 +36,7 @@ Before making changes, read:
 
 ## Data Sources
 
-1. **Supervisor System filesystem** — agent state, stories, tasks (read via adapters at `SUPERVISOR_SYSTEM_PATH`)
+1. **Workflow System filesystem** — agent state, stories, tasks (read via adapters at `WORKFLOW_SYSTEM_PATH`)
 2. **SQLite** (`data/mission-control.db`) — Langfuse import data, planning schema
 
 ## Navigation

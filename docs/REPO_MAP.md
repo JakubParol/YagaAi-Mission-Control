@@ -22,12 +22,12 @@ The Next.js application serving the Mission Control dashboard.
 |---|---|
 | Entry point | `apps/web/src/app/` (App Router) |
 | Domain types | `apps/web/src/lib/types.ts` |
-| Filesystem adapters | `apps/web/src/lib/adapters/` — reads Supervisor System YAML/markdown |
+| Filesystem adapters | `apps/web/src/lib/adapters/` — reads Workflow System YAML/markdown |
 | Langfuse import | `apps/web/src/lib/langfuse-import/` — imports LLM cost data from Langfuse |
 | Planning schema | `apps/web/src/lib/planning/` — v1 DB schema, types, repository |
 | API routes | `apps/web/src/app/api/` — Next.js API routes (dashboard data) |
 | Database | `data/mission-control.db` (SQLite, shared) |
-| Config | `apps/web/.env.local` — `SUPERVISOR_SYSTEM_PATH`, `LANGFUSE_*` |
+| Config | `apps/web/.env.local` — `WORKFLOW_SYSTEM_PATH`, `LANGFUSE_*` |
 | AGENTS.md | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
 
 ---
@@ -75,7 +75,7 @@ FastAPI REST service with two domain modules:
 
 | System | Purpose | How accessed |
 |---|---|---|
-| Supervisor System filesystem | Agent state, stories, tasks (YAML/markdown) | Read via `apps/web/src/lib/adapters/` at `SUPERVISOR_SYSTEM_PATH` |
+| Workflow System filesystem | Agent state, stories, tasks (YAML/markdown) | Read via `apps/web/src/lib/adapters/` at `WORKFLOW_SYSTEM_PATH` |
 | Langfuse | LLM observability (costs, traces) | HTTP API → imported to local SQLite |
 
 ---

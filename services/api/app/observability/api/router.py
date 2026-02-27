@@ -5,20 +5,20 @@ from fastapi import APIRouter, Depends, Query
 
 from app.observability.application.dashboard_service import DashboardService
 from app.observability.application.import_service import ImportService
-from app.observability.application.supervisor_service import SupervisorService
+from app.observability.application.workflow_service import WorkflowService
 from app.observability.dependencies import (
     get_dashboard_service,
     get_import_service,
-    get_supervisor_service,
+    get_workflow_service,
 )
-from app.observability.domain.models import SupervisorTask
+from app.observability.domain.models import WorkflowTask
 from app.shared.api.errors import NotFoundError
 
 router = APIRouter(tags=["observability"])
 
 
-def _task_to_dict(task: SupervisorTask) -> dict:
-    """Serialize SupervisorTask with camelCase keys matching the frontend."""
+def _task_to_dict(task: WorkflowTask) -> dict:
+    """Serialize WorkflowTask with camelCase keys matching the frontend."""
     d = asdict(task)
     d["parseError"] = d.pop("parse_error")
     return d
@@ -29,7 +29,7 @@ def _task_to_dict(task: SupervisorTask) -> dict:
 
 @router.get("/agents")
 async def get_agents(
-    service: SupervisorService = Depends(get_supervisor_service),
+    service: WorkflowService = Depends(get_workflow_service),
 ) -> list[dict]:
     statuses = await service.get_agent_statuses()
     result = []
@@ -104,21 +104,21 @@ async def get_import_status(
     return await service.get_import_status()
 
 
-# --- Supervisor: Stories, Board, Tasks ---
+# --- Workflow: Stories, Board, Tasks ---
 
 
-@router.get("/supervisor/stories")
+@router.get("/workflow/stories")
 async def list_stories(
-    service: SupervisorService = Depends(get_supervisor_service),
+    service: WorkflowService = Depends(get_workflow_service),
 ) -> list[dict]:
     stories = await service.list_stories()
     return [asdict(s) for s in stories]
 
 
-@router.get("/supervisor/stories/{story_id}")
+@router.get("/workflow/stories/{story_id}")
 async def get_story(
     story_id: str,
-    service: SupervisorService = Depends(get_supervisor_service),
+    service: WorkflowService = Depends(get_workflow_service),
 ) -> dict:
     story, tasks = await service.get_story(story_id)
     if not story:
@@ -126,9 +126,9 @@ async def get_story(
     return {"story": asdict(story), "tasks": [_task_to_dict(t) for t in tasks]}
 
 
-@router.get("/supervisor/board")
+@router.get("/workflow/board")
 async def get_board(
-    service: SupervisorService = Depends(get_supervisor_service),
+    service: WorkflowService = Depends(get_workflow_service),
 ) -> dict:
     stories, tasks = await service.get_board()
     return {
@@ -137,11 +137,11 @@ async def get_board(
     }
 
 
-@router.get("/supervisor/tasks/{story_id}/{task_id}")
+@router.get("/workflow/tasks/{story_id}/{task_id}")
 async def get_task(
     story_id: str,
     task_id: str,
-    service: SupervisorService = Depends(get_supervisor_service),
+    service: WorkflowService = Depends(get_workflow_service),
 ) -> dict:
     task, results = await service.get_task(story_id, task_id)
     if not task:

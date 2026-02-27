@@ -3,7 +3,7 @@ import { Archive, Clock, UserCheck, CheckCircle, AlertTriangle } from "lucide-re
 import { apiUrl } from "@/lib/api-client";
 import { KanbanBoard } from "@/components/kanban-board";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
-import type { SupervisorTask, TaskState } from "@/lib/types";
+import type { WorkflowTask, TaskState } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,10 @@ export const metadata: Metadata = {
 
 export default async function BoardPage() {
   let stories: { id: string; content: string; task_counts: Record<TaskState, number> }[] = [];
-  let allTasks: SupervisorTask[] = [];
+  let allTasks: WorkflowTask[] = [];
 
   try {
-    const res = await fetch(apiUrl("/v1/observability/supervisor/board"), {
+    const res = await fetch(apiUrl("/v1/observability/workflow/board"), {
       cache: "no-store",
     });
     if (res.ok) {

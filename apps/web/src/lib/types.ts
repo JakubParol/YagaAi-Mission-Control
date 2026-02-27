@@ -1,6 +1,6 @@
 /**
  * Core domain types for Mission Control.
- * These mirror the SUPERVISOR_SYSTEM filesystem structure.
+ * These mirror the Workflow System filesystem structure.
  */
 
 /** Possible states a task can be in, matching TASKS/ subdirectory names. */
@@ -33,7 +33,7 @@ export interface TaskOutputRequirements {
 }
 
 /** Parsed task from a YAML file in TASKS/<state>/. */
-export interface SupervisorTask {
+export interface WorkflowTask {
   task_id: string;
   objective: string;
   worker_type: string;
@@ -49,7 +49,7 @@ export interface SupervisorTask {
 }
 
 /** A story, parsed from STORIES/<id>/STORY.md plus metadata. */
-export interface SupervisorStory {
+export interface WorkflowStory {
   id: string;
   /** Raw markdown content of STORY.md. */
   content: string;

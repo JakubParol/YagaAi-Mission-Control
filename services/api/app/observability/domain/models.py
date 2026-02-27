@@ -54,7 +54,7 @@ class PaginatedRequests:
 
 
 @dataclass
-class SupervisorTask:
+class WorkflowTask:
     task_id: str
     objective: str
     worker_type: str
@@ -67,7 +67,7 @@ class SupervisorTask:
 
 
 @dataclass
-class SupervisorStory:
+class WorkflowStory:
     id: str
     content: str
     task_counts: dict[str, int] = field(default_factory=dict)
