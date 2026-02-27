@@ -1,5 +1,5 @@
 /**
- * Server-only adapter for reading task results from the SUPERVISOR_SYSTEM filesystem.
+ * Server-only adapter for reading task results from the Workflow System filesystem.
  */
 import "server-only";
 

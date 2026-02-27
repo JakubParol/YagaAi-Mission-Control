@@ -26,7 +26,7 @@ async function fetchJson<T>(path: string, fallback: T): Promise<T> {
 
 export default async function DashboardPage() {
   const [agents, costs, requests, importStatus] = await Promise.all([
-    fetchJson<AgentStatus[]>("/v1/observability/agents", []),
+    fetchJson<AgentStatus[]>("/v1/workflow/agents", []),
     fetchJson<CostMetrics>("/v1/observability/costs?days=7", { daily: [] }),
     fetchJson<LLMRequestsResponse>("/v1/observability/requests?page=1&limit=50", {
       data: [],

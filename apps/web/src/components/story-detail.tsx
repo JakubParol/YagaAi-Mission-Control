@@ -26,7 +26,7 @@ export function StoryDetail({
   initialData: StoryDetailData;
 }) {
   const { data, error } = useAutoRefresh<StoryDetailData>({
-    url: apiUrl(`/v1/observability/workflow/stories/${storyId}`),
+    url: apiUrl(`/v1/workflow/stories/${storyId}`),
     initialData,
   });
 

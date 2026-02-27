@@ -104,35 +104,3 @@ def test_get_import_status_empty_db(client) -> None:
     data = response.json()
     assert "lastImport" in data
     assert "counts" in data
-
-
-def test_get_agents_no_filesystem(client) -> None:
-    response = client.get("/v1/observability/agents")
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) == 4
-    assert all(a["status"] == "idle" for a in data)
-
-
-def test_list_stories_no_filesystem(client) -> None:
-    response = client.get("/v1/observability/workflow/stories")
-    assert response.status_code == 200
-    assert response.json() == []
-
-
-def test_get_board_no_filesystem(client) -> None:
-    response = client.get("/v1/observability/workflow/board")
-    assert response.status_code == 200
-    data = response.json()
-    assert data == {"stories": [], "tasks": []}
-
-
-def test_get_story_not_found(client) -> None:
-    response = client.get("/v1/observability/workflow/stories/nonexistent")
-    assert response.status_code == 404
-
-
-def test_get_task_not_found(client) -> None:
-    response = client.get("/v1/observability/workflow/tasks/story1/task1")
-    assert response.status_code == 404

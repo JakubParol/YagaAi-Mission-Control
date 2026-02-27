@@ -41,7 +41,7 @@ export function TaskDetail({
   initialData: TaskDetailData;
 }) {
   const { data } = useAutoRefresh<TaskDetailData>({
-    url: apiUrl(`/v1/observability/workflow/tasks/${storyId}/${taskId}`),
+    url: apiUrl(`/v1/workflow/tasks/${storyId}/${taskId}`),
     initialData,
   });
 

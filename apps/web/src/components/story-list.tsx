@@ -31,7 +31,7 @@ function extractSummary(content: string): string {
 
 export function StoryList({ initialData }: { initialData: WorkflowStory[] }) {
   const { data: stories, error } = useAutoRefresh<WorkflowStory[]>({
-    url: apiUrl("/v1/observability/workflow/stories"),
+    url: apiUrl("/v1/workflow/stories"),
     initialData,
   });
 

@@ -52,7 +52,7 @@ const STORY_COLORS = [
 
 export function KanbanBoard({ initialData }: { initialData: BoardData }) {
   const { data, error } = useAutoRefresh<BoardData>({
-    url: apiUrl("/v1/observability/workflow/board"),
+    url: apiUrl("/v1/workflow/board"),
     initialData,
   });
 

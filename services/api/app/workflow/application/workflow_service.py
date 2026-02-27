@@ -1,5 +1,5 @@
-from app.observability.application.ports import WorkflowAdapterPort
-from app.observability.domain.models import (
+from app.workflow.application.ports import WorkflowAdapterPort
+from app.workflow.domain.models import (
     AgentStatus,
     TaskResult,
     WorkflowStory,

@@ -24,9 +24,9 @@ const AGENTS: AgentConfig[] = [
 ];
 
 /**
- * Parse the supervisor's last-tick.md to extract timestamp and decision.
+ * Parse the workflow coordinator's last-tick.md to extract timestamp and decision.
  */
-async function getSupervisorStatus(): Promise<{ decision: string | null }> {
+async function getWorkflowCoordinatorStatus(): Promise<{ decision: string | null }> {
   try {
     const tickPath = join(
       WORKFLOW_SYSTEM_PATH,
@@ -95,23 +95,23 @@ async function getAssignedTasks(): Promise<Map<string, string>> {
  * Get the status of all agents.
  */
 export async function getAgentStatuses(): Promise<AgentStatus[]> {
-  const [supervisorStatus, assignedTasks] = await Promise.all([
-    getSupervisorStatus(),
+  const [coordinatorStatus, assignedTasks] = await Promise.all([
+    getWorkflowCoordinatorStatus(),
     getAssignedTasks(),
   ]);
 
   return AGENTS.map((agent) => {
     if (agent.workerType === null) {
-      // James (supervisor) — working if decision involves active work
-      const decision = supervisorStatus.decision?.toUpperCase() ?? "";
+      // James (coordinator) — working if decision involves active work
+      const decision = coordinatorStatus.decision?.toUpperCase() ?? "";
       const isWorking =
         decision.includes("ASSIGN") || decision.includes("CREATE");
       return {
         name: agent.name,
         role: agent.role,
         status: isWorking ? ("working" as const) : ("idle" as const),
-        ...(isWorking && supervisorStatus.decision
-          ? { task: supervisorStatus.decision }
+        ...(isWorking && coordinatorStatus.decision
+          ? { task: coordinatorStatus.decision }
           : {}),
       };
     }

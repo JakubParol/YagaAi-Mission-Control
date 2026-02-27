@@ -44,12 +44,13 @@ Planned. Not yet implemented.
 
 ## API (`services/api/`)
 
-FastAPI REST service with two domain modules:
+FastAPI REST service with three domain modules:
 
 | Module | Prefix | Domain |
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
-| **observability** | `/v1/observability` | Agent status, LLM costs, requests, Langfuse import |
+| **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
+| **workflow** | `/v1/workflow` | Agent status, workflow stories/tasks, board (filesystem-based) |
 
 | Item | Detail |
 |---|---|

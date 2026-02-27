@@ -6,8 +6,8 @@ from pathlib import Path
 
 import yaml
 
-from app.observability.application.ports import WorkflowAdapterPort
-from app.observability.domain.models import (
+from app.workflow.application.ports import WorkflowAdapterPort
+from app.workflow.domain.models import (
     AgentStatus,
     ResultFile,
     TaskResult,
@@ -196,22 +196,22 @@ class FilesystemWorkflowAdapter(WorkflowAdapterPort):
         return TaskResult(task_id=task_id, files=files)
 
     async def get_agent_statuses(self) -> list[AgentStatus]:
-        supervisor_status, assigned_tasks = await asyncio.gather(
-            self._get_supervisor_status(),
+        coordinator_status, assigned_tasks = await asyncio.gather(
+            self._get_coordinator_status(),
             self._get_assigned_tasks(),
         )
 
         statuses: list[AgentStatus] = []
         for agent in _AGENT_CONFIGS:
             if agent["worker_type"] is None:
-                decision = (supervisor_status.get("decision") or "").upper()
+                decision = (coordinator_status.get("decision") or "").upper()
                 is_working = "ASSIGN" in decision or "CREATE" in decision
                 statuses.append(
                     AgentStatus(
                         name=agent["name"],
                         role=agent["role"],
                         status="working" if is_working else "idle",
-                        task=supervisor_status.get("decision") if is_working else None,
+                        task=coordinator_status.get("decision") if is_working else None,
                     )
                 )
             else:
@@ -227,7 +227,7 @@ class FilesystemWorkflowAdapter(WorkflowAdapterPort):
 
         return statuses
 
-    async def _get_supervisor_status(self) -> dict:
+    async def _get_coordinator_status(self) -> dict:
         tick_path = os.path.join(self._root, "supervisor", "state", "last-tick.md")
         try:
             content = await asyncio.to_thread(Path(tick_path).read_text, "utf-8")

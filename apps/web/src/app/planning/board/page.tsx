@@ -16,7 +16,7 @@ export default async function BoardPage() {
   let allTasks: WorkflowTask[] = [];
 
   try {
-    const res = await fetch(apiUrl("/v1/observability/workflow/board"), {
+    const res = await fetch(apiUrl("/v1/workflow/board"), {
       cache: "no-store",
     });
     if (res.ok) {

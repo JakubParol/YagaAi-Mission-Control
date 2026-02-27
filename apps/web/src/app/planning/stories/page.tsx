@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default async function StoriesPage() {
   let stories: WorkflowStory[] = [];
   try {
-    const res = await fetch(apiUrl("/v1/observability/workflow/stories"), {
+    const res = await fetch(apiUrl("/v1/workflow/stories"), {
       cache: "no-store",
     });
     if (res.ok) stories = await res.json();

@@ -25,9 +25,10 @@ The API is a single FastAPI service with multiple domain modules:
 | Module | Prefix | Domain |
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
-| **observability** | `/v1/observability` | Agent status, LLM costs, requests, Langfuse import |
+| **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
+| **workflow** | `/v1/workflow` | Agent status, workflow stories/tasks, board (filesystem-based) |
 
-More modules will be added over time. Each module is self-contained and follows the same internal structure.
+Each module is self-contained and follows the same internal structure.
 
 ---
 
@@ -71,28 +72,34 @@ services/api/
 │   │   └── infrastructure/      # Port implementations
 │   │       └── repository.py    # Async SQL queries
 │   │
-│   └── observability/           # Module: /v1/observability/...
+│   ├── observability/           # Module: /v1/observability/...
+│   │   ├── api/
+│   │   │   └── router.py
+│   │   ├── application/
+│   │   │   ├── ports.py
+│   │   │   ├── metrics_service.py
+│   │   │   └── import_service.py
+│   │   ├── domain/
+│   │   │   └── models.py
+│   │   └── infrastructure/
+│   │       ├── langfuse_repository.py
+│   │       └── langfuse_client.py
+│   │
+│   └── workflow/               # Module: /v1/workflow/...
 │       ├── api/
-│       │   ├── router.py
-│       │   ├── schemas.py
-│       │   ├── agents.py
-│       │   ├── costs.py
-│       │   ├── requests.py
-│       │   └── imports.py
+│       │   └── router.py
 │       ├── application/
 │       │   ├── ports.py
-│       │   ├── agent_service.py
-│       │   ├── cost_service.py
-│       │   └── import_service.py
+│       │   └── workflow_service.py
 │       ├── domain/
 │       │   └── models.py
 │       └── infrastructure/
-│           ├── repository.py
-│           └── langfuse_client.py  # External API adapter
+│           └── filesystem_adapter.py
 │
 ├── tests/
 │   ├── planning/
-│   └── observability/
+│   ├── observability/
+│   └── workflow/
 ├── docs/
 └── pyproject.toml
 ```
@@ -190,10 +197,12 @@ All config from env vars prefixed `MC_API_`. No config files beyond `.env` for l
 from app.shared.api.health import health_router
 from app.planning.api.router import planning_router
 from app.observability.api.router import observability_router
+from app.workflow.api.router import workflow_router
 
 app.include_router(health_router)
 app.include_router(planning_router, prefix="/v1/planning")
 app.include_router(observability_router, prefix="/v1/observability")
+app.include_router(workflow_router, prefix="/v1/workflow")
 ```
 
 When v2 is needed, add v2 routers per module. Old versions stay until deprecated.

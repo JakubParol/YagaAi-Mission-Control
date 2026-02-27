@@ -72,7 +72,7 @@ function AgentCard({ agent }: { agent: AgentStatus }) {
 
 export function AgentsSection({ initialData }: { initialData: AgentStatus[] }) {
   const { data: agents } = useAutoRefresh<AgentStatus[]>({
-    url: apiUrl("/v1/observability/agents"),
+    url: apiUrl("/v1/workflow/agents"),
     interval: 15000,
     initialData,
   });
