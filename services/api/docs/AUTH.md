@@ -1,8 +1,8 @@
 # Auth Approach — Mission Control v1
 
-**Status:** Draft v1.0
+**Status:** Draft v1.1
 **Date:** 2026-02-27
-**Applies to:** `services/api`
+**Applies to:** `services/api` — all modules (planning, observability)
 
 ---
 
@@ -40,8 +40,8 @@ When auth is needed:
 1. **API keys** for agent-to-API calls (simple, service-to-service).
 2. **JWT bearer tokens** for human users (issued by an external identity provider).
 3. **RBAC** with roles: `admin`, `member`, `agent`.
-4. FastAPI dependency `get_current_user()` in `deps.py` already exists as a stub — wire it to token validation.
-5. Permission checks happen in the service layer, not in routers.
+4. FastAPI dependency `get_current_user()` in `shared/api/deps.py` — wire it to token validation.
+5. Permission checks happen in the application layer (services), not in routers.
 
 No auth code will be written in v1 beyond the actor-identity headers described above.
 

@@ -1,8 +1,8 @@
 # Operational Notes — Mission Control v1
 
-**Status:** Draft v1.0
+**Status:** Draft v1.1
 **Date:** 2026-02-27
-**Applies to:** `services/api`
+**Applies to:** `services/api` — all modules (planning, observability)
 
 ---
 
@@ -44,7 +44,7 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 
 ---
 
-## 3) Observability
+## 3) Logging & Health
 
 ### Structured Logging
 
@@ -65,9 +65,9 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 
 ---
 
-## 4) Audit Hooks
+## 4) Audit Hooks (Planning Module)
 
-The service layer emits `activity_log` entries for key events:
+The planning module's application layer emits `activity_log` entries for key events:
 
 | Event | `event_name` | Logged data |
 |---|---|---|
@@ -79,7 +79,7 @@ The service layer emits `activity_log` entries for key events:
 | Backlog item added/removed | `backlog.item.added` / `backlog.item.removed` | Item ID, backlog ID |
 
 Implementation:
-- Service methods call a lightweight `log_activity()` helper after successful DB commits.
+- Application service methods call a lightweight `log_activity()` helper after successful DB commits.
 - Activity log writes are best-effort in v1 (failure to log does not roll back the operation).
 - Actor identity comes from request headers (`X-Actor-Id`, `X-Actor-Type`).
 

@@ -1,8 +1,8 @@
 # Status Transition Rules — Mission Control v1
 
-**Status:** Draft v1.0
+**Status:** Draft v1.1
 **Date:** 2026-02-27
-**Applies to:** `services/api` — aligned with [WORKFLOW_LOGIC_V1.md](../../../docs/WORKFLOW_LOGIC_V1.md)
+**Applies to:** `services/api` — **planning module** — aligned with [WORKFLOW_LOGIC_V1.md](../../../docs/WORKFLOW_LOGIC_V1.md)
 
 ---
 

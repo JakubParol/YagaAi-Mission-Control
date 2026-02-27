@@ -7,11 +7,16 @@
 
 ## API v1 Design (MC-24)
 
-- [Architecture](./ARCHITECTURE.md) — modules, layers, DI, config, versioning, routing
-- [API Contracts](./API_CONTRACTS.md) — error model, response envelope, resource endpoints, pagination/filter/sort
+### Shared (all modules)
+
+- [Architecture](./ARCHITECTURE.md) — modular design, package-by-feature, layers, DI, routing
+- [API Contracts](./API_CONTRACTS.md) — response envelope, error model, pagination/filter/sort, all module endpoints
 - [Auth](./AUTH.md) — v1 actor-identity headers, future auth plan
+- [Operational Notes](./OPERATIONAL.md) — idempotency, concurrency, logging, audit hooks, deferred items
+
+### Planning module
+
 - [Status Transitions](./STATUS_TRANSITIONS.md) — status derivation, overrides, blocking, side effects
-- [Operational Notes](./OPERATIONAL.md) — idempotency, concurrency, observability, audit hooks, out-of-scope items
 
 ## Reference
 

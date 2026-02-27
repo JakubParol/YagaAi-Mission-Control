@@ -1,143 +1,206 @@
 # API Architecture — Mission Control v1
 
-**Status:** Draft v1.0
+**Status:** Draft v1.1
 **Date:** 2026-02-27
 **Applies to:** `services/api`
 
 ---
 
-## 1) High-Level Layout
+## 1) Design Principles
+
+This architecture follows the [workspace coding standards](../../../.openclaw/standards/coding-standards.md):
+
+- **Package by feature** — top-level directories are domain modules, not technical layers
+- **Clean Architecture** — layers inside each module: api → application ← infrastructure; domain has zero external dependencies
+- **Port/Adapter pattern** — application defines interfaces (ports), infrastructure implements them
+- **Async-first** — async endpoints, async DB driver
+- **Constructor injection** — services receive dependencies via constructor, wired through FastAPI `Depends()`
+
+---
+
+## 2) Modules
+
+The API is a single FastAPI service with multiple domain modules:
+
+| Module | Prefix | Domain |
+|---|---|---|
+| **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
+| **observability** | `/v1/observability` | Agent status, LLM costs, requests, Langfuse import |
+
+More modules will be added over time. Each module is self-contained and follows the same internal structure.
+
+---
+
+## 3) High-Level Layout
 
 ```
 services/api/
 ├── app/
-│   ├── main.py              # FastAPI app factory, middleware, lifespan
-│   ├── config.py            # pydantic-settings (env-driven)
-│   ├── deps.py              # Shared FastAPI dependencies (db session, current user, etc.)
-│   ├── exceptions.py        # App-level exception classes + handlers
-│   ├── api/
-│   │   ├── health.py        # /healthz (exists)
-│   │   └── v1/
-│   │       ├── router.py    # Aggregates all v1 sub-routers under /v1
-│   │       ├── projects.py
-│   │       ├── epics.py
-│   │       ├── stories.py
-│   │       ├── tasks.py
-│   │       ├── backlogs.py
-│   │       ├── assignments.py
-│   │       └── labels.py
-│   ├── schemas/             # Pydantic request/response models
-│   │   ├── common.py        # Envelope, pagination, error models
-│   │   ├── projects.py
-│   │   ├── epics.py
-│   │   ├── stories.py
-│   │   ├── tasks.py
-│   │   ├── backlogs.py
-│   │   ├── assignments.py
-│   │   └── labels.py
-│   ├── services/            # Business logic (status derivation, workflow rules)
-│   │   ├── project_service.py
-│   │   ├── epic_service.py
-│   │   ├── story_service.py
-│   │   ├── task_service.py
-│   │   ├── backlog_service.py
-│   │   └── label_service.py
-│   ├── repositories/        # Data access (SQL queries, repository pattern)
-│   │   └── ...              # One per aggregate root
-│   └── models/              # SQLAlchemy / DB models (if ORM used) or raw SQL helpers
+│   ├── main.py                  # FastAPI app factory, middleware, lifespan
+│   ├── config.py                # pydantic-settings (env-driven)
+│   │
+│   ├── shared/                  # Cross-module shared code
+│   │   ├── api/                 # Response envelope, error handlers, common deps
+│   │   │   ├── deps.py          # DB session, actor identity, common Depends()
+│   │   │   ├── envelope.py      # Envelope[T], ListMeta, ErrorResponse
+│   │   │   ├── errors.py        # AppError hierarchy + exception handlers
+│   │   │   └── health.py        # GET /healthz (unversioned)
+│   │   └── db.py                # Async engine, session factory
+│   │
+│   ├── planning/                # Module: /v1/planning/...
+│   │   ├── api/                 # Routers + request/response DTOs
+│   │   │   ├── router.py        # Aggregates sub-routers for this module
+│   │   │   ├── schemas.py       # Pydantic models (CreateProject, UpdateTask, etc.)
+│   │   │   ├── projects.py      # CRUD routes
+│   │   │   ├── epics.py
+│   │   │   ├── stories.py
+│   │   │   ├── tasks.py
+│   │   │   ├── backlogs.py
+│   │   │   ├── assignments.py
+│   │   │   └── labels.py
+│   │   ├── application/         # Use cases, orchestration, ports
+│   │   │   ├── ports.py         # ABC interfaces (ProjectRepo, TaskRepo, etc.)
+│   │   │   ├── project_service.py
+│   │   │   ├── epic_service.py
+│   │   │   ├── story_service.py
+│   │   │   ├── task_service.py
+│   │   │   ├── backlog_service.py
+│   │   │   └── label_service.py
+│   │   ├── domain/              # Entities, value objects, invariants
+│   │   │   └── models.py        # Status enums, business rules
+│   │   └── infrastructure/      # Port implementations
+│   │       └── repository.py    # Async SQL queries
+│   │
+│   └── observability/           # Module: /v1/observability/...
+│       ├── api/
+│       │   ├── router.py
+│       │   ├── schemas.py
+│       │   ├── agents.py
+│       │   ├── costs.py
+│       │   ├── requests.py
+│       │   └── imports.py
+│       ├── application/
+│       │   ├── ports.py
+│       │   ├── agent_service.py
+│       │   ├── cost_service.py
+│       │   └── import_service.py
+│       ├── domain/
+│       │   └── models.py
+│       └── infrastructure/
+│           ├── repository.py
+│           └── langfuse_client.py  # External API adapter
+│
 ├── tests/
+│   ├── planning/
+│   └── observability/
 ├── docs/
 └── pyproject.toml
 ```
 
 ---
 
-## 2) Layers
+## 4) Layers (within each module)
 
 | Layer | Responsibility | Imports from |
 |---|---|---|
-| **api/** (routers) | HTTP handling, request validation, response shaping | schemas, services, deps |
-| **schemas/** | Pydantic models for request/response contracts | (standalone) |
-| **services/** | Business logic, workflow rules, status derivation | repositories, schemas |
-| **repositories/** | Data access, SQL queries | models/db |
-| **models/** | DB table definitions | (standalone) |
-| **deps.py** | FastAPI `Depends()` providers | config, repositories |
+| **api/** | HTTP handling, request validation, response shaping | application, shared/api |
+| **application/** | Business logic, orchestration, transaction boundaries | domain, ports (own interfaces) |
+| **domain/** | Entities, value objects, enums, invariants | nothing (standalone) |
+| **infrastructure/** | Port implementations, SQL, external HTTP calls | application/ports, shared/db |
 
 Rules:
-- Routers never import repositories directly — always go through services.
-- Services own transaction boundaries.
-- Repositories are stateless; they receive a db session via DI.
+- **api** never imports **infrastructure** or **domain** directly — always through **application**.
+- **application** defines ports (ABCs); **infrastructure** implements them.
+- **domain** has zero imports from other layers or external packages.
+- Cross-module imports are forbidden. Shared code lives in `shared/`.
 
 ---
 
-## 3) Dependency Injection
+## 5) Dependency Injection
 
-FastAPI's built-in `Depends()` is the only DI mechanism in v1.
+FastAPI `Depends()` is the wiring mechanism. Services use constructor injection.
 
 ```python
-# deps.py
-from app.config import settings
+# planning/application/ports.py
+from abc import ABC, abstractmethod
 
-def get_db() -> Generator[Session, None, None]:
-    """Yield a DB session, close on teardown."""
-    ...
+class TaskRepository(ABC):
+    @abstractmethod
+    async def get_by_id(self, task_id: UUID) -> Task | None: ...
 
-def get_current_user() -> str | None:
-    """Extract caller identity from request (stub in v1)."""
-    ...
+# planning/application/task_service.py
+class TaskService:
+    def __init__(self, repo: TaskRepository) -> None:
+        self._repo = repo
+
+    async def get_task(self, task_id: UUID) -> Task:
+        task = await self._repo.get_by_id(task_id)
+        if not task:
+            raise NotFoundError("Task", task_id)
+        return task
+
+# planning/api/tasks.py
+async def get_task_service(db: AsyncSession = Depends(get_db)) -> TaskService:
+    repo = SqlTaskRepository(db)
+    return TaskService(repo)
+
+@router.get("/{task_id}")
+async def get_task(
+    task_id: UUID,
+    service: TaskService = Depends(get_task_service),
+) -> Envelope[TaskResponse]:
+    task = await service.get_task(task_id)
+    return Envelope(data=TaskResponse.from_domain(task))
 ```
 
-Services are instantiated per-request in the router or provided via `Depends()` closures. No global singletons for stateful objects.
+No global singletons for stateful objects. Composition happens at the edge (router-level `Depends`).
 
 ---
 
-## 4) Configuration
-
-Existing `app/config.py` uses `pydantic-settings`. Extend as needed:
+## 6) Configuration
 
 ```python
 class Settings(BaseSettings):
     app_name: str = "mission-control-api"
-    env: str = "dev"                   # dev | staging | prod
+    env: str = "dev"                    # dev | staging | prod
     log_level: str = "INFO"
-    database_url: str = "sqlite:///mc.db"
-    allowed_origins: list[str] = ["*"]  # CORS
+    database_url: str = "sqlite+aiosqlite:///mc.db"
+    allowed_origins: list[str] = ["*"]
+
+    # Observability module
+    langfuse_host: str = ""
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
 
     model_config = SettingsConfigDict(env_prefix="MC_API_", env_file=".env")
 ```
 
-All config comes from env vars prefixed `MC_API_`. No config files beyond `.env` for local dev.
+All config from env vars prefixed `MC_API_`. No config files beyond `.env` for local dev.
 
 ---
 
-## 5) API Versioning & Routing
+## 7) API Versioning & Routing
 
-- All resource endpoints live under `/v1`.
+- All module endpoints live under `/v1/{module}`.
 - Health check (`/healthz`) stays at root (unversioned).
-- Version prefix is applied via a single `APIRouter(prefix="/v1")` in `api/v1/router.py`.
-
-```python
-# app/api/v1/router.py
-from fastapi import APIRouter
-from app.api.v1 import projects, epics, stories, tasks, backlogs, assignments, labels
-
-v1_router = APIRouter(prefix="/v1")
-v1_router.include_router(projects.router)
-v1_router.include_router(epics.router)
-# ... etc.
-```
+- Each module has its own `router.py` aggregating sub-routers.
 
 ```python
 # app/main.py
+from app.shared.api.health import health_router
+from app.planning.api.router import planning_router
+from app.observability.api.router import observability_router
+
 app.include_router(health_router)
-app.include_router(v1_router)
+app.include_router(planning_router, prefix="/v1/planning")
+app.include_router(observability_router, prefix="/v1/observability")
 ```
 
-When v2 is needed, add `api/v2/` and a separate `v2_router`. Old versions stay until deprecated.
+When v2 is needed, add v2 routers per module. Old versions stay until deprecated.
 
 ---
 
-## 6) Middleware Stack (planned order)
+## 8) Middleware Stack (planned order)
 
 1. **CORS** — `CORSMiddleware` (allow configured origins)
 2. **Request ID** — inject `X-Request-Id` header (UUID) for tracing
