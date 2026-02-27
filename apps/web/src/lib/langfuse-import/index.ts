@@ -7,8 +7,9 @@
 
 export { LangfuseImportService } from "./import-service";
 export { LangfuseRepository } from "./repository";
-export { getDb, closeDb, getDbStatus } from "./db";
-export type { DbStatus } from "./db";
+export { DashboardService } from "./dashboard-service";
+export { getDb, closeDb, getDbStatus } from "../db";
+export type { DbStatus } from "../db";
 export type {
   ImportRecord,
   ImportMode,

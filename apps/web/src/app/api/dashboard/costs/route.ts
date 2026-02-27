@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
-import { LangfuseRepository } from "@/lib/langfuse-import";
-import type { DailyCost, LangfuseModelUsage } from "@/lib/dashboard-types";
+import { NextResponse } from "next/server";
+import { DashboardService } from "@/lib/langfuse-import";
+import { withErrorHandler } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export const GET = withErrorHandler(async (request) => {
   const searchParams = request.nextUrl.searchParams;
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
@@ -25,55 +25,8 @@ export async function GET(request: NextRequest) {
     toStr = now.toISOString().split("T")[0];
   }
 
-  try {
-    const repo = new LangfuseRepository();
+  const service = new DashboardService();
+  const costs = service.getCosts(fromStr, toStr);
 
-    // ISO timestamps (contain "T") → query individual requests for
-    // timezone-aware boundaries; plain dates → pre-aggregated daily metrics.
-    const useTimestamps = fromStr.includes("T") && toStr.includes("T");
-    const metrics = useTimestamps
-      ? repo.getMetricsByTimeRange(fromStr, toStr)
-      : repo.getDailyMetrics(fromStr, toStr);
-
-    // Group DailyMetric[] (one row per date+model) into DailyCost[] (one row per date)
-    const dateMap = new Map<string, DailyCost>();
-
-    for (const m of metrics) {
-      let entry = dateMap.get(m.date);
-      if (!entry) {
-        entry = {
-          date: m.date,
-          totalCost: 0,
-          countObservations: 0,
-          usage: [],
-        };
-        dateMap.set(m.date, entry);
-      }
-
-      entry.totalCost += m.total_cost;
-      entry.countObservations += m.request_count;
-
-      const usage: LangfuseModelUsage = {
-        model: m.model,
-        inputUsage: m.input_tokens,
-        outputUsage: m.output_tokens,
-        totalUsage: m.total_tokens,
-        totalCost: m.total_cost,
-        countObservations: m.request_count,
-      };
-      entry.usage.push(usage);
-    }
-
-    const daily = Array.from(dateMap.values()).sort(
-      (a, b) => a.date.localeCompare(b.date),
-    );
-
-    return NextResponse.json({ daily });
-  } catch (err) {
-    console.error("GET /api/dashboard/costs failed:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal server error" },
-      { status: 500 },
-    );
-  }
-}
+  return NextResponse.json(costs);
+});

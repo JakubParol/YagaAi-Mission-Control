@@ -8,12 +8,12 @@ import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
 import { ParseErrorBadge } from "./state-badge";
-import type { Story, Task, TaskState } from "@/lib/types";
+import type { SupervisorStory, SupervisorTask, TaskState } from "@/lib/types";
 import { TASK_STATES } from "@/lib/types";
 
 interface BoardData {
-  stories: Story[];
-  tasks: Task[];
+  stories: SupervisorStory[];
+  tasks: SupervisorTask[];
 }
 
 const COLUMN_COLORS: Record<TaskState, string> = {
@@ -67,7 +67,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
 
     const cols = TASK_STATES.map((state) => {
       const stateTasks = tasks.filter((t) => t.state === state);
-      const grouped = new Map<string, Task[]>();
+      const grouped = new Map<string, SupervisorTask[]>();
       for (const task of stateTasks) {
         const list = grouped.get(task.story_id) ?? [];
         list.push(task);

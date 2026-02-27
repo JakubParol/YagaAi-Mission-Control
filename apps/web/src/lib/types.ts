@@ -33,7 +33,7 @@ export interface TaskOutputRequirements {
 }
 
 /** Parsed task from a YAML file in TASKS/<state>/. */
-export interface Task {
+export interface SupervisorTask {
   task_id: string;
   objective: string;
   worker_type: string;
@@ -49,7 +49,7 @@ export interface Task {
 }
 
 /** A story, parsed from STORIES/<id>/STORY.md plus metadata. */
-export interface Story {
+export interface SupervisorStory {
   id: string;
   /** Raw markdown content of STORY.md. */
   content: string;

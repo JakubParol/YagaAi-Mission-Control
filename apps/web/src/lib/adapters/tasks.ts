@@ -8,15 +8,15 @@ import { basename, join } from "node:path";
 import yaml from "js-yaml";
 
 import { STORIES_PATH } from "./config";
-import type { Task, TaskState } from "../types";
+import type { SupervisorTask, TaskState } from "../types";
 import { TASK_STATES } from "../types";
 
 /**
  * List all tasks for a given story, across all state folders.
  */
-export async function listTasksForStory(storyId: string): Promise<Task[]> {
+export async function listTasksForStory(storyId: string): Promise<SupervisorTask[]> {
   const tasksDir = join(STORIES_PATH, storyId, "TASKS");
-  const tasks: Task[] = [];
+  const tasks: SupervisorTask[] = [];
 
   for (const state of TASK_STATES) {
     const stateDir = join(tasksDir, state);
@@ -50,7 +50,7 @@ export async function listTasksForStory(storyId: string): Promise<Task[]> {
 export async function getTask(
   storyId: string,
   taskId: string
-): Promise<Task | null> {
+): Promise<SupervisorTask | null> {
   const tasksDir = join(STORIES_PATH, storyId, "TASKS");
 
   for (const state of TASK_STATES) {
@@ -83,7 +83,7 @@ function errorTask(
   state: TaskState,
   storyId: string,
   error: string
-): Task {
+): SupervisorTask {
   const filename = basename(filePath, ".yaml").replace(/\.yml$/, "");
   return {
     task_id: filename || "unknown",
@@ -104,7 +104,7 @@ async function parseTaskFile(
   filePath: string,
   state: TaskState,
   storyId: string
-): Promise<Task> {
+): Promise<SupervisorTask> {
   try {
     const raw = await readFile(filePath, "utf-8");
     const data = yaml.load(raw) as Record<string, unknown>;
@@ -125,9 +125,9 @@ async function parseTaskFile(
       task_id: data.task_id as string,
       objective: (data.objective as string) || "",
       worker_type: (data.worker_type as string) || "unknown",
-      inputs: data.inputs as Task["inputs"],
-      constraints: data.constraints as Task["constraints"],
-      output_requirements: data.output_requirements as Task["output_requirements"],
+      inputs: data.inputs as SupervisorTask["inputs"],
+      constraints: data.constraints as SupervisorTask["constraints"],
+      output_requirements: data.output_requirements as SupervisorTask["output_requirements"],
       state,
       story_id: storyId,
     };

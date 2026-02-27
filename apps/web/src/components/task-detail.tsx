@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
-import type { Task, TaskResult } from "@/lib/types";
+import type { SupervisorTask, TaskResult } from "@/lib/types";
 
 interface TaskDetailData {
-  task: Task;
+  task: SupervisorTask;
   results: TaskResult | null;
 }
 
