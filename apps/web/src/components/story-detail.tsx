@@ -56,7 +56,7 @@ export function StoryDetail({
         <ol className="flex items-center gap-1.5 text-sm">
           <li>
             <Link
-              href="/"
+              href="/planning/stories"
               className="focus-ring rounded text-muted-foreground transition-colors duration-150 hover:text-foreground"
             >
               Stories
@@ -107,7 +107,7 @@ export function StoryDetail({
           {tasks.map((task) => (
             <Link
               key={task.task_id}
-              href={`/tasks/${task.story_id}/${task.task_id}`}
+              href={`/planning/tasks/${task.story_id}/${task.task_id}`}
               role="listitem"
               aria-label={`Task ${task.task_id}, state: ${task.state}${task.parseError ? ", parse error" : ""}`}
               className={cn(

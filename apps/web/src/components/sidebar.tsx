@@ -2,30 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Activity, BookOpen } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  matchPaths?: string[];
-}
-
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: Activity },
-  { href: "/board", label: "Board", icon: LayoutDashboard },
-  { href: "/", label: "Stories", icon: BookOpen, matchPaths: ["/stories"] },
-];
-
-function isActiveRoute(pathname: string, item: NavItem): boolean {
-  if (item.href === "/") {
-    return pathname === "/" || pathname.startsWith("/stories");
-  }
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
+import { navModules, isModuleActive } from "@/lib/navigation";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -59,14 +38,14 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav aria-label="Main navigation" className="flex flex-1 flex-col gap-1">
-        {navItems.map((item) => {
-          const active = isActiveRoute(pathname, item);
-          const Icon = item.icon;
+        {navModules.map((mod) => {
+          const active = isModuleActive(pathname, mod);
+          const Icon = mod.icon;
 
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={mod.href}
+              href={mod.subPages?.[0]?.href ?? mod.href}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "focus-ring flex items-center gap-3 rounded-lg px-3 py-2.5",
@@ -78,7 +57,7 @@ export function Sidebar() {
               )}
             >
               <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-              {item.label}
+              {mod.label}
             </Link>
           );
         })}

@@ -71,7 +71,7 @@ export function StoryList({ initialData }: { initialData: SupervisorStory[] }) {
       {stories.map((story) => (
         <Link
           key={story.id}
-          href={`/stories/${story.id}`}
+          href={`/planning/stories/${story.id}`}
           role="listitem"
           aria-label={`Story ${story.id}`}
           className="focus-ring group flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-5 transition-colors duration-150 hover:border-primary/40 hover:bg-white/[0.02]"

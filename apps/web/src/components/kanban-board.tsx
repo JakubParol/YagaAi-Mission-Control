@@ -134,7 +134,7 @@ export function KanbanBoard({ initialData }: { initialData: BoardData }) {
               {storyTasks.map((task) => (
                 <Link
                   key={task.task_id}
-                  href={`/tasks/${task.story_id}/${task.task_id}`}
+                  href={`/planning/tasks/${task.story_id}/${task.task_id}`}
                   aria-label={`Task ${task.task_id}: ${task.parseError ? "Parse error" : task.objective.split("\n")[0].slice(0, 60)}`}
                   className={cn(
                     "focus-ring block rounded-lg border border-border bg-card p-3 border-l-2",

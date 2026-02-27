@@ -4,29 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, Activity, BookOpen } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}
-
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: Activity },
-  { href: "/board", label: "Board", icon: LayoutDashboard },
-  { href: "/", label: "Stories", icon: BookOpen },
-];
-
-function isActiveRoute(pathname: string, item: NavItem): boolean {
-  if (item.href === "/") {
-    return pathname === "/" || pathname.startsWith("/stories");
-  }
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
+import { navModules, isModuleActive } from "@/lib/navigation";
 
 const DRAWER_ID = "mobile-nav-drawer";
 
@@ -167,14 +148,14 @@ export function MobileNav() {
 
             {/* Nav links */}
             <div className="flex-1 space-y-1 overflow-y-auto">
-              {navItems.map((item) => {
-                const active = isActiveRoute(pathname, item);
-                const Icon = item.icon;
+              {navModules.map((mod) => {
+                const active = isModuleActive(pathname, mod);
+                const Icon = mod.icon;
 
                 return (
                   <Link
-                    key={item.href}
-                    href={item.href}
+                    key={mod.href}
+                    href={mod.subPages?.[0]?.href ?? mod.href}
                     onClick={handleClose}
                     aria-current={active ? "page" : undefined}
                     className={cn(
@@ -187,7 +168,7 @@ export function MobileNav() {
                     )}
                   >
                     <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                    {item.label}
+                    {mod.label}
                   </Link>
                 );
               })}

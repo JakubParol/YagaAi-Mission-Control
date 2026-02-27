@@ -244,6 +244,13 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
     [costs.daily],
   );
 
+  const totals = useMemo(() => ({
+    requests: models.reduce((s, m) => s + m.countObservations, 0),
+    tokensIn: models.reduce((s, m) => s + m.inputTokens, 0),
+    tokensOut: models.reduce((s, m) => s + m.outputTokens, 0),
+    cost: models.reduce((s, m) => s + m.totalCost, 0),
+  }), [models]);
+
   const handlePresetClick = (key: string) => {
     setActiveFilter(key);
     setCustomRange(undefined);
@@ -271,8 +278,42 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
 
   return (
     <section aria-label="LLM costs">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-foreground">LLM Costs</h2>
+      <h2 className="mb-4 text-lg font-semibold text-foreground">LLM Costs</h2>
+
+      {/* Stat cards */}
+      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <CostStatCard
+          label="Today's Spend"
+          value={formatUSD(todaySpend)}
+          icon={DollarSign}
+          iconColor="text-green-400"
+          iconBg="bg-green-500/10"
+        />
+        <CostStatCard
+          label="Yesterday's Spend"
+          value={formatUSD(yesterdaySpend)}
+          icon={DollarSign}
+          iconColor="text-blue-400"
+          iconBg="bg-blue-500/10"
+        />
+        <CostStatCard
+          label="Requests Today"
+          value={String(todayRequests)}
+          icon={Hash}
+          iconColor="text-amber-400"
+          iconBg="bg-amber-500/10"
+        />
+        <CostStatCard
+          label="Avg Cost/Request"
+          value={formatUSD(avgCost)}
+          icon={TrendingUp}
+          iconColor="text-purple-400"
+          iconBg="bg-purple-500/10"
+        />
+      </div>
+
+      {/* Date range picker — below stat cards, right-aligned */}
+      <div className="mb-6 flex justify-end">
         <div className="flex items-center gap-2">
           <div className="flex gap-1 rounded-lg border border-border bg-card p-1">
             {TIME_RANGES.map((range) => (
@@ -342,63 +383,50 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <CostStatCard
-          label="Today's Spend"
-          value={formatUSD(todaySpend)}
-          icon={DollarSign}
-          iconColor="text-green-400"
-          iconBg="bg-green-500/10"
-        />
-        <CostStatCard
-          label="Yesterday's Spend"
-          value={formatUSD(yesterdaySpend)}
-          icon={DollarSign}
-          iconColor="text-blue-400"
-          iconBg="bg-blue-500/10"
-        />
-        <CostStatCard
-          label="Requests Today"
-          value={String(todayRequests)}
-          icon={Hash}
-          iconColor="text-amber-400"
-          iconBg="bg-amber-500/10"
-        />
-        <CostStatCard
-          label="Avg Cost/Request"
-          value={formatUSD(avgCost)}
-          icon={TrendingUp}
-          iconColor="text-purple-400"
-          iconBg="bg-purple-500/10"
-        />
-      </div>
-
-      {/* Per-model table */}
-      {models.length > 0 && (
-        <div className="mb-8 overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead>
+      {/* Per-model table — always visible */}
+      <div className="mb-8 overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-card/50">
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
+                Model
+              </th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+                Requests
+              </th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+                Tokens In
+              </th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+                Tokens Out
+              </th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
+                Total Cost
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {models.length > 0 && (
               <tr className="border-b border-border bg-card">
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
-                  Model
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                  Requests
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                  Tokens In
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                  Tokens Out
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                  Total Cost
-                </th>
+                <td className="px-4 py-2.5 text-xs font-semibold text-foreground">
+                  Total
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-semibold tabular-nums text-foreground">
+                  {totals.requests}
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-semibold tabular-nums text-foreground">
+                  {formatTokens(totals.tokensIn)}
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-semibold tabular-nums text-foreground">
+                  {formatTokens(totals.tokensOut)}
+                </td>
+                <td className="px-4 py-2.5 text-right text-xs font-semibold tabular-nums text-foreground">
+                  {formatUSD(totals.cost)}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {models.map((m) => (
+            )}
+            {models.length > 0 ? (
+              models.map((m) => (
                 <tr
                   key={m.model}
                   className="border-b border-border last:border-0"
@@ -419,30 +447,20 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
                     {formatUSD(m.totalCost)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border bg-card/50">
-                <td className="px-4 py-3 text-xs font-semibold text-foreground">
-                  Total
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
-                  {models.reduce((s, m) => s + m.countObservations, 0)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
-                  {formatTokens(models.reduce((s, m) => s + m.inputTokens, 0))}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
-                  {formatTokens(models.reduce((s, m) => s + m.outputTokens, 0))}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums font-semibold text-foreground">
-                  {formatUSD(models.reduce((s, m) => s + m.totalCost, 0))}
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-4 py-8 text-center text-sm text-muted-foreground"
+                >
+                  No model data for this period
                 </td>
               </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+            )}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
