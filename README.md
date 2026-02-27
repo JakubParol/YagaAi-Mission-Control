@@ -1,6 +1,6 @@
 # Mission Control
 
-Management platform for AI agent workflows. Combines a web dashboard for observability with a REST API for planning and coordination.
+Management platform for AI agent workflows. Combines a web dashboard with a REST API powering two domain modules: **planning** (work management) and **observability** (LLM costs).
 
 ## Repository Structure
 
@@ -49,10 +49,8 @@ Runs at [http://localhost:3000](http://localhost:3000).
 
 ```bash
 cd services/api
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-
-uvicorn app.main:app --reload
+poetry install
+poetry run uvicorn app.main:app --reload --port 8080
 ```
 
 See [services/api/README.md](./services/api/README.md) for details.

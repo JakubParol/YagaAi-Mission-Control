@@ -2,7 +2,7 @@
 
 **Status:** Draft v1.1 (agreed + defaulted decisions)  
 **Date:** 2026-02-26  
-**Scope:** Application/runtime behavior (entity schema is in `ENTITY_MODEL_V1.md`)
+**Scope:** Planning module — application/runtime behavior (entity schema is in `ENTITY_MODEL_V1.md`)
 
 ## Purpose
 

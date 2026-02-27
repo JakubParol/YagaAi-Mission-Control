@@ -2,7 +2,7 @@
 
 **Status:** Draft v1.2 (aligned with current decisions)  
 **Date:** 2026-02-26  
-**Applies to:** Mission Control DB refactor
+**Applies to:** Mission Control — planning module (shared between `apps/web` and `services/api`)
 
 ## Purpose
 

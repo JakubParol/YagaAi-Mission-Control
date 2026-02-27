@@ -26,7 +26,7 @@ app/
 │   ├── application/         # Services + ports (ABCs)
 │   ├── domain/              # Models, enums, invariants
 │   └── infrastructure/      # Repository implementations
-└── observability/           # /v1/observability — agents, costs, imports
+└── observability/           # /v1/observability — LLM costs, requests, Langfuse import
     ├── api/
     ├── application/
     ├── domain/

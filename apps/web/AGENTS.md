@@ -2,11 +2,11 @@
 
 ## What This Is
 
-Next.js 15 dashboard for the Mission Control platform. Provides LLM cost tracking, Langfuse data import, and planning views.
+Next.js 15 dashboard for the Mission Control platform. Provides observability views (LLM costs) and planning views (projects, stories, tasks).
 
 ## Scope
 
-- **In scope:** Dashboard UI, Next.js API routes, Langfuse import, planning DB schema
+- **In scope:** Dashboard UI, planning views, planning DB schema (direct SQLite via better-sqlite3)
 - **Out of scope:** REST API (see `services/api/`), CLI (see `apps/cli/`)
 
 ## Required Reading
@@ -31,8 +31,8 @@ Before making changes, read:
 
 ## Data Sources
 
-1. **FastAPI** (`services/api/`) — planning and observability data via REST
-2. **SQLite** (`data/mission-control.db`) — Langfuse import data, planning schema
+1. **FastAPI** (`services/api/`) — observability data (LLM costs, requests, Langfuse import) via REST
+2. **SQLite** (`data/mission-control.db`) — planning schema (direct access via better-sqlite3)
 
 ## Navigation
 
