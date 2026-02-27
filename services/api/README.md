@@ -1,6 +1,6 @@
-# Mission Control API (services/api)
+# Mission Control API (`services/api`)
 
-Python FastAPI backend scaffold for Mission Control.
+FastAPI REST service for Mission Control — planning and observability modules.
 
 ## Run locally
 
@@ -12,13 +12,37 @@ pip install -e ".[dev]"
 uvicorn app.main:app --reload --port 8080
 ```
 
-Health endpoint:
-- `GET /healthz`
+Health endpoint: `GET /healthz`
 
 ## Structure
 
-- `app/main.py` — FastAPI app entrypoint
-- `app/config.py` — environment settings
-- `app/api/health.py` — health router
-- `tests/` — scaffolded tests
-- `docs/INDEX.md` — API docs index
+```
+app/
+├── main.py                  # FastAPI app factory
+├── config.py                # pydantic-settings (MC_API_* env vars)
+├── shared/                  # Cross-module: health, envelope, errors, deps
+│   └── api/
+│       └── health.py
+├── planning/                # /v1/planning — work management
+│   ├── api/                 # Routers + schemas
+│   ├── application/         # Services + ports (ABCs)
+│   ├── domain/              # Models, enums, invariants
+│   └── infrastructure/      # Repository implementations
+└── observability/           # /v1/observability — agents, costs, imports
+    ├── api/
+    ├── application/
+    ├── domain/
+    └── infrastructure/
+```
+
+## Tests
+
+```bash
+pytest
+```
+
+## Links
+
+- [AGENTS.md](./AGENTS.md) — AI agent context and rules
+- [docs/INDEX.md](./docs/INDEX.md) — API documentation
+- [Root README](../../README.md)

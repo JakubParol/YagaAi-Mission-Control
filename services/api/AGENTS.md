@@ -1,13 +1,47 @@
-# AGENTS.md - services/api
+# AGENTS.md — Mission Control API
 
-Scope: Python FastAPI service scaffold for Mission Control.
+## What This Is
 
-Required reading before changes:
-1. /home/kuba/repos/mission-control/docs/ENTITY_MODEL_V1.md
-2. /home/kuba/repos/mission-control/docs/WORKFLOW_LOGIC_V1.md
-3. /home/kuba/.openclaw/standards/coding-standards.md
-4. /home/kuba/.openclaw/standards/documentation.md
+FastAPI REST service for Mission Control. Two domain modules: **planning** (work management) and **observability** (agent monitoring, LLM costs).
 
-Navigation:
-- README.md
-- docs/INDEX.md
+## Scope
+
+- **In scope:** REST API for planning (projects, epics, stories, tasks, backlogs, assignments, labels) and observability (agents, costs, requests, Langfuse import)
+- **Out of scope:** Frontend UI (see `apps/web/`), CLI (see `apps/cli/`), auth enforcement (v2)
+
+## Required Reading
+
+Before making changes, read:
+
+1. This file
+2. [docs/INDEX.md](./docs/INDEX.md) — API documentation index
+
+Domain context (read if unfamiliar):
+
+3. [Entity Model v1](../../docs/ENTITY_MODEL_V1.md)
+4. [Workflow Logic v1](../../docs/WORKFLOW_LOGIC_V1.md)
+
+## Tech Decisions
+
+| Decision | Rationale |
+|---|---|
+| Package by feature | Per workspace coding-standards — `planning/`, `observability/` as top-level modules |
+| Clean Architecture layers | api → application ← infrastructure, domain standalone |
+| Port/Adapter pattern | Application defines ABCs, infrastructure implements |
+| Async-first | Async endpoints, aiosqlite for DB access |
+| Constructor injection | Services receive deps via constructor, wired through `Depends()` |
+| pydantic-settings | Env-driven config with `MC_API_` prefix |
+
+## Rules
+
+- **Routers never import repositories** — always go through application services.
+- **Application layer owns transaction boundaries** and defines ports (ABCs).
+- **Domain has zero external dependencies** — pure models, enums, invariants.
+- **Cross-module imports are forbidden** — shared code lives in `shared/`.
+- **No cross-project imports** — API does not import from `apps/web/`.
+
+## Navigation
+
+- ↑ [Root AGENTS.md](../../AGENTS.md)
+- → [README.md](./README.md)
+- → [docs/INDEX.md](./docs/INDEX.md)

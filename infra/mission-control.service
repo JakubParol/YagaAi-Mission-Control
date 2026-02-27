@@ -5,9 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=kuba
-WorkingDirectory=/home/kuba/.openclaw/workspace-james/repos/mission-control
-Environment=NODE_ENV=production
-Environment=SUPERVISOR_SYSTEM_PATH=/home/kuba/.openclaw/SUPERVISOR_SYSTEM
+WorkingDirectory=/home/kuba/.openclaw/workspace-james/repos/mission-control/apps/web
+EnvironmentFile=/home/kuba/mission-control/mission-control.env
 ExecStart=/usr/bin/env npm start -- -p 3100
 Restart=on-failure
 RestartSec=5
