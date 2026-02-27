@@ -1,28 +1,16 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { apiUrl } from "@/lib/api-client";
-import { StoryDetail } from "@/components/story-detail";
+import { EmptyState } from "@/components/empty-state";
 
-export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Story Detail",
+};
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
-
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params;
-  return { title: id };
-}
-
-export default async function StoryPage({ params }: PageProps) {
-  const { id } = await params;
-
-  const res = await fetch(apiUrl(`/v1/workflow/stories/${id}`), {
-    cache: "no-store",
-  });
-  if (!res.ok) notFound();
-
-  const data = await res.json();
-
-  return <StoryDetail storyId={id} initialData={data} />;
+export default function StoryPage() {
+  return (
+    <EmptyState
+      icon="stories"
+      title="Coming soon"
+      description="Story details will be available once the planning module API is connected."
+    />
+  );
 }

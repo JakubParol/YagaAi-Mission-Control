@@ -6,7 +6,7 @@ Mission Control is a monorepo for managing AI agent workflows. It contains a web
 
 ## Scope
 
-- **In scope:** Dashboard UI, REST API (planning + observability modules), CLI (planned), SQLite persistence, Langfuse integration, Workflow System filesystem reads
+- **In scope:** Dashboard UI, REST API (planning + observability modules), CLI (planned), SQLite persistence, Langfuse integration
 - **Out of scope:** Authentication enforcement (v2), real-time WebSocket events (v2), multi-tenancy (v2)
 
 ## Required Reading (Mandatory)
@@ -52,7 +52,7 @@ If you then drill into a project, report that too.
 | API | FastAPI, Python 3.12, async, pydantic |
 | CLI | Planned |
 | Database | SQLite (aiosqlite for API, better-sqlite3 for frontend) |
-| External | Langfuse (LLM observability), Workflow System (filesystem) |
+| External | Langfuse (LLM observability) |
 
 ## Rules
 

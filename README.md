@@ -26,7 +26,7 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 | API | FastAPI, Python 3.12, pydantic, async |
 | CLI | Planned |
 | Database | SQLite (shared `data/mission-control.db`) |
-| External | Langfuse (LLM cost tracking), Workflow System (agent filesystem) |
+| External | Langfuse (LLM cost tracking) |
 
 ## Getting Started
 
@@ -38,7 +38,7 @@ npm install
 
 # Configure
 cp .env.example .env.local
-# Edit WORKFLOW_SYSTEM_PATH, LANGFUSE_* vars as needed
+# Edit LANGFUSE_* vars as needed
 
 npm run dev
 ```

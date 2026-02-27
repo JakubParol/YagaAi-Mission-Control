@@ -1,15 +1,6 @@
 /**
- * Types for the Dashboard page: agent status, LLM costs, and recent requests.
+ * Types for the Dashboard page: LLM costs and recent requests.
  */
-
-export type AgentStatusValue = "idle" | "working";
-
-export interface AgentStatus {
-  name: string;
-  role: string;
-  status: AgentStatusValue;
-  task?: string;
-}
 
 export interface ModelUsage {
   model: string;

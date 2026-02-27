@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     default: "Mission Control",
     template: "%s | Mission Control",
   },
-  description: "Workflow System observability dashboard",
+  description: "Mission Control observability dashboard",
 };
 
 export default function RootLayout({

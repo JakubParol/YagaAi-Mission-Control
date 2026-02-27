@@ -5,7 +5,6 @@ import pytest
 
 # Set env vars BEFORE importing app
 os.environ["MC_API_DB_PATH"] = ""
-os.environ["MC_API_WORKFLOW_SYSTEM_PATH"] = "/tmp/nonexistent_workflow_test"
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +52,6 @@ def _setup_test_db(tmp_path, monkeypatch):
     from app.config import settings
 
     monkeypatch.setattr(settings, "db_path", db_path)
-    monkeypatch.setattr(settings, "workflow_system_path", str(tmp_path / "workflow"))
     monkeypatch.setattr(settings, "langfuse_host", "http://localhost:9999")
     monkeypatch.setattr(settings, "langfuse_public_key", "pk-test")
     monkeypatch.setattr(settings, "langfuse_secret_key", "sk-test")
