@@ -22,14 +22,10 @@ for arg in "$@"; do
     esac
 done
 
-# Ensure venv is active
-if [[ -z "${VIRTUAL_ENV:-}" ]]; then
-    if [[ -d ".venv" ]]; then
-        source .venv/bin/activate
-    else
-        echo "No .venv found. Create one: python -m venv .venv && pip install -e '.[dev]'"
-        exit 1
-    fi
+# Ensure poetry is available
+if ! command -v poetry &>/dev/null; then
+    echo "Poetry not found. Install: https://python-poetry.org/docs/#installation"
+    exit 1
 fi
 
 PYLINT_TARGETS="app"
@@ -45,7 +41,7 @@ run_tool() {
     shift
     echo ""
     echo "› $name"
-    if "$@"; then
+    if poetry run "$@"; then
         RESULTS["$name"]="OK"
         echo "$name: OK"
     else
@@ -59,10 +55,8 @@ run_tool() {
 run_pylint() {
     echo ""
     echo "› Pylint"
-    # Pylint exit codes: 1=fatal, 2=error, 4=warning, 8=refactor, 16=convention, 32=usage
-    # We only fail on fatal (1) and error (2)
     set +e
-    pylint --rcfile pyproject.toml $PYLINT_TARGETS
+    poetry run pylint --rcfile pyproject.toml $PYLINT_TARGETS
     local code=$?
     set -e
 
@@ -108,8 +102,8 @@ run_tool "Bandit" bandit -r app -ll -q
 if [[ "$FIX" == true ]]; then
     echo ""
     echo "› Post-fix checks"
-    black --check --diff . || true
-    isort --check-only --diff . || true
+    poetry run black --check --diff . || true
+    poetry run isort --check-only --diff . || true
 fi
 
 # --- Summary ---
@@ -117,13 +111,7 @@ echo ""
 echo "=== Summary ==="
 for tool in "${!RESULTS[@]}"; do
     status="${RESULTS[$tool]}"
-    if [[ "$status" == "OK" ]]; then
-        echo "  $tool: $status"
-    elif [[ "$status" == "WARNINGS" ]]; then
-        echo "  $tool: $status"
-    else
-        echo "  $tool: $status"
-    fi
+    echo "  $tool: $status"
 done
 
 if (( FAILED )); then
