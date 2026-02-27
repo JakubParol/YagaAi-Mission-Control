@@ -22,12 +22,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile header */}
         <MobileHeader />
 
-        {/* Main content */}
-        <main className="flex-1 px-4 py-6 sm:px-6 sm:py-8">
-          <div className="mx-auto w-full max-w-7xl">
-            {children}
-          </div>
-        </main>
+        {/* Page content */}
+        {children}
       </div>
     </div>
   );

@@ -53,7 +53,7 @@ export function TaskDetail({
         <ol className="flex items-center gap-1.5 text-sm">
           <li>
             <Link
-              href="/"
+              href="/planning/stories"
               className="focus-ring rounded text-muted-foreground transition-colors duration-150 hover:text-foreground"
             >
               Stories
@@ -62,7 +62,7 @@ export function TaskDetail({
           <li aria-hidden="true" className="text-muted-foreground/40 select-none">/</li>
           <li>
             <Link
-              href={`/stories/${task.story_id}`}
+              href={`/planning/stories/${task.story_id}`}
               className="focus-ring rounded font-mono text-muted-foreground transition-colors duration-150 hover:text-foreground"
             >
               {task.story_id}
@@ -89,7 +89,7 @@ export function TaskDetail({
           <span className="text-sm text-muted-foreground">
             Story:{" "}
             <Link
-              href={`/stories/${task.story_id}`}
+              href={`/planning/stories/${task.story_id}`}
               className="focus-ring rounded font-mono transition-colors duration-150 hover:text-foreground"
             >
               {task.story_id}
