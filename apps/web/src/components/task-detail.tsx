@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
+import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { SupervisorTask, TaskResult } from "@/lib/types";
 
@@ -40,7 +41,7 @@ export function TaskDetail({
   initialData: TaskDetailData;
 }) {
   const { data } = useAutoRefresh<TaskDetailData>({
-    url: `/api/tasks/${storyId}/${taskId}`,
+    url: apiUrl(`/v1/observability/supervisor/tasks/${storyId}/${taskId}`),
     initialData,
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { apiUrl } from "@/lib/api-client";
 import {
   DollarSign,
   Hash,
@@ -89,7 +90,7 @@ function buildCostUrl(
     }
   }
 
-  return `/api/dashboard/costs?from=${from}&to=${to}`;
+  return apiUrl(`/v1/observability/costs?from=${from}&to=${to}`);
 }
 
 function mapUsage(u: LangfuseModelUsage): ModelUsage {
@@ -215,8 +216,8 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
     const yesterdayStart = new Date(todayStart);
     yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
-    const todayUrl = `/api/dashboard/costs?from=${todayStart.toISOString()}&to=${now.toISOString()}`;
-    const yesterdayUrl = `/api/dashboard/costs?from=${yesterdayStart.toISOString()}&to=${todayStart.toISOString()}`;
+    const todayUrl = apiUrl(`/v1/observability/costs?from=${todayStart.toISOString()}&to=${now.toISOString()}`);
+    const yesterdayUrl = apiUrl(`/v1/observability/costs?from=${yesterdayStart.toISOString()}&to=${todayStart.toISOString()}`);
 
     Promise.all([
       fetch(todayUrl).then((r) => r.json()),

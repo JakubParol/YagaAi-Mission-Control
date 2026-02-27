@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { apiUrl } from '@/lib/api-client';
 
 export function ConnectionStatus() {
   const [ok, setOk] = useState(true);
   const mountedRef = useRef(true);
 
   const check = useCallback(() => {
-    fetch('/api/stories')
+    fetch(apiUrl('/healthz'))
       .then((res) => {
         if (mountedRef.current) setOk(res.ok);
       })

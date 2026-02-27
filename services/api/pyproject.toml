@@ -15,9 +15,14 @@ fastapi = ">=0.116.0"
 uvicorn = {extras = ["standard"], version = ">=0.35.0"}
 pydantic = ">=2.8.0"
 pydantic-settings = ">=2.4.0"
+aiosqlite = ">=0.20.0"
+httpx = ">=0.27.0"
+pyyaml = ">=6.0"
+python-dotenv = ">=1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.0"
+pytest-asyncio = ">=0.24.0"
 httpx = ">=0.27.0"
 black = ">=25.1.0"
 isort = ">=6.0.0"
@@ -118,6 +123,9 @@ name = "API routes cannot import Infrastructure directly"
 type = "forbidden"
 source_modules = ["app.planning.api", "app.observability.api"]
 forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure"]
+ignore_imports = [
+    "app.observability.dependencies -> app.observability.infrastructure.*",
+]
 
 [[tool.importlinter.contracts]]
 name = "No cross-module imports"

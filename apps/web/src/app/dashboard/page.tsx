@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import { getAgentStatuses } from "@/lib/adapters";
 import { Dashboard } from "@/components/dashboard";
-import { DashboardService } from "@/lib/langfuse-import";
-import { getDbStatus } from "@/lib/db";
+import { apiUrl } from "@/lib/api-client";
 import type {
+  AgentStatus,
   CostMetrics,
   LLMRequestsResponse,
   ImportStatusInfo,
@@ -15,54 +14,29 @@ export const metadata: Metadata = {
   title: "Dashboard",
 };
 
-function toDateStr(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getCosts(): CostMetrics {
+async function fetchJson<T>(path: string, fallback: T): Promise<T> {
   try {
-    const service = new DashboardService();
-    const now = new Date();
-    const from = new Date(now);
-    from.setDate(from.getDate() - 7);
-    return service.getCosts(toDateStr(from), toDateStr(now));
+    const res = await fetch(apiUrl(path), { cache: "no-store" });
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
   } catch {
-    return { daily: [] };
-  }
-}
-
-function getImportStatus(): ImportStatusInfo {
-  try {
-    const service = new DashboardService();
-    return service.getImportStatus();
-  } catch {
-    return { lastImport: null, lastStatus: null, counts: { metrics: 0, requests: 0 } };
-  }
-}
-
-function getRequests(): LLMRequestsResponse {
-  try {
-    const service = new DashboardService();
-    return service.getRequests(1, 50);
-  } catch {
-    return {
-      data: [],
-      meta: { page: 1, limit: 50, totalItems: 0, totalPages: 0 },
-    };
+    return fallback;
   }
 }
 
 export default async function DashboardPage() {
-  const dbStatus = getDbStatus();
-
   const [agents, costs, requests, importStatus] = await Promise.all([
-    getAgentStatuses(),
-    Promise.resolve(getCosts()),
-    Promise.resolve(getRequests()),
-    Promise.resolve(getImportStatus()),
+    fetchJson<AgentStatus[]>("/v1/observability/agents", []),
+    fetchJson<CostMetrics>("/v1/observability/costs?days=7", { daily: [] }),
+    fetchJson<LLMRequestsResponse>("/v1/observability/requests?page=1&limit=50", {
+      data: [],
+      meta: { page: 1, limit: 50, totalItems: 0, totalPages: 0 },
+    }),
+    fetchJson<ImportStatusInfo>("/v1/observability/imports/status", {
+      lastImport: null,
+      lastStatus: null,
+      counts: { metrics: 0, requests: 0 },
+    }),
   ]);
 
   return (
@@ -71,7 +45,6 @@ export default async function DashboardPage() {
       initialCosts={costs}
       initialRequests={requests}
       initialImportStatus={importStatus}
-      dbError={dbStatus.ok ? undefined : dbStatus.error}
     />
   );
 }

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { BookOpen, ListTodo, CheckCircle, AlertTriangle } from "lucide-react";
-import { listStories } from "@/lib/adapters";
+import { apiUrl } from "@/lib/api-client";
 import { StoryList } from "@/components/story-list";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
+import type { SupervisorStory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,15 @@ export const metadata: Metadata = {
 };
 
 export default async function StoriesPage() {
-  const stories = await listStories();
+  let stories: SupervisorStory[] = [];
+  try {
+    const res = await fetch(apiUrl("/v1/observability/supervisor/stories"), {
+      cache: "no-store",
+    });
+    if (res.ok) stories = await res.json();
+  } catch {
+    // API unavailable — render empty
+  }
 
   // Aggregate task counts across all stories
   let totalTasks = 0;

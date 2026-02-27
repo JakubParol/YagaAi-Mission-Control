@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Archive, Clock, UserCheck, CheckCircle, AlertTriangle } from "lucide-react";
-import { listStories, listTasksForStory } from "@/lib/adapters";
+import { apiUrl } from "@/lib/api-client";
 import { KanbanBoard } from "@/components/kanban-board";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
 import type { SupervisorTask, TaskState } from "@/lib/types";
@@ -12,13 +12,21 @@ export const metadata: Metadata = {
 };
 
 export default async function BoardPage() {
-  const stories = await listStories();
+  let stories: { id: string; content: string; task_counts: Record<TaskState, number> }[] = [];
+  let allTasks: SupervisorTask[] = [];
 
-  // Fetch tasks for all stories in parallel
-  const tasksPerStory = await Promise.all(
-    stories.map((story) => listTasksForStory(story.id))
-  );
-  const allTasks: SupervisorTask[] = tasksPerStory.flat();
+  try {
+    const res = await fetch(apiUrl("/v1/observability/supervisor/board"), {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      stories = data.stories ?? [];
+      allTasks = data.tasks ?? [];
+    }
+  } catch {
+    // API unavailable — render empty
+  }
 
   // Compute counts per state
   const counts: Record<TaskState, number> = {

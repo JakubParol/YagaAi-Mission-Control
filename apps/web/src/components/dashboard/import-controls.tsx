@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { apiUrl } from "@/lib/api-client";
 import {
   Download,
   Loader2,
@@ -30,7 +31,7 @@ export function ImportButton({
     setErrorMsg(null);
 
     try {
-      const res = await fetch("/api/dashboard/import", { method: "POST" });
+      const res = await fetch(apiUrl("/v1/observability/imports"), { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `HTTP ${res.status}`);

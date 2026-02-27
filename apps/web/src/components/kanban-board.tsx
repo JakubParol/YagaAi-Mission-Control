@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
@@ -51,7 +52,7 @@ const STORY_COLORS = [
 
 export function KanbanBoard({ initialData }: { initialData: BoardData }) {
   const { data, error } = useAutoRefresh<BoardData>({
-    url: "/api/board",
+    url: apiUrl("/v1/observability/supervisor/board"),
     initialData,
   });
 

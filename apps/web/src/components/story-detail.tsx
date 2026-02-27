@@ -9,6 +9,7 @@ import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorCard } from "@/components/error-card";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
+import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { SupervisorStory, SupervisorTask, TaskState } from "@/lib/types";
 
@@ -25,7 +26,7 @@ export function StoryDetail({
   initialData: StoryDetailData;
 }) {
   const { data, error } = useAutoRefresh<StoryDetailData>({
-    url: `/api/stories/${storyId}`,
+    url: apiUrl(`/v1/observability/supervisor/stories/${storyId}`),
     initialData,
   });
 
