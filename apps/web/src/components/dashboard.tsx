@@ -300,7 +300,7 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
 
   // Memoize so the URL only changes when the filter/range changes, not on
   // every render (buildCostUrl uses new Date() internally).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const url = useMemo(() => buildCostUrl(activeFilter, customRange), [activeFilter, customRange]);
 
   // Fetch filtered cost data. Unlike useAutoRefresh (which skips the initial
@@ -349,7 +349,7 @@ function CostsSection({ initialData }: { initialData: CostMetrics }) {
         });
       })
       .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
   const { todaySpend, yesterdaySpend, todayRequests, avgCost } = statCards;
 
   // Model breakdown responds to the active date filter

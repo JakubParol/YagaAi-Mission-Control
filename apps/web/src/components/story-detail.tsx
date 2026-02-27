@@ -3,7 +3,7 @@
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ListTodo, Archive, Clock, UserCheck, CheckCircle, AlertTriangle } from "lucide-react";
+import { ListTodo, Archive, Clock, UserCheck, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { EmptyState } from "@/components/empty-state";

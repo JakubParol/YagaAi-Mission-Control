@@ -18,8 +18,6 @@ import type {
   Story,
   Task,
   Backlog,
-  BacklogStory,
-  BacklogTask,
   Agent,
   TaskAssignment,
   Label,

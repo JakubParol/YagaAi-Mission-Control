@@ -6,10 +6,8 @@ FastAPI REST service for Mission Control — planning and observability modules.
 
 ```bash
 cd services/api
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn app.main:app --reload --port 8080
+poetry install
+poetry run uvicorn app.main:app --reload --port 8080
 ```
 
 Health endpoint: `GET /healthz`
@@ -38,7 +36,14 @@ app/
 ## Tests
 
 ```bash
-pytest
+poetry run pytest
+```
+
+## Linting
+
+```bash
+./scripts/lint.sh          # Check mode
+./scripts/lint.sh --fix    # Auto-fix formatting
 ```
 
 ## Links

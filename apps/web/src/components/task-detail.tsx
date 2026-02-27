@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { StateBadge, ParseErrorBadge } from "@/components/state-badge";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { Task, TaskResult } from "@/lib/types";
