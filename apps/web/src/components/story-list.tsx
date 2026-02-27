@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { TaskCountBadges } from "@/components/task-count-badges";
+import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
@@ -30,7 +31,7 @@ function extractSummary(content: string): string {
 
 export function StoryList({ initialData }: { initialData: SupervisorStory[] }) {
   const { data: stories, error } = useAutoRefresh<SupervisorStory[]>({
-    url: "/api/stories",
+    url: apiUrl("/v1/observability/supervisor/stories"),
     initialData,
   });
 

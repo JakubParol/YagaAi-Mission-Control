@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api-client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
@@ -93,7 +94,7 @@ export function RequestsSection({
   const [page, setPage] = useState(1);
   const [modelFilter, setModelFilter] = useState<string>("");
 
-  const url = `/api/dashboard/requests?page=${page}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ""}`;
+  const url = apiUrl(`/v1/observability/requests?page=${page}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ""}`);
   const { data: response } = useAutoRefresh<LLMRequestsResponse>({
     url,
     interval: 30000,
@@ -102,7 +103,7 @@ export function RequestsSection({
 
   const [models, setModels] = useState<string[]>([]);
   useEffect(() => {
-    fetch("/api/dashboard/requests/models")
+    fetch(apiUrl("/v1/observability/requests/models"))
       .then((res) => res.json())
       .then((data) => setModels(data.models ?? []))
       .catch(() => {});

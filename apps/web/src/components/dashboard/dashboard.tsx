@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { AlertCircle } from "lucide-react";
+import { apiUrl } from "@/lib/api-client";
 import { EmptyState } from "@/components/empty-state";
 import { AgentsSection } from "./agents-section";
 import { CostsSection } from "./costs-section";
@@ -36,7 +37,7 @@ export function Dashboard({
   const handleImportComplete = useCallback(async () => {
     // Re-fetch import status
     try {
-      const res = await fetch("/api/dashboard/status");
+      const res = await fetch(apiUrl("/v1/observability/imports/status"));
       if (res.ok) {
         const data: ImportStatusInfo = await res.json();
         setImportStatus(data);

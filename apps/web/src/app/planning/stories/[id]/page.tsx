@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getStory, listTasksForStory } from "@/lib/adapters";
+import { apiUrl } from "@/lib/api-client";
 import { StoryDetail } from "@/components/story-detail";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +16,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function StoryPage({ params }: PageProps) {
   const { id } = await params;
-  const story = await getStory(id);
-  if (!story) notFound();
 
-  const tasks = await listTasksForStory(id);
+  const res = await fetch(apiUrl(`/v1/observability/supervisor/stories/${id}`), {
+    cache: "no-store",
+  });
+  if (!res.ok) notFound();
 
-  return <StoryDetail storyId={id} initialData={{ story, tasks }} />;
+  const data = await res.json();
+
+  return <StoryDetail storyId={id} initialData={data} />;
 }

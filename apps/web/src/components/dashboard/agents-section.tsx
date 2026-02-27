@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { apiUrl } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import type { AgentStatus } from "@/lib/dashboard-types";
 
@@ -71,7 +72,7 @@ function AgentCard({ agent }: { agent: AgentStatus }) {
 
 export function AgentsSection({ initialData }: { initialData: AgentStatus[] }) {
   const { data: agents } = useAutoRefresh<AgentStatus[]>({
-    url: "/api/dashboard/agents",
+    url: apiUrl("/v1/observability/agents"),
     interval: 15000,
     initialData,
   });
