@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
 import { getStory, listTasksForStory } from "@/lib/adapters";
+import { withErrorHandler, NotFoundError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export const GET = withErrorHandler(async (_request, context) => {
+  const { id } = await context!.params;
   const story = await getStory(id);
   if (!story) {
-    return NextResponse.json({ error: "Story not found" }, { status: 404 });
+    throw new NotFoundError("Story not found");
   }
   const tasks = await listTasksForStory(id);
   return NextResponse.json({ story, tasks });
-}
+});

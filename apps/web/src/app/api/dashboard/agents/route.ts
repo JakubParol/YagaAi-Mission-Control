@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAgentStatuses } from "@/lib/adapters";
+import { withErrorHandler } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  try {
-    const agents = await getAgentStatuses();
-    return NextResponse.json(agents);
-  } catch (err) {
-    console.error("GET /api/dashboard/agents failed:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal server error" },
-      { status: 500 },
-    );
-  }
-}
+export const GET = withErrorHandler(async () => {
+  const agents = await getAgentStatuses();
+  return NextResponse.json(agents);
+});

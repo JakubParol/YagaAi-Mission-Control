@@ -6,7 +6,7 @@ import { TaskCountBadges } from "@/components/task-count-badges";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { EmptyState } from "./empty-state";
 import { ErrorCard } from "./error-card";
-import type { Story } from "@/lib/types";
+import type { SupervisorStory } from "@/lib/types";
 
 /** Extract the first meaningful line from markdown as a summary. */
 function extractSummary(content: string): string {
@@ -28,8 +28,8 @@ function extractSummary(content: string): string {
   return "No description";
 }
 
-export function StoryList({ initialData }: { initialData: Story[] }) {
-  const { data: stories, error } = useAutoRefresh<Story[]>({
+export function StoryList({ initialData }: { initialData: SupervisorStory[] }) {
+  const { data: stories, error } = useAutoRefresh<SupervisorStory[]>({
     url: "/api/stories",
     initialData,
   });

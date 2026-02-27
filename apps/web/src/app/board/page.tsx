@@ -3,7 +3,7 @@ import { Archive, Clock, UserCheck, CheckCircle, AlertTriangle } from "lucide-re
 import { listStories, listTasksForStory } from "@/lib/adapters";
 import { KanbanBoard } from "@/components/kanban-board";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
-import type { Task, TaskState } from "@/lib/types";
+import type { SupervisorTask, TaskState } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,7 @@ export default async function BoardPage() {
   const tasksPerStory = await Promise.all(
     stories.map((story) => listTasksForStory(story.id))
   );
-  const allTasks: Task[] = tasksPerStory.flat();
+  const allTasks: SupervisorTask[] = tasksPerStory.flat();
 
   // Compute counts per state
   const counts: Record<TaskState, number> = {

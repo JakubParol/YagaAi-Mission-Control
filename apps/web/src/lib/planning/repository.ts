@@ -10,7 +10,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import type Database from "better-sqlite3";
-import { getDb } from "../langfuse-import/db";
+import { getDb } from "../db";
 import type {
   Project,
   ProjectCounter,

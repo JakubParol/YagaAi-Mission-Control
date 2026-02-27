@@ -8,13 +8,13 @@ import { join } from "node:path";
 
 import { STORIES_PATH } from "./config";
 import { listTasksForStory } from "./tasks";
-import type { Story, TaskState } from "../types";
+import type { SupervisorStory, TaskState } from "../types";
 
 /**
  * List all stories in the SUPERVISOR_SYSTEM.
  * Reads each story's STORY.md and counts tasks per state.
  */
-export async function listStories(): Promise<Story[]> {
+export async function listStories(): Promise<SupervisorStory[]> {
   let entries: string[];
   try {
     entries = await readdir(STORIES_PATH);
@@ -57,7 +57,7 @@ export async function listStories(): Promise<Story[]> {
  * Get a single story by ID.
  * Returns null if the story directory doesn't exist.
  */
-export async function getStory(id: string): Promise<Story | null> {
+export async function getStory(id: string): Promise<SupervisorStory | null> {
   const storyDir = join(STORIES_PATH, id);
   const storyFile = join(storyDir, "STORY.md");
 

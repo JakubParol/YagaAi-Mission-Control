@@ -10,11 +10,11 @@ import { EmptyState } from "@/components/empty-state";
 import { ErrorCard } from "@/components/error-card";
 import { StatCard, StatCardsRow } from "@/components/stat-card";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
-import type { Story, Task, TaskState } from "@/lib/types";
+import type { SupervisorStory, SupervisorTask, TaskState } from "@/lib/types";
 
 interface StoryDetailData {
-  story: Story;
-  tasks: Task[];
+  story: SupervisorStory;
+  tasks: SupervisorTask[];
 }
 
 export function StoryDetail({
