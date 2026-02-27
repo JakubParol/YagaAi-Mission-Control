@@ -1,0 +1,15 @@
+[Unit]
+Description=Mission Control API
+After=network.target
+
+[Service]
+Type=simple
+User=kuba
+WorkingDirectory=/home/kuba/repos/mission-control/services/api
+EnvironmentFile=/home/kuba/mission-control/mission-control.env
+ExecStart=/home/kuba/repos/mission-control/services/api/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 5001
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

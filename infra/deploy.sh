@@ -4,22 +4,35 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "📦 Switching to main and pulling..."
+echo "Switching to main and pulling..."
 git checkout main
 git pull origin main
 
+# --- API ---
+echo "Installing API dependencies..."
+cd services/api
+poetry install --only main --no-interaction
+cd ../..
+
+# --- Web ---
+echo "Loading env for build (NEXT_PUBLIC_API_URL)..."
+set -a
+source /home/kuba/mission-control/mission-control.env
+set +a
+
 cd apps/web
 
-echo "🧹 Cleaning .next..."
+echo "Cleaning .next..."
 rm -rf .next
 
-echo "🔨 Building..."
+echo "Building..."
 npm run build
 
-echo "⏳ Waiting for build artifacts..."
-test -f .next/server/pages-manifest.json
+cd ../..
 
-echo "🔄 Restarting service..."
+# --- Services ---
+echo "Restarting services..."
+sudo systemctl restart mission-control-api
 sudo systemctl restart mission-control
 
-echo "✅ Deployed! Check: http://localhost:3100"
+echo "Deployed! Web: http://localhost:3100 | API: http://localhost:5001"
