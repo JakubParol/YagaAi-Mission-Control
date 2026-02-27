@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from app.observability.application.ports import LangfuseRepositoryPort
 
 
-class DashboardService:
+class MetricsService:
     def __init__(self, repo: LangfuseRepositoryPort) -> None:
         self._repo = repo
 

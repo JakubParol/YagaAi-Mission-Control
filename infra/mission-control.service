@@ -1,5 +1,5 @@
 [Unit]
-Description=Mission Control — Supervisor System Dashboard
+Description=Mission Control — Dashboard
 After=network.target
 
 [Service]

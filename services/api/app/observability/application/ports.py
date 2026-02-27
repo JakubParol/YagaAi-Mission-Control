@@ -1,14 +1,10 @@
 from abc import ABC, abstractmethod
 
 from app.observability.domain.models import (
-    AgentStatus,
     DailyMetric,
     ImportRecord,
     LangfuseRequest,
     PaginatedRequests,
-    SupervisorStory,
-    SupervisorTask,
-    TaskResult,
 )
 
 
@@ -64,26 +60,3 @@ class LangfuseClientPort(ABC):
 
     @abstractmethod
     async def fetch_all_observations(self, from_timestamp: str | None = None) -> list[dict]: ...
-
-
-class SupervisorAdapterPort(ABC):
-    @abstractmethod
-    async def list_stories(self) -> list[SupervisorStory]: ...
-
-    @abstractmethod
-    async def get_board(self) -> tuple[list[SupervisorStory], list[SupervisorTask]]: ...
-
-    @abstractmethod
-    async def get_story(self, story_id: str) -> SupervisorStory | None: ...
-
-    @abstractmethod
-    async def list_tasks_for_story(self, story_id: str) -> list[SupervisorTask]: ...
-
-    @abstractmethod
-    async def get_task(self, story_id: str, task_id: str) -> SupervisorTask | None: ...
-
-    @abstractmethod
-    async def get_task_results(self, story_id: str, task_id: str) -> TaskResult | None: ...
-
-    @abstractmethod
-    async def get_agent_statuses(self) -> list[AgentStatus]: ...

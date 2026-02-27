@@ -25,9 +25,9 @@ The API is a single FastAPI service with multiple domain modules:
 | Module | Prefix | Domain |
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
-| **observability** | `/v1/observability` | Agent status, LLM costs, requests, Langfuse import |
+| **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
 
-More modules will be added over time. Each module is self-contained and follows the same internal structure.
+Each module is self-contained and follows the same internal structure.
 
 ---
 
@@ -73,22 +73,16 @@ services/api/
 │   │
 │   └── observability/           # Module: /v1/observability/...
 │       ├── api/
-│       │   ├── router.py
-│       │   ├── schemas.py
-│       │   ├── agents.py
-│       │   ├── costs.py
-│       │   ├── requests.py
-│       │   └── imports.py
+│       │   └── router.py
 │       ├── application/
 │       │   ├── ports.py
-│       │   ├── agent_service.py
-│       │   ├── cost_service.py
+│       │   ├── metrics_service.py
 │       │   └── import_service.py
 │       ├── domain/
 │       │   └── models.py
 │       └── infrastructure/
-│           ├── repository.py
-│           └── langfuse_client.py  # External API adapter
+│           ├── langfuse_repository.py
+│           └── langfuse_client.py
 │
 ├── tests/
 │   ├── planning/

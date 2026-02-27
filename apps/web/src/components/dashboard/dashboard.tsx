@@ -4,19 +4,16 @@ import { useState, useCallback } from "react";
 import { AlertCircle } from "lucide-react";
 import { apiUrl } from "@/lib/api-client";
 import { EmptyState } from "@/components/empty-state";
-import { AgentsSection } from "./agents-section";
 import { CostsSection } from "./costs-section";
 import { RequestsSection } from "./requests-section";
 import { ImportButton, ImportStatusBar } from "./import-controls";
 import type {
-  AgentStatus,
   CostMetrics,
   LLMRequestsResponse,
   ImportStatusInfo,
 } from "@/lib/dashboard-types";
 
 export interface DashboardProps {
-  initialAgents: AgentStatus[];
   initialCosts: CostMetrics;
   initialRequests: LLMRequestsResponse;
   initialImportStatus: ImportStatusInfo;
@@ -24,7 +21,6 @@ export interface DashboardProps {
 }
 
 export function Dashboard({
-  initialAgents,
   initialCosts,
   initialRequests,
   initialImportStatus,
@@ -61,7 +57,7 @@ export function Dashboard({
         <div>
           <h1 className="mb-1 text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground">
-            Agent status, LLM costs, and recent requests
+            LLM costs and recent requests
           </p>
         </div>
         <ImportButton onImportComplete={handleImportComplete} />
@@ -94,7 +90,6 @@ export function Dashboard({
         </EmptyState>
       ) : (
         <>
-          <AgentsSection key={`agents-${refreshKey}`} initialData={initialAgents} />
           <CostsSection key={`costs-${refreshKey}`} initialData={initialCosts} />
           <RequestsSection key={`requests-${refreshKey}`} initialData={initialRequests} />
         </>

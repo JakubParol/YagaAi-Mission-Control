@@ -1,44 +1,15 @@
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 
-from app.observability.application.dashboard_service import DashboardService
 from app.observability.application.import_service import ImportService
-from app.observability.application.supervisor_service import SupervisorService
+from app.observability.application.metrics_service import MetricsService
 from app.observability.dependencies import (
-    get_dashboard_service,
     get_import_service,
-    get_supervisor_service,
+    get_metrics_service,
 )
-from app.observability.domain.models import SupervisorTask
-from app.shared.api.errors import NotFoundError
 
 router = APIRouter(tags=["observability"])
-
-
-def _task_to_dict(task: SupervisorTask) -> dict:
-    """Serialize SupervisorTask with camelCase keys matching the frontend."""
-    d = asdict(task)
-    d["parseError"] = d.pop("parse_error")
-    return d
-
-
-# --- Agents ---
-
-
-@router.get("/agents")
-async def get_agents(
-    service: SupervisorService = Depends(get_supervisor_service),
-) -> list[dict]:
-    statuses = await service.get_agent_statuses()
-    result = []
-    for s in statuses:
-        item: dict = {"name": s.name, "role": s.role, "status": s.status}
-        if s.task:
-            item["task"] = s.task
-        result.append(item)
-    return result
 
 
 # --- Costs ---
@@ -46,7 +17,7 @@ async def get_agents(
 
 @router.get("/costs")
 async def get_costs(
-    service: DashboardService = Depends(get_dashboard_service),
+    service: MetricsService = Depends(get_metrics_service),
     from_param: str | None = Query(None, alias="from"),
     to_param: str | None = Query(None, alias="to"),
     days: int | None = Query(None),
@@ -69,7 +40,7 @@ async def get_costs(
 
 @router.get("/requests")
 async def get_requests(
-    service: DashboardService = Depends(get_dashboard_service),
+    service: MetricsService = Depends(get_metrics_service),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=100),
     model: str | None = Query(None),
@@ -81,7 +52,7 @@ async def get_requests(
 
 @router.get("/requests/models")
 async def get_request_models(
-    service: DashboardService = Depends(get_dashboard_service),
+    service: MetricsService = Depends(get_metrics_service),
 ) -> dict:
     models = await service.get_distinct_models()
     return {"models": models}
@@ -99,54 +70,6 @@ async def trigger_import(
 
 @router.get("/imports/status")
 async def get_import_status(
-    service: DashboardService = Depends(get_dashboard_service),
+    service: MetricsService = Depends(get_metrics_service),
 ) -> dict:
     return await service.get_import_status()
-
-
-# --- Supervisor: Stories, Board, Tasks ---
-
-
-@router.get("/supervisor/stories")
-async def list_stories(
-    service: SupervisorService = Depends(get_supervisor_service),
-) -> list[dict]:
-    stories = await service.list_stories()
-    return [asdict(s) for s in stories]
-
-
-@router.get("/supervisor/stories/{story_id}")
-async def get_story(
-    story_id: str,
-    service: SupervisorService = Depends(get_supervisor_service),
-) -> dict:
-    story, tasks = await service.get_story(story_id)
-    if not story:
-        raise NotFoundError("Story not found")
-    return {"story": asdict(story), "tasks": [_task_to_dict(t) for t in tasks]}
-
-
-@router.get("/supervisor/board")
-async def get_board(
-    service: SupervisorService = Depends(get_supervisor_service),
-) -> dict:
-    stories, tasks = await service.get_board()
-    return {
-        "stories": [asdict(s) for s in stories],
-        "tasks": [_task_to_dict(t) for t in tasks],
-    }
-
-
-@router.get("/supervisor/tasks/{story_id}/{task_id}")
-async def get_task(
-    story_id: str,
-    task_id: str,
-    service: SupervisorService = Depends(get_supervisor_service),
-) -> dict:
-    task, results = await service.get_task(story_id, task_id)
-    if not task:
-        raise NotFoundError("Task not found")
-    return {
-        "task": _task_to_dict(task),
-        "results": asdict(results) if results else None,
-    }

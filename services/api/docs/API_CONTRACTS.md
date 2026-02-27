@@ -440,46 +440,16 @@ Hard delete. Removes from all story/task associations. Returns `204`.
 
 ## 5) Observability Module — `/v1/observability`
 
-Migrated from the existing Next.js dashboard API routes. Provides agent monitoring, LLM cost tracking, and Langfuse data import.
+LLM cost tracking, request browsing, and Langfuse data import.
 
 ### Conventions
 
 - Observability endpoints are mostly read-only (GET), except for the import trigger (POST).
 - Cost/request data originates from Langfuse and is cached locally in SQLite.
-- Agent status is derived from the Supervisor System filesystem.
 
 ---
 
-### 5.1) Agents
-
-**Base path:** `/v1/observability/agents`
-
-#### `GET /v1/observability/agents` — List agent statuses
-
-Returns current status of all registered agents.
-
-Response:
-```jsonc
-{
-  "data": [
-    {
-      "id": "naomi",
-      "name": "Naomi",
-      "role": "Principal Developer",
-      "status": "working",          // "working" | "idle"
-      "current_task": {             // null if idle
-        "story_id": "...",
-        "task_id": "...",
-        "objective": "..."
-      }
-    }
-  ]
-}
-```
-
----
-
-### 5.2) Costs
+### 5.1) Costs
 
 **Base path:** `/v1/observability/costs`
 
@@ -516,7 +486,7 @@ Response:
 
 ---
 
-### 5.3) Requests
+### 5.2) Requests
 
 **Base path:** `/v1/observability/requests`
 
@@ -554,7 +524,7 @@ Response:
 
 ---
 
-### 5.4) Imports
+### 5.3) Imports
 
 **Base path:** `/v1/observability/imports`
 

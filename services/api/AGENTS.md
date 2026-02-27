@@ -2,11 +2,11 @@
 
 ## What This Is
 
-FastAPI REST service for Mission Control. Two domain modules: **planning** (work management) and **observability** (agent monitoring, LLM costs).
+FastAPI REST service for Mission Control. Two domain modules: **planning** (work management) and **observability** (LLM costs).
 
 ## Scope
 
-- **In scope:** REST API for planning (projects, epics, stories, tasks, backlogs, assignments, labels) and observability (agents, costs, requests, Langfuse import)
+- **In scope:** REST API for planning (projects, epics, stories, tasks, backlogs, assignments, labels) and observability (costs, requests, Langfuse import)
 - **Out of scope:** Frontend UI (see `apps/web/`), CLI (see `apps/cli/`), auth enforcement (v2)
 
 ## Required Reading

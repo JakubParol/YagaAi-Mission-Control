@@ -8,7 +8,7 @@ Overview of all projects and components in this monorepo.
 
 | Project | Path | Type | Description |
 |---|---|---|---|
-| **Web** | `apps/web/` | Next.js 15 | Dashboard UI — agent monitoring, LLM costs, stories/tasks board |
+| **Web** | `apps/web/` | Next.js 15 | Dashboard UI — LLM costs, planning views |
 | **CLI** | `apps/cli/` | Planned | Command-line interface for Mission Control |
 | **API** | `services/api/` | FastAPI (Python) | REST API — planning and observability modules |
 
@@ -22,12 +22,11 @@ The Next.js application serving the Mission Control dashboard.
 |---|---|
 | Entry point | `apps/web/src/app/` (App Router) |
 | Domain types | `apps/web/src/lib/types.ts` |
-| Filesystem adapters | `apps/web/src/lib/adapters/` — reads Supervisor System YAML/markdown |
 | Langfuse import | `apps/web/src/lib/langfuse-import/` — imports LLM cost data from Langfuse |
 | Planning schema | `apps/web/src/lib/planning/` — v1 DB schema, types, repository |
 | API routes | `apps/web/src/app/api/` — Next.js API routes (dashboard data) |
 | Database | `data/mission-control.db` (SQLite, shared) |
-| Config | `apps/web/.env.local` — `SUPERVISOR_SYSTEM_PATH`, `LANGFUSE_*` |
+| Config | `apps/web/.env.local` — `LANGFUSE_*` |
 | AGENTS.md | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
 
 ---
@@ -49,7 +48,7 @@ FastAPI REST service with two domain modules:
 | Module | Prefix | Domain |
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
-| **observability** | `/v1/observability` | Agent status, LLM costs, requests, Langfuse import |
+| **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
 
 | Item | Detail |
 |---|---|
@@ -75,7 +74,6 @@ FastAPI REST service with two domain modules:
 
 | System | Purpose | How accessed |
 |---|---|---|
-| Supervisor System filesystem | Agent state, stories, tasks (YAML/markdown) | Read via `apps/web/src/lib/adapters/` at `SUPERVISOR_SYSTEM_PATH` |
 | Langfuse | LLM observability (costs, traces) | HTTP API → imported to local SQLite |
 
 ---
