@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mission-control-api"
 version = "0.1.0"
-description = "Mission Control FastAPI service scaffold"
-requires-python = ">=3.11"
+description = "Mission Control FastAPI service"
+requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.116.0",
   "uvicorn[standard]>=0.35.0",
@@ -18,8 +18,115 @@ dependencies = [
 dev = [
   "pytest>=8.3.0",
   "httpx>=0.27.0",
+  "black>=25.1.0",
+  "isort>=6.0.0",
+  "pylint>=4.0.0",
+  "pyright>=1.1.400",
+  "bandit>=1.9.0",
+  "import-linter>=2.9",
 ]
+
+# ============================================
+# Tool Configurations
+# ============================================
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+exclude = '''
+/(
+    \.git
+    | \.venv
+    | __pycache__
+    | \.pytest_cache
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip = [".venv", "__pycache__"]
+known_first_party = ["app"]
+
+[tool.pylint.master]
+ignore-paths = ["^.venv/.*$", "^__pycache__/.*$"]
+load-plugins = []
+
+[tool.pylint.messages_control]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-few-public-methods",
+    "import-outside-toplevel",
+    "unnecessary-ellipsis",
+    "too-many-instance-attributes",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-return-statements",
+    "duplicate-code",
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+include = ["app", "tests"]
+exclude = [".venv", "__pycache__", ".pytest_cache"]
+reportMissingImports = true
+reportMissingTypeStubs = false
 
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+
+# ============================================
+# Import Linter - Clean Architecture Rules
+# ============================================
+
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "Application cannot import from Infrastructure"
+type = "forbidden"
+source_modules = ["app.planning.application", "app.observability.application"]
+forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure"]
+
+[[tool.importlinter.contracts]]
+name = "Application cannot import from API"
+type = "forbidden"
+source_modules = ["app.planning.application", "app.observability.application"]
+forbidden_modules = ["app.planning.api", "app.observability.api"]
+
+[[tool.importlinter.contracts]]
+name = "Domain cannot import from other layers"
+type = "forbidden"
+source_modules = ["app.planning.domain", "app.observability.domain"]
+forbidden_modules = [
+    "app.planning.infrastructure",
+    "app.planning.api",
+    "app.observability.infrastructure",
+    "app.observability.api",
+    "app.shared",
+]
+
+[[tool.importlinter.contracts]]
+name = "API routes cannot import Infrastructure directly"
+type = "forbidden"
+source_modules = ["app.planning.api", "app.observability.api"]
+forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure"]
+
+[[tool.importlinter.contracts]]
+name = "No cross-module imports"
+type = "forbidden"
+source_modules = ["app.planning"]
+forbidden_modules = ["app.observability"]
+
+[[tool.importlinter.contracts]]
+name = "No cross-module imports (reverse)"
+type = "forbidden"
+source_modules = ["app.observability"]
+forbidden_modules = ["app.planning"]

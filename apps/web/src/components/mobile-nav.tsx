@@ -38,7 +38,7 @@ export function MobileNav() {
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    setMounted(true);
+    requestAnimationFrame(() => setMounted(true));
   }, []);
 
   const handleClose = useCallback(() => {

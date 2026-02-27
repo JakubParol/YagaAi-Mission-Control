@@ -37,7 +37,7 @@ export function useAutoRefresh<T>({
     }
 
     let cancelled = false;
-    setIsLoading(true);
+    requestAnimationFrame(() => setIsLoading(true));
 
     fetch(url)
       .then((res) => {
