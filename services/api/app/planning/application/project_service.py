@@ -29,7 +29,9 @@ class ProjectService:
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Project], int]:
-        return await self._project_repo.list(status=status, limit=limit, offset=offset, sort=sort)
+        return await self._project_repo.list_all(
+            status=status, limit=limit, offset=offset, sort=sort
+        )
 
     async def get_project(self, project_id: str) -> Project:
         project = await self._project_repo.get_by_id(project_id)

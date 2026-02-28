@@ -1,6 +1,16 @@
 from fastapi import APIRouter, Depends, Query
 
-from app.planning.api.schemas import BacklogCreate, BacklogResponse, BacklogUpdate
+from app.planning.api.schemas import (
+    BacklogAddStory,
+    BacklogAddTask,
+    BacklogCreate,
+    BacklogReorderRequest,
+    BacklogReorderResponse,
+    BacklogResponse,
+    BacklogStoryItemResponse,
+    BacklogTaskItemResponse,
+    BacklogUpdate,
+)
 from app.planning.application.backlog_service import BacklogService
 from app.planning.dependencies import get_backlog_service
 from app.planning.domain.models import BacklogKind
@@ -83,3 +93,69 @@ async def delete_backlog(
     service: BacklogService = Depends(get_backlog_service),
 ) -> None:
     await service.delete_backlog(backlog_id)
+
+
+@router.post("/{backlog_id}/stories")
+async def add_story_to_backlog(
+    backlog_id: str,
+    body: BacklogAddStory,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogStoryItemResponse]:
+    item = await service.add_story_to_backlog(backlog_id, body.story_id, body.position)
+    return Envelope(
+        data=BacklogStoryItemResponse(
+            backlog_id=item.backlog_id,
+            story_id=item.story_id,
+            position=item.position,
+            added_at=item.added_at,
+        )
+    )
+
+
+@router.delete("/{backlog_id}/stories/{story_id}", status_code=204)
+async def remove_story_from_backlog(
+    backlog_id: str,
+    story_id: str,
+    service: BacklogService = Depends(get_backlog_service),
+) -> None:
+    await service.remove_story_from_backlog(backlog_id, story_id)
+
+
+@router.post("/{backlog_id}/tasks")
+async def add_task_to_backlog(
+    backlog_id: str,
+    body: BacklogAddTask,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogTaskItemResponse]:
+    item = await service.add_task_to_backlog(backlog_id, body.task_id, body.position)
+    return Envelope(
+        data=BacklogTaskItemResponse(
+            backlog_id=item.backlog_id,
+            task_id=item.task_id,
+            position=item.position,
+            added_at=item.added_at,
+        )
+    )
+
+
+@router.delete("/{backlog_id}/tasks/{task_id}", status_code=204)
+async def remove_task_from_backlog(
+    backlog_id: str,
+    task_id: str,
+    service: BacklogService = Depends(get_backlog_service),
+) -> None:
+    await service.remove_task_from_backlog(backlog_id, task_id)
+
+
+@router.patch("/{backlog_id}/reorder")
+async def reorder_backlog_items(
+    backlog_id: str,
+    body: BacklogReorderRequest,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogReorderResponse]:
+    summary = await service.reorder_backlog_items(
+        backlog_id,
+        [row.model_dump() for row in body.stories],
+        [row.model_dump() for row in body.tasks],
+    )
+    return Envelope(data=BacklogReorderResponse(**summary))
