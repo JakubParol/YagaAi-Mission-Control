@@ -124,6 +124,7 @@ source_modules = ["app.planning.api", "app.observability.api"]
 forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure"]
 ignore_imports = [
     "app.observability.dependencies -> app.observability.infrastructure.*",
+    "app.planning.dependencies -> app.planning.infrastructure.*",
 ]
 
 [[tool.importlinter.contracts]]
