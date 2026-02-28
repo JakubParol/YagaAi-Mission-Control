@@ -29,7 +29,7 @@ class Project:
     key: str
     name: str
     description: str | None
-    status: str
+    status: ProjectStatus
     created_by: str | None
     updated_by: str | None
     created_at: str
@@ -44,7 +44,7 @@ class Agent:
     role: str | None
     worker_type: str | None
     is_active: bool
-    source: str
+    source: AgentSource
     metadata_json: str | None
     last_synced_at: str | None
     created_at: str
@@ -65,8 +65,8 @@ class Backlog:
     id: str
     project_id: str | None
     name: str
-    kind: str
-    status: str
+    kind: BacklogKind
+    status: BacklogStatus
     is_default: bool
     goal: str | None
     start_date: str | None

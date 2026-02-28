@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from app.planning.api.schemas import AgentCreate, AgentResponse, AgentUpdate
 from app.planning.application.agent_service import AgentService
 from app.planning.dependencies import get_agent_service
+from app.planning.domain.models import AgentSource
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/agents", tags=["planning/agents"])
@@ -19,7 +20,7 @@ async def create_agent(
         role=body.role,
         worker_type=body.worker_type,
         is_active=body.is_active,
-        source=body.source,
+        source=AgentSource(body.source),
         metadata_json=body.metadata_json,
     )
     return Envelope(data=AgentResponse(**agent.__dict__))

@@ -1,13 +1,9 @@
-from datetime import datetime, timezone
-from uuid import uuid4
+from typing import Any
 
 from app.planning.application.ports import BacklogRepository
-from app.planning.domain.models import Backlog
+from app.planning.domain.models import Backlog, BacklogKind, BacklogStatus
 from app.shared.api.errors import BusinessRuleError, NotFoundError
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from app.shared.utils import new_uuid, utc_now
 
 
 class BacklogService:
@@ -52,19 +48,19 @@ class BacklogService:
         *,
         project_id: str | None = None,
         name: str,
-        kind: str,
+        kind: BacklogKind,
         goal: str | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
         actor: str | None = None,
     ) -> Backlog:
-        now = _now()
+        now = utc_now()
         backlog = Backlog(
-            id=str(uuid4()),
+            id=new_uuid(),
             project_id=project_id,
             name=name,
             kind=kind,
-            status="ACTIVE",
+            status=BacklogStatus.ACTIVE,
             is_default=False,
             goal=goal,
             start_date=start_date,
@@ -78,7 +74,7 @@ class BacklogService:
         return await self._repo.create(backlog)
 
     async def update_backlog(
-        self, backlog_id: str, data: dict, *, actor: str | None = None
+        self, backlog_id: str, data: dict[str, Any], *, actor: str | None = None
     ) -> Backlog:
         existing = await self._repo.get_by_id(backlog_id)
         if not existing:
@@ -88,7 +84,7 @@ class BacklogService:
             raise BusinessRuleError("Cannot manually set a backlog as default")
 
         data["updated_by"] = actor
-        data["updated_at"] = _now()
+        data["updated_at"] = utc_now()
 
         updated = await self._repo.update(backlog_id, data)
         if not updated:

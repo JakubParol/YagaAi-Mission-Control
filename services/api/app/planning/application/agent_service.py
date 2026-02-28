@@ -1,13 +1,9 @@
-from datetime import datetime, timezone
-from uuid import uuid4
+from typing import Any
 
 from app.planning.application.ports import AgentRepository
-from app.planning.domain.models import Agent
+from app.planning.domain.models import Agent, AgentSource
 from app.shared.api.errors import NotFoundError
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from app.shared.utils import new_uuid, utc_now
 
 
 class AgentService:
@@ -41,12 +37,12 @@ class AgentService:
         role: str | None = None,
         worker_type: str | None = None,
         is_active: bool = True,
-        source: str = "manual",
+        source: AgentSource = AgentSource.MANUAL,
         metadata_json: str | None = None,
     ) -> Agent:
-        now = _now()
+        now = utc_now()
         agent = Agent(
-            id=str(uuid4()),
+            id=new_uuid(),
             openclaw_key=openclaw_key,
             name=name,
             role=role,
@@ -60,12 +56,12 @@ class AgentService:
         )
         return await self._repo.create(agent)
 
-    async def update_agent(self, agent_id: str, data: dict) -> Agent:
+    async def update_agent(self, agent_id: str, data: dict[str, Any]) -> Agent:
         existing = await self._repo.get_by_id(agent_id)
         if not existing:
             raise NotFoundError(f"Agent {agent_id} not found")
 
-        data["updated_at"] = _now()
+        data["updated_at"] = utc_now()
         updated = await self._repo.update(agent_id, data)
         if not updated:
             raise NotFoundError(f"Agent {agent_id} not found")

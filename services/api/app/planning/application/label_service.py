@@ -1,13 +1,7 @@
-from datetime import datetime, timezone
-from uuid import uuid4
-
 from app.planning.application.ports import LabelRepository
 from app.planning.domain.models import Label
 from app.shared.api.errors import ConflictError, NotFoundError
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from app.shared.utils import new_uuid, utc_now
 
 
 class LabelService:
@@ -44,11 +38,11 @@ class LabelService:
             raise ConflictError(f"Label '{name}' already exists in {scope}")
 
         label = Label(
-            id=str(uuid4()),
+            id=new_uuid(),
             project_id=project_id,
             name=name,
             color=color,
-            created_at=_now(),
+            created_at=utc_now(),
         )
         return await self._repo.create(label)
 

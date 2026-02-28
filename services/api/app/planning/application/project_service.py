@@ -1,18 +1,15 @@
-from datetime import datetime, timezone
+from typing import Any
 
 from app.planning.application.ports import BacklogRepository, ProjectRepository
-from app.planning.domain.models import Backlog, Project
+from app.planning.domain.models import (
+    Backlog,
+    BacklogKind,
+    BacklogStatus,
+    Project,
+    ProjectStatus,
+)
 from app.shared.api.errors import ConflictError, NotFoundError
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _uuid() -> str:
-    import uuid
-
-    return str(uuid.uuid4())
+from app.shared.utils import new_uuid, utc_now
 
 
 class ProjectService:
@@ -51,13 +48,13 @@ class ProjectService:
         if await self._project_repo.key_exists(key):
             raise ConflictError(f"Project with key '{key}' already exists")
 
-        now = _now()
+        now = utc_now()
         project = Project(
-            id=_uuid(),
+            id=new_uuid(),
             key=key.upper(),
             name=name,
             description=description,
-            status="ACTIVE",
+            status=ProjectStatus.ACTIVE,
             created_by=actor,
             updated_by=actor,
             created_at=now,
@@ -67,11 +64,11 @@ class ProjectService:
         await self._project_repo.create_project_counter(created.id)
 
         default_backlog = Backlog(
-            id=_uuid(),
+            id=new_uuid(),
             project_id=created.id,
             name=f"{created.key} Backlog",
-            kind="BACKLOG",
-            status="ACTIVE",
+            kind=BacklogKind.BACKLOG,
+            status=BacklogStatus.ACTIVE,
             is_default=True,
             goal=None,
             start_date=None,
@@ -87,14 +84,14 @@ class ProjectService:
         return created
 
     async def update_project(
-        self, project_id: str, data: dict, *, actor: str | None = None
+        self, project_id: str, data: dict[str, Any], *, actor: str | None = None
     ) -> Project:
         existing = await self._project_repo.get_by_id(project_id)
         if not existing:
             raise NotFoundError(f"Project {project_id} not found")
 
         data["updated_by"] = actor
-        data["updated_at"] = _now()
+        data["updated_at"] = utc_now()
 
         updated = await self._project_repo.update(project_id, data)
         if not updated:

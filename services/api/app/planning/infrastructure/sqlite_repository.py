@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from typing import Any
 
 import aiosqlite
@@ -9,7 +8,18 @@ from app.planning.application.ports import (
     LabelRepository,
     ProjectRepository,
 )
-from app.planning.domain.models import Agent, Backlog, Label, Project
+from app.planning.domain.models import (
+    Agent,
+    AgentSource,
+    Backlog,
+    BacklogKind,
+    BacklogStatus,
+    Label,
+    Project,
+    ProjectStatus,
+)
+from app.shared.api.errors import ValidationError
+from app.shared.utils import utc_now
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,8 +42,11 @@ def _parse_sort(raw: str, allowed: set[str]) -> str:
         else:
             field = part
             direction = "ASC"
-        if field in allowed:
-            clauses.append(f"{field} {direction}")
+        if field not in allowed:
+            raise ValidationError(
+                f"Invalid sort field '{field}'. Allowed: {', '.join(sorted(allowed))}"
+            )
+        clauses.append(f"{field} {direction}")
     return ", ".join(clauses) if clauses else "created_at DESC"
 
 
@@ -43,7 +56,7 @@ def _row_to_project(row: aiosqlite.Row) -> Project:
         key=row["key"],
         name=row["name"],
         description=row["description"],
-        status=row["status"],
+        status=ProjectStatus(row["status"]),
         created_by=row["created_by"],
         updated_by=row["updated_by"],
         created_at=row["created_at"],
@@ -59,7 +72,7 @@ def _row_to_agent(row: aiosqlite.Row) -> Agent:
         role=row["role"],
         worker_type=row["worker_type"],
         is_active=bool(row["is_active"]),
-        source=row["source"],
+        source=AgentSource(row["source"]),
         metadata_json=row["metadata_json"],
         last_synced_at=row["last_synced_at"],
         created_at=row["created_at"],
@@ -82,8 +95,8 @@ def _row_to_backlog(row: aiosqlite.Row) -> Backlog:
         id=row["id"],
         project_id=row["project_id"],
         name=row["name"],
-        kind=row["kind"],
-        status=row["status"],
+        kind=BacklogKind(row["kind"]),
+        status=BacklogStatus(row["status"]),
         is_default=bool(row["is_default"]),
         goal=row["goal"],
         start_date=row["start_date"],
@@ -185,7 +198,7 @@ class SqliteProjectRepository(ProjectRepository):
         await self._db.commit()
         return project
 
-    async def update(self, project_id: str, data: dict) -> Project | None:
+    async def update(self, project_id: str, data: dict[str, Any]) -> Project | None:
         allowed = {"name", "description", "status", "updated_by", "updated_at"}
         sets = []
         params: list[Any] = []
@@ -211,11 +224,10 @@ class SqliteProjectRepository(ProjectRepository):
         return (cursor.rowcount or 0) > 0
 
     async def create_project_counter(self, project_id: str) -> None:
-        now_str = datetime.now(timezone.utc).isoformat()
         await self._db.execute(
             """INSERT OR IGNORE INTO project_counters (project_id, next_number, updated_at)
                VALUES (?, 1, ?)""",
-            [project_id, now_str],
+            [project_id, utc_now()],
         )
         await self._db.commit()
 
@@ -289,7 +301,7 @@ class SqliteAgentRepository(AgentRepository):
         await self._db.commit()
         return agent
 
-    async def update(self, agent_id: str, data: dict) -> Agent | None:
+    async def update(self, agent_id: str, data: dict[str, Any]) -> Agent | None:
         allowed = {
             "name",
             "role",
@@ -394,8 +406,6 @@ class SqliteLabelRepository(LabelRepository):
         return label
 
     async def delete(self, label_id: str) -> bool:
-        await self._db.execute("DELETE FROM story_labels WHERE label_id = ?", [label_id])
-        await self._db.execute("DELETE FROM task_labels WHERE label_id = ?", [label_id])
         cursor = await self._db.execute("DELETE FROM labels WHERE id = ?", [label_id])
         await self._db.commit()
         return (cursor.rowcount or 0) > 0
@@ -482,7 +492,7 @@ class SqliteBacklogRepository(BacklogRepository):
         await self._db.commit()
         return backlog
 
-    async def update(self, backlog_id: str, data: dict) -> Backlog | None:
+    async def update(self, backlog_id: str, data: dict[str, Any]) -> Backlog | None:
         allowed = {
             "name",
             "status",
@@ -512,8 +522,6 @@ class SqliteBacklogRepository(BacklogRepository):
         return await self.get_by_id(backlog_id)
 
     async def delete(self, backlog_id: str) -> bool:
-        await self._db.execute("DELETE FROM backlog_stories WHERE backlog_id = ?", [backlog_id])
-        await self._db.execute("DELETE FROM backlog_tasks WHERE backlog_id = ?", [backlog_id])
         cursor = await self._db.execute("DELETE FROM backlogs WHERE id = ?", [backlog_id])
         await self._db.commit()
         return (cursor.rowcount or 0) > 0

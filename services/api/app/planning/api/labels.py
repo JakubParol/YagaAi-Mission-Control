@@ -34,7 +34,7 @@ async def list_labels(
         offset=offset,
     )
     return ListEnvelope(
-        data=[LabelResponse(**l.__dict__) for l in items],
+        data=[LabelResponse(**label.__dict__) for label in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 

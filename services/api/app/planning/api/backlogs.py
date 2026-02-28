@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from app.planning.api.schemas import BacklogCreate, BacklogResponse, BacklogUpdate
 from app.planning.application.backlog_service import BacklogService
 from app.planning.dependencies import get_backlog_service
+from app.planning.domain.models import BacklogKind
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/backlogs", tags=["planning/backlogs"])
@@ -16,7 +17,7 @@ async def create_backlog(
     backlog = await service.create_backlog(
         project_id=body.project_id,
         name=body.name,
-        kind=body.kind,
+        kind=BacklogKind(body.kind),
         goal=body.goal,
         start_date=body.start_date,
         end_date=body.end_date,
