@@ -76,6 +76,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           updated_by TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
+          started_at TEXT,
           completed_at TEXT
         );
 

@@ -262,6 +262,7 @@ class StoryResponse(BaseModel):
     updated_by: str | None
     created_at: str
     updated_at: str
+    started_at: str | None
     completed_at: str | None
 
 
@@ -294,6 +295,7 @@ class TaskUpdate(BaseModel):
     objective: str | None = None
     task_type: str | None = Field(None, min_length=1, max_length=50)
     status: str | None = Field(None, pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$")
+    is_blocked: bool | None = None
     story_id: str | None = None
     priority: int | None = None
     estimate_points: float | None = None

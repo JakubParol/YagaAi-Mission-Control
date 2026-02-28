@@ -623,3 +623,46 @@ def test_task_deletion_rederives_parent_story_status(client) -> None:
     client.delete(f"/v1/planning/tasks/{t2_id}")
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
     assert story["status"] == "DONE"
+
+
+# ── is_blocked update ─────────────────────────────────────────────────────
+
+
+def test_update_task_is_blocked(client) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "Blockable", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"is_blocked": True})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["is_blocked"] is True
+
+    resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"is_blocked": False})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["is_blocked"] is False
+
+
+# ── Story started_at on first IN_PROGRESS task ────────────────────────────
+
+
+def test_first_task_in_progress_sets_story_started_at(client) -> None:
+    story_id = client.post(
+        "/v1/planning/stories",
+        json={"title": "Track Start", "story_type": "USER_STORY", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    # Story starts with no started_at
+    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
+    assert story["started_at"] is None
+
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T1", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
+    ).json()["data"]["id"]
+
+    # Move task to IN_PROGRESS — story should get started_at
+    client.patch(f"/v1/planning/tasks/{task_id}", json={"status": "IN_PROGRESS"})
+    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
+    assert story["status"] == "IN_PROGRESS"
+    assert story["started_at"] is not None

@@ -114,6 +114,9 @@ class TaskService:
         )
         created = await self._task_repo.create(task)
 
+        # Per WORKFLOW_LOGIC_V1 §2 "Override behavior": any child status change
+        # expires the parent override.  Creating a new TODO task counts as a
+        # child status change, so we re-derive the story status here.
         if story_id:
             await self._rederive_story_status(story_id)
 
@@ -254,6 +257,11 @@ class TaskService:
         derived = _derive_story_status(child_statuses)
 
         now = utc_now()
+        started_at = (
+            now
+            if derived == ItemStatus.IN_PROGRESS and story.started_at is None
+            else story.started_at
+        )
         await self._story_repo.update(
             story_id,
             {
@@ -262,6 +270,7 @@ class TaskService:
                 "status_override": None,
                 "status_override_set_at": None,
                 "updated_at": now,
+                "started_at": started_at,
                 "completed_at": now if derived == ItemStatus.DONE else None,
             },
         )

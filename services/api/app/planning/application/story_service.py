@@ -81,6 +81,7 @@ class StoryService:
             updated_by=actor,
             created_at=now,
             updated_at=now,
+            started_at=None,
             completed_at=None,
         )
         return await self._story_repo.create(story)

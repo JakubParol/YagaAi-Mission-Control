@@ -142,6 +142,7 @@ def _row_to_story(row: aiosqlite.Row) -> Story:
         updated_by=row["updated_by"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        started_at=row["started_at"],
         completed_at=row["completed_at"],
     )
 
@@ -548,8 +549,9 @@ class SqliteStoryRepository(StoryRepository):
                description, story_type, status, status_mode,
                status_override, status_override_set_at,
                is_blocked, blocked_reason, priority, metadata_json,
-               created_by, updated_by, created_at, updated_at, completed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               created_by, updated_by, created_at, updated_at,
+               started_at, completed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 story.id,
                 story.project_id,
@@ -571,6 +573,7 @@ class SqliteStoryRepository(StoryRepository):
                 story.updated_by,
                 story.created_at,
                 story.updated_at,
+                story.started_at,
                 story.completed_at,
             ],
         )
@@ -594,6 +597,7 @@ class SqliteStoryRepository(StoryRepository):
             "metadata_json",
             "updated_by",
             "updated_at",
+            "started_at",
             "completed_at",
         }
         sets = []

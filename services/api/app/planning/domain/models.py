@@ -143,6 +143,7 @@ class Story:
     updated_by: str | None
     created_at: str
     updated_at: str
+    started_at: str | None
     completed_at: str | None
 
 
