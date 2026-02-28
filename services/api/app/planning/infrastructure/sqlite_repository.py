@@ -9,6 +9,7 @@ from app.planning.application.ports import (
     LabelRepository,
     ProjectRepository,
     StoryRepository,
+    TaskRepository,
 )
 from app.planning.domain.models import (
     Agent,
@@ -26,6 +27,8 @@ from app.planning.domain.models import (
     ProjectStatus,
     StatusMode,
     Story,
+    Task,
+    TaskAssignment,
 )
 from app.shared.api.errors import ValidationError
 from app.shared.utils import utc_now
@@ -39,6 +42,7 @@ _SORT_ALLOWED_EPIC = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_STORY = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_AGENT = {"created_at", "updated_at", "name", "openclaw_key"}
 _SORT_ALLOWED_BACKLOG = {"created_at", "updated_at", "name"}
+_SORT_ALLOWED_TASK = {"created_at", "updated_at", "title", "priority", "status"}
 
 
 def _parse_sort(raw: str, allowed: set[str]) -> str:
@@ -184,6 +188,44 @@ def _row_to_backlog(row: aiosqlite.Row) -> Backlog:
         updated_by=row["updated_by"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+    )
+
+
+def _row_to_task(row: aiosqlite.Row) -> Task:
+    return Task(
+        id=row["id"],
+        project_id=row["project_id"],
+        story_id=row["story_id"],
+        key=row["key"],
+        title=row["title"],
+        objective=row["objective"],
+        task_type=row["task_type"],
+        status=ItemStatus(row["status"]),
+        is_blocked=bool(row["is_blocked"]),
+        blocked_reason=row["blocked_reason"],
+        priority=row["priority"],
+        estimate_points=row["estimate_points"],
+        due_at=row["due_at"],
+        current_assignee_agent_id=row["current_assignee_agent_id"],
+        metadata_json=row["metadata_json"],
+        created_by=row["created_by"],
+        updated_by=row["updated_by"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+        started_at=row["started_at"],
+        completed_at=row["completed_at"],
+    )
+
+
+def _row_to_assignment(row: aiosqlite.Row) -> TaskAssignment:
+    return TaskAssignment(
+        id=row["id"],
+        task_id=row["task_id"],
+        agent_id=row["agent_id"],
+        assigned_at=row["assigned_at"],
+        unassigned_at=row["unassigned_at"],
+        assigned_by=row["assigned_by"],
+        reason=row["reason"],
     )
 
 
@@ -1063,3 +1105,218 @@ class SqliteBacklogRepository(BacklogRepository):
             "updated_story_count": len(stories),
             "updated_task_count": len(tasks),
         }
+
+
+# ---------------------------------------------------------------------------
+# Task Repository
+# ---------------------------------------------------------------------------
+
+
+class SqliteTaskRepository(TaskRepository):
+    def __init__(self, db: aiosqlite.Connection) -> None:
+        self._db = db
+
+    async def list_all(
+        self,
+        *,
+        project_id: str | None = None,
+        story_id: str | None = None,
+        status: str | None = None,
+        assignee_id: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[Task], int]:
+        where_parts: list[str] = []
+        params: list[Any] = []
+
+        if project_id:
+            where_parts.append("project_id = ?")
+            params.append(project_id)
+        if story_id:
+            where_parts.append("story_id = ?")
+            params.append(story_id)
+        if status:
+            where_parts.append("status = ?")
+            params.append(status)
+        if assignee_id:
+            where_parts.append("current_assignee_agent_id = ?")
+            params.append(assignee_id)
+
+        order_sql = _parse_sort(sort, _SORT_ALLOWED_TASK)
+        count_q, select_q = _build_list_queries("tasks", where_parts, order_sql)
+
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        return [_row_to_task(r) for r in rows], total
+
+    async def get_by_id(self, task_id: str) -> Task | None:
+        row = await _fetch_one(self._db, "SELECT * FROM tasks WHERE id = ?", [task_id])
+        return _row_to_task(row) if row else None
+
+    async def create(self, task: Task) -> Task:
+        await self._db.execute(
+            """INSERT INTO tasks (id, project_id, story_id, key, title, objective,
+               task_type, status, is_blocked, blocked_reason, priority,
+               estimate_points, due_at, current_assignee_agent_id,
+               metadata_json, created_by, updated_by, created_at, updated_at,
+               started_at, completed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                task.id,
+                task.project_id,
+                task.story_id,
+                task.key,
+                task.title,
+                task.objective,
+                task.task_type,
+                task.status,
+                1 if task.is_blocked else 0,
+                task.blocked_reason,
+                task.priority,
+                task.estimate_points,
+                task.due_at,
+                task.current_assignee_agent_id,
+                task.metadata_json,
+                task.created_by,
+                task.updated_by,
+                task.created_at,
+                task.updated_at,
+                task.started_at,
+                task.completed_at,
+            ],
+        )
+        await self._db.commit()
+        return task
+
+    async def update(self, task_id: str, data: dict[str, Any]) -> Task | None:
+        allowed = {
+            "title",
+            "objective",
+            "task_type",
+            "status",
+            "story_id",
+            "is_blocked",
+            "blocked_reason",
+            "priority",
+            "estimate_points",
+            "due_at",
+            "current_assignee_agent_id",
+            "metadata_json",
+            "updated_by",
+            "updated_at",
+            "started_at",
+            "completed_at",
+        }
+        sets = []
+        params: list[Any] = []
+        for k, v in data.items():
+            if k in allowed:
+                sets.append(k + " = ?")
+                if k == "is_blocked":
+                    params.append(1 if v else 0)
+                else:
+                    params.append(v)
+
+        if not sets:
+            return await self.get_by_id(task_id)
+
+        params.append(task_id)
+        await self._db.execute(_build_update_query("tasks", sets), params)
+        await self._db.commit()
+        return await self.get_by_id(task_id)
+
+    async def delete(self, task_id: str) -> bool:
+        cursor = await self._db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+        await self._db.commit()
+        return (cursor.rowcount or 0) > 0
+
+    async def allocate_key(self, project_id: str) -> str:
+        return await _allocate_next_key(self._db, project_id)
+
+    async def project_exists(self, project_id: str) -> bool:
+        return await _project_exists(self._db, project_id)
+
+    async def story_exists(self, story_id: str) -> bool:
+        return await _exists(self._db, "SELECT 1 FROM stories WHERE id = ?", [story_id])
+
+    async def agent_exists(self, agent_id: str) -> bool:
+        return await _exists(self._db, "SELECT 1 FROM agents WHERE id = ?", [agent_id])
+
+    async def label_exists(self, label_id: str) -> bool:
+        return await _exists(self._db, "SELECT 1 FROM labels WHERE id = ?", [label_id])
+
+    async def label_attached(self, task_id: str, label_id: str) -> bool:
+        return await _exists(
+            self._db,
+            "SELECT 1 FROM task_labels WHERE task_id = ? AND label_id = ?",
+            [task_id, label_id],
+        )
+
+    async def attach_label(self, task_id: str, label_id: str) -> None:
+        await self._db.execute(
+            """INSERT INTO task_labels (task_id, label_id, added_at)
+               VALUES (?, ?, ?)""",
+            [task_id, label_id, utc_now()],
+        )
+        await self._db.commit()
+
+    async def detach_label(self, task_id: str, label_id: str) -> bool:
+        cursor = await self._db.execute(
+            "DELETE FROM task_labels WHERE task_id = ? AND label_id = ?",
+            [task_id, label_id],
+        )
+        await self._db.commit()
+        return (cursor.rowcount or 0) > 0
+
+    async def get_active_assignment(self, task_id: str) -> TaskAssignment | None:
+        row = await _fetch_one(
+            self._db,
+            "SELECT * FROM task_assignments WHERE task_id = ? AND unassigned_at IS NULL",
+            [task_id],
+        )
+        return _row_to_assignment(row) if row else None
+
+    async def get_assignments(self, task_id: str) -> list[TaskAssignment]:
+        rows = await _fetch_all(
+            self._db,
+            "SELECT * FROM task_assignments WHERE task_id = ? ORDER BY assigned_at DESC",
+            [task_id],
+        )
+        return [_row_to_assignment(r) for r in rows]
+
+    async def create_assignment(self, assignment: TaskAssignment) -> TaskAssignment:
+        await self._db.execute(
+            """INSERT INTO task_assignments (id, task_id, agent_id, assigned_at,
+               unassigned_at, assigned_by, reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            [
+                assignment.id,
+                assignment.task_id,
+                assignment.agent_id,
+                assignment.assigned_at,
+                assignment.unassigned_at,
+                assignment.assigned_by,
+                assignment.reason,
+            ],
+        )
+        await self._db.commit()
+        return assignment
+
+    async def close_assignment(self, task_id: str, unassigned_at: str) -> bool:
+        cursor = await self._db.execute(
+            """UPDATE task_assignments
+               SET unassigned_at = ?
+               WHERE task_id = ? AND unassigned_at IS NULL""",
+            [unassigned_at, task_id],
+        )
+        await self._db.commit()
+        return (cursor.rowcount or 0) > 0
+
+    async def get_child_task_statuses(self, story_id: str) -> list[str]:
+        rows = await _fetch_all(
+            self._db,
+            "SELECT status FROM tasks WHERE story_id = ?",
+            [story_id],
+        )
+        return [row["status"] for row in rows]

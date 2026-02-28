@@ -7,6 +7,7 @@ from app.planning.application.epic_service import EpicService
 from app.planning.application.label_service import LabelService
 from app.planning.application.project_service import ProjectService
 from app.planning.application.story_service import StoryService
+from app.planning.application.task_service import TaskService
 from app.planning.infrastructure.sqlite_repository import (
     SqliteAgentRepository,
     SqliteBacklogRepository,
@@ -14,6 +15,7 @@ from app.planning.infrastructure.sqlite_repository import (
     SqliteLabelRepository,
     SqliteProjectRepository,
     SqliteStoryRepository,
+    SqliteTaskRepository,
 )
 from app.shared.api.deps import get_db
 
@@ -49,6 +51,15 @@ async def get_story_service(
     db: aiosqlite.Connection = Depends(get_db),
 ) -> StoryService:
     return StoryService(SqliteStoryRepository(db))
+
+
+async def get_task_service(
+    db: aiosqlite.Connection = Depends(get_db),
+) -> TaskService:
+    return TaskService(
+        task_repo=SqliteTaskRepository(db),
+        story_repo=SqliteStoryRepository(db),
+    )
 
 
 async def get_backlog_service(
