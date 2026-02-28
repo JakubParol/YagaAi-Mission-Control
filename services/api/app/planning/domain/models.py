@@ -143,6 +143,7 @@ class Story:
     updated_by: str | None
     created_at: str
     updated_at: str
+    started_at: str | None
     completed_at: str | None
 
 
@@ -160,3 +161,39 @@ class BacklogTaskItem:
     task_id: str
     position: int
     added_at: str
+
+
+@dataclass
+class Task:
+    id: str
+    project_id: str | None
+    story_id: str | None
+    key: str | None
+    title: str
+    objective: str | None
+    task_type: str
+    status: ItemStatus
+    is_blocked: bool
+    blocked_reason: str | None
+    priority: int | None
+    estimate_points: float | None
+    due_at: str | None
+    current_assignee_agent_id: str | None
+    metadata_json: str | None
+    created_by: str | None
+    updated_by: str | None
+    created_at: str
+    updated_at: str
+    started_at: str | None
+    completed_at: str | None
+
+
+@dataclass
+class TaskAssignment:
+    id: str
+    task_id: str
+    agent_id: str
+    assigned_at: str
+    unassigned_at: str | None
+    assigned_by: str | None
+    reason: str | None

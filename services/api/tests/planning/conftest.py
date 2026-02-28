@@ -76,6 +76,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           updated_by TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
+          started_at TEXT,
           completed_at TEXT
         );
 
@@ -152,6 +153,40 @@ def _setup_test_db(tmp_path, monkeypatch):
           added_at TEXT NOT NULL,
           PRIMARY KEY (story_id, label_id)
         );
+
+        CREATE TABLE task_labels (
+          task_id  TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+          added_at TEXT NOT NULL,
+          PRIMARY KEY (task_id, label_id)
+        );
+
+        CREATE TABLE agents (
+          id             TEXT PRIMARY KEY,
+          openclaw_key   TEXT NOT NULL UNIQUE,
+          name           TEXT NOT NULL,
+          role           TEXT,
+          worker_type    TEXT,
+          is_active      INTEGER NOT NULL DEFAULT 1,
+          source         TEXT NOT NULL DEFAULT 'manual',
+          metadata_json  TEXT,
+          last_synced_at TEXT,
+          created_at     TEXT NOT NULL,
+          updated_at     TEXT NOT NULL
+        );
+
+        CREATE TABLE task_assignments (
+          id            TEXT PRIMARY KEY,
+          task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          agent_id      TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          assigned_at   TEXT NOT NULL,
+          unassigned_at TEXT,
+          assigned_by   TEXT,
+          reason        TEXT
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
+          ON task_assignments(task_id) WHERE unassigned_at IS NULL;
         """)
 
     conn.executescript(f"""
@@ -184,6 +219,11 @@ def _setup_test_db(tmp_path, monkeypatch):
           ('t2', 'p1', 'Task 2', 'TASK', 'TODO', '{TS}', '{TS}'),
           ('tp2', 'p2', 'Task P2', 'TASK', 'TODO', '{TS}', '{TS}'),
           ('tg', NULL, 'Global Task', 'TASK', 'TODO', '{TS}', '{TS}');
+
+        INSERT INTO agents (id, openclaw_key, name, role, is_active, source, created_at, updated_at)
+        VALUES
+          ('a1', 'agent-1', 'Agent Alpha', 'developer', 1, 'manual', '{TS}', '{TS}'),
+          ('a2', 'agent-2', 'Agent Beta', 'reviewer', 1, 'manual', '{TS}', '{TS}');
         """)
     conn.close()
 
