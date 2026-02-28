@@ -1,3 +1,22 @@
+"""
+Shared fixtures for planning module integration tests.
+
+Provides an in-memory SQLite database with the full planning schema and seed data,
+plus a FastAPI TestClient wired to use that database.
+
+Fixtures:
+- _setup_test_db (autouse) — creates temp SQLite DB with schema + seed data,
+  patches app.config.settings.db_path
+- client — FastAPI TestClient instance
+
+Seed data:
+- 2 projects (p1, p2) with counters
+- 3 backlogs (b1, b2 project-scoped + bg global)
+- 4 stories (s1, s2 in p1; sp2 in p2; sg global)
+- 4 tasks (t1, t2 in p1; tp2 in p2; tg global)
+- 2 agents (a1, a2)
+"""
+
 import os
 import sqlite3
 

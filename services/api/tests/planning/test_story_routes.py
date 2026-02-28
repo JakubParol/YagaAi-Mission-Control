@@ -1,3 +1,20 @@
+"""
+Integration tests for the stories CRUD API.
+
+Coverage:
+- POST /v1/planning/stories — create with/without project, with epic, key generation
+- GET /v1/planning/stories — list with project/epic/status filters, pagination, sorting
+- GET /v1/planning/stories/{id} — single story with task_count aggregation
+- PATCH /v1/planning/stories/{id} — update fields, status override, completed_at lifecycle
+- DELETE /v1/planning/stories/{id} — hard delete, ON DELETE SET NULL on tasks
+- POST /v1/planning/stories/{id}/labels — attach label (conflict, not found)
+- DELETE /v1/planning/stories/{id}/labels/{label_id} — detach label
+
+Fixtures:
+- client — FastAPI TestClient (from conftest)
+- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+"""
+
 import sqlite3
 
 TS = "2026-01-01T00:00:00Z"

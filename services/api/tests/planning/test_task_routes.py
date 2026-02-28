@@ -1,3 +1,24 @@
+"""
+Integration tests for the tasks CRUD API.
+
+Coverage:
+- POST /v1/planning/tasks — create with/without project, with story, key generation
+- GET /v1/planning/tasks — list with project/story/status/assignee filters, pagination, sorting
+- GET /v1/planning/tasks/{id} — single task with assignment history
+- PATCH /v1/planning/tasks/{id} — update fields, status lifecycle (started_at, completed_at),
+  is_blocked flag, DONE auto-closes assignment
+- DELETE /v1/planning/tasks/{id} — hard delete
+- POST /v1/planning/tasks/{id}/assignments — assign agent (replace, conflict, validation)
+- DELETE /v1/planning/tasks/{id}/assignments/{agent_id} — unassign agent
+- POST /v1/planning/tasks/{id}/labels — attach/detach labels
+- Parent story status re-derivation on task create/update/delete
+- Story started_at set on first IN_PROGRESS task
+
+Fixtures:
+- client — FastAPI TestClient (from conftest)
+- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+"""
+
 import sqlite3
 
 TS = "2026-01-01T00:00:00Z"

@@ -1,3 +1,19 @@
+"""
+Integration tests for the observability API endpoints.
+
+Coverage:
+- GET /healthz — health check (via observability test client)
+- GET /v1/observability/costs?days=N — daily cost aggregation (empty DB)
+- GET /v1/observability/requests — paginated request list (empty DB)
+- GET /v1/observability/requests/models — distinct model list (empty DB)
+- GET /v1/observability/imports/status — import status summary (empty DB)
+
+Fixtures:
+- client — FastAPI TestClient (from conftest)
+- _setup_test_db — in-memory SQLite with observability schema (from conftest)
+"""
+
+
 def test_healthz(client) -> None:
     response = client.get("/healthz")
     assert response.status_code == 200

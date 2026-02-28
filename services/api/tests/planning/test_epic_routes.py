@@ -1,3 +1,18 @@
+"""
+Integration tests for the epics CRUD API.
+
+Coverage:
+- POST /v1/planning/epics — create with key generation, validation, cross-project
+- GET /v1/planning/epics — list with project/status filters, pagination, sorting
+- GET /v1/planning/epics/{id} — single epic with story_count aggregation
+- PATCH /v1/planning/epics/{id} — update title, description, status (override logic)
+- DELETE /v1/planning/epics/{id} — hard delete, ON DELETE SET NULL on stories
+
+Fixtures:
+- client — FastAPI TestClient (from conftest)
+- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+"""
+
 import sqlite3
 
 TS = "2026-01-01T00:00:00Z"
