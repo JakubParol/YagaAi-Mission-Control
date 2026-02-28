@@ -7,6 +7,7 @@ import type { SubPage } from "@/lib/navigation";
 
 interface ModuleTopBarProps {
   subPages: SubPage[];
+  leftSlot?: React.ReactNode;
 }
 
 function isSubPageActive(pathname: string, subPage: SubPage): boolean {
@@ -14,7 +15,7 @@ function isSubPageActive(pathname: string, subPage: SubPage): boolean {
   return pathname.startsWith(`${subPage.href}/`);
 }
 
-export function ModuleTopBar({ subPages }: ModuleTopBarProps) {
+export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
   const pathname = usePathname();
 
   return (
@@ -26,6 +27,12 @@ export function ModuleTopBar({ subPages }: ModuleTopBarProps) {
       )}
     >
       <div className="mx-auto flex h-11 max-w-7xl items-center gap-1 px-4 sm:px-6">
+        {leftSlot && (
+          <>
+            {leftSlot}
+            <div className="mx-1.5 h-4 w-px bg-white/[0.12]" />
+          </>
+        )}
         {subPages.map((page) => {
           const active = isSubPageActive(pathname, page);
 
