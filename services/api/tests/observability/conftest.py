@@ -1,3 +1,15 @@
+"""
+Shared fixtures for observability module integration tests.
+
+Provides an in-memory SQLite database with Langfuse-related tables
+(imports, langfuse_daily_metrics, langfuse_requests) and a FastAPI TestClient.
+
+Fixtures:
+- _setup_test_db (autouse) — creates temp SQLite DB with observability schema,
+  patches settings (db_path, langfuse_host, langfuse keys)
+- client — FastAPI TestClient instance
+"""
+
 import os
 import sqlite3
 

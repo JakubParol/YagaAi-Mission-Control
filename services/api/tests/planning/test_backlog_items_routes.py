@@ -1,3 +1,20 @@
+"""
+Integration tests for backlog item management (stories + tasks in backlogs).
+
+Coverage:
+- POST /v1/planning/backlogs/{id}/stories — add story (position normalization,
+  project scope validation, global backlog rules, conflict on duplicate)
+- DELETE /v1/planning/backlogs/{id}/stories/{story_id} — remove with position shift
+- POST /v1/planning/backlogs/{id}/tasks — add task (scope validation, conflict)
+- DELETE /v1/planning/backlogs/{id}/tasks/{task_id} — remove task
+- PATCH /v1/planning/backlogs/{id}/reorder — reorder stories/tasks (validation:
+  membership, duplicates, contiguous positions, partial lists)
+
+Fixtures:
+- client — FastAPI TestClient (from conftest)
+- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+"""
+
 # ── Add story ────────────────────────────────────────────────────────────
 
 
