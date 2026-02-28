@@ -89,6 +89,7 @@ It supports:
 - `name` TEXT NOT NULL
 - `description` TEXT NULL
 - `status` TEXT NOT NULL (`ACTIVE`/`ARCHIVED`)
+- `repo_root` TEXT NULL (absolute path to the project's local repository root)
 - `created_by` TEXT NULL
 - `updated_by` TEXT NULL
 - `created_at` TEXT NOT NULL (ISO datetime)
