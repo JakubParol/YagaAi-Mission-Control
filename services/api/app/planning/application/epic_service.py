@@ -79,8 +79,13 @@ class EpicService:
                 raise ValidationError(
                     f"Invalid epic status '{new_status}'. Allowed: {', '.join(sorted(valid))}"
                 )
+            # Manual status override: set the override fields and explicitly
+            # write the resolved status value. Switch status_mode to MANUAL so
+            # derived-status logic knows this was a human/API override.
+            data["status"] = new_status
             data["status_override"] = new_status
             data["status_override_set_at"] = utc_now()
+            data["status_mode"] = StatusMode.MANUAL
 
         data["updated_by"] = actor
         data["updated_at"] = utc_now()

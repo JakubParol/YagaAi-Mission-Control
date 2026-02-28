@@ -140,6 +140,12 @@ def test_list_epics_sort(client) -> None:
     assert data[1]["title"] == "Bravo"
 
 
+def test_list_epics_sort_invalid_column(client) -> None:
+    resp = client.get("/v1/planning/epics", params={"sort": "nonexistent"})
+    assert resp.status_code == 400
+    assert "Invalid sort field" in resp.json()["error"]["message"]
+
+
 # ── Get single ────────────────────────────────────────────────────────────
 
 
@@ -171,6 +177,8 @@ def test_get_epic_includes_story_count(client, _setup_test_db) -> None:
     )
     epic_id = create_resp.json()["data"]["id"]
 
+    # Direct DB access: stories CRUD is not yet exposed via the API, so we
+    # insert test stories directly to verify the story_count aggregation.
     db_path = _setup_test_db
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -232,6 +240,7 @@ def test_update_epic_status_sets_override(client) -> None:
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["status"] == "IN_PROGRESS"
+    assert data["status_mode"] == "MANUAL"
     assert data["status_override"] == "IN_PROGRESS"
     assert data["status_override_set_at"] is not None
 
@@ -281,6 +290,8 @@ def test_delete_epic_sets_null_on_stories(client, _setup_test_db) -> None:
     )
     epic_id = create_resp.json()["data"]["id"]
 
+    # Direct DB access: stories CRUD is not yet exposed via the API, so we
+    # insert and query stories directly to verify ON DELETE SET NULL behavior.
     db_path = _setup_test_db
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")

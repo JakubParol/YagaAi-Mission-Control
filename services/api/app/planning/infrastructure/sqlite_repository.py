@@ -372,6 +372,9 @@ class SqliteEpicRepository(EpicRepository):
         return await self.get_by_id(epic_id)
 
     async def delete(self, epic_id: str) -> bool:
+        # stories.epic_id uses ON DELETE SET NULL (not CASCADE) because stories
+        # are independent entities that can exist without an epic. Deleting an
+        # epic orphans its stories rather than destroying them.
         cursor = await self._db.execute("DELETE FROM epics WHERE id = ?", [epic_id])
         await self._db.commit()
         return (cursor.rowcount or 0) > 0
@@ -384,6 +387,9 @@ class SqliteEpicRepository(EpicRepository):
         )
 
     async def allocate_key(self, project_id: str) -> str:
+        # NOTE: This read-then-increment is safe under SQLite's single-writer
+        # serialisation. TODO: use an atomic UPDATE ... RETURNING or a
+        # database-level lock if we ever move to a multi-writer backend.
         row = await _fetch_one(
             self._db,
             "SELECT key FROM projects WHERE id = ?",
