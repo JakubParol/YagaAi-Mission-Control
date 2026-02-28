@@ -41,6 +41,7 @@ export interface Project {
   name: string;
   description: string | null;
   status: ProjectStatus;
+  repo_root: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
