@@ -3,11 +3,13 @@ from fastapi import Depends
 
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
+from app.planning.application.epic_service import EpicService
 from app.planning.application.label_service import LabelService
 from app.planning.application.project_service import ProjectService
 from app.planning.infrastructure.sqlite_repository import (
     SqliteAgentRepository,
     SqliteBacklogRepository,
+    SqliteEpicRepository,
     SqliteLabelRepository,
     SqliteProjectRepository,
 )
@@ -33,6 +35,12 @@ async def get_label_service(
     db: aiosqlite.Connection = Depends(get_db),
 ) -> LabelService:
     return LabelService(SqliteLabelRepository(db))
+
+
+async def get_epic_service(
+    db: aiosqlite.Connection = Depends(get_db),
+) -> EpicService:
+    return EpicService(SqliteEpicRepository(db))
 
 
 async def get_backlog_service(

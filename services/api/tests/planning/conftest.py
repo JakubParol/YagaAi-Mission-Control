@@ -28,10 +28,37 @@ def _setup_test_db(tmp_path, monkeypatch):
           updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE project_counters (
+          project_id TEXT PRIMARY KEY,
+          next_number INTEGER NOT NULL DEFAULT 1,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE epics (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          key TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT NOT NULL DEFAULT 'TODO',
+          status_mode TEXT NOT NULL DEFAULT 'MANUAL',
+          status_override TEXT,
+          status_override_set_at TEXT,
+          is_blocked INTEGER NOT NULL DEFAULT 0,
+          blocked_reason TEXT,
+          priority INTEGER,
+          metadata_json TEXT,
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(project_id, key)
+        );
+
         CREATE TABLE stories (
           id TEXT PRIMARY KEY,
           project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          epic_id TEXT,
+          epic_id TEXT REFERENCES epics(id) ON DELETE SET NULL,
           key TEXT,
           title TEXT NOT NULL,
           intent TEXT,
@@ -117,6 +144,11 @@ def _setup_test_db(tmp_path, monkeypatch):
         VALUES
           ('p1', 'P1', 'Project 1', NULL, 'ACTIVE', '{TS}', '{TS}'),
           ('p2', 'P2', 'Project 2', NULL, 'ACTIVE', '{TS}', '{TS}');
+
+        INSERT INTO project_counters (project_id, next_number, updated_at)
+        VALUES
+          ('p1', 1, '{TS}'),
+          ('p2', 1, '{TS}');
 
         INSERT INTO backlogs (id, project_id, name, kind, status, is_default, created_at, updated_at)
         VALUES
