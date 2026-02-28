@@ -33,11 +33,17 @@ The Next.js application serving the Mission Control dashboard.
 
 ## CLI (`apps/cli/`)
 
-Planned. Not yet implemented.
+TypeScript CLI (`mc`) built with Commander.js. Mirrors API resources as command groups.
 
 | Item | Detail |
 |---|---|
+| Entry point | `apps/cli/src/index.ts` |
+| Binary | `mc` (via `dist/index.js`) |
+| Tech | TypeScript, Commander.js, native fetch |
+| Config | Env vars `MC_API_BASE_URL`, `MC_ACTOR_ID`, `MC_ACTOR_TYPE`, `MC_OUTPUT`, `MC_TIMEOUT_SECONDS` |
+| Lint | `apps/cli/scripts/lint.sh` (ESLint + TypeScript type-check) |
 | AGENTS.md | [`apps/cli/AGENTS.md`](../apps/cli/AGENTS.md) |
+| Docs | [`apps/cli/docs/INDEX.md`](../apps/cli/docs/INDEX.md) |
 
 ---
 

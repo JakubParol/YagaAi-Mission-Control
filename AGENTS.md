@@ -2,11 +2,11 @@
 
 ## What This Is
 
-Mission Control is a monorepo for managing AI agent workflows. It contains a web dashboard, a REST API, and a CLI (planned).
+Mission Control is a monorepo for managing AI agent workflows. It contains a web dashboard, a REST API, and a CLI.
 
 ## Scope
 
-- **In scope:** Dashboard UI, REST API (planning + observability modules), CLI (planned), SQLite persistence, Langfuse integration
+- **In scope:** Dashboard UI, REST API (planning + observability modules), CLI, SQLite persistence, Langfuse integration
 - **Out of scope:** Authentication enforcement (v2), real-time WebSocket events (v2), multi-tenancy (v2)
 
 ## Required Reading (Mandatory)
@@ -50,7 +50,7 @@ If you then drill into a project, report that too.
 |---|---|
 | Frontend | Next.js 15, TypeScript, Tailwind CSS v4, shadcn/ui |
 | API | FastAPI, Python 3.12, async, pydantic |
-| CLI | Planned |
+| CLI | TypeScript, Commander.js |
 | Database | SQLite (aiosqlite for API, better-sqlite3 for frontend) |
 | External | Langfuse (LLM observability) |
 
