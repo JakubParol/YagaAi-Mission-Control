@@ -12,7 +12,7 @@ This document defines the test strategy for the Services API. The goal is to val
 
 | Level | Scope | Tools | Status |
 |-------|-------|-------|--------|
-| **Integration** | API endpoints + DB | FastAPI TestClient, pytest, SQLite (tmp) | Active — 139 tests |
+| **Integration** | API endpoints + DB | FastAPI TestClient, pytest, SQLite (tmp) | Active — 225 tests |
 | **Unit** | Domain models, pure services | pytest | Future — as domain layer grows |
 | **E2E** | Full flow (API → DB → response) | httpx / pytest | Future — for critical paths |
 
@@ -26,6 +26,10 @@ services/api/tests/
 ├── test_health.py                       # GET /healthz smoke test
 ├── planning/
 │   ├── conftest.py                      # Schema + seed data + TestClient
+│   ├── test_project_routes.py           # Projects CRUD + business rules (24 tests)
+│   ├── test_agent_routes.py             # Agents CRUD + filtering (22 tests)
+│   ├── test_label_routes.py             # Labels CRUD + duplicate detection (15 tests)
+│   ├── test_backlog_routes.py           # Backlogs CRUD + business rules (25 tests)
 │   ├── test_epic_routes.py              # Epics CRUD (24 tests)
 │   ├── test_story_routes.py             # Stories CRUD + labels (35 tests)
 │   ├── test_task_routes.py              # Tasks CRUD + assignments + labels + derivation (46 tests)
@@ -125,13 +129,13 @@ All assertions follow the standard response envelope:
 
 ## Coverage Goals
 
-- **Current:** 139 integration tests across 6 test files
+- **Current:** 225 integration tests across 10 test files, 92% code coverage
 - **Target:** Maintain full endpoint coverage; add unit tests as domain logic grows
-- **Gaps:** Observability module has minimal tests (empty-DB smoke tests only)
+- **Gaps:** Observability module has minimal tests (empty-DB smoke tests only); Langfuse client/import service require external integration
 
 ## Future Improvements
 
-1. **pytest-cov integration** — add `pytest-cov` to dev dependencies and enforce minimum coverage
+1. ~~**pytest-cov integration**~~ — Done: `pytest-cov` added as dev dependency, baseline coverage 92%
 2. **Unit tests for domain logic** — as status derivation and workflow rules move to domain layer
 3. **Parametrized tests** — reduce boilerplate for similar CRUD patterns across entities
 4. **Factory fixtures** — extract entity creation helpers to reduce test verbosity
