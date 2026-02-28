@@ -18,6 +18,14 @@ class BacklogStatus(StrEnum):
     CLOSED = "CLOSED"
 
 
+class ItemStatus(StrEnum):
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    CODE_REVIEW = "CODE_REVIEW"
+    VERIFY = "VERIFY"
+    DONE = "DONE"
+
+
 class EpicStatus(StrEnum):
     TODO = "TODO"
     IN_PROGRESS = "IN_PROGRESS"
@@ -109,6 +117,33 @@ class Epic:
     updated_by: str | None
     created_at: str
     updated_at: str
+
+
+@dataclass
+class Story:
+    id: str
+    project_id: str | None
+    epic_id: str | None
+    key: str | None
+    title: str
+    intent: str | None
+    description: str | None
+    # story_type is intentionally a free-form string (no enum constraint).
+    # Consumers may use values like USER_STORY, SPIKE, BUG, CHORE, etc.
+    story_type: str
+    status: ItemStatus
+    status_mode: StatusMode
+    status_override: str | None
+    status_override_set_at: str | None
+    is_blocked: bool
+    blocked_reason: str | None
+    priority: int | None
+    metadata_json: str | None
+    created_by: str | None
+    updated_by: str | None
+    created_at: str
+    updated_at: str
+    completed_at: str | None
 
 
 @dataclass

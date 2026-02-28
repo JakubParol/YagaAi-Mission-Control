@@ -82,7 +82,7 @@ def _setup_test_db(tmp_path, monkeypatch):
         CREATE TABLE tasks (
           id TEXT PRIMARY KEY,
           project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          story_id TEXT,
+          story_id TEXT REFERENCES stories(id) ON DELETE SET NULL,
           key TEXT,
           title TEXT NOT NULL,
           objective TEXT,
@@ -136,6 +136,21 @@ def _setup_test_db(tmp_path, monkeypatch):
           added_at TEXT NOT NULL,
           PRIMARY KEY (backlog_id, task_id),
           UNIQUE(task_id)
+        );
+
+        CREATE TABLE labels (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+          name       TEXT NOT NULL,
+          color      TEXT,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE story_labels (
+          story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+          label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+          added_at TEXT NOT NULL,
+          PRIMARY KEY (story_id, label_id)
         );
         """)
 

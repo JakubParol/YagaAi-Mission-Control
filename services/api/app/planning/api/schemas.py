@@ -214,3 +214,60 @@ class BacklogReorderRequest(BaseModel):
 class BacklogReorderResponse(BaseModel):
     updated_story_count: int
     updated_task_count: int
+
+
+# ---------------------------------------------------------------------------
+# Stories
+# ---------------------------------------------------------------------------
+
+
+class StoryCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    story_type: str = Field(..., min_length=1, max_length=50)
+    project_id: str | None = None
+    epic_id: str | None = None
+    intent: str | None = None
+    description: str | None = None
+    priority: int | None = None
+
+
+class StoryUpdate(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=500)
+    description: str | None = None
+    intent: str | None = None
+    story_type: str | None = Field(None, min_length=1, max_length=50)
+    status: str | None = Field(None, pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$")
+    epic_id: str | None = None
+    priority: int | None = None
+
+
+class StoryResponse(BaseModel):
+    id: str
+    project_id: str | None
+    epic_id: str | None
+    key: str | None
+    title: str
+    intent: str | None
+    description: str | None
+    story_type: str
+    status: str
+    status_mode: str
+    status_override: str | None
+    status_override_set_at: str | None
+    is_blocked: bool
+    blocked_reason: str | None
+    priority: int | None
+    metadata_json: str | None
+    created_by: str | None
+    updated_by: str | None
+    created_at: str
+    updated_at: str
+    completed_at: str | None
+
+
+class StoryDetailResponse(StoryResponse):
+    task_count: int
+
+
+class StoryAttachLabel(BaseModel):
+    label_id: str = Field(..., min_length=1)
