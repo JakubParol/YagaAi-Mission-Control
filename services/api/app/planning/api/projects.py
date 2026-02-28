@@ -14,7 +14,7 @@ async def create_project(
     service: ProjectService = Depends(get_project_service),
 ) -> Envelope[ProjectResponse]:
     project = await service.create_project(
-        key=body.key, name=body.name, description=body.description
+        key=body.key, name=body.name, description=body.description, repo_root=body.repo_root
     )
     return Envelope(data=ProjectResponse(**project.__dict__))
 

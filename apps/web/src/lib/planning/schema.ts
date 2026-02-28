@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name        TEXT NOT NULL,
   description TEXT,
   status      TEXT NOT NULL DEFAULT 'ACTIVE',
+  repo_root   TEXT,
   created_by  TEXT,
   updated_by  TEXT,
   created_at  TEXT NOT NULL,
