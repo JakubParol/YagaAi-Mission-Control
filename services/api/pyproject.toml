@@ -33,6 +33,7 @@ import-linter = ">=2.9"
 # ============================================
 # Tool Configurations
 # ============================================
+pytest-cov = "^7.0.0"
 
 [tool.black]
 line-length = 100
