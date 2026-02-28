@@ -143,7 +143,8 @@ Request:
 {
   "key": "MC",                // required, unique, uppercase letters
   "name": "Mission Control",  // required
-  "description": "..."        // optional
+  "description": "...",       // optional
+  "repo_root": "/home/..."    // optional, absolute path to local repo root
 }
 ```
 
@@ -157,7 +158,7 @@ Query: `status`, `sort`, `limit`, `offset`.
 
 #### `PATCH /v1/planning/projects/{id}` — Update project
 
-Updatable: `name`, `description`, `status` (`ACTIVE`/`ARCHIVED`).
+Updatable: `name`, `description`, `status` (`ACTIVE`/`ARCHIVED`), `repo_root`.
 
 #### `DELETE /v1/planning/projects/{id}` — Delete project
 
