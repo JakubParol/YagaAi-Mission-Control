@@ -12,6 +12,8 @@ interface PlanningFilterState {
 const PlanningFilterContext = createContext<PlanningFilterState | null>(null);
 
 export function PlanningFilterProvider({ children }: { children: React.ReactNode }) {
+  // Empty array = "all projects selected". Toggling off the last project
+  // resets to [] which means "all" — this is intentional to avoid an empty view.
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
 
   const toggleProject = useCallback((id: string) => {

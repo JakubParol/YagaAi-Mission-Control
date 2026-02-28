@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronsUpDown, FolderKanban } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
@@ -34,7 +34,10 @@ export function ProjectSelector() {
   useEffect(() => {
     let cancelled = false;
     fetch(apiUrl("/v1/planning/projects?limit=100"))
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to fetch projects: ${res.status}`);
+        return res.json();
+      })
       .then((json) => {
         if (!cancelled && json.data) {
           setProjects(
@@ -46,7 +49,9 @@ export function ProjectSelector() {
           );
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("[ProjectSelector]", err);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -75,12 +80,12 @@ export function ProjectSelector() {
     [allSelected, projects, setSelectedProjectIds, toggleProject],
   );
 
-  const isChecked = useCallback(
-    (id: string) => allSelected || selectedProjectIds.includes(id),
-    [allSelected, selectedProjectIds],
+  const checkedIds = useMemo(
+    () => new Set(allSelected ? projects.map((p) => p.id) : selectedProjectIds),
+    [allSelected, projects, selectedProjectIds],
   );
 
-  const triggerLabel = (() => {
+  const triggerLabel = useMemo(() => {
     if (loading) return "Projects…";
     if (allSelected || selectedProjectIds.length === 0) return "All projects";
     if (selectedProjectIds.length === projects.length) return "All projects";
@@ -89,7 +94,7 @@ export function ProjectSelector() {
     if (selected.length === 2)
       return selected.map((p) => `(${p.key}) ${p.name}`).join(", ");
     return `${selected.length} projects`;
-  })();
+  }, [loading, allSelected, selectedProjectIds, projects]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -134,7 +139,7 @@ export function ProjectSelector() {
                   className="text-xs"
                 >
                   <Checkbox
-                    checked={isChecked(project.id)}
+                    checked={checkedIds.has(project.id)}
                     className="mr-2 size-3.5"
                     tabIndex={-1}
                   />
