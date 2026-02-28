@@ -77,6 +77,7 @@ def _row_to_project(row: aiosqlite.Row) -> Project:
         name=row["name"],
         description=row["description"],
         status=ProjectStatus(row["status"]),
+        repo_root=row["repo_root"],
         created_by=row["created_by"],
         updated_by=row["updated_by"],
         created_at=row["created_at"],
@@ -191,15 +192,16 @@ class SqliteProjectRepository(ProjectRepository):
 
     async def create(self, project: Project) -> Project:
         await self._db.execute(
-            """INSERT INTO projects (id, key, name, description, status,
+            """INSERT INTO projects (id, key, name, description, status, repo_root,
                created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 project.id,
                 project.key,
                 project.name,
                 project.description,
                 project.status,
+                project.repo_root,
                 project.created_by,
                 project.updated_by,
                 project.created_at,
@@ -210,7 +212,7 @@ class SqliteProjectRepository(ProjectRepository):
         return project
 
     async def update(self, project_id: str, data: dict[str, Any]) -> Project | None:
-        allowed = {"name", "description", "status", "updated_by", "updated_at"}
+        allowed = {"name", "description", "status", "repo_root", "updated_by", "updated_at"}
         sets = []
         params: list[Any] = []
         for k, v in data.items():

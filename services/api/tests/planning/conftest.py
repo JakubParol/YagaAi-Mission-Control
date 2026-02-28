@@ -21,6 +21,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           name TEXT NOT NULL,
           description TEXT,
           status TEXT NOT NULL,
+          repo_root TEXT,
           created_by TEXT,
           updated_by TEXT,
           created_at TEXT NOT NULL,
