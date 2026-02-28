@@ -124,3 +124,47 @@ class BacklogResponse(BaseModel):
     updated_by: str | None
     created_at: str
     updated_at: str
+
+
+class BacklogAddStory(BaseModel):
+    story_id: str = Field(..., min_length=1)
+    position: int = Field(..., ge=0)
+
+
+class BacklogAddTask(BaseModel):
+    task_id: str = Field(..., min_length=1)
+    position: int = Field(..., ge=0)
+
+
+class BacklogStoryItemResponse(BaseModel):
+    backlog_id: str
+    story_id: str
+    position: int
+    added_at: str
+
+
+class BacklogTaskItemResponse(BaseModel):
+    backlog_id: str
+    task_id: str
+    position: int
+    added_at: str
+
+
+class BacklogReorderStoryItem(BaseModel):
+    story_id: str = Field(..., min_length=1)
+    position: int = Field(..., ge=0)
+
+
+class BacklogReorderTaskItem(BaseModel):
+    task_id: str = Field(..., min_length=1)
+    position: int = Field(..., ge=0)
+
+
+class BacklogReorderRequest(BaseModel):
+    stories: list[BacklogReorderStoryItem] = Field(default_factory=list)
+    tasks: list[BacklogReorderTaskItem] = Field(default_factory=list)
+
+
+class BacklogReorderResponse(BaseModel):
+    updated_story_count: int
+    updated_task_count: int

@@ -14,6 +14,8 @@ from app.planning.domain.models import (
     Backlog,
     BacklogKind,
     BacklogStatus,
+    BacklogStoryItem,
+    BacklogTaskItem,
     Label,
     Project,
     ProjectStatus,
@@ -46,8 +48,26 @@ def _parse_sort(raw: str, allowed: set[str]) -> str:
             raise ValidationError(
                 f"Invalid sort field '{field}'. Allowed: {', '.join(sorted(allowed))}"
             )
-        clauses.append(f"{field} {direction}")
+        clauses.append(field + " " + direction)
     return ", ".join(clauses) if clauses else "created_at DESC"
+
+
+def _build_list_queries(
+    table: str, where_parts: list[str], order_sql: str | None = None
+) -> tuple[str, str]:
+    """Build COUNT and SELECT queries for list operations."""
+    where = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    count_q = "SELECT COUNT(*) FROM " + table + where
+    select_q = "SELECT * FROM " + table + where
+    if order_sql:
+        select_q += " ORDER BY " + order_sql
+    select_q += " LIMIT ? OFFSET ?"
+    return count_q, select_q
+
+
+def _build_update_query(table: str, sets: list[str]) -> str:
+    """Build UPDATE query for partial updates."""
+    return "UPDATE " + table + " SET " + ", ".join(sets) + " WHERE id = ?"
 
 
 def _row_to_project(row: aiosqlite.Row) -> Project:
@@ -140,7 +160,7 @@ class SqliteProjectRepository(ProjectRepository):
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
 
-    async def list(
+    async def list_all(
         self,
         *,
         status: str | None = None,
@@ -155,20 +175,11 @@ class SqliteProjectRepository(ProjectRepository):
             where_parts.append("status = ?")
             params.append(status)
 
-        where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
         order_sql = _parse_sort(sort, _SORT_ALLOWED_PROJECT)
+        count_q, select_q = _build_list_queries("projects", where_parts, order_sql)
 
-        total = await _fetch_count(
-            self._db,
-            f"SELECT COUNT(*) FROM projects {where_sql}",  # nosec B608
-            params,
-        )
-        rows = await _fetch_all(
-            self._db,
-            f"SELECT * FROM projects {where_sql} "  # nosec B608
-            f"ORDER BY {order_sql} LIMIT ? OFFSET ?",
-            [*params, limit, offset],
-        )
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
         return [_row_to_project(r) for r in rows], total
 
     async def get_by_id(self, project_id: str) -> Project | None:
@@ -204,17 +215,14 @@ class SqliteProjectRepository(ProjectRepository):
         params: list[Any] = []
         for k, v in data.items():
             if k in allowed:
-                sets.append(f"{k} = ?")
+                sets.append(k + " = ?")
                 params.append(v)
 
         if not sets:
             return await self.get_by_id(project_id)
 
         params.append(project_id)
-        await self._db.execute(
-            f"UPDATE projects SET {', '.join(sets)} WHERE id = ?",  # nosec B608
-            params,
-        )
+        await self._db.execute(_build_update_query("projects", sets), params)
         await self._db.commit()
         return await self.get_by_id(project_id)
 
@@ -241,7 +249,7 @@ class SqliteAgentRepository(AgentRepository):
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
 
-    async def list(
+    async def list_all(
         self,
         *,
         is_active: bool | None = None,
@@ -260,19 +268,11 @@ class SqliteAgentRepository(AgentRepository):
             where_parts.append("source = ?")
             params.append(source)
 
-        where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
         order_sql = _parse_sort(sort, _SORT_ALLOWED_AGENT)
+        count_q, select_q = _build_list_queries("agents", where_parts, order_sql)
 
-        total = await _fetch_count(
-            self._db,
-            f"SELECT COUNT(*) FROM agents {where_sql}",  # nosec B608
-            params,
-        )
-        rows = await _fetch_all(
-            self._db,
-            f"SELECT * FROM agents {where_sql} ORDER BY {order_sql} LIMIT ? OFFSET ?",  # nosec B608
-            [*params, limit, offset],
-        )
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
         return [_row_to_agent(r) for r in rows], total
 
     async def get_by_id(self, agent_id: str) -> Agent | None:
@@ -316,7 +316,7 @@ class SqliteAgentRepository(AgentRepository):
         params: list[Any] = []
         for k, v in data.items():
             if k in allowed:
-                sets.append(f"{k} = ?")
+                sets.append(k + " = ?")
                 if k == "is_active":
                     params.append(1 if v else 0)
                 else:
@@ -326,10 +326,7 @@ class SqliteAgentRepository(AgentRepository):
             return await self.get_by_id(agent_id)
 
         params.append(agent_id)
-        await self._db.execute(
-            f"UPDATE agents SET {', '.join(sets)} WHERE id = ?",  # nosec B608
-            params,
-        )
+        await self._db.execute(_build_update_query("agents", sets), params)
         await self._db.commit()
         return await self.get_by_id(agent_id)
 
@@ -348,7 +345,7 @@ class SqliteLabelRepository(LabelRepository):
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
 
-    async def list(
+    async def list_all(
         self,
         *,
         project_id: str | None = None,
@@ -365,18 +362,10 @@ class SqliteLabelRepository(LabelRepository):
             where_parts.append("(project_id = ? OR project_id IS NULL)")
             params.append(project_id)
 
-        where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+        count_q, select_q = _build_list_queries("labels", where_parts, "name ASC")
 
-        total = await _fetch_count(
-            self._db,
-            f"SELECT COUNT(*) FROM labels {where_sql}",  # nosec B608
-            params,
-        )
-        rows = await _fetch_all(
-            self._db,
-            f"SELECT * FROM labels {where_sql} ORDER BY name ASC LIMIT ? OFFSET ?",  # nosec B608
-            [*params, limit, offset],
-        )
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
         return [_row_to_label(r) for r in rows], total
 
     async def get_by_id(self, label_id: str) -> Label | None:
@@ -420,7 +409,7 @@ class SqliteBacklogRepository(BacklogRepository):
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
 
-    async def list(
+    async def list_all(
         self,
         *,
         project_id: str | None = None,
@@ -446,20 +435,11 @@ class SqliteBacklogRepository(BacklogRepository):
             where_parts.append("kind = ?")
             params.append(kind)
 
-        where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
         order_sql = _parse_sort(sort, _SORT_ALLOWED_BACKLOG)
+        count_q, select_q = _build_list_queries("backlogs", where_parts, order_sql)
 
-        total = await _fetch_count(
-            self._db,
-            f"SELECT COUNT(*) FROM backlogs {where_sql}",  # nosec B608
-            params,
-        )
-        rows = await _fetch_all(
-            self._db,
-            f"SELECT * FROM backlogs {where_sql} "  # nosec B608
-            f"ORDER BY {order_sql} LIMIT ? OFFSET ?",
-            [*params, limit, offset],
-        )
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
         return [_row_to_backlog(r) for r in rows], total
 
     async def get_by_id(self, backlog_id: str) -> Backlog | None:
@@ -507,17 +487,14 @@ class SqliteBacklogRepository(BacklogRepository):
         params: list[Any] = []
         for k, v in data.items():
             if k in allowed:
-                sets.append(f"{k} = ?")
+                sets.append(k + " = ?")
                 params.append(v)
 
         if not sets:
             return await self.get_by_id(backlog_id)
 
         params.append(backlog_id)
-        await self._db.execute(
-            f"UPDATE backlogs SET {', '.join(sets)} WHERE id = ?",  # nosec B608
-            params,
-        )
+        await self._db.execute(_build_update_query("backlogs", sets), params)
         await self._db.commit()
         return await self.get_by_id(backlog_id)
 
@@ -552,3 +529,157 @@ class SqliteBacklogRepository(BacklogRepository):
             "SELECT COUNT(*) FROM backlog_tasks WHERE backlog_id = ?",
             [backlog_id],
         )
+
+    async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]:
+        row = await _fetch_one(self._db, "SELECT project_id FROM stories WHERE id = ?", [story_id])
+        if not row:
+            return False, None
+        return True, row["project_id"]
+
+    async def get_task_project_id(self, task_id: str) -> tuple[bool, str | None]:
+        row = await _fetch_one(self._db, "SELECT project_id FROM tasks WHERE id = ?", [task_id])
+        if not row:
+            return False, None
+        return True, row["project_id"]
+
+    async def story_backlog_id(self, story_id: str) -> str | None:
+        row = await _fetch_one(
+            self._db,
+            "SELECT backlog_id FROM backlog_stories WHERE story_id = ?",
+            [story_id],
+        )
+        return row["backlog_id"] if row else None
+
+    async def task_backlog_id(self, task_id: str) -> str | None:
+        row = await _fetch_one(
+            self._db,
+            "SELECT backlog_id FROM backlog_tasks WHERE task_id = ?",
+            [task_id],
+        )
+        return row["backlog_id"] if row else None
+
+    async def add_story_item(
+        self, backlog_id: str, story_id: str, position: int
+    ) -> BacklogStoryItem:
+        max_position = await _fetch_count(
+            self._db,
+            "SELECT COUNT(*) FROM backlog_stories WHERE backlog_id = ?",
+            [backlog_id],
+        )
+        normalized = min(position, max_position)
+        await self._db.execute(
+            """UPDATE backlog_stories
+               SET position = position + 1
+               WHERE backlog_id = ? AND position >= ?""",
+            [backlog_id, normalized],
+        )
+        added_at = utc_now()
+        await self._db.execute(
+            """INSERT INTO backlog_stories (backlog_id, story_id, position, added_at)
+               VALUES (?, ?, ?, ?)""",
+            [backlog_id, story_id, normalized, added_at],
+        )
+        await self._db.commit()
+        return BacklogStoryItem(
+            backlog_id=backlog_id,
+            story_id=story_id,
+            position=normalized,
+            added_at=added_at,
+        )
+
+    async def remove_story_item(self, backlog_id: str, story_id: str) -> bool:
+        row = await _fetch_one(
+            self._db,
+            "SELECT position FROM backlog_stories WHERE backlog_id = ? AND story_id = ?",
+            [backlog_id, story_id],
+        )
+        if not row:
+            return False
+        removed_position = row["position"]
+        await self._db.execute(
+            "DELETE FROM backlog_stories WHERE backlog_id = ? AND story_id = ?",
+            [backlog_id, story_id],
+        )
+        await self._db.execute(
+            """UPDATE backlog_stories
+               SET position = position - 1
+               WHERE backlog_id = ? AND position > ?""",
+            [backlog_id, removed_position],
+        )
+        await self._db.commit()
+        return True
+
+    async def add_task_item(self, backlog_id: str, task_id: str, position: int) -> BacklogTaskItem:
+        max_position = await _fetch_count(
+            self._db,
+            "SELECT COUNT(*) FROM backlog_tasks WHERE backlog_id = ?",
+            [backlog_id],
+        )
+        normalized = min(position, max_position)
+        await self._db.execute(
+            """UPDATE backlog_tasks
+               SET position = position + 1
+               WHERE backlog_id = ? AND position >= ?""",
+            [backlog_id, normalized],
+        )
+        added_at = utc_now()
+        await self._db.execute(
+            """INSERT INTO backlog_tasks (backlog_id, task_id, position, added_at)
+               VALUES (?, ?, ?, ?)""",
+            [backlog_id, task_id, normalized, added_at],
+        )
+        await self._db.commit()
+        return BacklogTaskItem(
+            backlog_id=backlog_id,
+            task_id=task_id,
+            position=normalized,
+            added_at=added_at,
+        )
+
+    async def remove_task_item(self, backlog_id: str, task_id: str) -> bool:
+        row = await _fetch_one(
+            self._db,
+            "SELECT position FROM backlog_tasks WHERE backlog_id = ? AND task_id = ?",
+            [backlog_id, task_id],
+        )
+        if not row:
+            return False
+        removed_position = row["position"]
+        await self._db.execute(
+            "DELETE FROM backlog_tasks WHERE backlog_id = ? AND task_id = ?",
+            [backlog_id, task_id],
+        )
+        await self._db.execute(
+            """UPDATE backlog_tasks
+               SET position = position - 1
+               WHERE backlog_id = ? AND position > ?""",
+            [backlog_id, removed_position],
+        )
+        await self._db.commit()
+        return True
+
+    async def reorder_items(
+        self,
+        backlog_id: str,
+        stories: list[dict[str, Any]],
+        tasks: list[dict[str, Any]],
+    ) -> dict[str, int]:
+        for row in stories:
+            await self._db.execute(
+                """UPDATE backlog_stories
+                   SET position = ?
+                   WHERE backlog_id = ? AND story_id = ?""",
+                [row["position"], backlog_id, row["story_id"]],
+            )
+        for row in tasks:
+            await self._db.execute(
+                """UPDATE backlog_tasks
+                   SET position = ?
+                   WHERE backlog_id = ? AND task_id = ?""",
+                [row["position"], backlog_id, row["task_id"]],
+            )
+        await self._db.commit()
+        return {
+            "updated_story_count": len(stories),
+            "updated_task_count": len(tasks),
+        }

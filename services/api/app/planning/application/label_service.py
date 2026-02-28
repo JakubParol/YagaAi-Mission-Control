@@ -16,7 +16,7 @@ class LabelService:
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[Label], int]:
-        return await self._repo.list(
+        return await self._repo.list_all(
             project_id=project_id, filter_global=filter_global, limit=limit, offset=offset
         )
 

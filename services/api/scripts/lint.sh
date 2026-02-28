@@ -96,7 +96,7 @@ run_tool "Import Linter" lint-imports
 run_tool "Pyright" pyright
 
 # --- Bandit ---
-run_tool "Bandit" bandit -r app -ll -q
+run_tool "Bandit" bandit -r app -ll -ii -q
 
 # --- Post-fix re-check ---
 if [[ "$FIX" == true ]]; then

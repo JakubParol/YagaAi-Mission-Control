@@ -1,12 +1,19 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from app.planning.domain.models import Agent, Backlog, Label, Project
+from app.planning.domain.models import (
+    Agent,
+    Backlog,
+    BacklogStoryItem,
+    BacklogTaskItem,
+    Label,
+    Project,
+)
 
 
 class ProjectRepository(ABC):
     @abstractmethod
-    async def list(
+    async def list_all(
         self,
         *,
         status: str | None = None,
@@ -36,7 +43,7 @@ class ProjectRepository(ABC):
 
 class AgentRepository(ABC):
     @abstractmethod
-    async def list(
+    async def list_all(
         self,
         *,
         is_active: bool | None = None,
@@ -61,7 +68,7 @@ class AgentRepository(ABC):
 
 class LabelRepository(ABC):
     @abstractmethod
-    async def list(
+    async def list_all(
         self,
         *,
         project_id: str | None = None,
@@ -85,7 +92,7 @@ class LabelRepository(ABC):
 
 class BacklogRepository(ABC):
     @abstractmethod
-    async def list(
+    async def list_all(
         self,
         *,
         project_id: str | None = None,
@@ -117,3 +124,39 @@ class BacklogRepository(ABC):
 
     @abstractmethod
     async def get_task_count(self, backlog_id: str) -> int: ...
+
+    @abstractmethod
+    async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]: ...
+
+    @abstractmethod
+    async def get_task_project_id(self, task_id: str) -> tuple[bool, str | None]: ...
+
+    @abstractmethod
+    async def story_backlog_id(self, story_id: str) -> str | None: ...
+
+    @abstractmethod
+    async def task_backlog_id(self, task_id: str) -> str | None: ...
+
+    @abstractmethod
+    async def add_story_item(
+        self, backlog_id: str, story_id: str, position: int
+    ) -> BacklogStoryItem: ...
+
+    @abstractmethod
+    async def remove_story_item(self, backlog_id: str, story_id: str) -> bool: ...
+
+    @abstractmethod
+    async def add_task_item(
+        self, backlog_id: str, task_id: str, position: int
+    ) -> BacklogTaskItem: ...
+
+    @abstractmethod
+    async def remove_task_item(self, backlog_id: str, task_id: str) -> bool: ...
+
+    @abstractmethod
+    async def reorder_items(
+        self,
+        backlog_id: str,
+        stories: list[dict[str, Any]],
+        tasks: list[dict[str, Any]],
+    ) -> dict[str, int]: ...

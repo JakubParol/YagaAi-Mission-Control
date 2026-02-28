@@ -76,3 +76,19 @@ class Backlog:
     updated_by: str | None
     created_at: str
     updated_at: str
+
+
+@dataclass
+class BacklogStoryItem:
+    backlog_id: str
+    story_id: str
+    position: int
+    added_at: str
+
+
+@dataclass
+class BacklogTaskItem:
+    backlog_id: str
+    task_id: str
+    position: int
+    added_at: str

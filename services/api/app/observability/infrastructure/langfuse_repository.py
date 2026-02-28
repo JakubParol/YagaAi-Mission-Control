@@ -174,25 +174,20 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
             conditions.append("started_at <= ?")
             params.append(to_date)
 
-        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-
-        cursor = await self._db.execute(
-            f"SELECT * FROM langfuse_requests {where} "  # noqa: S608  # nosec B608
-            "ORDER BY started_at DESC LIMIT ? OFFSET ?",
-            (*params, limit, offset),
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        select_q = (
+            "SELECT * FROM langfuse_requests" + where + " ORDER BY started_at DESC LIMIT ? OFFSET ?"
         )
+        count_q = "SELECT COUNT(*) as count FROM langfuse_requests" + where
+
+        cursor = await self._db.execute(select_q, (*params, limit, offset))
         rows = await cursor.fetchall()
 
-        count_cursor = await self._db.execute(
-            f"SELECT COUNT(*) as count FROM langfuse_requests {where}",  # noqa: S608  # nosec B608
-            tuple(params),
-        )
-        count_row = await count_cursor.fetchone()
-        total = count_row[0] if count_row else 0
+        count_row = await (await self._db.execute(count_q, tuple(params))).fetchone()
 
         return PaginatedRequests(
             data=[_row_to_langfuse_request(r) for r in rows],
-            total=total,
+            total=count_row[0] if count_row else 0,
         )
 
 

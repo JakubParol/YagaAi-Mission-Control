@@ -16,21 +16,9 @@ class ImportService:
 
     async def run_import(self) -> dict:
         last_import = await self._repo.get_last_successful_import()
-        is_incremental = last_import is not None
-
-        now = datetime.now(timezone.utc)
-        to_timestamp = now.isoformat()
-
-        from_timestamp: str | None = None
-        if is_incremental and last_import:
-            from_timestamp = last_import.to_timestamp
-            from_date = last_import.to_timestamp.split("T")[0]
-        else:
-            lookback = now - timedelta(days=FULL_IMPORT_LOOKBACK_DAYS)
-            from_date = lookback.isoformat().split("T")[0]
-
-        to_date = now.isoformat().split("T")[0]
-        mode = "incremental" if is_incremental else "full"
+        from_timestamp, from_date, to_date, to_timestamp, mode = self._resolve_import_range(
+            last_import
+        )
 
         import_run = await self._repo.create_import_run(mode, from_timestamp, to_timestamp)
 
@@ -55,6 +43,27 @@ class ImportService:
             error_message = str(err)
             await self._repo.complete_import_run(import_run.id, "failed", error_message)
             raise
+
+    @staticmethod
+    def _resolve_import_range(
+        last_import: ImportRecord | None,
+    ) -> tuple[str | None, str, str, str, str]:
+        """Return (from_timestamp, from_date, to_date, to_timestamp, mode)."""
+        now = datetime.now(timezone.utc)
+        to_timestamp = now.isoformat()
+        to_date = now.isoformat().split("T")[0]
+
+        if last_import is not None:
+            from_timestamp: str | None = last_import.to_timestamp
+            from_date = last_import.to_timestamp.split("T")[0]
+            mode = "incremental"
+        else:
+            from_timestamp = None
+            lookback = now - timedelta(days=FULL_IMPORT_LOOKBACK_DAYS)
+            from_date = lookback.isoformat().split("T")[0]
+            mode = "full"
+
+        return from_timestamp, from_date, to_date, to_timestamp, mode
 
     @staticmethod
     def _transform_daily_metrics(raw: list[dict]) -> list[DailyMetric]:

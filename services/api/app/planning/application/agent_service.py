@@ -19,7 +19,7 @@ class AgentService:
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Agent], int]:
-        return await self._repo.list(
+        return await self._repo.list_all(
             is_active=is_active, source=source, limit=limit, offset=offset, sort=sort
         )
 
