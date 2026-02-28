@@ -6,6 +6,7 @@ from app.planning.domain.models import (
     Backlog,
     BacklogStoryItem,
     BacklogTaskItem,
+    Epic,
     Label,
     Project,
 )
@@ -39,6 +40,40 @@ class ProjectRepository(ABC):
 
     @abstractmethod
     async def create_project_counter(self, project_id: str) -> None: ...
+
+
+class EpicRepository(ABC):
+    @abstractmethod
+    async def list_all(
+        self,
+        *,
+        project_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[Epic], int]: ...
+
+    @abstractmethod
+    async def get_by_id(self, epic_id: str) -> Epic | None: ...
+
+    @abstractmethod
+    async def create(self, epic: Epic) -> Epic: ...
+
+    @abstractmethod
+    async def update(self, epic_id: str, data: dict[str, Any]) -> Epic | None: ...
+
+    @abstractmethod
+    async def delete(self, epic_id: str) -> bool: ...
+
+    @abstractmethod
+    async def get_story_count(self, epic_id: str) -> int: ...
+
+    @abstractmethod
+    async def allocate_key(self, project_id: str) -> str: ...
+
+    @abstractmethod
+    async def project_exists(self, project_id: str) -> bool: ...
 
 
 class AgentRepository(ABC):

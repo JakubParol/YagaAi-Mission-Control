@@ -5,6 +5,7 @@ import aiosqlite
 from app.planning.application.ports import (
     AgentRepository,
     BacklogRepository,
+    EpicRepository,
     LabelRepository,
     ProjectRepository,
 )
@@ -16,9 +17,12 @@ from app.planning.domain.models import (
     BacklogStatus,
     BacklogStoryItem,
     BacklogTaskItem,
+    Epic,
+    EpicStatus,
     Label,
     Project,
     ProjectStatus,
+    StatusMode,
 )
 from app.shared.api.errors import ValidationError
 from app.shared.utils import utc_now
@@ -28,6 +32,7 @@ from app.shared.utils import utc_now
 # ---------------------------------------------------------------------------
 
 _SORT_ALLOWED_PROJECT = {"created_at", "updated_at", "name", "key"}
+_SORT_ALLOWED_EPIC = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_AGENT = {"created_at", "updated_at", "name", "openclaw_key"}
 _SORT_ALLOWED_BACKLOG = {"created_at", "updated_at", "name"}
 
@@ -78,6 +83,28 @@ def _row_to_project(row: aiosqlite.Row) -> Project:
         description=row["description"],
         status=ProjectStatus(row["status"]),
         repo_root=row["repo_root"],
+        created_by=row["created_by"],
+        updated_by=row["updated_by"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _row_to_epic(row: aiosqlite.Row) -> Epic:
+    return Epic(
+        id=row["id"],
+        project_id=row["project_id"],
+        key=row["key"],
+        title=row["title"],
+        description=row["description"],
+        status=EpicStatus(row["status"]),
+        status_mode=StatusMode(row["status_mode"]),
+        status_override=row["status_override"],
+        status_override_set_at=row["status_override_set_at"],
+        is_blocked=bool(row["is_blocked"]),
+        blocked_reason=row["blocked_reason"],
+        priority=row["priority"],
+        metadata_json=row["metadata_json"],
         created_by=row["created_by"],
         updated_by=row["updated_by"],
         created_at=row["created_at"],
@@ -240,6 +267,152 @@ class SqliteProjectRepository(ProjectRepository):
             [project_id, utc_now()],
         )
         await self._db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Epic Repository
+# ---------------------------------------------------------------------------
+
+
+class SqliteEpicRepository(EpicRepository):
+    def __init__(self, db: aiosqlite.Connection) -> None:
+        self._db = db
+
+    async def list_all(
+        self,
+        *,
+        project_id: str | None = None,
+        status: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[Epic], int]:
+        where_parts: list[str] = []
+        params: list[Any] = []
+
+        if project_id:
+            where_parts.append("project_id = ?")
+            params.append(project_id)
+        if status:
+            where_parts.append("status = ?")
+            params.append(status)
+
+        order_sql = _parse_sort(sort, _SORT_ALLOWED_EPIC)
+        count_q, select_q = _build_list_queries("epics", where_parts, order_sql)
+
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        return [_row_to_epic(r) for r in rows], total
+
+    async def get_by_id(self, epic_id: str) -> Epic | None:
+        row = await _fetch_one(self._db, "SELECT * FROM epics WHERE id = ?", [epic_id])
+        return _row_to_epic(row) if row else None
+
+    async def create(self, epic: Epic) -> Epic:
+        await self._db.execute(
+            """INSERT INTO epics (id, project_id, key, title, description,
+               status, status_mode, status_override, status_override_set_at,
+               is_blocked, blocked_reason, priority, metadata_json,
+               created_by, updated_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                epic.id,
+                epic.project_id,
+                epic.key,
+                epic.title,
+                epic.description,
+                epic.status,
+                epic.status_mode,
+                epic.status_override,
+                epic.status_override_set_at,
+                1 if epic.is_blocked else 0,
+                epic.blocked_reason,
+                epic.priority,
+                epic.metadata_json,
+                epic.created_by,
+                epic.updated_by,
+                epic.created_at,
+                epic.updated_at,
+            ],
+        )
+        await self._db.commit()
+        return epic
+
+    async def update(self, epic_id: str, data: dict[str, Any]) -> Epic | None:
+        allowed = {
+            "title",
+            "description",
+            "status",
+            "status_mode",
+            "status_override",
+            "status_override_set_at",
+            "is_blocked",
+            "blocked_reason",
+            "priority",
+            "metadata_json",
+            "updated_by",
+            "updated_at",
+        }
+        sets = []
+        params: list[Any] = []
+        for k, v in data.items():
+            if k in allowed:
+                sets.append(k + " = ?")
+                if k == "is_blocked":
+                    params.append(1 if v else 0)
+                else:
+                    params.append(v)
+
+        if not sets:
+            return await self.get_by_id(epic_id)
+
+        params.append(epic_id)
+        await self._db.execute(_build_update_query("epics", sets), params)
+        await self._db.commit()
+        return await self.get_by_id(epic_id)
+
+    async def delete(self, epic_id: str) -> bool:
+        cursor = await self._db.execute("DELETE FROM epics WHERE id = ?", [epic_id])
+        await self._db.commit()
+        return (cursor.rowcount or 0) > 0
+
+    async def get_story_count(self, epic_id: str) -> int:
+        return await _fetch_count(
+            self._db,
+            "SELECT COUNT(*) FROM stories WHERE epic_id = ?",
+            [epic_id],
+        )
+
+    async def allocate_key(self, project_id: str) -> str:
+        row = await _fetch_one(
+            self._db,
+            "SELECT key FROM projects WHERE id = ?",
+            [project_id],
+        )
+        if not row:
+            raise ValidationError(f"Project {project_id} does not exist")
+        project_key = row["key"]
+
+        counter_row = await _fetch_one(
+            self._db,
+            "SELECT next_number FROM project_counters WHERE project_id = ?",
+            [project_id],
+        )
+        if not counter_row:
+            raise ValidationError(f"No counter found for project {project_id}")
+
+        next_num = counter_row["next_number"]
+        await self._db.execute(
+            """UPDATE project_counters
+               SET next_number = next_number + 1, updated_at = ?
+               WHERE project_id = ?""",
+            [utc_now(), project_id],
+        )
+        await self._db.commit()
+        return f"{project_key}-{next_num}"
+
+    async def project_exists(self, project_id: str) -> bool:
+        return await _exists(self._db, "SELECT 1 FROM projects WHERE id = ?", [project_id])
 
 
 # ---------------------------------------------------------------------------

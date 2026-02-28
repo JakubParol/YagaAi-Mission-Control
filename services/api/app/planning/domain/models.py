@@ -18,6 +18,17 @@ class BacklogStatus(StrEnum):
     CLOSED = "CLOSED"
 
 
+class EpicStatus(StrEnum):
+    TODO = "TODO"
+    IN_PROGRESS = "IN_PROGRESS"
+    DONE = "DONE"
+
+
+class StatusMode(StrEnum):
+    MANUAL = "MANUAL"
+    DERIVED = "DERIVED"
+
+
 class AgentSource(StrEnum):
     OPENCLAW_JSON = "openclaw_json"
     MANUAL = "manual"
@@ -72,6 +83,27 @@ class Backlog:
     goal: str | None
     start_date: str | None
     end_date: str | None
+    metadata_json: str | None
+    created_by: str | None
+    updated_by: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class Epic:
+    id: str
+    project_id: str
+    key: str
+    title: str
+    description: str | None
+    status: EpicStatus
+    status_mode: StatusMode
+    status_override: str | None
+    status_override_set_at: str | None
+    is_blocked: bool
+    blocked_reason: str | None
+    priority: int | None
     metadata_json: str | None
     created_by: str | None
     updated_by: str | None
