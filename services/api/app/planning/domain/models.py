@@ -128,6 +128,8 @@ class Story:
     title: str
     intent: str | None
     description: str | None
+    # story_type is intentionally a free-form string (no enum constraint).
+    # Consumers may use values like USER_STORY, SPIKE, BUG, CHORE, etc.
     story_type: str
     status: ItemStatus
     status_mode: StatusMode

@@ -104,6 +104,11 @@ class StoryService:
             data["status_override_set_at"] = utc_now()
             data["status_mode"] = StatusMode.MANUAL
 
+            if new_status == ItemStatus.DONE:
+                data["completed_at"] = utc_now()
+            elif existing.status == ItemStatus.DONE:
+                data["completed_at"] = None
+
         if "epic_id" in data and data["epic_id"] is not None:
             if not await self._story_repo.epic_exists(data["epic_id"]):
                 raise ValidationError(f"Epic {data['epic_id']} does not exist")

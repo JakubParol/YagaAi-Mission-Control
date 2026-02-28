@@ -209,6 +209,40 @@ async def _exists(db: aiosqlite.Connection, sql: str, params: list[Any]) -> bool
     return row is not None
 
 
+async def _allocate_next_key(db: aiosqlite.Connection, project_id: str) -> str:
+    """Allocate the next sequential key for a project.
+
+    Reads the project key prefix and increments the shared counter atomically
+    (safe under SQLite's single-writer serialisation).
+    """
+    row = await _fetch_one(db, "SELECT key FROM projects WHERE id = ?", [project_id])
+    if not row:
+        raise ValidationError(f"Project {project_id} does not exist")
+    project_key = row["key"]
+
+    counter_row = await _fetch_one(
+        db,
+        "SELECT next_number FROM project_counters WHERE project_id = ?",
+        [project_id],
+    )
+    if not counter_row:
+        raise ValidationError(f"No counter found for project {project_id}")
+
+    next_num = counter_row["next_number"]
+    await db.execute(
+        """UPDATE project_counters
+           SET next_number = next_number + 1, updated_at = ?
+           WHERE project_id = ?""",
+        [utc_now(), project_id],
+    )
+    await db.commit()
+    return f"{project_key}-{next_num}"
+
+
+async def _project_exists(db: aiosqlite.Connection, project_id: str) -> bool:
+    return await _exists(db, "SELECT 1 FROM projects WHERE id = ?", [project_id])
+
+
 # ---------------------------------------------------------------------------
 # Project Repository
 # ---------------------------------------------------------------------------
@@ -417,38 +451,10 @@ class SqliteEpicRepository(EpicRepository):
         )
 
     async def allocate_key(self, project_id: str) -> str:
-        # NOTE: This read-then-increment is safe under SQLite's single-writer
-        # serialisation. TODO: use an atomic UPDATE ... RETURNING or a
-        # database-level lock if we ever move to a multi-writer backend.
-        row = await _fetch_one(
-            self._db,
-            "SELECT key FROM projects WHERE id = ?",
-            [project_id],
-        )
-        if not row:
-            raise ValidationError(f"Project {project_id} does not exist")
-        project_key = row["key"]
-
-        counter_row = await _fetch_one(
-            self._db,
-            "SELECT next_number FROM project_counters WHERE project_id = ?",
-            [project_id],
-        )
-        if not counter_row:
-            raise ValidationError(f"No counter found for project {project_id}")
-
-        next_num = counter_row["next_number"]
-        await self._db.execute(
-            """UPDATE project_counters
-               SET next_number = next_number + 1, updated_at = ?
-               WHERE project_id = ?""",
-            [utc_now(), project_id],
-        )
-        await self._db.commit()
-        return f"{project_key}-{next_num}"
+        return await _allocate_next_key(self._db, project_id)
 
     async def project_exists(self, project_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM projects WHERE id = ?", [project_id])
+        return await _project_exists(self._db, project_id)
 
 
 # ---------------------------------------------------------------------------
@@ -579,35 +585,10 @@ class SqliteStoryRepository(StoryRepository):
         )
 
     async def allocate_key(self, project_id: str) -> str:
-        row = await _fetch_one(
-            self._db,
-            "SELECT key FROM projects WHERE id = ?",
-            [project_id],
-        )
-        if not row:
-            raise ValidationError(f"Project {project_id} does not exist")
-        project_key = row["key"]
-
-        counter_row = await _fetch_one(
-            self._db,
-            "SELECT next_number FROM project_counters WHERE project_id = ?",
-            [project_id],
-        )
-        if not counter_row:
-            raise ValidationError(f"No counter found for project {project_id}")
-
-        next_num = counter_row["next_number"]
-        await self._db.execute(
-            """UPDATE project_counters
-               SET next_number = next_number + 1, updated_at = ?
-               WHERE project_id = ?""",
-            [utc_now(), project_id],
-        )
-        await self._db.commit()
-        return f"{project_key}-{next_num}"
+        return await _allocate_next_key(self._db, project_id)
 
     async def project_exists(self, project_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM projects WHERE id = ?", [project_id])
+        return await _project_exists(self._db, project_id)
 
     async def epic_exists(self, epic_id: str) -> bool:
         return await _exists(self._db, "SELECT 1 FROM epics WHERE id = ?", [epic_id])

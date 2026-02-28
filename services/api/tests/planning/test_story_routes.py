@@ -318,6 +318,36 @@ def test_update_story_status_sets_override(client) -> None:
     assert data["status_override_set_at"] is not None
 
 
+def test_update_story_status_done_sets_completed_at(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    )
+    story_id = create_resp.json()["data"]["id"]
+    assert create_resp.json()["data"]["completed_at"] is None
+
+    resp = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "DONE"})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["status"] == "DONE"
+    assert data["completed_at"] is not None
+
+
+def test_update_story_status_away_from_done_clears_completed_at(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    )
+    story_id = create_resp.json()["data"]["id"]
+
+    client.patch(f"/v1/planning/stories/{story_id}", json={"status": "DONE"})
+    resp = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "TODO"})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["status"] == "TODO"
+    assert data["completed_at"] is None
+
+
 def test_update_story_not_found(client) -> None:
     resp = client.patch("/v1/planning/stories/nope", json={"title": "X"})
     assert resp.status_code == 404
