@@ -21,6 +21,7 @@ export const navModules: NavModule[] = [
     icon: ClipboardList,
     subPages: [
       { href: "/planning/board", label: "Board" },
+      { href: "/planning/backlog", label: "Backlog" },
     ],
   },
 ];
