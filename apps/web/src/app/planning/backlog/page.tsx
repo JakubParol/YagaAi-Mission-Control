@@ -44,6 +44,11 @@ type PageState =
   | { kind: "error"; message: string }
   | { kind: "ok"; sections: BacklogWithStories[] };
 
+type FetchResult =
+  | { kind: "empty" }
+  | { kind: "error"; message: string }
+  | { kind: "ok"; sections: BacklogWithStories[] };
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 const KIND_CONFIG: Record<BacklogKind, { label: string; accent: string }> = {
@@ -200,11 +205,6 @@ function BacklogSection({
 
 export default function BacklogPage() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
-  type FetchResult =
-    | { kind: "empty" }
-    | { kind: "error"; message: string }
-    | { kind: "ok"; sections: BacklogWithStories[] };
-
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const prevProjectRef = useRef<string | null>(null);
