@@ -1,9 +1,10 @@
 import type React from "react";
-import { BookOpen, LayoutDashboard, ListTodo, Inbox } from "lucide-react";
+import { BookOpen, LayoutDashboard, Layers, ListTodo, Inbox } from "lucide-react";
 
 const ICON_MAP = {
   stories: BookOpen,
   board: LayoutDashboard,
+  backlog: Layers,
   tasks: ListTodo,
   default: Inbox,
 } as const;
