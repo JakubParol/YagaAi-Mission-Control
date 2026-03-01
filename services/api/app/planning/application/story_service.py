@@ -106,6 +106,9 @@ class StoryService:
             elif existing.status == ItemStatus.DONE:
                 data["completed_at"] = None
 
+            if new_status == ItemStatus.IN_PROGRESS and existing.started_at is None:
+                data["started_at"] = utc_now()
+
         if "epic_id" in data and data["epic_id"] is not None:
             if not await self._story_repo.epic_exists(data["epic_id"]):
                 raise ValidationError(f"Epic {data['epic_id']} does not exist")

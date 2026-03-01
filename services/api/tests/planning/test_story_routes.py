@@ -363,6 +363,27 @@ def test_update_story_status_away_from_done_clears_completed_at(client) -> None:
     assert data["completed_at"] is None
 
 
+def test_update_story_in_progress_sets_started_at(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    )
+    story_id = create_resp.json()["data"]["id"]
+    assert create_resp.json()["data"]["started_at"] is None
+
+    resp = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "IN_PROGRESS"})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["status"] == "IN_PROGRESS"
+    assert data["started_at"] is not None
+
+    # started_at should not change on subsequent status updates
+    first_started = data["started_at"]
+    resp2 = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "CODE_REVIEW"})
+    resp3 = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "IN_PROGRESS"})
+    assert resp3.json()["data"]["started_at"] == first_started
+
+
 def test_update_story_not_found(client) -> None:
     resp = client.patch("/v1/planning/stories/nope", json={"title": "X"})
     assert resp.status_code == 404
