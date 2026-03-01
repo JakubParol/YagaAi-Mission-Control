@@ -242,7 +242,7 @@ export default function BacklogPage() {
 
     fetch(
       apiUrl(
-        `/v1/planning/backlogs?project_id=${singleProjectId}&sort=-kind,-status&limit=100`,
+        `/v1/planning/backlogs?project_id=${singleProjectId}&limit=100`,
       ),
     )
       .then((res) => {
