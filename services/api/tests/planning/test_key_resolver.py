@@ -27,9 +27,7 @@ async def _call_resolver(
     from app.planning.dependencies import resolve_project_key
 
     mock_db = AsyncMock()
-    with patch(
-        "app.planning.dependencies.SqliteProjectRepository"
-    ) as mock_repo_cls:
+    with patch("app.planning.dependencies.SqliteProjectRepository") as mock_repo_cls:
         repo_instance = AsyncMock()
         mock_repo_cls.return_value = repo_instance
 
@@ -40,9 +38,7 @@ async def _call_resolver(
 
         repo_instance.get_by_key = fake_get_by_key
 
-        return await resolve_project_key(
-            project_id=project_id, project_key=project_key, db=mock_db
-        )
+        return await resolve_project_key(project_id=project_id, project_key=project_key, db=mock_db)
 
 
 @pytest.mark.asyncio
