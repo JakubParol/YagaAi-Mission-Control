@@ -31,6 +31,13 @@ class EpicService:
         story_count = await self._epic_repo.get_story_count(epic_id)
         return epic, story_count
 
+    async def get_epic_by_key(self, key: str) -> tuple[Epic, int]:
+        epic = await self._epic_repo.get_by_key(key)
+        if not epic:
+            raise NotFoundError(f"Epic with key '{key}' not found")
+        story_count = await self._epic_repo.get_story_count(epic.id)
+        return epic, story_count
+
     async def create_epic(
         self,
         *,

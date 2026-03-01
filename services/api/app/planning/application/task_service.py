@@ -45,6 +45,13 @@ class TaskService:
         assignments = await self._task_repo.get_assignments(task_id)
         return task, assignments
 
+    async def get_task_by_key(self, key: str) -> tuple[Task, list[TaskAssignment]]:
+        task = await self._task_repo.get_by_key(key)
+        if not task:
+            raise NotFoundError(f"Task with key '{key}' not found")
+        assignments = await self._task_repo.get_assignments(task.id)
+        return task, assignments
+
     async def create_task(
         self,
         *,

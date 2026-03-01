@@ -193,6 +193,12 @@ Query: `project_id`, `project_key`, `status`, `is_blocked`, `sort`, `limit`, `of
 
 `project_key` — same behavior as stories (see above).
 
+#### `GET /v1/planning/epics/by-key/{key}` — Get epic by key
+
+Returns the same response as `GET .../epics/{id}`. Key lookup is case-insensitive.
+
+Returns `404` if no epic matches the key.
+
 #### `GET .../epics/{id}` — Get epic
 
 #### `PATCH .../epics/{id}` — Update epic
@@ -235,6 +241,12 @@ Request:
 Query: `project_id`, `project_key`, `epic_id`, `status`, `is_blocked`, `story_type`, `sort`, `limit`, `offset`.
 
 `project_key` resolves a human-readable key (e.g. `MC`) to `project_id`. Takes precedence over `project_id` if both provided. Returns 404 if key not found. Case-insensitive.
+
+#### `GET /v1/planning/stories/by-key/{key}` — Get story by key
+
+Returns the same response as `GET /v1/planning/stories/{id}`. Key lookup is case-insensitive.
+
+Returns `404` if no story matches the key.
 
 #### `GET /v1/planning/stories/{id}` — Get story
 
@@ -282,6 +294,12 @@ Request:
 Query: `project_id`, `project_key`, `story_id`, `status`, `is_blocked`, `task_type`, `current_assignee_agent_id`, `sort`, `limit`, `offset`.
 
 `project_key` — same behavior as stories (see above).
+
+#### `GET /v1/planning/tasks/by-key/{key}` — Get task by key
+
+Returns the same response as `GET /v1/planning/tasks/{id}`. Key lookup is case-insensitive.
+
+Returns `404` if no task matches the key.
 
 #### `GET /v1/planning/tasks/{id}` — Get task
 
@@ -381,7 +399,7 @@ Returns `200`.
 
 Returns the first active sprint (`kind=SPRINT`, `status=ACTIVE`) for a project, including its stories ordered by backlog position.
 
-Query (required): `project_id`.
+Query: `project_id` or `project_key` (at least one required). `project_key` resolves to `project_id` (case-insensitive).
 
 Response `200`:
 ```jsonc

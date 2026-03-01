@@ -1211,6 +1211,10 @@ class SqliteTaskRepository(TaskRepository):
         row = await _fetch_one(self._db, "SELECT * FROM tasks WHERE id = ?", [task_id])
         return _row_to_task(row) if row else None
 
+    async def get_by_key(self, key: str) -> Task | None:
+        row = await _fetch_one(self._db, "SELECT * FROM tasks WHERE key = ?", [key.upper()])
+        return _row_to_task(row) if row else None
+
     async def create(self, task: Task) -> Task:
         await self._db.execute(
             """INSERT INTO tasks (id, project_id, story_id, key, title, objective,
