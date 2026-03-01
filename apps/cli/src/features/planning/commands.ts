@@ -17,8 +17,11 @@ import {
 interface CommonFilterOptions {
   filter?: string[];
   projectId?: string;
+  projectKey?: string;
   epicId?: string;
+  epicKey?: string;
   storyId?: string;
+  storyKey?: string;
   status?: string;
   kind?: string;
   source?: string;
@@ -72,9 +75,12 @@ type TaskAssignmentsOptions = SelectorOptions;
 
 function addSelectConvenienceOptions(command: Command): Command {
   return command
-    .option("--project-id <id>", "project context/filter")
-    .option("--epic-id <id>", "epic filter")
-    .option("--story-id <id>", "story filter")
+    .option("--project-id <id>", "filter by project UUID")
+    .option("--project-key <key>", "filter by project key (e.g. MC)")
+    .option("--epic-id <id>", "filter by epic UUID")
+    .option("--epic-key <key>", "filter by epic key (e.g. MC-1)")
+    .option("--story-id <id>", "filter by story UUID")
+    .option("--story-key <key>", "filter by story key (e.g. MC-42)")
     .option("--status <status>", "status filter")
     .option("--kind <kind>", "kind filter")
     .option("--source <source>", "source filter")
@@ -116,7 +122,22 @@ function mergeQuery(
   return target;
 }
 
+function validateMutuallyExclusive(
+  idValue: string | undefined,
+  keyValue: string | undefined,
+  idFlag: string,
+  keyFlag: string,
+): void {
+  if (idValue !== undefined && keyValue !== undefined) {
+    throw new CliUsageError(`${idFlag} and ${keyFlag} are mutually exclusive.`);
+  }
+}
+
 function buildConvenienceQuery(opts: CommonFilterOptions): Record<string, string> {
+  validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
+  validateMutuallyExclusive(opts.epicId, opts.epicKey, "--epic-id", "--epic-key");
+  validateMutuallyExclusive(opts.storyId, opts.storyKey, "--story-id", "--story-key");
+
   const query: Record<string, string> = {};
 
   const assign = (key: string, value: string | undefined): void => {
@@ -129,8 +150,11 @@ function buildConvenienceQuery(opts: CommonFilterOptions): Record<string, string
   };
 
   assign("project_id", opts.projectId);
+  assign("project_key", opts.projectKey);
   assign("epic_id", opts.epicId);
+  assign("epic_key", opts.epicKey);
   assign("story_id", opts.storyId);
+  assign("story_key", opts.storyKey);
   assign("status", opts.status);
   assign("kind", opts.kind);
   assign("source", opts.source);
@@ -158,7 +182,7 @@ function resolvePathContext(
 
   if (spec.requiredContext.includes("projectId") && !projectId) {
     throw new CliUsageError(
-      `${spec.name} command requires --project-id because API path is nested by project.`,
+      `${spec.name} command requires --project-id or --project-key because API path is nested by project.`,
     );
   }
 
