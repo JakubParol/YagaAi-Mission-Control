@@ -1,7 +1,8 @@
 import { CliUsageError } from "./errors";
 
 export function collectOption(value: string, previous: string[] = []): string[] {
-  return [...previous, value];
+  previous.push(value);
+  return previous;
 }
 
 export function parseKeyValue(raw: string): { key: string; value: string } {

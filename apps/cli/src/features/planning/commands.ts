@@ -2,6 +2,7 @@ import { Command } from "commander";
 
 import { CliUsageError } from "../../core/errors";
 import { unwrapEnvelope } from "../../core/envelope";
+import type { ApiClient } from "../../core/http";
 import { collectOption, parseIntegerOption, parseKeyValueList } from "../../core/kv";
 import { buildPayload } from "../../core/payload";
 import { printPayload } from "../../core/output";
@@ -247,8 +248,7 @@ function ensureSingleMatch(resourceName: string, payload: unknown): string {
 async function resolveTargetId(
   spec: PlanningResourceSpec,
   opts: SelectorOptions,
-  getContext: ContextFactory,
-  command: Command,
+  client: ApiClient,
 ): Promise<{ id: string; ctx: PathContext }> {
   if (opts.id) {
     const quickCtx = resolvePathContext(spec, {}, opts.projectId);
@@ -260,7 +260,6 @@ async function resolveTargetId(
     throw new CliUsageError("Provide --id or at least one selector via --by field=value.");
   }
 
-  const client = getContext(command).client;
   const listPath = spec.listPath(ctx);
   const payload = await client.get(listPath, {
     query: {
@@ -302,7 +301,7 @@ function registerStandardResourceCommands(
       .option("--by <field=value>", "selector filter (repeatable)", collectOption, []),
   ).action(async (opts: SelectorOptions, command: Command) => {
     const ctx = getContext(command);
-    const target = await resolveTargetId(spec, opts, getContext, command);
+    const target = await resolveTargetId(spec, opts, ctx.client);
     const payload = await ctx.client.get(spec.itemPath(target.id, target.ctx));
     printPayload(payload, ctx.config.output);
   });
@@ -338,7 +337,7 @@ function registerStandardResourceCommands(
     ),
   ).action(async (opts: MutationOptions, command: Command) => {
     const ctx = getContext(command);
-    const target = await resolveTargetId(spec, opts, getContext, command);
+    const target = await resolveTargetId(spec, opts, ctx.client);
     const payloadBody = buildPayload({
       json: opts.json,
       file: opts.file,
@@ -365,7 +364,7 @@ function registerStandardResourceCommands(
     }
 
     const ctx = getContext(command);
-    const target = await resolveTargetId(spec, opts, getContext, command);
+    const target = await resolveTargetId(spec, opts, ctx.client);
     const payload = await ctx.client.delete(spec.itemPath(target.id, target.ctx));
     printPayload(payload, ctx.config.output);
   });
@@ -533,7 +532,7 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
       .option("--reason <text>", "assignment reason"),
   ).action(async (opts: TaskAssignOptions, command: Command) => {
     const ctx = getContext(command);
-    const target = await resolveTargetId(taskSpec, opts, getContext, command);
+    const target = await resolveTargetId(taskSpec, opts, ctx.client);
     const payload = await ctx.client.post(
       `/v1/planning/tasks/${target.id}/assignments`,
       {
@@ -554,7 +553,7 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
       .option("--by <field=value>", "task selector filter (repeatable)", collectOption, []),
   ).action(async (opts: TaskUnassignOptions, command: Command) => {
     const ctx = getContext(command);
-    const target = await resolveTargetId(taskSpec, opts, getContext, command);
+    const target = await resolveTargetId(taskSpec, opts, ctx.client);
     const payload = await ctx.client.delete(
       `/v1/planning/tasks/${target.id}/assignments/current`,
     );
@@ -569,7 +568,7 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
       .option("--by <field=value>", "task selector filter (repeatable)", collectOption, []),
   ).action(async (opts: TaskAssignmentsOptions, command: Command) => {
     const ctx = getContext(command);
-    const target = await resolveTargetId(taskSpec, opts, getContext, command);
+    const target = await resolveTargetId(taskSpec, opts, ctx.client);
     const payload = await ctx.client.get(
       `/v1/planning/tasks/${target.id}/assignments`,
     );

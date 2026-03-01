@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { isObject } from "./envelope";
 import { CliUsageError } from "./errors";
 import { parseKeyValueList } from "./kv";
 
@@ -7,10 +8,6 @@ interface PayloadInput {
   json?: string;
   file?: string;
   sets?: string[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function parseJson(raw: string, source: string): unknown {
@@ -33,7 +30,10 @@ function coerceValue(raw: string): unknown {
       return num;
     }
   }
-  if ((value.startsWith("{") && value.endsWith("}")) || (value.startsWith("[") && value.endsWith("]"))) {
+  const isJsonLike =
+    (value.startsWith("{") && value.endsWith("}")) ||
+    (value.startsWith("[") && value.endsWith("]"));
+  if (isJsonLike) {
     return parseJson(value, "--set value");
   }
   return value;
@@ -56,7 +56,7 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
 
   if (hasJson) {
     const parsed = parseJson(input.json!, "--json");
-    if (!isRecord(parsed)) {
+    if (!isObject(parsed)) {
       throw new CliUsageError("--json payload must be a JSON object.");
     }
     base = { ...parsed };
@@ -66,7 +66,7 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
     const path = input.file!.trim();
     const content = readFileSync(path, "utf8");
     const parsed = parseJson(content, path);
-    if (!isRecord(parsed)) {
+    if (!isObject(parsed)) {
       throw new CliUsageError("JSON file payload must contain an object.");
     }
     base = { ...parsed };

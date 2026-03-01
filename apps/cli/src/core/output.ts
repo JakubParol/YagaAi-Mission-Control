@@ -51,10 +51,10 @@ export function printPayload(payload: unknown, outputMode: OutputMode): void {
   }
 
   if (meta !== undefined && meta !== null) {
-    if (isObject(meta)) {
+    if (isObject(meta) && Object.keys(meta).length > 0) {
       console.log("meta:");
       console.table([flattenRow(meta)]);
-    } else {
+    } else if (!isObject(meta)) {
       console.log(`meta: ${stringifyValue(meta)}`);
     }
   }

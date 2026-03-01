@@ -1,5 +1,7 @@
 import process from "node:process";
 
+import { CliUsageError } from "./errors";
+
 export type OutputMode = "table" | "json";
 
 export interface GlobalCliOptions {
@@ -34,7 +36,7 @@ function parseOutputMode(value: string | undefined): OutputMode {
   if (raw === "table" || raw === "json") {
     return raw;
   }
-  throw new Error(`Invalid output mode '${value}'. Expected: table or json.`);
+  throw new CliUsageError(`Invalid output mode '${value}'. Expected: table or json.`);
 }
 
 function parseTimeoutSeconds(value: number | string | undefined): number {
@@ -43,7 +45,7 @@ function parseTimeoutSeconds(value: number | string | undefined): number {
   }
   const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid timeout value '${value}'. It must be a positive integer.`);
+    throw new CliUsageError(`Invalid timeout value '${value}'. It must be a positive integer.`);
   }
   return parsed;
 }
