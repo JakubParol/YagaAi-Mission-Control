@@ -1,7 +1,7 @@
 # API Contracts — Mission Control v1
 
-**Status:** Draft v1.1
-**Date:** 2026-02-27
+**Status:** Draft v1.2
+**Date:** 2026-03-01
 **Applies to:** `services/api` — all `/v1` module endpoints
 
 ---
@@ -369,6 +369,46 @@ Returns `204`.
 ```
 
 Returns `200`.
+
+#### `GET /v1/planning/backlogs/active-sprint` — Get active sprint board
+
+Returns the first active sprint (`kind=SPRINT`, `status=ACTIVE`) for a project, including its stories ordered by backlog position.
+
+Query (required): `project_id`.
+
+Response `200`:
+```jsonc
+{
+  "data": {
+    "backlog": {
+      "id": "...",
+      "project_id": "...",
+      "name": "Sprint 1",
+      "kind": "SPRINT",
+      "status": "ACTIVE",
+      "is_default": false,
+      "goal": "Ship MVP",
+      "start_date": "2026-03-01",
+      "end_date": "2026-03-15",
+      // ... standard backlog fields
+    },
+    "stories": [
+      {
+        "id": "...",
+        "key": "MC-42",
+        "title": "Implement board view",
+        "status": "IN_PROGRESS",
+        "priority": 1,
+        "story_type": "feature",
+        "position": 0
+      }
+    ]
+  }
+}
+```
+
+Returns `404` if no active sprint exists for the given project.
+Returns `422` if `project_id` is missing.
 
 ---
 

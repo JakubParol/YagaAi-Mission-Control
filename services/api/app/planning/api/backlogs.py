@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from app.planning.api.schemas import (
+    ActiveSprintResponse,
     BacklogAddStory,
     BacklogAddTask,
     BacklogCreate,
@@ -10,6 +11,7 @@ from app.planning.api.schemas import (
     BacklogStoryItemResponse,
     BacklogTaskItemResponse,
     BacklogUpdate,
+    SprintStoryResponse,
 )
 from app.planning.application.backlog_service import BacklogService
 from app.planning.dependencies import get_backlog_service
@@ -60,6 +62,20 @@ async def list_backlogs(
     return ListEnvelope(
         data=[BacklogResponse(**b.__dict__) for b in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
+    )
+
+
+@router.get("/active-sprint")
+async def get_active_sprint(
+    project_id: str = Query(...),
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[ActiveSprintResponse]:
+    backlog, stories = await service.get_active_sprint(project_id)
+    return Envelope(
+        data=ActiveSprintResponse(
+            backlog=BacklogResponse(**backlog.__dict__),
+            stories=[SprintStoryResponse(**s) for s in stories],
+        )
     )
 
 

@@ -216,6 +216,21 @@ class BacklogReorderResponse(BaseModel):
     updated_task_count: int
 
 
+class SprintStoryResponse(BaseModel):
+    id: str
+    key: str | None
+    title: str
+    status: str
+    priority: int | None
+    story_type: str
+    position: int
+
+
+class ActiveSprintResponse(BaseModel):
+    backlog: BacklogResponse
+    stories: list[SprintStoryResponse]
+
+
 # ---------------------------------------------------------------------------
 # Stories
 # ---------------------------------------------------------------------------

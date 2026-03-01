@@ -11,6 +11,8 @@ from app.planning.domain.models import (
 from app.shared.api.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.shared.utils import new_uuid, utc_now
 
+ActiveSprintResult = tuple[Backlog, list[dict[str, Any]]]
+
 
 class BacklogService:
     def __init__(self, repo: BacklogRepository) -> None:
@@ -195,6 +197,12 @@ class BacklogService:
             if task_backlog_id != backlog_id:
                 raise NotFoundError(f"Task {row['task_id']} is not in backlog {backlog_id}")
         return await self._repo.reorder_items(backlog_id, stories, tasks)
+
+    async def get_active_sprint(self, project_id: str) -> ActiveSprintResult:
+        backlog, stories = await self._repo.get_active_sprint_with_stories(project_id)
+        if not backlog:
+            raise NotFoundError(f"No active sprint found for project {project_id}")
+        return backlog, stories
 
     def _validate_backlog_scope(
         self,
