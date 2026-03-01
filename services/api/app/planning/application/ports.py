@@ -31,6 +31,9 @@ class ProjectRepository(ABC):
     async def get_by_id(self, project_id: str) -> Project | None: ...
 
     @abstractmethod
+    async def get_by_key(self, key: str) -> Project | None: ...
+
+    @abstractmethod
     async def key_exists(self, key: str) -> bool: ...
 
     @abstractmethod
