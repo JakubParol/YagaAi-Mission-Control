@@ -395,6 +395,33 @@ Returns `204`.
 
 Returns `200`.
 
+#### `GET /v1/planning/backlogs/{id}/stories` — List stories in a backlog
+
+Returns stories belonging to the given backlog, ordered by `position ASC`.
+Story objects match the active sprint story shape (`id`, `key`, `title`, `status`, `priority`, `story_type`, `position`, `task_count`, `done_task_count`).
+
+Response `200`:
+```jsonc
+{
+  "data": [
+    {
+      "id": "...",
+      "key": "MC-42",
+      "title": "Implement board view",
+      "status": "IN_PROGRESS",
+      "priority": 1,
+      "story_type": "feature",
+      "position": 0,
+      "task_count": 3,
+      "done_task_count": 1
+    }
+  ]
+}
+```
+
+Returns `404` if backlog does not exist.
+Returns empty list when backlog has no stories.
+
 #### `GET /v1/planning/backlogs/active-sprint` — Get active sprint board
 
 Returns the first active sprint (`kind=SPRINT`, `status=ACTIVE`) for a project, including its stories ordered by backlog position.

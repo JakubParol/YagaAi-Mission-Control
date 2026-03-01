@@ -131,6 +131,15 @@ async def add_story_to_backlog(
     )
 
 
+@router.get("/{backlog_id}/stories")
+async def list_backlog_stories(
+    backlog_id: str,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[list[SprintStoryResponse]]:
+    stories = await service.get_backlog_stories(backlog_id)
+    return Envelope(data=[SprintStoryResponse(**s) for s in stories])
+
+
 @router.delete("/{backlog_id}/stories/{story_id}", status_code=204)
 async def remove_story_from_backlog(
     backlog_id: str,

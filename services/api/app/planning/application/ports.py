@@ -263,6 +263,9 @@ class BacklogRepository(ABC):
     ) -> dict[str, int]: ...
 
     @abstractmethod
+    async def list_backlog_stories(self, backlog_id: str) -> list[dict[str, Any]]: ...
+
+    @abstractmethod
     async def get_active_sprint_with_stories(
         self, project_id: str
     ) -> tuple[Backlog | None, list[dict[str, Any]]]: ...

@@ -198,6 +198,10 @@ class BacklogService:
                 raise NotFoundError(f"Task {row['task_id']} is not in backlog {backlog_id}")
         return await self._repo.reorder_items(backlog_id, stories, tasks)
 
+    async def get_backlog_stories(self, backlog_id: str) -> list[dict[str, Any]]:
+        await self.get_backlog(backlog_id)
+        return await self._repo.list_backlog_stories(backlog_id)
+
     async def get_active_sprint(self, project_id: str) -> ActiveSprintResult:
         backlog, stories = await self._repo.get_active_sprint_with_stories(project_id)
         if not backlog:
