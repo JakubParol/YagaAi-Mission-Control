@@ -10,7 +10,7 @@ from app.planning.api.schemas import (
     TaskUpdate,
 )
 from app.planning.application.task_service import TaskService
-from app.planning.dependencies import get_task_service
+from app.planning.dependencies import get_task_service, resolve_project_key
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/tasks", tags=["planning/tasks"])
@@ -38,7 +38,7 @@ async def create_task(
 async def list_tasks(
     service: TaskService = Depends(get_task_service),
     key: str | None = Query(None),
-    project_id: str | None = Query(None),
+    project_id: str | None = Depends(resolve_project_key),
     story_id: str | None = Query(None),
     status: str | None = Query(None),
     assignee_id: str | None = Query(None),

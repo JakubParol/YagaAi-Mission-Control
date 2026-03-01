@@ -14,7 +14,7 @@ from app.planning.api.schemas import (
     SprintStoryResponse,
 )
 from app.planning.application.backlog_service import BacklogService
-from app.planning.dependencies import get_backlog_service
+from app.planning.dependencies import get_backlog_service, resolve_project_key
 from app.planning.domain.models import BacklogKind
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
@@ -40,7 +40,7 @@ async def create_backlog(
 @router.get("")
 async def list_backlogs(
     service: BacklogService = Depends(get_backlog_service),
-    project_id: str | None = Query(None),
+    project_id: str | None = Depends(resolve_project_key),
     status: str | None = Query(None),
     kind: str | None = Query(None),
     sort: str = Query("-created_at"),

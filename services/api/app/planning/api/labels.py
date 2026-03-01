@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.planning.api.schemas import LabelCreate, LabelResponse
 from app.planning.application.label_service import LabelService
-from app.planning.dependencies import get_label_service
+from app.planning.dependencies import get_label_service, resolve_project_key
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/labels", tags=["planning/labels"])
@@ -20,7 +20,7 @@ async def create_label(
 @router.get("")
 async def list_labels(
     service: LabelService = Depends(get_label_service),
-    project_id: str | None = Query(None),
+    project_id: str | None = Depends(resolve_project_key),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[LabelResponse]:

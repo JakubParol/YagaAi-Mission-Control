@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.planning.api.schemas import EpicCreate, EpicDetailResponse, EpicResponse, EpicUpdate
 from app.planning.application.epic_service import EpicService
-from app.planning.dependencies import get_epic_service
+from app.planning.dependencies import get_epic_service, resolve_project_key
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/epics", tags=["planning/epics"])
@@ -26,7 +26,7 @@ async def create_epic(
 async def list_epics(
     service: EpicService = Depends(get_epic_service),
     key: str | None = Query(None),
-    project_id: str | None = Query(None),
+    project_id: str | None = Depends(resolve_project_key),
     status: str | None = Query(None),
     sort: str = Query("-created_at"),
     limit: int = Query(20, ge=1, le=100),
