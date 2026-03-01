@@ -15,6 +15,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "cli-table3": "^0.6.5",
     "commander": "^13.1.0"
   },
   "devDependencies": {

@@ -72,9 +72,9 @@ export const PLANNING_RESOURCES: Record<PlanningResourceName, PlanningResourceSp
   },
   epic: {
     name: "epic",
-    listPath: (ctx) => `/v1/planning/projects/${ctx.projectId}/epics`,
-    itemPath: (id, ctx) => `/v1/planning/projects/${ctx.projectId}/epics/${id}`,
-    requiredContext: ["projectId"],
+    listPath: () => "/v1/planning/epics",
+    itemPath: (id) => `/v1/planning/epics/${id}`,
+    requiredContext: [],
     defaultSort: "-created_at",
   },
 };
