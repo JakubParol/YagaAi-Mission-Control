@@ -122,10 +122,9 @@ class StoryService:
         return updated
 
     async def delete_story(self, story_id: str) -> None:
-        existing = await self._story_repo.get_by_id(story_id)
-        if not existing:
+        deleted = await self._story_repo.delete(story_id)
+        if not deleted:
             raise NotFoundError(f"Story {story_id} not found")
-        await self._story_repo.delete(story_id)
 
     async def attach_label(self, story_id: str, label_id: str) -> None:
         if not await self._story_repo.get_by_id(story_id):

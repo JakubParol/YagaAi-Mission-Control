@@ -5,7 +5,7 @@ Coverage:
 - POST /v1/planning/stories — create with/without project, with epic, key generation
 - GET /v1/planning/stories — list with project/epic/status filters, pagination, sorting
 - GET /v1/planning/stories/{id} — single story with task_count aggregation
-- PATCH /v1/planning/stories/{id} — update fields, status override, completed_at lifecycle
+- PATCH /v1/planning/stories/{id} — update fields, status transitions, completed_at/started_at lifecycle
 - DELETE /v1/planning/stories/{id} — hard delete, ON DELETE SET NULL on tasks
 - POST /v1/planning/stories/{id}/labels — attach label (conflict, not found)
 - DELETE /v1/planning/stories/{id}/labels/{label_id} — detach label

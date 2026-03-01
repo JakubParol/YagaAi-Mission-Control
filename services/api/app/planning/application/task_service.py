@@ -101,6 +101,8 @@ class TaskService:
         if not existing:
             raise NotFoundError(f"Task {task_id} not found")
 
+        now = utc_now()
+
         if "status" in data:
             new_status = data["status"]
             valid = {s.value for s in ItemStatus}
@@ -110,20 +112,20 @@ class TaskService:
                 )
 
             if new_status == ItemStatus.DONE:
-                data["completed_at"] = utc_now()
-                await self._task_repo.close_assignment(task_id, utc_now())
+                data["completed_at"] = now
+                await self._task_repo.close_assignment(task_id, now)
             elif existing.status == ItemStatus.DONE:
                 data["completed_at"] = None
 
             if new_status == ItemStatus.IN_PROGRESS and existing.started_at is None:
-                data["started_at"] = utc_now()
+                data["started_at"] = now
 
         if "story_id" in data and data["story_id"] is not None:
             if not await self._task_repo.story_exists(data["story_id"]):
                 raise ValidationError(f"Story {data['story_id']} does not exist")
 
         data["updated_by"] = actor
-        data["updated_at"] = utc_now()
+        data["updated_at"] = now
 
         updated = await self._task_repo.update(task_id, data)
         if not updated:
@@ -132,10 +134,9 @@ class TaskService:
         return updated
 
     async def delete_task(self, task_id: str) -> None:
-        existing = await self._task_repo.get_by_id(task_id)
-        if not existing:
+        deleted = await self._task_repo.delete(task_id)
+        if not deleted:
             raise NotFoundError(f"Task {task_id} not found")
-        await self._task_repo.delete(task_id)
 
     async def attach_label(self, task_id: str, label_id: str) -> None:
         if not await self._task_repo.get_by_id(task_id):

@@ -580,7 +580,8 @@ def test_task_status_change_does_not_affect_parent_story(client) -> None:
     ).json()["data"]["id"]
 
     # Move task to DONE — story stays TODO (no derivation)
-    client.patch(f"/v1/planning/tasks/{t1_id}", json={"status": "DONE"})
+    task_resp = client.patch(f"/v1/planning/tasks/{t1_id}", json={"status": "DONE"})
+    assert task_resp.json()["data"]["status"] == "DONE"
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
     assert story["status"] == "TODO"
 
@@ -619,7 +620,8 @@ def test_task_in_progress_does_not_affect_story_started_at(client) -> None:
     ).json()["data"]["id"]
 
     # Move task to IN_PROGRESS — story should NOT change
-    client.patch(f"/v1/planning/tasks/{task_id}", json={"status": "IN_PROGRESS"})
+    task_resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"status": "IN_PROGRESS"})
+    assert task_resp.json()["data"]["status"] == "IN_PROGRESS"
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
     assert story["status"] == "TODO"
     assert story["started_at"] is None
