@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.planning.application.ports import StoryRepository
-from app.planning.domain.models import ItemStatus, StatusMode, Story
+from app.planning.domain.models import ItemStatus, Story
 from app.shared.api.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.utils import new_uuid, utc_now
 
@@ -72,9 +72,6 @@ class StoryService:
             description=description,
             story_type=story_type,
             status=ItemStatus.TODO,
-            status_mode=StatusMode.MANUAL,
-            status_override=None,
-            status_override_set_at=None,
             is_blocked=False,
             blocked_reason=None,
             priority=priority,
@@ -103,14 +100,14 @@ class StoryService:
                     f"Invalid story status '{new_status}'. Allowed: {', '.join(sorted(valid))}"
                 )
             data["status"] = new_status
-            data["status_override"] = new_status
-            data["status_override_set_at"] = utc_now()
-            data["status_mode"] = StatusMode.MANUAL
 
             if new_status == ItemStatus.DONE:
                 data["completed_at"] = utc_now()
             elif existing.status == ItemStatus.DONE:
                 data["completed_at"] = None
+
+            if new_status == ItemStatus.IN_PROGRESS and existing.started_at is None:
+                data["started_at"] = utc_now()
 
         if "epic_id" in data and data["epic_id"] is not None:
             if not await self._story_repo.epic_exists(data["epic_id"]):
@@ -125,10 +122,9 @@ class StoryService:
         return updated
 
     async def delete_story(self, story_id: str) -> None:
-        existing = await self._story_repo.get_by_id(story_id)
-        if not existing:
+        deleted = await self._story_repo.delete(story_id)
+        if not deleted:
             raise NotFoundError(f"Story {story_id} not found")
-        await self._story_repo.delete(story_id)
 
     async def attach_label(self, story_id: str, label_id: str) -> None:
         if not await self._story_repo.get_by_id(story_id):

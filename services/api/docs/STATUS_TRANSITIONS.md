@@ -32,26 +32,11 @@ Validation: reject unknown status values (400).
 
 ---
 
-## 3) Story Status (Derived + Override)
+## 3) Story Status
 
-| Condition | Behavior |
-|---|---|
-| Story has **no tasks** | Status is **manual** — set directly via PATCH. |
-| Story has **tasks** | Status is **derived** from child tasks (see derivation below). Manual override allowed. |
+Story status is always **manual** — set directly via PATCH. It is never derived from child tasks.
 
-### Derivation Logic
-
-| Child task states | Derived story status |
-|---|---|
-| All `TODO` | `TODO` |
-| All `DONE` | `DONE` |
-| Any mix | `IN_PROGRESS` |
-
-### Override
-
-- Client can PATCH `status` on a derived story → sets `status_override` + `status_override_set_at`.
-- Override is **temporary**: cleared on the next child task status change, at which point derivation resumes.
-- API response includes both `status` (effective) and `status_mode` (`MANUAL` | `DERIVED`) so clients know the source.
+No `status_mode`, `status_override`, or `status_override_set_at` fields exist on stories.
 
 ---
 
@@ -94,7 +79,7 @@ Override expires on next child story status change.
 |---|---|
 | Task status → `DONE` | Close active assignment, set `completed_at` |
 | Task status away from `DONE` | Clear `completed_at` |
-| Task status change (any) | Re-derive parent story status, clear story override |
+| Task status change (any) | No side effects on parent story |
 | Story status change (any) | Re-derive parent epic status, clear epic override |
 | Story/task gets `project_id` set | Auto-generate `key`, remove from global backlog |
 | Project created | Auto-create default backlog |

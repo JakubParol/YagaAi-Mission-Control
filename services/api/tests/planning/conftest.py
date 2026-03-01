@@ -84,9 +84,6 @@ def _setup_test_db(tmp_path, monkeypatch):
           description TEXT,
           story_type TEXT NOT NULL,
           status TEXT NOT NULL,
-          status_mode TEXT NOT NULL,
-          status_override TEXT,
-          status_override_set_at TEXT,
           is_blocked INTEGER NOT NULL DEFAULT 0,
           blocked_reason TEXT,
           priority INTEGER,
@@ -225,12 +222,12 @@ def _setup_test_db(tmp_path, monkeypatch):
           ('b2', 'p1', 'P1 Sprint', 'SPRINT', 'ACTIVE', 0, '{TS}', '{TS}'),
           ('bg', NULL, 'Global Backlog', 'BACKLOG', 'ACTIVE', 0, '{TS}', '{TS}');
 
-        INSERT INTO stories (id, project_id, title, story_type, status, status_mode, created_at, updated_at)
+        INSERT INTO stories (id, project_id, title, story_type, status, created_at, updated_at)
         VALUES
-          ('s1', 'p1', 'Story 1', 'USER_STORY', 'TODO', 'MANUAL', '{TS}', '{TS}'),
-          ('s2', 'p1', 'Story 2', 'USER_STORY', 'TODO', 'MANUAL', '{TS}', '{TS}'),
-          ('sp2', 'p2', 'Story P2', 'USER_STORY', 'TODO', 'MANUAL', '{TS}', '{TS}'),
-          ('sg', NULL, 'Global Story', 'USER_STORY', 'TODO', 'MANUAL', '{TS}', '{TS}');
+          ('s1', 'p1', 'Story 1', 'USER_STORY', 'TODO', '{TS}', '{TS}'),
+          ('s2', 'p1', 'Story 2', 'USER_STORY', 'TODO', '{TS}', '{TS}'),
+          ('sp2', 'p2', 'Story P2', 'USER_STORY', 'TODO', '{TS}', '{TS}'),
+          ('sg', NULL, 'Global Story', 'USER_STORY', 'TODO', '{TS}', '{TS}');
 
         INSERT INTO tasks (id, project_id, title, task_type, status, created_at, updated_at)
         VALUES

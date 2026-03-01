@@ -9,7 +9,6 @@ import {
 
 import type { ItemStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import {
   STATUS_STYLE,
   STATUS_LABEL,
@@ -28,7 +27,6 @@ export interface StoryDetail {
   description: string | null;
   story_type: string;
   status: ItemStatus;
-  status_mode: string;
   is_blocked: boolean;
   blocked_reason: string | null;
   priority: number | null;
@@ -242,12 +240,6 @@ export function StoryView({
 
         <MetaRow label="Priority">
           <PriorityLabel priority={story.priority} />
-        </MetaRow>
-
-        <MetaRow label="Status mode">
-          <Badge variant="secondary" className="text-[10px] uppercase">
-            {story.status_mode}
-          </Badge>
         </MetaRow>
 
         <MetaRow label="Created">

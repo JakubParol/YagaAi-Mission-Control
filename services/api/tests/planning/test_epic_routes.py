@@ -199,13 +199,13 @@ def test_get_epic_includes_story_count(client, _setup_test_db) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute(
         "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
-        "status_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-count-1", "p1", epic_id, "Story 1", "USER_STORY", "TODO", "MANUAL", TS, TS),
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-count-1", "p1", epic_id, "Story 1", "USER_STORY", "TODO", TS, TS),
     )
     conn.execute(
         "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
-        "status_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-count-2", "p1", epic_id, "Story 2", "USER_STORY", "TODO", "MANUAL", TS, TS),
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-count-2", "p1", epic_id, "Story 2", "USER_STORY", "TODO", TS, TS),
     )
     conn.commit()
     conn.close()
@@ -312,8 +312,8 @@ def test_delete_epic_sets_null_on_stories(client, _setup_test_db) -> None:
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute(
         "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
-        "status_mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-del-1", "p1", epic_id, "Child Story", "USER_STORY", "TODO", "MANUAL", TS, TS),
+        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-del-1", "p1", epic_id, "Child Story", "USER_STORY", "TODO", TS, TS),
     )
     conn.commit()
 

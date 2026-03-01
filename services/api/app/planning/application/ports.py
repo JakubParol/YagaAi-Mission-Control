@@ -324,6 +324,3 @@ class TaskRepository(ABC):
 
     @abstractmethod
     async def close_assignment(self, task_id: str, unassigned_at: str) -> bool: ...
-
-    @abstractmethod
-    async def get_child_task_statuses(self, story_id: str) -> list[str]: ...

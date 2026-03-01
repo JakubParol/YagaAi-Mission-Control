@@ -238,11 +238,11 @@ Query: `project_id`, `project_key`, `epic_id`, `status`, `is_blocked`, `story_ty
 
 #### `GET /v1/planning/stories/{id}` — Get story
 
-Includes computed fields: `effective_status` (derived if tasks exist), `task_count`, `tasks_done_count`.
+Includes computed fields: `task_count`.
 
 #### `PATCH /v1/planning/stories/{id}` — Update story
 
-Updatable: `project_id`, `epic_id`, `title`, `intent`, `description`, `story_type`, `status`, `status_override`, `is_blocked`, `blocked_reason`, `priority`, `metadata_json`.
+Updatable: `project_id`, `epic_id`, `title`, `intent`, `description`, `story_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `metadata_json`.
 
 Side effects:
 - Setting `project_id` on a project-less story triggers key generation and removal from global backlog.

@@ -5,7 +5,7 @@ Coverage:
 - POST /v1/planning/stories — create with/without project, with epic, key generation
 - GET /v1/planning/stories — list with project/epic/status filters, pagination, sorting
 - GET /v1/planning/stories/{id} — single story with task_count aggregation
-- PATCH /v1/planning/stories/{id} — update fields, status override, completed_at lifecycle
+- PATCH /v1/planning/stories/{id} — update fields, status transitions, completed_at/started_at lifecycle
 - DELETE /v1/planning/stories/{id} — hard delete, ON DELETE SET NULL on tasks
 - POST /v1/planning/stories/{id}/labels — attach label (conflict, not found)
 - DELETE /v1/planning/stories/{id}/labels/{label_id} — detach label
@@ -35,7 +35,6 @@ def test_create_story_with_project(client) -> None:
     assert data["title"] == "Auth Story"
     assert data["story_type"] == "USER_STORY"
     assert data["status"] == "TODO"
-    assert data["status_mode"] == "MANUAL"
     assert data["is_blocked"] is False
     assert "id" in data
     assert "created_at" in data
@@ -319,7 +318,7 @@ def test_update_story_description(client) -> None:
     assert resp.json()["data"]["description"] == "New desc"
 
 
-def test_update_story_status_sets_override(client) -> None:
+def test_update_story_status(client) -> None:
     create_resp = client.post(
         "/v1/planning/stories",
         json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
@@ -330,9 +329,8 @@ def test_update_story_status_sets_override(client) -> None:
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["status"] == "IN_PROGRESS"
-    assert data["status_mode"] == "MANUAL"
-    assert data["status_override"] == "IN_PROGRESS"
-    assert data["status_override_set_at"] is not None
+    assert "status_mode" not in data
+    assert "status_override" not in data
 
 
 def test_update_story_status_done_sets_completed_at(client) -> None:
@@ -363,6 +361,27 @@ def test_update_story_status_away_from_done_clears_completed_at(client) -> None:
     data = resp.json()["data"]
     assert data["status"] == "TODO"
     assert data["completed_at"] is None
+
+
+def test_update_story_in_progress_sets_started_at(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    )
+    story_id = create_resp.json()["data"]["id"]
+    assert create_resp.json()["data"]["started_at"] is None
+
+    resp = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "IN_PROGRESS"})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["status"] == "IN_PROGRESS"
+    assert data["started_at"] is not None
+
+    # started_at should not change on subsequent status updates
+    first_started = data["started_at"]
+    resp2 = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "CODE_REVIEW"})
+    resp3 = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "IN_PROGRESS"})
+    assert resp3.json()["data"]["started_at"] == first_started
 
 
 def test_update_story_not_found(client) -> None:
