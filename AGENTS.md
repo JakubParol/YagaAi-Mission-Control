@@ -77,7 +77,9 @@ When the user asks you to work with planning entities (projects, epics, stories,
 
 ## Task Workflow
 
-When asked to plan and implement a User Story:
+When asked to plan and implement a User Story, execute the FULL workflow end-to-end. Do NOT stop between steps unless there is a blocker that requires user intervention.
+
+### Phase 1: Implementation
 
 1. **Plan** — Prepare the implementation plan for the US.
 2. **Create tasks** — Use `mc task create` to create tasks in the US based on the plan.
@@ -86,7 +88,28 @@ When asked to plan and implement a User Story:
    - Set the task to IN_PROGRESS via `mc task update --id <uuid> --set status=IN_PROGRESS`
    - Implement and commit
    - Set the task to DONE via `mc task update --id <uuid> --set status=DONE`
-5. **Finish** — After all tasks are DONE, set the story to CODE_REVIEW via `mc story update`.
+
+### Phase 2: Pull Request
+
+5. **Create PR** — After all tasks are DONE, create a PR to `main` using `gh pr create`. Set the story to CODE_REVIEW via `mc story update`.
+
+### Phase 3: Code Review & Fix
+
+6. **Self-review** — Run `/review-pr` on your own PR. Be thorough.
+7. **Fix EVERYTHING** — Address ALL review findings, no matter how small (typos, naming, style, logic — everything). Commit and push fixes.
+8. **Re-review** — Run `/review-pr` again. Fix any remaining findings and commit. Two review rounds max.
+
+### Phase 4: Merge & Deploy
+
+9. **Merge** — Squash-merge the PR via `gh pr merge --squash --delete-branch`.
+10. **Update local** — `git checkout main && git pull`.
+11. **Deploy** — Run `./infra/deploy.sh`.
+12. **Close story** — Set the story to DONE via `mc story update`.
+
+### Blocker Protocol
+
+- If ANY step fails with an error you cannot resolve autonomously (deploy failure, merge conflict needing user input, test failure with unclear cause, etc.) — STOP, report the blocker clearly, and wait for user input.
+- Do NOT stop for routine issues you can fix yourself (lint errors, failing tests with obvious cause, review findings, etc.).
 
 
 ## Navigation
