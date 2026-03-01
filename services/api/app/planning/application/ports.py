@@ -20,6 +20,7 @@ class ProjectRepository(ABC):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         status: str | None = None,
         limit: int = 20,
         offset: int = 0,
@@ -50,6 +51,7 @@ class EpicRepository(ABC):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         status: str | None = None,
         limit: int = 20,
@@ -84,6 +86,7 @@ class AgentRepository(ABC):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         is_active: bool | None = None,
         source: str | None = None,
         limit: int = 20,
@@ -133,6 +136,7 @@ class StoryRepository(ABC):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         epic_id: str | None = None,
         status: str | None = None,
@@ -260,6 +264,7 @@ class TaskRepository(ABC):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         story_id: str | None = None,
         status: str | None = None,

@@ -38,6 +38,7 @@ class TaskService:
     async def list_tasks(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         story_id: str | None = None,
         status: str | None = None,
@@ -47,6 +48,7 @@ class TaskService:
         sort: str = "-created_at",
     ) -> tuple[list[Task], int]:
         return await self._task_repo.list_all(
+            key=key,
             project_id=project_id,
             story_id=story_id,
             status=status,

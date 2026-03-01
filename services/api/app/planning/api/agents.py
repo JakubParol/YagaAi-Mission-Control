@@ -29,6 +29,7 @@ async def create_agent(
 @router.get("")
 async def list_agents(
     service: AgentService = Depends(get_agent_service),
+    key: str | None = Query(None),
     is_active: bool | None = Query(None),
     source: str | None = Query(None),
     sort: str = Query("-created_at"),
@@ -36,7 +37,7 @@ async def list_agents(
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[AgentResponse]:
     items, total = await service.list_agents(
-        is_active=is_active, source=source, limit=limit, offset=offset, sort=sort
+        key=key, is_active=is_active, source=source, limit=limit, offset=offset, sort=sort
     )
     return ListEnvelope(
         data=[AgentResponse(**a.__dict__) for a in items],

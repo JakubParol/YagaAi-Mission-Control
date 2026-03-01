@@ -24,13 +24,14 @@ class ProjectService:
     async def list_projects(
         self,
         *,
+        key: str | None = None,
         status: str | None = None,
         limit: int = 20,
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Project], int]:
         return await self._project_repo.list_all(
-            status=status, limit=limit, offset=offset, sort=sort
+            key=key, status=status, limit=limit, offset=offset, sort=sort
         )
 
     async def get_project(self, project_id: str) -> Project:

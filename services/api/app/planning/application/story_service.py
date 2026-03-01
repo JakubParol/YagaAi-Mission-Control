@@ -13,6 +13,7 @@ class StoryService:
     async def list_stories(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         epic_id: str | None = None,
         status: str | None = None,
@@ -21,6 +22,7 @@ class StoryService:
         sort: str = "-created_at",
     ) -> tuple[list[Story], int]:
         return await self._story_repo.list_all(
+            key=key,
             project_id=project_id,
             epic_id=epic_id,
             status=status,

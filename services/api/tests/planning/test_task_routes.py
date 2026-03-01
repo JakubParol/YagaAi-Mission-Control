@@ -687,3 +687,31 @@ def test_first_task_in_progress_sets_story_started_at(client) -> None:
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
     assert story["status"] == "IN_PROGRESS"
     assert story["started_at"] is not None
+
+
+# ── Key filter ────────────────────────────────────────────────────────────
+
+
+def test_list_tasks_filter_by_key(client):
+    # Create a task with a project to get an auto-generated key
+    resp = client.post(
+        "/v1/planning/tasks",
+        json={"title": "Keyed task", "task_type": "TASK", "project_id": "p1"},
+    )
+    assert resp.status_code == 201
+    key = resp.json()["data"]["key"]
+    assert key is not None
+
+    resp = client.get(f"/v1/planning/tasks?key={key}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["key"] == key
+
+
+def test_list_tasks_filter_by_key_no_match(client):
+    resp = client.get("/v1/planning/tasks?key=NONEXISTENT-999")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 0
+    assert body["data"] == []

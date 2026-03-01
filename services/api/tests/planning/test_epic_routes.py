@@ -323,3 +323,31 @@ def test_delete_epic_sets_null_on_stories(client, _setup_test_db) -> None:
     conn.close()
     assert row is not None
     assert row[0] is None  # ON DELETE SET NULL
+
+
+# ── Key filter ────────────────────────────────────────────────────────────
+
+
+def test_list_epics_filter_by_key(client):
+    # Create an epic with a project to get an auto-generated key
+    resp = client.post(
+        "/v1/planning/epics",
+        json={"title": "Keyed epic", "project_id": "p1"},
+    )
+    assert resp.status_code == 201
+    key = resp.json()["data"]["key"]
+    assert key is not None
+
+    resp = client.get(f"/v1/planning/epics?key={key}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["key"] == key
+
+
+def test_list_epics_filter_by_key_no_match(client):
+    resp = client.get("/v1/planning/epics?key=NONEXISTENT-999")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 0
+    assert body["data"] == []
