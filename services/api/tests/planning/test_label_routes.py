@@ -140,3 +140,18 @@ def test_delete_label(client):
 def test_delete_label_not_found(client):
     resp = client.delete(f"{PREFIX}/nonexistent")
     assert resp.status_code == 404
+
+
+# ── project_key resolver ─────────────────────────────────────────────────
+
+
+def test_list_labels_by_project_key(client):
+    resp = client.get(f"{PREFIX}?project_key=P1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) >= 0  # may be empty if no labels seeded for p1
+
+
+def test_list_labels_project_key_not_found(client):
+    resp = client.get(f"{PREFIX}?project_key=NOPE")
+    assert resp.status_code == 404

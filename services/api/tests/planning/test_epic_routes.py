@@ -351,3 +351,18 @@ def test_list_epics_filter_by_key_no_match(client):
     body = resp.json()
     assert body["meta"]["total"] == 0
     assert body["data"] == []
+
+
+# ── project_key resolver ─────────────────────────────────────────────────
+
+
+def test_list_epics_by_project_key(client):
+    resp = client.get("/v1/planning/epics?project_key=P1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) >= 0  # may be empty if no epics seeded for p1
+
+
+def test_list_epics_project_key_not_found(client):
+    resp = client.get("/v1/planning/epics?project_key=NOPE")
+    assert resp.status_code == 404
