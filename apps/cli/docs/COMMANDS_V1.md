@@ -38,6 +38,19 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | `obs requests` | `list`, `models` |
 | `obs import` | `run`, `status` |
 
+## Key-Based Filtering
+
+All commands that accept `--project-id`, `--epic-id`, or `--story-id` also accept key-based alternatives:
+
+| UUID option | Key option | Example |
+|---|---|---|
+| `--project-id <uuid>` | `--project-key <key>` | `--project-key MC` |
+| `--epic-id <uuid>` | `--epic-key <key>` | `--epic-key MC-1` |
+| `--story-id <uuid>` | `--story-key <key>` | `--story-key MC-42` |
+
+- The CLI sends the key directly to the API, which resolves it server-side.
+- `--*-id` and `--*-key` for the same entity are mutually exclusive.
+
 ## Examples
 
 ```bash
@@ -45,11 +58,12 @@ mc project list --limit 20 --offset 0
 mc project create --set key=MC --set name="Mission Control"
 mc project get --id <uuid>
 mc project get --by key=MC
-mc task list --project-id <uuid> --status TODO,IN_PROGRESS --sort priority,-updated_at
+mc task list --project-key MC --status TODO,IN_PROGRESS --sort priority,-updated_at
+mc story list --project-key MC --epic-key MC-1
 mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"
 mc task assignments --id <uuid>
 mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
-mc backlog active-sprint --project-id <uuid>
+mc backlog active-sprint --project-key MC
 mc label attach-task --task-id <uuid> --label-id <uuid>
 mc obs costs --days 7
 mc obs requests list --model claude-sonnet-4-20250514 --limit 50
