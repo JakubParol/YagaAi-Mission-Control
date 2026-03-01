@@ -34,7 +34,7 @@ cd ../..
 # --- CLI ---
 echo "Installing CLI dependencies..."
 cd apps/cli
-npm ci
+npm ci --include=dev
 
 echo "Building CLI..."
 npm run build
