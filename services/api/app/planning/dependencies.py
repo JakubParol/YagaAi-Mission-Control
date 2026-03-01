@@ -81,3 +81,33 @@ async def resolve_project_key(
             raise NotFoundError(f"Project with key '{project_key}' not found")
         return project.id
     return project_id
+
+
+async def resolve_epic_key(
+    epic_id: str | None = Query(None),
+    epic_key: str | None = Query(None),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> str | None:
+    """Resolve epic_key to epic_id. epic_key takes precedence."""
+    if epic_key is not None:
+        repo = SqliteEpicRepository(db)
+        epic = await repo.get_by_key(epic_key)
+        if epic is None:
+            raise NotFoundError(f"Epic with key '{epic_key}' not found")
+        return epic.id
+    return epic_id
+
+
+async def resolve_story_key(
+    story_id: str | None = Query(None),
+    story_key: str | None = Query(None),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> str | None:
+    """Resolve story_key to story_id. story_key takes precedence."""
+    if story_key is not None:
+        repo = SqliteStoryRepository(db)
+        story = await repo.get_by_key(story_key)
+        if story is None:
+            raise NotFoundError(f"Story with key '{story_key}' not found")
+        return story.id
+    return story_id
