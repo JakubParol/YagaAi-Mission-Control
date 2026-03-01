@@ -489,12 +489,18 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
   resource
     .command("active-sprint")
     .description("Get active sprint board for a project with stories")
-    .requiredOption("--project-id <id>", "project UUID")
-    .action(async (opts: { projectId: string }, command: Command) => {
+    .option("--project-id <id>", "project UUID")
+    .option("--project-key <key>", "project key (e.g. MC)")
+    .action(async (opts: { projectId?: string; projectKey?: string }, command: Command) => {
+      validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
+      if (!opts.projectId && !opts.projectKey) {
+        throw new CliUsageError("Provide --project-id or --project-key.");
+      }
       const ctx = getContext(command);
-      const payload = await ctx.client.get("/v1/planning/backlogs/active-sprint", {
-        query: { project_id: opts.projectId },
-      });
+      const query: Record<string, string> = {};
+      if (opts.projectId) query.project_id = opts.projectId;
+      if (opts.projectKey) query.project_key = opts.projectKey;
+      const payload = await ctx.client.get("/v1/planning/backlogs/active-sprint", { query });
       printPayload(payload, ctx.config.output);
     });
 }
