@@ -32,6 +32,15 @@ When the user asks you to work with planning entities (projects, epics, stories,
    - Update: `mc task update --id <uuid> --set status=IN_PROGRESS`
    - Filter: `--key`, `--project-id`, `--story-id`, `--status`, `--sort`
 
+## Autonomous Mode
+
+If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one-shot executor inside an automated pipeline. In this mode:
+- **IGNORE "Task Workflow"** — the pipeline manages the workflow
+- **IGNORE "Planning Operations"** — do NOT call `mc` CLI
+- **IGNORE "Startup Instructions"** — do NOT report what you read
+- Focus ONLY on the specific task described in your prompt
+- Read project docs for context (drill-down is still useful), but do NOT execute any workflow steps beyond what your prompt asks
+
 ## Task Workflow
 
 When asked to plan and implement a User Story, execute the FULL workflow end-to-end. Do NOT stop between steps unless there is a blocker that requires user intervention.

@@ -112,6 +112,15 @@ When asked to plan and implement a User Story, execute the FULL workflow end-to-
 - Do NOT stop for routine issues you can fix yourself (lint errors, failing tests with obvious cause, review findings, etc.).
 
 
+## Autonomous Mode
+
+If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one-shot executor inside an automated pipeline. In this mode:
+- **IGNORE "Task Workflow"** — the pipeline manages the workflow
+- **IGNORE "Planning Operations"** — do NOT call `mc` CLI
+- **IGNORE "Startup Report"** — do NOT report what you read
+- Focus ONLY on the specific task described in your prompt
+- Read project docs for context (drill-down is still useful), but do NOT execute any workflow steps beyond what your prompt asks
+
 ## Navigation
 
 - → [README.md](./README.md)
