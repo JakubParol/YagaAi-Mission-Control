@@ -66,6 +66,9 @@ class EpicRepository(ABC):
     async def get_by_id(self, epic_id: str) -> Epic | None: ...
 
     @abstractmethod
+    async def get_by_key(self, key: str) -> Epic | None: ...
+
+    @abstractmethod
     async def create(self, epic: Epic) -> Epic: ...
 
     @abstractmethod
@@ -150,6 +153,9 @@ class StoryRepository(ABC):
 
     @abstractmethod
     async def get_by_id(self, story_id: str) -> Story | None: ...
+
+    @abstractmethod
+    async def get_by_key(self, key: str) -> Story | None: ...
 
     @abstractmethod
     async def create(self, story: Story) -> Story: ...

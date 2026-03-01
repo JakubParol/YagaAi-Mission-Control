@@ -424,6 +424,10 @@ class SqliteEpicRepository(EpicRepository):
         row = await _fetch_one(self._db, "SELECT * FROM epics WHERE id = ?", [epic_id])
         return _row_to_epic(row) if row else None
 
+    async def get_by_key(self, key: str) -> Epic | None:
+        row = await _fetch_one(self._db, "SELECT * FROM epics WHERE key = ?", [key.upper()])
+        return _row_to_epic(row) if row else None
+
     async def create(self, epic: Epic) -> Epic:
         await self._db.execute(
             """INSERT INTO epics (id, project_id, key, title, description,
@@ -554,6 +558,10 @@ class SqliteStoryRepository(StoryRepository):
 
     async def get_by_id(self, story_id: str) -> Story | None:
         row = await _fetch_one(self._db, "SELECT * FROM stories WHERE id = ?", [story_id])
+        return _row_to_story(row) if row else None
+
+    async def get_by_key(self, key: str) -> Story | None:
+        row = await _fetch_one(self._db, "SELECT * FROM stories WHERE key = ?", [key.upper()])
         return _row_to_story(row) if row else None
 
     async def create(self, story: Story) -> Story:

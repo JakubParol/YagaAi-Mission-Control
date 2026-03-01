@@ -8,7 +8,7 @@ from app.planning.api.schemas import (
     StoryUpdate,
 )
 from app.planning.application.story_service import StoryService
-from app.planning.dependencies import get_story_service, resolve_project_key
+from app.planning.dependencies import get_story_service, resolve_epic_key, resolve_project_key
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/stories", tags=["planning/stories"])
@@ -36,7 +36,7 @@ async def list_stories(
     service: StoryService = Depends(get_story_service),
     key: str | None = Query(None),
     project_id: str | None = Depends(resolve_project_key),
-    epic_id: str | None = Query(None),
+    epic_id: str | None = Depends(resolve_epic_key),
     status: str | None = Query(None),
     sort: str = Query("-created_at"),
     limit: int = Query(20, ge=1, le=100),
