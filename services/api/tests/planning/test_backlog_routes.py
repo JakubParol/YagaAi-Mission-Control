@@ -230,3 +230,26 @@ def test_delete_default_backlog_rejected(client, _setup_test_db):
     resp = client.delete(f"{PREFIX}/bdef2")
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+
+
+# ── project_key resolver ─────────────────────────────────────────────────
+
+
+def test_list_backlogs_by_project_key(client):
+    resp = client.get(f"{PREFIX}?project_key=P1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(b["project_id"] == "p1" for b in data)
+
+
+def test_list_backlogs_project_key_not_found(client):
+    resp = client.get(f"{PREFIX}?project_key=NOPE")
+    assert resp.status_code == 404
+
+
+def test_list_backlogs_null_project_id_still_works(client):
+    resp = client.get(f"{PREFIX}?project_id=null")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert any(b["project_id"] is None for b in data)

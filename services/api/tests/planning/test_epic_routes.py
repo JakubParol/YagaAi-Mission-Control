@@ -351,3 +351,30 @@ def test_list_epics_filter_by_key_no_match(client):
     body = resp.json()
     assert body["meta"]["total"] == 0
     assert body["data"] == []
+
+
+# ── project_key resolver ─────────────────────────────────────────────────
+
+
+def test_list_epics_by_project_key(client):
+    client.post("/v1/planning/epics", json={"project_id": "p1", "title": "E1"})
+    client.post("/v1/planning/epics", json={"project_id": "p2", "title": "E2"})
+    resp = client.get("/v1/planning/epics?project_key=P1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(e["project_id"] == "p1" for e in data)
+
+
+def test_list_epics_project_key_not_found(client):
+    resp = client.get("/v1/planning/epics?project_key=NOPE")
+    assert resp.status_code == 404
+
+
+def test_list_epics_project_key_case_insensitive(client):
+    client.post("/v1/planning/epics", json={"project_id": "p1", "title": "E1"})
+    resp = client.get("/v1/planning/epics?project_key=p1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(e["project_id"] == "p1" for e in data)

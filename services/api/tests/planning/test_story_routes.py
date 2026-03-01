@@ -566,3 +566,34 @@ def test_list_stories_filter_by_key_no_match(client):
     body = resp.json()
     assert body["meta"]["total"] == 0
     assert body["data"] == []
+
+
+# ── project_key resolver ─────────────────────────────────────────────────
+
+
+def test_list_stories_by_project_key(client):
+    resp = client.get("/v1/planning/stories?project_key=P1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(s["project_id"] == "p1" for s in data)
+
+
+def test_list_stories_project_key_not_found(client):
+    resp = client.get("/v1/planning/stories?project_key=NOPE")
+    assert resp.status_code == 404
+
+
+def test_list_stories_project_key_overrides_project_id(client):
+    resp = client.get("/v1/planning/stories?project_key=P1&project_id=p2")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert all(s["project_id"] == "p1" for s in data)
+
+
+def test_list_stories_project_key_case_insensitive(client):
+    resp = client.get("/v1/planning/stories?project_key=p1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(s["project_id"] == "p1" for s in data)

@@ -325,6 +325,10 @@ class SqliteProjectRepository(ProjectRepository):
         row = await _fetch_one(self._db, "SELECT * FROM projects WHERE id = ?", [project_id])
         return _row_to_project(row) if row else None
 
+    async def get_by_key(self, key: str) -> Project | None:
+        row = await _fetch_one(self._db, "SELECT * FROM projects WHERE key = ?", [key.upper()])
+        return _row_to_project(row) if row else None
+
     async def key_exists(self, key: str) -> bool:
         return await _exists(self._db, "SELECT 1 FROM projects WHERE key = ?", [key.upper()])
 

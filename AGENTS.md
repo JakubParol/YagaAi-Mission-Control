@@ -61,18 +61,32 @@ If you then drill into a project, report that too.
 - **Async-first.** API endpoints, DB access, and external IO are async.
 - **No cross-project imports.** Apps and services do not import from each other.
 
-# Planning Database
+# Planning Operations
 
 When the user asks you to work with planning entities (projects, epics, stories, tasks, backlogs, agents, labels, etc.) — creating, updating, querying, or reviewing them:
 
-1. **DB location**: Read `MC_DB_PATH` from `/home/kuba/mission-control/mission-control.env`
-2. **First time in session**: Before any DB operations, read the schema at `apps/web/src/lib/planning/schema.ts` and types at `apps/web/src/lib/planning/types.ts` to understand the current table structure, constraints, and enums
-3. **Direct SQL**: Use `sqlite3` CLI to run queries directly against the database. Examples:
-   - `sqlite3 <db_path> "SELECT * FROM projects;"`
-   - `sqlite3 <db_path> ".mode column" ".headers on" "SELECT ..."`
-4. **Write operations**: For INSERT/UPDATE/DELETE, always show the SQL to the user and confirm before executing
-5. **Key generation**: When creating epics/stories/tasks within a project, use the `project_counters` table to allocate the next key (e.g. `MC-42`). Read `apps/web/src/lib/planning/repository.ts` to understand the `allocateKey`/`buildKey` logic before doing this manually
-6. **UUIDs**: Generate UUIDs for new entity `id` fields using `uuidgen` or `sqlite3` `lower(hex(randomblob(4)))||'-'||...` pattern
+1. **Use `mc` CLI only.** Do NOT use direct SQL queries or raw API calls. The CLI handles key generation, UUIDs, validation, and all business logic. The `mc` command is deployed and available in PATH.
+2. **Discover commands with `--help`.** Use `mc --help`, `mc story --help`, `mc story create --help`, etc. to learn available commands, options, and required fields.
+4. **Use `--output json`** when you need to parse responses programmatically. Default is table output for human reading.
+5. **Common patterns:**
+   - List: `mc story list --project-key MC --sort priority`
+   - Get: `mc story get --key MC-47 --output json`
+   - Create: `mc story create --json '{"title":"...","story_type":"USER_STORY","project_id":"..."}'`
+   - Update: `mc task update --id <uuid> --set status=IN_PROGRESS`
+   - Filter: `--key`, `--project-id`, `--story-id`, `--status`, `--sort`
+
+## Task Workflow
+
+When asked to plan and implement a User Story:
+
+1. **Plan** — Prepare the implementation plan for the US.
+2. **Create tasks** — Use `mc task create` to create tasks in the US based on the plan.
+3. **Start the story** — Before starting the first task, set the story to IN_PROGRESS via `mc story update`.
+4. **For each task:**
+   - Set the task to IN_PROGRESS via `mc task update --id <uuid> --set status=IN_PROGRESS`
+   - Implement and commit
+   - Set the task to DONE via `mc task update --id <uuid> --set status=DONE`
+5. **Finish** — After all tasks are DONE, set the story to CODE_REVIEW via `mc story update`.
 
 
 ## Navigation

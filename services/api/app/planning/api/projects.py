@@ -28,7 +28,9 @@ async def list_projects(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[ProjectResponse]:
-    items, total = await service.list_projects(key=key, status=status, limit=limit, offset=offset, sort=sort)
+    items, total = await service.list_projects(
+        key=key, status=status, limit=limit, offset=offset, sort=sort
+    )
     return ListEnvelope(
         data=[ProjectResponse(**p.__dict__) for p in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),

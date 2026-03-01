@@ -715,3 +715,26 @@ def test_list_tasks_filter_by_key_no_match(client):
     body = resp.json()
     assert body["meta"]["total"] == 0
     assert body["data"] == []
+
+
+# ── project_key resolver ─────────────────────────────────────────────────
+
+
+def test_list_tasks_by_project_key(client):
+    resp = client.get("/v1/planning/tasks?project_key=P1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(t["project_id"] == "p1" for t in data)
+
+
+def test_list_tasks_project_key_not_found(client):
+    resp = client.get("/v1/planning/tasks?project_key=NOPE")
+    assert resp.status_code == 404
+
+
+def test_list_tasks_project_key_overrides_project_id(client):
+    resp = client.get("/v1/planning/tasks?project_key=P1&project_id=p2")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert all(t["project_id"] == "p1" for t in data)

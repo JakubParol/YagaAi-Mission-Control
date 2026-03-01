@@ -1,5 +1,5 @@
 import aiosqlite
-from fastapi import Depends
+from fastapi import Depends, Query
 
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
@@ -18,6 +18,7 @@ from app.planning.infrastructure.sqlite_repository import (
     SqliteTaskRepository,
 )
 from app.shared.api.deps import get_db
+from app.shared.api.errors import NotFoundError
 
 
 async def get_project_service(
@@ -66,3 +67,18 @@ async def get_backlog_service(
     db: aiosqlite.Connection = Depends(get_db),
 ) -> BacklogService:
     return BacklogService(SqliteBacklogRepository(db))
+
+
+async def resolve_project_key(
+    project_id: str | None = Query(None),
+    project_key: str | None = Query(None),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> str | None:
+    """Resolve project_key to project_id. project_key takes precedence."""
+    if project_key is not None:
+        repo = SqliteProjectRepository(db)
+        project = await repo.get_by_key(project_key)
+        if project is None:
+            raise NotFoundError(f"Project with key '{project_key}' not found")
+        return project.id
+    return project_id

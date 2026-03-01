@@ -102,6 +102,7 @@ Filters are query params on list endpoints. Convention:
 | `field=value` | `status=TODO` | Exact match |
 | `field=v1,v2` | `status=TODO,IN_PROGRESS` | IN list |
 | `project_id=null` | — | Filter for NULL |
+| `project_key=MC` | — | Resolve project key to UUID, filter by project |
 | `is_blocked=true` | — | Boolean filter |
 
 Date range filters use `_after` / `_before` suffixes:
@@ -186,9 +187,11 @@ Request:
 
 `key` is auto-generated. `status` defaults to `TODO`. `status_mode` defaults to `MANUAL`.
 
-#### `GET .../epics` — List epics
+#### `GET /v1/planning/epics` — List epics
 
-Query: `status`, `is_blocked`, `sort`, `limit`, `offset`.
+Query: `project_id`, `project_key`, `status`, `is_blocked`, `sort`, `limit`, `offset`.
+
+`project_key` — same behavior as stories (see above).
 
 #### `GET .../epics/{id}` — Get epic
 
@@ -229,7 +232,9 @@ Request:
 
 #### `GET /v1/planning/stories` — List stories
 
-Query: `project_id`, `epic_id`, `status`, `is_blocked`, `story_type`, `sort`, `limit`, `offset`.
+Query: `project_id`, `project_key`, `epic_id`, `status`, `is_blocked`, `story_type`, `sort`, `limit`, `offset`.
+
+`project_key` resolves a human-readable key (e.g. `MC`) to `project_id`. Takes precedence over `project_id` if both provided. Returns 404 if key not found. Case-insensitive.
 
 #### `GET /v1/planning/stories/{id}` — Get story
 
@@ -274,7 +279,9 @@ Request:
 
 #### `GET /v1/planning/tasks` — List tasks
 
-Query: `project_id`, `story_id`, `status`, `is_blocked`, `task_type`, `current_assignee_agent_id`, `sort`, `limit`, `offset`.
+Query: `project_id`, `project_key`, `story_id`, `status`, `is_blocked`, `task_type`, `current_assignee_agent_id`, `sort`, `limit`, `offset`.
+
+`project_key` — same behavior as stories (see above).
 
 #### `GET /v1/planning/tasks/{id}` — Get task
 
@@ -319,8 +326,8 @@ Request:
 
 #### `GET /v1/planning/backlogs` — List backlogs
 
-Query: `project_id`, `status`, `kind`, `sort`, `limit`, `offset`.
-Use `project_id=null` to list global backlogs.
+Query: `project_id`, `project_key`, `status`, `kind`, `sort`, `limit`, `offset`.
+Use `project_id=null` to list global backlogs. `project_key` — same behavior as stories (see above).
 
 #### `GET /v1/planning/backlogs/{id}` — Get backlog
 
@@ -455,7 +462,9 @@ Returns `201`.
 
 #### `GET /v1/planning/labels` — List labels
 
-Query: `project_id` (use `project_id=null` for global only), `limit`, `offset`.
+Query: `project_id`, `project_key` (use `project_id=null` for global only), `limit`, `offset`.
+
+`project_key` — same behavior as stories (see above).
 
 #### `DELETE /v1/planning/labels/{id}` — Delete label
 
