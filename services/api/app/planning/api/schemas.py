@@ -268,9 +268,6 @@ class StoryResponse(BaseModel):
     description: str | None
     story_type: str
     status: str
-    status_mode: str
-    status_override: str | None
-    status_override_set_at: str | None
     is_blocked: bool
     blocked_reason: str | None
     priority: int | None

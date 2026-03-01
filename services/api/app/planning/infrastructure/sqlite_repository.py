@@ -131,9 +131,6 @@ def _row_to_story(row: aiosqlite.Row) -> Story:
         description=row["description"],
         story_type=row["story_type"],
         status=ItemStatus(row["status"]),
-        status_mode=StatusMode(row["status_mode"]),
-        status_override=row["status_override"],
-        status_override_set_at=row["status_override_set_at"],
         is_blocked=bool(row["is_blocked"]),
         blocked_reason=row["blocked_reason"],
         priority=row["priority"],
@@ -562,12 +559,11 @@ class SqliteStoryRepository(StoryRepository):
     async def create(self, story: Story) -> Story:
         await self._db.execute(
             """INSERT INTO stories (id, project_id, epic_id, key, title, intent,
-               description, story_type, status, status_mode,
-               status_override, status_override_set_at,
+               description, story_type, status,
                is_blocked, blocked_reason, priority, metadata_json,
                created_by, updated_by, created_at, updated_at,
                started_at, completed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 story.id,
                 story.project_id,
@@ -578,9 +574,6 @@ class SqliteStoryRepository(StoryRepository):
                 story.description,
                 story.story_type,
                 story.status,
-                story.status_mode,
-                story.status_override,
-                story.status_override_set_at,
                 1 if story.is_blocked else 0,
                 story.blocked_reason,
                 story.priority,
@@ -603,9 +596,6 @@ class SqliteStoryRepository(StoryRepository):
             "description",
             "story_type",
             "status",
-            "status_mode",
-            "status_override",
-            "status_override_set_at",
             "epic_id",
             "is_blocked",
             "blocked_reason",
@@ -1367,11 +1357,3 @@ class SqliteTaskRepository(TaskRepository):
         )
         await self._db.commit()
         return (cursor.rowcount or 0) > 0
-
-    async def get_child_task_statuses(self, story_id: str) -> list[str]:
-        rows = await _fetch_all(
-            self._db,
-            "SELECT status FROM tasks WHERE story_id = ?",
-            [story_id],
-        )
-        return [row["status"] for row in rows]

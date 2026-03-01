@@ -37,21 +37,17 @@ This document defines how the app should behave on top of the v1 entity model.
 ### Story behavior
 
 - New story starts as `TODO`.
-- If story has no tasks: status is manual.
-- If story has tasks: status is derived from tasks, with manual override allowed.
-- If children are mixed, effective parent status defaults to `IN_PROGRESS`.
+- Story status is always set directly via PATCH — never derived from child tasks.
 
 ### Epic behavior
 
 - If epic has no stories: starts manual in `TODO`.
 - If epic has stories: status derived from stories, with manual override allowed.
 
-### Override behavior
+### Override behavior (Epics only)
 
-- Manual override is temporary.
-- Override expires on next child status change:
-  - story override expires when a task status changes,
-  - epic override expires when a story status changes.
+- Manual override on epics is temporary.
+- Epic override expires on next child story status change.
 
 ---
 

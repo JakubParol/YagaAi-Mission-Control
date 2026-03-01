@@ -96,7 +96,6 @@ export interface CreateStoryInput {
   description?: string | null;
   story_type: string;
   status?: ItemStatus;
-  status_mode?: StatusMode;
   priority?: number | null;
   metadata_json?: string | null;
   created_by?: string | null;
@@ -110,9 +109,6 @@ export interface UpdateStoryInput {
   description?: string | null;
   story_type?: string;
   status?: ItemStatus;
-  status_mode?: StatusMode;
-  status_override?: string | null;
-  status_override_set_at?: string | null;
   is_blocked?: number;
   blocked_reason?: string | null;
   priority?: number | null;
@@ -464,8 +460,8 @@ export class PlanningRepository {
 
     this.db
       .prepare(
-        `INSERT INTO stories (id, project_id, epic_id, key, title, intent, description, story_type, status, status_mode, status_override, status_override_set_at, is_blocked, blocked_reason, priority, metadata_json, created_by, updated_by, created_at, updated_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO stories (id, project_id, epic_id, key, title, intent, description, story_type, status, is_blocked, blocked_reason, priority, metadata_json, created_by, updated_by, created_at, updated_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -477,9 +473,6 @@ export class PlanningRepository {
         input.description ?? null,
         input.story_type,
         input.status ?? "TODO",
-        input.status_mode ?? "MANUAL",
-        null,
-        null,
         0,
         null,
         input.priority ?? null,
@@ -529,9 +522,6 @@ export class PlanningRepository {
     if (input.description !== undefined) { fields.push("description = ?"); values.push(input.description); }
     if (input.story_type !== undefined) { fields.push("story_type = ?"); values.push(input.story_type); }
     if (input.status !== undefined) { fields.push("status = ?"); values.push(input.status); }
-    if (input.status_mode !== undefined) { fields.push("status_mode = ?"); values.push(input.status_mode); }
-    if (input.status_override !== undefined) { fields.push("status_override = ?"); values.push(input.status_override); }
-    if (input.status_override_set_at !== undefined) { fields.push("status_override_set_at = ?"); values.push(input.status_override_set_at); }
     if (input.is_blocked !== undefined) { fields.push("is_blocked = ?"); values.push(input.is_blocked); }
     if (input.blocked_reason !== undefined) { fields.push("blocked_reason = ?"); values.push(input.blocked_reason); }
     if (input.priority !== undefined) { fields.push("priority = ?"); values.push(input.priority); }

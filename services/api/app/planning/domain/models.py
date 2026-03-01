@@ -132,9 +132,6 @@ class Story:
     # Consumers may use values like USER_STORY, SPIKE, BUG, CHORE, etc.
     story_type: str
     status: ItemStatus
-    status_mode: StatusMode
-    status_override: str | None
-    status_override_set_at: str | None
     is_blocked: bool
     blocked_reason: str | None
     priority: int | None

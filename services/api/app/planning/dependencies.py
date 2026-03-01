@@ -59,7 +59,6 @@ async def get_task_service(
 ) -> TaskService:
     return TaskService(
         task_repo=SqliteTaskRepository(db),
-        story_repo=SqliteStoryRepository(db),
     )
 
 

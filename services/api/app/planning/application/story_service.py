@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.planning.application.ports import StoryRepository
-from app.planning.domain.models import ItemStatus, StatusMode, Story
+from app.planning.domain.models import ItemStatus, Story
 from app.shared.api.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.utils import new_uuid, utc_now
 
@@ -72,9 +72,6 @@ class StoryService:
             description=description,
             story_type=story_type,
             status=ItemStatus.TODO,
-            status_mode=StatusMode.MANUAL,
-            status_override=None,
-            status_override_set_at=None,
             is_blocked=False,
             blocked_reason=None,
             priority=priority,
@@ -103,9 +100,6 @@ class StoryService:
                     f"Invalid story status '{new_status}'. Allowed: {', '.join(sorted(valid))}"
                 )
             data["status"] = new_status
-            data["status_override"] = new_status
-            data["status_override_set_at"] = utc_now()
-            data["status_mode"] = StatusMode.MANUAL
 
             if new_status == ItemStatus.DONE:
                 data["completed_at"] = utc_now()

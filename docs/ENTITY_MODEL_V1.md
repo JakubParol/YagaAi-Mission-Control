@@ -137,9 +137,6 @@ Constraint:
 - `description` TEXT NULL
 - `story_type` TEXT NOT NULL
 - `status` TEXT NOT NULL
-- `status_mode` TEXT NOT NULL (`MANUAL`/`DERIVED`)
-- `status_override` TEXT NULL
-- `status_override_set_at` TEXT NULL
 - `is_blocked` INTEGER NOT NULL DEFAULT 0
 - `blocked_reason` TEXT NULL
 - `priority` INTEGER NULL

@@ -1,39 +1,17 @@
 from typing import Any
 
-from app.planning.application.ports import StoryRepository, TaskRepository
-from app.planning.domain.models import ItemStatus, StatusMode, Task, TaskAssignment
+from app.planning.application.ports import TaskRepository
+from app.planning.domain.models import ItemStatus, Task, TaskAssignment
 from app.shared.api.errors import ConflictError, NotFoundError, ValidationError
 from app.shared.utils import new_uuid, utc_now
-
-
-def _derive_story_status(task_statuses: list[str]) -> str:
-    """Derive a parent story status from its child task statuses.
-
-    Rules (from WORKFLOW_LOGIC_V1):
-    - All TODO -> TODO
-    - All DONE -> DONE
-    - Mixed -> IN_PROGRESS
-    """
-    if not task_statuses:
-        return ItemStatus.TODO
-
-    status_set = set(task_statuses)
-
-    if status_set == {ItemStatus.TODO}:
-        return ItemStatus.TODO
-    if status_set == {ItemStatus.DONE}:
-        return ItemStatus.DONE
-    return ItemStatus.IN_PROGRESS
 
 
 class TaskService:
     def __init__(
         self,
         task_repo: TaskRepository,
-        story_repo: StoryRepository,
     ) -> None:
         self._task_repo = task_repo
-        self._story_repo = story_repo
 
     async def list_tasks(
         self,
@@ -114,15 +92,7 @@ class TaskService:
             started_at=None,
             completed_at=None,
         )
-        created = await self._task_repo.create(task)
-
-        # Per WORKFLOW_LOGIC_V1 §2 "Override behavior": any child status change
-        # expires the parent override.  Creating a new TODO task counts as a
-        # child status change, so we re-derive the story status here.
-        if story_id:
-            await self._rederive_story_status(story_id)
-
-        return created
+        return await self._task_repo.create(task)
 
     async def update_task(
         self, task_id: str, data: dict[str, Any], *, actor: str | None = None
@@ -159,23 +129,13 @@ class TaskService:
         if not updated:
             raise NotFoundError(f"Task {task_id} not found")
 
-        if "status" in data:
-            if existing.story_id:
-                await self._rederive_story_status(existing.story_id)
-            if updated.story_id and updated.story_id != existing.story_id:
-                await self._rederive_story_status(updated.story_id)
-
         return updated
 
     async def delete_task(self, task_id: str) -> None:
         existing = await self._task_repo.get_by_id(task_id)
         if not existing:
             raise NotFoundError(f"Task {task_id} not found")
-        story_id = existing.story_id
         await self._task_repo.delete(task_id)
-
-        if story_id:
-            await self._rederive_story_status(story_id)
 
     async def attach_label(self, task_id: str, label_id: str) -> None:
         if not await self._task_repo.get_by_id(task_id):
@@ -239,40 +199,4 @@ class TaskService:
         await self._task_repo.close_assignment(task_id, now)
         await self._task_repo.update(
             task_id, {"current_assignee_agent_id": None, "updated_at": utc_now()}
-        )
-
-    async def _rederive_story_status(self, story_id: str) -> None:
-        """Re-derive parent story status from child tasks.
-
-        Only updates if story is not in MANUAL override mode, or if the
-        override should expire (per WORKFLOW_LOGIC_V1: override expires on
-        next child status change).
-        """
-        story = await self._story_repo.get_by_id(story_id)
-        if not story:
-            return
-
-        child_statuses = await self._task_repo.get_child_task_statuses(story_id)
-        if not child_statuses:
-            return
-
-        derived = _derive_story_status(child_statuses)
-
-        now = utc_now()
-        started_at = (
-            now
-            if derived == ItemStatus.IN_PROGRESS and story.started_at is None
-            else story.started_at
-        )
-        await self._story_repo.update(
-            story_id,
-            {
-                "status": derived,
-                "status_mode": StatusMode.DERIVED,
-                "status_override": None,
-                "status_override_set_at": None,
-                "updated_at": now,
-                "started_at": started_at,
-                "completed_at": now if derived == ItemStatus.DONE else None,
-            },
         )

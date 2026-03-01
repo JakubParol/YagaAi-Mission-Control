@@ -567,11 +567,8 @@ def test_detach_label_task_not_found(client) -> None:
     assert resp.status_code == 404
 
 
-# ── Parent story status re-derivation ─────────────────────────────────────
-
-
-def test_task_done_rederives_parent_story_status(client) -> None:
-    # Create a story and two tasks under it
+def test_task_status_change_does_not_affect_parent_story(client) -> None:
+    """After MC-51: story status is independent — task changes don't alter it."""
     story_id = client.post(
         "/v1/planning/stories",
         json={"title": "Parent Story", "story_type": "USER_STORY", "project_id": "p1"},
@@ -582,68 +579,10 @@ def test_task_done_rederives_parent_story_status(client) -> None:
         json={"title": "T1", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
     ).json()["data"]["id"]
 
-    t2_id = client.post(
-        "/v1/planning/tasks",
-        json={"title": "T2", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
-    ).json()["data"]["id"]
-
-    # Move T1 to DONE — story should become IN_PROGRESS (mixed)
+    # Move task to DONE — story stays TODO (no derivation)
     client.patch(f"/v1/planning/tasks/{t1_id}", json={"status": "DONE"})
-    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
-    assert story["status"] == "IN_PROGRESS"
-    assert story["status_mode"] == "DERIVED"
-
-    # Move T2 to DONE — all tasks done, story should become DONE
-    client.patch(f"/v1/planning/tasks/{t2_id}", json={"status": "DONE"})
-    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
-    assert story["status"] == "DONE"
-    assert story["status_mode"] == "DERIVED"
-    assert story["completed_at"] is not None
-
-
-def test_task_creation_rederives_parent_story_status(client) -> None:
-    # Create story, manually set to DONE
-    story_id = client.post(
-        "/v1/planning/stories",
-        json={"title": "Parent Story", "story_type": "USER_STORY", "project_id": "p1"},
-    ).json()["data"]["id"]
-    client.patch(f"/v1/planning/stories/{story_id}", json={"status": "DONE"})
-
-    # Create a TODO task under it — should rederive story to TODO
-    client.post(
-        "/v1/planning/tasks",
-        json={"title": "New Task", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
-    )
-
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
     assert story["status"] == "TODO"
-    assert story["status_mode"] == "DERIVED"
-
-
-def test_task_deletion_rederives_parent_story_status(client) -> None:
-    # Create story with two tasks, complete one
-    story_id = client.post(
-        "/v1/planning/stories",
-        json={"title": "Parent Story", "story_type": "USER_STORY", "project_id": "p1"},
-    ).json()["data"]["id"]
-
-    t1_id = client.post(
-        "/v1/planning/tasks",
-        json={"title": "T1", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
-    ).json()["data"]["id"]
-
-    t2_id = client.post(
-        "/v1/planning/tasks",
-        json={"title": "T2", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
-    ).json()["data"]["id"]
-
-    client.patch(f"/v1/planning/tasks/{t1_id}", json={"status": "DONE"})
-    # Story is IN_PROGRESS (mixed)
-
-    # Delete the TODO task — only DONE task remains, story should become DONE
-    client.delete(f"/v1/planning/tasks/{t2_id}")
-    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
-    assert story["status"] == "DONE"
 
 
 # ── is_blocked update ─────────────────────────────────────────────────────
@@ -667,26 +606,23 @@ def test_update_task_is_blocked(client) -> None:
 # ── Story started_at on first IN_PROGRESS task ────────────────────────────
 
 
-def test_first_task_in_progress_sets_story_started_at(client) -> None:
+def test_task_in_progress_does_not_affect_story_started_at(client) -> None:
+    """After MC-51: story started_at is independent — task changes don't set it."""
     story_id = client.post(
         "/v1/planning/stories",
         json={"title": "Track Start", "story_type": "USER_STORY", "project_id": "p1"},
     ).json()["data"]["id"]
-
-    # Story starts with no started_at
-    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
-    assert story["started_at"] is None
 
     task_id = client.post(
         "/v1/planning/tasks",
         json={"title": "T1", "task_type": "TASK", "project_id": "p1", "story_id": story_id},
     ).json()["data"]["id"]
 
-    # Move task to IN_PROGRESS — story should get started_at
+    # Move task to IN_PROGRESS — story should NOT change
     client.patch(f"/v1/planning/tasks/{task_id}", json={"status": "IN_PROGRESS"})
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
-    assert story["status"] == "IN_PROGRESS"
-    assert story["started_at"] is not None
+    assert story["status"] == "TODO"
+    assert story["started_at"] is None
 
 
 # ── Key filter ────────────────────────────────────────────────────────────

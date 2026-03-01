@@ -35,7 +35,6 @@ def test_create_story_with_project(client) -> None:
     assert data["title"] == "Auth Story"
     assert data["story_type"] == "USER_STORY"
     assert data["status"] == "TODO"
-    assert data["status_mode"] == "MANUAL"
     assert data["is_blocked"] is False
     assert "id" in data
     assert "created_at" in data
@@ -319,7 +318,7 @@ def test_update_story_description(client) -> None:
     assert resp.json()["data"]["description"] == "New desc"
 
 
-def test_update_story_status_sets_override(client) -> None:
+def test_update_story_status(client) -> None:
     create_resp = client.post(
         "/v1/planning/stories",
         json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
@@ -330,9 +329,8 @@ def test_update_story_status_sets_override(client) -> None:
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["status"] == "IN_PROGRESS"
-    assert data["status_mode"] == "MANUAL"
-    assert data["status_override"] == "IN_PROGRESS"
-    assert data["status_override_set_at"] is not None
+    assert "status_mode" not in data
+    assert "status_override" not in data
 
 
 def test_update_story_status_done_sets_completed_at(client) -> None:

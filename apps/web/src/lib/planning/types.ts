@@ -84,9 +84,6 @@ export interface Story {
   description: string | null;
   story_type: string;
   status: ItemStatus;
-  status_mode: StatusMode;
-  status_override: string | null;
-  status_override_set_at: string | null;
   is_blocked: number;
   blocked_reason: string | null;
   priority: number | null;
