@@ -224,6 +224,8 @@ class SprintStoryResponse(BaseModel):
     priority: int | None
     story_type: str
     position: int
+    task_count: int
+    done_task_count: int
 
 
 class ActiveSprintResponse(BaseModel):

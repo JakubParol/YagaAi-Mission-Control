@@ -1,5 +1,6 @@
 import {
   Bug,
+  CheckCircle2,
   FlaskConical,
   Wrench,
   BookOpen,
@@ -18,6 +19,8 @@ export interface StoryCardStory {
   priority: number | null;
   story_type: string;
   position: number;
+  task_count: number;
+  done_task_count: number;
 }
 
 export const STATUS_STYLE: Record<
@@ -112,22 +115,38 @@ export function StoryCard({
         {story.title}
       </p>
 
-      {/* Bottom row: type tag + status dot */}
+      {/* Bottom row: type tag + task progress + status dot */}
       <div className="flex items-center justify-between gap-2">
         <span className={cn("flex items-center gap-1 text-[11px]", typeConf.color)}>
           <TypeIcon className="size-3" />
           {typeConf.label}
         </span>
-        <span
-          className={cn(
-            "flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-            statusStyle.bg,
-            "text-muted-foreground"
+
+        <div className="flex items-center gap-2">
+          {story.task_count > 0 && (
+            <span
+              className={cn(
+                "flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground",
+                story.done_task_count === story.task_count && "text-emerald-400",
+              )}
+              title={`${story.done_task_count} of ${story.task_count} tasks done`}
+            >
+              <CheckCircle2 className="size-3" />
+              {story.done_task_count}/{story.task_count}
+            </span>
           )}
-        >
-          <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-          {STATUS_LABEL[story.status]}
-        </span>
+
+          <span
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+              statusStyle.bg,
+              "text-muted-foreground"
+            )}
+          >
+            <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+            {STATUS_LABEL[story.status]}
+          </span>
+        </div>
       </div>
     </button>
   );
