@@ -298,6 +298,7 @@ class SqliteProjectRepository(ProjectRepository):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         status: str | None = None,
         limit: int = 20,
         offset: int = 0,
@@ -306,6 +307,9 @@ class SqliteProjectRepository(ProjectRepository):
         where_parts: list[str] = []
         params: list[Any] = []
 
+        if key:
+            where_parts.append("key = ?")
+            params.append(key)
         if status:
             where_parts.append("status = ?")
             params.append(status)
@@ -388,6 +392,7 @@ class SqliteEpicRepository(EpicRepository):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         status: str | None = None,
         limit: int = 20,
@@ -397,6 +402,9 @@ class SqliteEpicRepository(EpicRepository):
         where_parts: list[str] = []
         params: list[Any] = []
 
+        if key:
+            where_parts.append("key = ?")
+            params.append(key)
         if project_id:
             where_parts.append("project_id = ?")
             params.append(project_id)
@@ -512,6 +520,7 @@ class SqliteStoryRepository(StoryRepository):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         epic_id: str | None = None,
         status: str | None = None,
@@ -522,6 +531,9 @@ class SqliteStoryRepository(StoryRepository):
         where_parts: list[str] = []
         params: list[Any] = []
 
+        if key:
+            where_parts.append("key = ?")
+            params.append(key)
         if project_id:
             where_parts.append("project_id = ?")
             params.append(project_id)
@@ -678,6 +690,7 @@ class SqliteAgentRepository(AgentRepository):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         is_active: bool | None = None,
         source: str | None = None,
         limit: int = 20,
@@ -687,6 +700,9 @@ class SqliteAgentRepository(AgentRepository):
         where_parts: list[str] = []
         params: list[Any] = []
 
+        if key:
+            where_parts.append("openclaw_key = ?")
+            params.append(key)
         if is_active is not None:
             where_parts.append("is_active = ?")
             params.append(1 if is_active else 0)
@@ -1148,6 +1164,7 @@ class SqliteTaskRepository(TaskRepository):
     async def list_all(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         story_id: str | None = None,
         status: str | None = None,
@@ -1159,6 +1176,9 @@ class SqliteTaskRepository(TaskRepository):
         where_parts: list[str] = []
         params: list[Any] = []
 
+        if key:
+            where_parts.append("key = ?")
+            params.append(key)
         if project_id:
             where_parts.append("project_id = ?")
             params.append(project_id)

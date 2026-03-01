@@ -189,3 +189,22 @@ def test_delete_agent(client):
 def test_delete_agent_not_found(client):
     resp = client.delete(f"{PREFIX}/nonexistent")
     assert resp.status_code == 404
+
+
+# ── Key filter ────────────────────────────────────────────────────────────
+
+
+def test_list_agents_filter_by_key(client):
+    resp = client.get(f"{PREFIX}?key=agent-1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["openclaw_key"] == "agent-1"
+
+
+def test_list_agents_filter_by_key_no_match(client):
+    resp = client.get(f"{PREFIX}?key=nonexistent-agent")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 0
+    assert body["data"] == []

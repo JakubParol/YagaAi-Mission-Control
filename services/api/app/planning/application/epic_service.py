@@ -13,6 +13,7 @@ class EpicService:
     async def list_epics(
         self,
         *,
+        key: str | None = None,
         project_id: str | None = None,
         status: str | None = None,
         limit: int = 20,
@@ -20,7 +21,7 @@ class EpicService:
         sort: str = "-created_at",
     ) -> tuple[list[Epic], int]:
         return await self._epic_repo.list_all(
-            project_id=project_id, status=status, limit=limit, offset=offset, sort=sort
+            key=key, project_id=project_id, status=status, limit=limit, offset=offset, sort=sort
         )
 
     async def get_epic(self, epic_id: str) -> tuple[Epic, int]:

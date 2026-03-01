@@ -13,6 +13,7 @@ class AgentService:
     async def list_agents(
         self,
         *,
+        key: str | None = None,
         is_active: bool | None = None,
         source: str | None = None,
         limit: int = 20,
@@ -20,7 +21,7 @@ class AgentService:
         sort: str = "-created_at",
     ) -> tuple[list[Agent], int]:
         return await self._repo.list_all(
-            is_active=is_active, source=source, limit=limit, offset=offset, sort=sort
+            key=key, is_active=is_active, source=source, limit=limit, offset=offset, sort=sort
         )
 
     async def get_agent(self, agent_id: str) -> Agent:

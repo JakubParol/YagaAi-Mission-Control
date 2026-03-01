@@ -37,6 +37,7 @@ async def create_task(
 @router.get("")
 async def list_tasks(
     service: TaskService = Depends(get_task_service),
+    key: str | None = Query(None),
     project_id: str | None = Query(None),
     story_id: str | None = Query(None),
     status: str | None = Query(None),
@@ -46,6 +47,7 @@ async def list_tasks(
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[TaskResponse]:
     items, total = await service.list_tasks(
+        key=key,
         project_id=project_id,
         story_id=story_id,
         status=status,

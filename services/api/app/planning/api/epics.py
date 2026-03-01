@@ -25,6 +25,7 @@ async def create_epic(
 @router.get("")
 async def list_epics(
     service: EpicService = Depends(get_epic_service),
+    key: str | None = Query(None),
     project_id: str | None = Query(None),
     status: str | None = Query(None),
     sort: str = Query("-created_at"),
@@ -32,7 +33,7 @@ async def list_epics(
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[EpicResponse]:
     items, total = await service.list_epics(
-        project_id=project_id, status=status, limit=limit, offset=offset, sort=sort
+        key=key, project_id=project_id, status=status, limit=limit, offset=offset, sort=sort
     )
     return ListEnvelope(
         data=[EpicResponse(**e.__dict__) for e in items],

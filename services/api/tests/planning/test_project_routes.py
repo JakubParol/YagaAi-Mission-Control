@@ -208,3 +208,22 @@ def test_delete_project_cascades_epics(client):
 
     get_resp = client.get(f"/v1/planning/epics/{epic_id}")
     assert get_resp.status_code == 404
+
+
+# ── Key filter ────────────────────────────────────────────────────────────
+
+
+def test_list_projects_filter_by_key(client):
+    resp = client.get(f"{PREFIX}?key=P1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["key"] == "P1"
+
+
+def test_list_projects_filter_by_key_no_match(client):
+    resp = client.get(f"{PREFIX}?key=NONEXISTENT")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 0
+    assert body["data"] == []

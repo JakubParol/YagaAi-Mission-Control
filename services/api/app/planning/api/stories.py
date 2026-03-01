@@ -34,6 +34,7 @@ async def create_story(
 @router.get("")
 async def list_stories(
     service: StoryService = Depends(get_story_service),
+    key: str | None = Query(None),
     project_id: str | None = Query(None),
     epic_id: str | None = Query(None),
     status: str | None = Query(None),
@@ -42,6 +43,7 @@ async def list_stories(
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[StoryResponse]:
     items, total = await service.list_stories(
+        key=key,
         project_id=project_id,
         epic_id=epic_id,
         status=status,
