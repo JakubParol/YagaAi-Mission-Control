@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Check, ChevronsUpDown, FolderKanban } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
@@ -25,11 +26,20 @@ interface ProjectItem {
 
 export function ProjectSelector() {
   const { selectedProjectIds, setSelectedProjectIds } = usePlanningFilter();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const selectedId = selectedProjectIds.length === 1 ? selectedProjectIds[0] : null;
+
+  const updateUrlParam = (projectKey: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("project", projectKey);
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -48,9 +58,17 @@ export function ProjectSelector() {
             }),
           );
           setProjects(items);
-          // Auto-select first project if none selected
+
           if (items.length > 0 && selectedProjectIds.length === 0) {
-            setSelectedProjectIds([items[0].id]);
+            const projectKeyFromUrl = searchParams.get("project");
+            const match = projectKeyFromUrl
+              ? items.find((p) => p.key === projectKeyFromUrl)
+              : null;
+            const target = match ?? items[0];
+            setSelectedProjectIds([target.id]);
+            if (!match) {
+              updateUrlParam(target.key);
+            }
           }
         }
       })
@@ -74,6 +92,10 @@ export function ProjectSelector() {
 
   const handleSelect = (id: string) => {
     setSelectedProjectIds([id]);
+    const project = projects.find((p) => p.id === id);
+    if (project) {
+      updateUrlParam(project.key);
+    }
     setOpen(false);
   };
 
