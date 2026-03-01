@@ -1128,6 +1128,21 @@ class SqliteBacklogRepository(BacklogRepository):
             "updated_task_count": len(tasks),
         }
 
+    async def list_backlog_stories(self, backlog_id: str) -> list[dict[str, Any]]:
+        story_rows = await _fetch_all(
+            self._db,
+            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+                      bs.position,
+                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0) AS task_count,
+                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id AND t.status = 'DONE'), 0) AS done_task_count
+               FROM backlog_stories bs
+               JOIN stories s ON s.id = bs.story_id
+               WHERE bs.backlog_id = ?
+               ORDER BY bs.position ASC""",
+            [backlog_id],
+        )
+        return [dict(r) for r in story_rows]
+
     async def get_active_sprint_with_stories(
         self, project_id: str
     ) -> tuple[Backlog | None, list[dict[str, Any]]]:
