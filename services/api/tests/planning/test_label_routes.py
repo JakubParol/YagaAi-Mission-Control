@@ -146,12 +146,24 @@ def test_delete_label_not_found(client):
 
 
 def test_list_labels_by_project_key(client):
+    client.post(PREFIX, json={"name": "bug", "project_id": "p1"})
+    client.post(PREFIX, json={"name": "feat", "project_id": "p2"})
     resp = client.get(f"{PREFIX}?project_key=P1")
     assert resp.status_code == 200
     data = resp.json()["data"]
-    assert len(data) >= 0  # may be empty if no labels seeded for p1
+    assert len(data) > 0
+    assert all(lb["project_id"] == "p1" for lb in data)
 
 
 def test_list_labels_project_key_not_found(client):
     resp = client.get(f"{PREFIX}?project_key=NOPE")
     assert resp.status_code == 404
+
+
+def test_list_labels_project_key_case_insensitive(client):
+    client.post(PREFIX, json={"name": "ci-test", "project_id": "p1"})
+    resp = client.get(f"{PREFIX}?project_key=p1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(lb["project_id"] == "p1" for lb in data)

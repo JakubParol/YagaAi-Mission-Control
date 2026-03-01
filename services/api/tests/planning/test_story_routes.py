@@ -589,3 +589,11 @@ def test_list_stories_project_key_overrides_project_id(client):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert all(s["project_id"] == "p1" for s in data)
+
+
+def test_list_stories_project_key_case_insensitive(client):
+    resp = client.get("/v1/planning/stories?project_key=p1")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) > 0
+    assert all(s["project_id"] == "p1" for s in data)
