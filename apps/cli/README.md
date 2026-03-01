@@ -1,100 +1,91 @@
 # Mission Control CLI
 
-Command-line interface for Mission Control. Provides CRUD operations on planning entities (projects, epics, stories, tasks) via the Mission Control API.
+Command-line interface for Mission Control.
 
-## Setup
+The CLI is the operator-focused entry point for planning and observability workflows exposed by the Mission Control API.
+
+## Status
+
+v1 implemented. All planning and observability command groups are functional.
+
+## Scope (v1)
+
+- Planning operations mapped to `/v1/planning` API resources:
+  - projects, epics, stories, tasks, backlogs, assignments, labels, agents
+- Observability operations mapped to `/v1/observability` API resources:
+  - costs, requests, imports
+- Human-friendly table output with optional JSON mode (`--output json`) for scripting
+
+## Getting Started
 
 ```bash
+# Install dependencies
 cd apps/cli
 npm install
+
+# Development (runs via tsx, no build needed)
+npm run dev -- project list
+
+# Build
 npm run build
-```
 
-## Usage
-
-```bash
-# Use the built CLI
-node dist/index.js <command> [options]
-
-# Or link globally
+# Run built version
+node dist/index.js project list
+# or link globally:
 npm link
-mc <command> [options]
+mc project list
 ```
 
-### Global Options
+## Configuration
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--api-url <url>` | API base URL | `http://localhost:5001` (or `MC_API_URL` env) |
-| `--json` | Output raw JSON instead of tables | `false` |
-| `--help` | Show help | |
-| `--version` | Show version | |
+| Variable | Default | Purpose |
+|---|---|---|
+| `MC_API_BASE_URL` | `http://127.0.0.1:8080` | API base URL |
+| `MC_ACTOR_ID` | — | Actor identity header |
+| `MC_ACTOR_TYPE` | `user` | Actor type header |
+| `MC_OUTPUT` | `table` | Output mode: `table` or `json` |
+| `MC_TIMEOUT_SECONDS` | `30` | HTTP request timeout |
 
-### Environment Variables
+All env vars can be overridden with CLI flags (`--api-base`, `--actor-id`, `--actor-type`, `--output`, `--timeout-seconds`).
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MC_API_URL` | Base URL for the Mission Control API | `http://localhost:5001` |
+See [docs/CONFIGURATION.md](./docs/CONFIGURATION.md) for full details.
 
-## Commands
+## Repository Structure
 
-### Projects
-
-```bash
-mc projects list [--limit N] [--offset N] [--status ACTIVE|ARCHIVED]
-mc projects get <id>
-mc projects create --key MC --name "Mission Control" [--description "..."] [--repo-root /path]
-mc projects update <id> [--name "..."] [--description "..."] [--status ACTIVE|ARCHIVED]
-mc projects delete <id>
+```
+apps/cli/
+├── src/
+│   ├── index.ts                          # Entry point, program setup
+│   ├── core/                             # Shared infrastructure
+│   │   ├── config.ts                     # Runtime config resolution
+│   │   ├── errors.ts                     # Error classes + exit codes
+│   │   ├── envelope.ts                   # API envelope unwrapping
+│   │   ├── http.ts                       # HTTP client (fetch-based)
+│   │   ├── kv.ts                         # Key-value parsing utilities
+│   │   ├── output.ts                     # Table/JSON output rendering
+│   │   ├── payload.ts                    # Payload builder (--json/--file/--set)
+│   │   └── runtime.ts                    # CommandContext type
+│   └── features/
+│       ├── planning/
+│       │   ├── commands.ts               # All planning commands
+│       │   └── resources.ts              # Resource path specs
+│       └── observability/
+│           └── commands.ts               # Observability commands
+├── scripts/
+│   └── lint.sh                           # ESLint + TypeScript check
+├── docs/                                 # CLI-specific documentation
+├── package.json
+├── tsconfig.json
+└── eslint.config.mjs
 ```
 
-### Epics
+## Dependencies
 
-```bash
-mc epics list --project-id <id> [--status TODO|IN_PROGRESS|DONE] [--limit N]
-mc epics get <id> --project-id <id>
-mc epics create --project-id <id> --title "..." [--description "..."] [--priority N]
-mc epics update <id> --project-id <id> [--title "..."] [--status "..."]
-mc epics delete <id> --project-id <id>
-```
-
-### Stories
-
-```bash
-mc stories list [--project-id <id>] [--epic-id <id>] [--status "..."] [--story-type feature|bug|chore|spike]
-mc stories get <id>
-mc stories create --title "..." --story-type feature [--project-id <id>] [--epic-id <id>]
-mc stories update <id> [--title "..."] [--status "..."] [--epic-id <id>]
-mc stories delete <id>
-mc stories labels add <story-id> <label-id>
-mc stories labels remove <story-id> <label-id>
-```
-
-### Tasks
-
-```bash
-mc tasks list [--project-id <id>] [--story-id <id>] [--status "..."] [--assignee <agent-id>]
-mc tasks get <id>
-mc tasks create --title "..." --task-type coding [--project-id <id>] [--story-id <id>]
-mc tasks update <id> [--title "..."] [--status "..."] [--priority N] [--is-blocked true|false]
-mc tasks delete <id>
-mc tasks assign <task-id> <agent-id> [--reason "..."]
-mc tasks unassign <task-id>
-mc tasks labels add <task-id> <label-id>
-mc tasks labels remove <task-id> <label-id>
-```
-
-## Development
-
-```bash
-npm run dev -- projects list     # Run via ts-node
-npm run build                     # Compile TypeScript
-npm run lint                      # Run ESLint
-npm run lint:fix                  # Auto-fix lint issues
-```
+- Runtime: [commander](https://www.npmjs.com/package/commander) (CLI framework)
+- API contracts source of truth: `services/api/docs/API_CONTRACTS.md`
 
 ## Links
 
 - [AGENTS.md](./AGENTS.md)
+- [CLI docs index](./docs/INDEX.md)
 - [Root README](../../README.md)
-- [API Contracts](../../services/api/docs/API_CONTRACTS.md)

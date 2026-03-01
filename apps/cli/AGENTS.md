@@ -2,57 +2,46 @@
 
 ## What This Is
 
-TypeScript CLI for Mission Control. Wraps the REST API (`/v1/planning/`) to provide command-line CRUD for projects, epics, stories, and tasks.
+Command-line interface for Mission Control focused on planning and observability workflows.
 
 ## Scope
 
-- **In scope:** CLI commands for all planning entities (projects, epics, stories, tasks), assignments, labels
-- **Out of scope:** Observability commands (v2), interactive/TUI mode (v2), offline mode
+### In scope (v1)
 
-## Tech Stack
+- CLI command surface for Mission Control API v1
+- Planning entities and workflows:
+  - projects, epics, stories, tasks, backlogs, assignments, labels
+- Observability workflows:
+  - costs, requests, imports
+- Usable terminal UX:
+  - concise table/text output for humans
+  - JSON output mode for automation
 
-| Layer | Tech |
-|-------|------|
-| CLI framework | Commander.js |
-| HTTP client | Axios |
-| Output | chalk (colors), cli-table3 (tables) |
-| Language | TypeScript (strict), CommonJS output |
+### Out of scope (v1)
 
-## Structure
+- Local business logic divergence from API rules
+- Real-time streaming/WebSocket UX
+- Auth policy design (CLI only consumes configured auth/actor headers)
 
-```
-apps/cli/
-├── src/
-│   ├── index.ts           # Entry point — Commander setup
-│   ├── config.ts           # Configuration loader (MC_API_URL)
-│   ├── client.ts           # Axios-based API client
-│   ├── types.ts            # TypeScript interfaces (Project, Epic, Story, Task)
-│   ├── commands/
-│   │   ├── projects.ts     # projects list|get|create|update|delete
-│   │   ├── epics.ts        # epics list|get|create|update|delete
-│   │   ├── stories.ts      # stories list|get|create|update|delete + labels
-│   │   └── tasks.ts        # tasks list|get|create|update|delete + assign/unassign + labels
-│   └── utils/
-│       └── formatters.ts   # Table/JSON output helpers
-├── package.json
-├── tsconfig.json
-├── .eslintrc.json
-└── .gitignore
-```
+## Required Reading (Mandatory)
+
+Before making changes in `apps/cli`, read:
+
+1. [Root AGENTS.md](../../AGENTS.md)
+2. [/home/kuba/.openclaw/standards/coding-standards.md](/home/kuba/.openclaw/standards/coding-standards.md)
+3. [/home/kuba/.openclaw/standards/documentation.md](/home/kuba/.openclaw/standards/documentation.md)
+4. [docs/INDEX.md](./docs/INDEX.md)
+5. [services/api/docs/API_CONTRACTS.md](../../services/api/docs/API_CONTRACTS.md)
 
 ## Rules
 
-- All commands go through the API client — no direct DB access
-- Output supports `--json` flag for machine-readable output
-- Error handling via Axios interceptors — API errors are formatted and displayed
-- Follow workspace coding standards
-
-## Required Reading
-
-1. [Root AGENTS.md](../../AGENTS.md)
-2. [API Contracts](../../services/api/docs/API_CONTRACTS.md) — endpoint specs this CLI wraps
+- API contracts are the source of truth for request/response shapes.
+- Do not encode backend-only workflow rules in CLI; validate only what improves UX.
+- Keep command names stable and explicit; avoid ambiguous aliases as defaults.
+- Keep output deterministic for scriptability in JSON mode.
 
 ## Navigation
 
 - ↑ [Root AGENTS.md](../../AGENTS.md)
 - → [README.md](./README.md)
+- → [docs/INDEX.md](./docs/INDEX.md)

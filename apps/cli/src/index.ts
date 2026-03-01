@@ -1,42 +1,74 @@
 #!/usr/bin/env node
 
-import { Command } from "commander";
-import { loadConfig } from "./config";
-import { ApiClient } from "./client";
-import { registerProjectsCommand } from "./commands/projects";
-import { registerEpicsCommand } from "./commands/epics";
-import { registerStoriesCommand } from "./commands/stories";
-import { registerTasksCommand } from "./commands/tasks";
+import { Command, CommanderError } from "commander";
 
-const program = new Command();
+import {
+  detectOutputModeFromArgv,
+  resolveRuntimeConfig,
+  type GlobalCliOptions,
+} from "./core/config";
+import { exitCodeForError, printCliError } from "./core/errors";
+import { ApiClient } from "./core/http";
+import { parseIntegerOption } from "./core/kv";
+import type { CommandContext } from "./core/runtime";
+import { printPayload } from "./core/output";
+import { registerObservabilityCommands } from "./features/observability/commands";
+import { registerPlanningCommands } from "./features/planning/commands";
 
-program
-  .name("mc")
-  .description("Mission Control CLI — manage projects, epics, stories, and tasks")
-  .version("0.1.0")
-  .option("--api-url <url>", "API base URL (env: MC_API_URL)")
-  .option("--json", "Output raw JSON instead of tables", false);
+function contextFromCommand(command: Command): CommandContext {
+  const opts = command.optsWithGlobals<GlobalCliOptions>();
+  const config = resolveRuntimeConfig(opts);
+  return {
+    config,
+    client: new ApiClient(config),
+  };
+}
 
-// Config and client are created at parse time via preAction hook
-// so that --api-url global option is available
-let client: ApiClient;
+async function main(): Promise<void> {
+  const program = new Command();
 
-program.hook("preAction", () => {
-  const opts = program.opts();
-  client = new ApiClient(
-    loadConfig({ apiUrl: opts.apiUrl, jsonOutput: opts.json })
-  );
-});
+  program
+    .name("mc")
+    .description("Mission Control CLI")
+    .showHelpAfterError()
+    .option("--api-base <url>", "Mission Control API base URL")
+    .option("--actor-id <id>", "actor identity sent via X-Actor-Id")
+    .option(
+      "--actor-type <type>",
+      "actor type sent via X-Actor-Type (human|agent|system)",
+    )
+    .option("--output <mode>", "output mode: table|json")
+    .option(
+      "--timeout-seconds <n>",
+      "HTTP timeout in seconds",
+      (raw) => parseIntegerOption(raw, "timeout-seconds"),
+    )
+    .exitOverride();
 
-// Placeholder client for command registration (replaced by hook before any action runs)
-client = new ApiClient(loadConfig());
+  registerPlanningCommands(program, contextFromCommand);
+  registerObservabilityCommands(program, contextFromCommand);
 
-registerProjectsCommand(program, client);
-registerEpicsCommand(program, client);
-registerStoriesCommand(program, client);
-registerTasksCommand(program, client);
+  program
+    .command("health")
+    .description("check API health")
+    .action(async (_opts: unknown, command: Command) => {
+      const ctx = contextFromCommand(command);
+      const payload = await ctx.client.get("/healthz");
+      printPayload(payload, ctx.config.output);
+    });
 
-program.parseAsync(process.argv).catch((err) => {
-  console.error(err);
-  process.exit(1);
+  await program.parseAsync(process.argv);
+}
+
+main().catch((error: unknown) => {
+  if (error instanceof CommanderError) {
+    if (typeof error.exitCode === "number") {
+      process.exit(error.exitCode);
+    }
+    process.exit(1);
+  }
+
+  const output = detectOutputModeFromArgv(process.argv.slice(2));
+  printCliError(error, output);
+  process.exit(exitCodeForError(error));
 });
