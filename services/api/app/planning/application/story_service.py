@@ -38,6 +38,13 @@ class StoryService:
         task_count = await self._story_repo.get_task_count(story_id)
         return story, task_count
 
+    async def get_story_by_key(self, key: str) -> tuple[Story, int]:
+        story = await self._story_repo.get_by_key(key)
+        if not story:
+            raise NotFoundError(f"Story with key '{key}' not found")
+        task_count = await self._story_repo.get_task_count(story.id)
+        return story, task_count
+
     async def create_story(
         self,
         *,

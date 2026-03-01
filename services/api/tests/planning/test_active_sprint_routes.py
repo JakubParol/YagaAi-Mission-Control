@@ -127,7 +127,8 @@ def test_active_sprint_no_sprint_exists(client):
 
 def test_active_sprint_missing_project_id(client):
     resp = client.get(ACTIVE_SPRINT_URL)
-    assert resp.status_code == 422
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 def test_active_sprint_nonexistent_project(client):

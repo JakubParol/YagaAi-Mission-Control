@@ -57,6 +57,15 @@ async def list_stories(
     )
 
 
+@router.get("/by-key/{key}")
+async def get_story_by_key(
+    key: str,
+    service: StoryService = Depends(get_story_service),
+) -> Envelope[StoryDetailResponse]:
+    story, task_count = await service.get_story_by_key(key)
+    return Envelope(data=StoryDetailResponse(**story.__dict__, task_count=task_count))
+
+
 @router.get("/{story_id}")
 async def get_story(
     story_id: str,

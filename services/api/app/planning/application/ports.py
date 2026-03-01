@@ -288,6 +288,9 @@ class TaskRepository(ABC):
     async def get_by_id(self, task_id: str) -> Task | None: ...
 
     @abstractmethod
+    async def get_by_key(self, key: str) -> Task | None: ...
+
+    @abstractmethod
     async def create(self, task: Task) -> Task: ...
 
     @abstractmethod

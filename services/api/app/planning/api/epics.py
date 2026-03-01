@@ -41,6 +41,15 @@ async def list_epics(
     )
 
 
+@router.get("/by-key/{key}")
+async def get_epic_by_key(
+    key: str,
+    service: EpicService = Depends(get_epic_service),
+) -> Envelope[EpicDetailResponse]:
+    epic, story_count = await service.get_epic_by_key(key)
+    return Envelope(data=EpicDetailResponse(**epic.__dict__, story_count=story_count))
+
+
 @router.get("/{epic_id}")
 async def get_epic(
     epic_id: str,

@@ -17,6 +17,7 @@ from app.planning.application.backlog_service import BacklogService
 from app.planning.dependencies import get_backlog_service, resolve_project_key
 from app.planning.domain.models import BacklogKind
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
+from app.shared.api.errors import ValidationError
 
 router = APIRouter(prefix="/backlogs", tags=["planning/backlogs"])
 
@@ -67,9 +68,11 @@ async def list_backlogs(
 
 @router.get("/active-sprint")
 async def get_active_sprint(
-    project_id: str = Query(...),
+    project_id: str | None = Depends(resolve_project_key),
     service: BacklogService = Depends(get_backlog_service),
 ) -> Envelope[ActiveSprintResponse]:
+    if not project_id:
+        raise ValidationError("Either project_id or project_key is required")
     backlog, stories = await service.get_active_sprint(project_id)
     return Envelope(
         data=ActiveSprintResponse(

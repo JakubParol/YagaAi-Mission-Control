@@ -69,6 +69,20 @@ async def list_tasks(
     )
 
 
+@router.get("/by-key/{key}")
+async def get_task_by_key(
+    key: str,
+    service: TaskService = Depends(get_task_service),
+) -> Envelope[TaskDetailResponse]:
+    task, assignments = await service.get_task_by_key(key)
+    return Envelope(
+        data=TaskDetailResponse(
+            **task.__dict__,
+            assignments=[TaskAssignmentResponse(**a.__dict__) for a in assignments],
+        )
+    )
+
+
 @router.get("/{task_id}")
 async def get_task(
     task_id: str,
