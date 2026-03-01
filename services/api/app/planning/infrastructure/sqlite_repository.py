@@ -1171,6 +1171,7 @@ class SqliteTaskRepository(TaskRepository):
         key: str | None = None,
         project_id: str | None = None,
         story_id: str | None = None,
+        epic_id: str | None = None,
         status: str | None = None,
         assignee_id: str | None = None,
         limit: int = 20,
@@ -1189,6 +1190,9 @@ class SqliteTaskRepository(TaskRepository):
         if story_id:
             where_parts.append("story_id = ?")
             params.append(story_id)
+        if epic_id:
+            where_parts.append("story_id IN (SELECT id FROM stories WHERE epic_id = ?)")
+            params.append(epic_id)
         if status:
             where_parts.append("status = ?")
             params.append(status)

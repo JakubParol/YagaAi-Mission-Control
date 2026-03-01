@@ -276,6 +276,7 @@ class TaskRepository(ABC):
         key: str | None = None,
         project_id: str | None = None,
         story_id: str | None = None,
+        epic_id: str | None = None,
         status: str | None = None,
         assignee_id: str | None = None,
         limit: int = 20,
