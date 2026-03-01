@@ -461,6 +461,18 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
       printPayload(payload, ctx.config.output);
     },
   );
+
+  resource
+    .command("active-sprint")
+    .description("Get active sprint board for a project with stories")
+    .requiredOption("--project-id <id>", "project UUID")
+    .action(async (opts: { projectId: string }, command: Command) => {
+      const ctx = getContext(command);
+      const payload = await ctx.client.get("/v1/planning/backlogs/active-sprint", {
+        query: { project_id: opts.projectId },
+      });
+      printPayload(payload, ctx.config.output);
+    });
 }
 
 function registerLabelCommands(resource: Command, getContext: ContextFactory): void {

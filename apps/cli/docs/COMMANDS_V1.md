@@ -26,7 +26,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | `epic` | `list`, `get`, `create`, `update`, `delete` |
 | `story` | `list`, `get`, `create`, `update`, `delete` |
 | `task` | `list`, `get`, `create`, `update`, `delete`, `assign`, `unassign`, `assignments` |
-| `backlog` | `list`, `get`, `create`, `update`, `delete`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder` |
+| `backlog` | `list`, `get`, `create`, `update`, `delete`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder`, `active-sprint` |
 | `agent` | `list`, `get`, `create`, `update`, `delete` |
 | `label` | `list`, `get`, `create`, `update`, `delete`, `attach-story`, `detach-story`, `attach-task`, `detach-task` |
 
@@ -49,6 +49,7 @@ mc task list --project-id <uuid> --status TODO,IN_PROGRESS --sort priority,-upda
 mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"
 mc task assignments --id <uuid>
 mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
+mc backlog active-sprint --project-id <uuid>
 mc label attach-task --task-id <uuid> --label-id <uuid>
 mc obs costs --days 7
 mc obs requests list --model claude-sonnet-4-20250514 --limit 50
