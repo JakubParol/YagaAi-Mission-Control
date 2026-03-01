@@ -23,6 +23,6 @@
 - [Entity Model v1](../../../docs/ENTITY_MODEL_V1.md)
 - [Workflow Logic v1](../../../docs/WORKFLOW_LOGIC_V1.md)
 
-## Planned (future tasks)
+### Testing
 
-- Test strategy
+- [Test Strategy](./TEST_STRATEGY.md) — test pyramid, structure, fixtures, patterns, coverage goals

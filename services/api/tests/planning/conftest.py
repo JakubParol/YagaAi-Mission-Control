@@ -1,3 +1,22 @@
+"""
+Shared fixtures for planning module integration tests.
+
+Provides an in-memory SQLite database with the full planning schema and seed data,
+plus a FastAPI TestClient wired to use that database.
+
+Fixtures:
+- _setup_test_db (autouse) — creates temp SQLite DB with schema + seed data,
+  patches app.config.settings.db_path
+- client — FastAPI TestClient instance
+
+Seed data:
+- 2 projects (p1, p2) with counters
+- 3 backlogs (b1, b2 project-scoped + bg global)
+- 4 stories (s1, s2 in p1; sp2 in p2; sg global)
+- 4 tasks (t1, t2 in p1; tp2 in p2; tg global)
+- 2 agents (a1, a2)
+"""
+
 import os
 import sqlite3
 
@@ -28,10 +47,37 @@ def _setup_test_db(tmp_path, monkeypatch):
           updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE project_counters (
+          project_id TEXT PRIMARY KEY,
+          next_number INTEGER NOT NULL DEFAULT 1,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE epics (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          key TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          status TEXT NOT NULL DEFAULT 'TODO',
+          status_mode TEXT NOT NULL DEFAULT 'MANUAL',
+          status_override TEXT,
+          status_override_set_at TEXT,
+          is_blocked INTEGER NOT NULL DEFAULT 0,
+          blocked_reason TEXT,
+          priority INTEGER,
+          metadata_json TEXT,
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(project_id, key)
+        );
+
         CREATE TABLE stories (
           id TEXT PRIMARY KEY,
           project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          epic_id TEXT,
+          epic_id TEXT REFERENCES epics(id) ON DELETE SET NULL,
           key TEXT,
           title TEXT NOT NULL,
           intent TEXT,
@@ -49,13 +95,14 @@ def _setup_test_db(tmp_path, monkeypatch):
           updated_by TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
+          started_at TEXT,
           completed_at TEXT
         );
 
         CREATE TABLE tasks (
           id TEXT PRIMARY KEY,
           project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          story_id TEXT,
+          story_id TEXT REFERENCES stories(id) ON DELETE SET NULL,
           key TEXT,
           title TEXT NOT NULL,
           objective TEXT,
@@ -110,6 +157,55 @@ def _setup_test_db(tmp_path, monkeypatch):
           PRIMARY KEY (backlog_id, task_id),
           UNIQUE(task_id)
         );
+
+        CREATE TABLE labels (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+          name       TEXT NOT NULL,
+          color      TEXT,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE story_labels (
+          story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+          label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+          added_at TEXT NOT NULL,
+          PRIMARY KEY (story_id, label_id)
+        );
+
+        CREATE TABLE task_labels (
+          task_id  TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
+          added_at TEXT NOT NULL,
+          PRIMARY KEY (task_id, label_id)
+        );
+
+        CREATE TABLE agents (
+          id             TEXT PRIMARY KEY,
+          openclaw_key   TEXT NOT NULL UNIQUE,
+          name           TEXT NOT NULL,
+          role           TEXT,
+          worker_type    TEXT,
+          is_active      INTEGER NOT NULL DEFAULT 1,
+          source         TEXT NOT NULL DEFAULT 'manual',
+          metadata_json  TEXT,
+          last_synced_at TEXT,
+          created_at     TEXT NOT NULL,
+          updated_at     TEXT NOT NULL
+        );
+
+        CREATE TABLE task_assignments (
+          id            TEXT PRIMARY KEY,
+          task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          agent_id      TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          assigned_at   TEXT NOT NULL,
+          unassigned_at TEXT,
+          assigned_by   TEXT,
+          reason        TEXT
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
+          ON task_assignments(task_id) WHERE unassigned_at IS NULL;
         """)
 
     conn.executescript(f"""
@@ -117,6 +213,11 @@ def _setup_test_db(tmp_path, monkeypatch):
         VALUES
           ('p1', 'P1', 'Project 1', NULL, 'ACTIVE', '{TS}', '{TS}'),
           ('p2', 'P2', 'Project 2', NULL, 'ACTIVE', '{TS}', '{TS}');
+
+        INSERT INTO project_counters (project_id, next_number, updated_at)
+        VALUES
+          ('p1', 1, '{TS}'),
+          ('p2', 1, '{TS}');
 
         INSERT INTO backlogs (id, project_id, name, kind, status, is_default, created_at, updated_at)
         VALUES
@@ -137,6 +238,11 @@ def _setup_test_db(tmp_path, monkeypatch):
           ('t2', 'p1', 'Task 2', 'TASK', 'TODO', '{TS}', '{TS}'),
           ('tp2', 'p2', 'Task P2', 'TASK', 'TODO', '{TS}', '{TS}'),
           ('tg', NULL, 'Global Task', 'TASK', 'TODO', '{TS}', '{TS}');
+
+        INSERT INTO agents (id, openclaw_key, name, role, is_active, source, created_at, updated_at)
+        VALUES
+          ('a1', 'agent-1', 'Agent Alpha', 'developer', 1, 'manual', '{TS}', '{TS}'),
+          ('a2', 'agent-2', 'Agent Beta', 'reviewer', 1, 'manual', '{TS}', '{TS}');
         """)
     conn.close()
 
