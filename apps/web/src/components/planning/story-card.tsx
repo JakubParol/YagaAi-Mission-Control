@@ -18,6 +18,8 @@ export interface StoryCardStory {
   status: ItemStatus;
   priority: number | null;
   story_type: string;
+  epic_key?: string | null;
+  epic_title?: string | null;
   position: number;
   task_count: number;
   done_task_count: number;

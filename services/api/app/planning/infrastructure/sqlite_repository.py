@@ -1132,11 +1132,14 @@ class SqliteBacklogRepository(BacklogRepository):
         story_rows = await _fetch_all(
             self._db,
             """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+                      e.key AS epic_key,
+                      e.title AS epic_title,
                       bs.position,
                       COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0) AS task_count,
                       COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id AND t.status = 'DONE'), 0) AS done_task_count
                FROM backlog_stories bs
                JOIN stories s ON s.id = bs.story_id
+               LEFT JOIN epics e ON e.id = s.epic_id
                WHERE bs.backlog_id = ?
                ORDER BY bs.position ASC""",
             [backlog_id],
@@ -1178,11 +1181,14 @@ class SqliteBacklogRepository(BacklogRepository):
         story_rows = await _fetch_all(
             self._db,
             """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+                      e.key AS epic_key,
+                      e.title AS epic_title,
                       bs.position,
                       COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0) AS task_count,
                       COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id AND t.status = 'DONE'), 0) AS done_task_count
                FROM backlog_stories bs
                JOIN stories s ON s.id = bs.story_id
+               LEFT JOIN epics e ON e.id = s.epic_id
                WHERE bs.backlog_id = ?
                ORDER BY bs.position ASC""",
             [backlog.id],

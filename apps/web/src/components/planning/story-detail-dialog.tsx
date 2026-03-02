@@ -13,9 +13,9 @@ import {
 import { StoryView, type StoryDetail, type TaskItem } from "./story-view";
 
 type DialogState =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ok"; story: StoryDetail; tasks: TaskItem[] };
+  | { kind: "loading"; forStoryId: string }
+  | { kind: "error"; forStoryId: string; message: string }
+  | { kind: "ok"; forStoryId: string; story: StoryDetail; tasks: TaskItem[] };
 
 export function StoryDetailDialog({
   storyId,
@@ -26,13 +26,22 @@ export function StoryDetailDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [state, setState] = useState<DialogState>({ kind: "loading" });
+  const [state, setState] = useState<DialogState>(() => ({
+    kind: "loading",
+    forStoryId: storyId ?? "",
+  }));
+
+  const viewState: DialogState =
+    open && storyId
+      ? state.forStoryId === storyId
+        ? state
+        : { kind: "loading", forStoryId: storyId }
+      : state;
 
   useEffect(() => {
     if (!storyId || !open) return;
 
     let cancelled = false;
-    setState({ kind: "loading" });
 
     Promise.all([
       fetch(apiUrl(`/v1/planning/stories/${storyId}`)).then((res) => {
@@ -46,10 +55,16 @@ export function StoryDetailDialog({
     ])
       .then(([storyJson, tasksJson]) => {
         if (!cancelled)
-          setState({ kind: "ok", story: storyJson.data, tasks: tasksJson.data ?? [] });
+          setState({
+            kind: "ok",
+            forStoryId: storyId,
+            story: storyJson.data,
+            tasks: tasksJson.data ?? [],
+          });
       })
       .catch((err) => {
-        if (!cancelled) setState({ kind: "error", message: String(err) });
+        if (!cancelled)
+          setState({ kind: "error", forStoryId: storyId, message: String(err) });
       });
 
     return () => {
@@ -60,7 +75,7 @@ export function StoryDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-6xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
-        {state.kind === "loading" && (
+        {viewState.kind === "loading" && (
           <>
             <DialogHeader>
               <DialogTitle className="sr-only">Loading story…</DialogTitle>
@@ -71,29 +86,29 @@ export function StoryDetailDialog({
           </>
         )}
 
-        {state.kind === "error" && (
+        {viewState.kind === "error" && (
           <>
             <DialogHeader>
               <DialogTitle className="sr-only">Error</DialogTitle>
             </DialogHeader>
             <div className="py-8 text-center">
               <AlertTriangle className="mx-auto mb-2 size-6 text-destructive" />
-              <p className="text-sm text-muted-foreground">{state.message}</p>
+              <p className="text-sm text-muted-foreground">{viewState.message}</p>
             </div>
           </>
         )}
 
-        {state.kind === "ok" && (
+        {viewState.kind === "ok" && (
           <>
             <DialogHeader className="sr-only">
-              <DialogTitle>{state.story.title}</DialogTitle>
+              <DialogTitle>{viewState.story.title}</DialogTitle>
             </DialogHeader>
             <StoryView
-              story={state.story}
-              tasks={state.tasks}
+              story={viewState.story}
+              tasks={viewState.tasks}
               headerActions={
                 <a
-                  href={`/planning/stories/${state.story.id}`}
+                  href={`/planning/stories/${viewState.story.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

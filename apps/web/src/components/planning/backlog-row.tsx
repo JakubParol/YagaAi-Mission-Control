@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { CheckCircle2 } from "lucide-react";
 import type { StoryCardStory } from "./story-card";
 import { STATUS_STYLE, STATUS_LABEL, TYPE_CONFIG } from "./story-card";
 
 /**
  * A single compact row in the Jira-like backlog list.
- * Columns: type icon | key | summary | status pill | task progress
+ * Columns: type icon | key | summary | epic | status pill | SP | task progress
  */
 export function BacklogRow({
   item,
@@ -45,6 +46,23 @@ export function BacklogRow({
         {item.title}
       </span>
 
+      {/* Epic */}
+      <span className="shrink-0 w-[240px]">
+        {item.epic_key && item.epic_title ? (
+          <Badge
+            variant="outline"
+            className={cn(
+              "w-full justify-start gap-1.5 px-2 py-0.5 text-[10px] font-medium",
+              "bg-violet-500/10 text-violet-300 border-violet-500/30",
+            )}
+            title={`${item.epic_key} ${item.epic_title}`}
+          >
+            <span className="font-mono">{item.epic_key}</span>
+            <span className="truncate min-w-0">{item.epic_title}</span>
+          </Badge>
+        ) : null}
+      </span>
+
       {/* Status pill */}
       <span
         className={cn(
@@ -55,6 +73,11 @@ export function BacklogRow({
       >
         <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
         {STATUS_LABEL[item.status]}
+      </span>
+
+      {/* SP */}
+      <span className="shrink-0 w-[36px] text-center text-[11px] text-muted-foreground">
+        -
       </span>
 
       {/* Task progress */}
