@@ -202,6 +202,10 @@ class BacklogService:
         await self.get_backlog(backlog_id)
         return await self._repo.list_backlog_stories(backlog_id)
 
+    async def list_backlog_tasks(self, backlog_id: str) -> list[BacklogTaskItem]:
+        _ = await self.get_backlog(backlog_id)
+        return await self._repo.list_task_items(backlog_id)
+
     async def get_active_sprint(self, project_id: str) -> ActiveSprintResult:
         backlog, stories = await self._repo.get_active_sprint_with_stories(project_id)
         if not backlog:

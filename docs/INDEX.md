@@ -34,3 +34,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 
 - ↑ [README.md](../README.md)
 - ↑ [AGENTS.md](../AGENTS.md)
+
+## MC-98 — Backlog rows contract
+
+- See [MC-98 — Backlog Jira-like list rows (minimal)](./REPO_MAP.md#mc-98--backlog-jira-like-list-rows-minimal) in the repository map for route scope and file ownership.
