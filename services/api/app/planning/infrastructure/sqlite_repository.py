@@ -1143,6 +1143,26 @@ class SqliteBacklogRepository(BacklogRepository):
         )
         return [dict(r) for r in story_rows]
 
+    async def list_task_items(self, backlog_id: str) -> list[BacklogTaskItem]:
+        rows = await _fetch_all(
+            self._db,
+            """SELECT bt.backlog_id, bt.task_id, bt.position, bt.added_at
+               FROM backlog_tasks bt
+               JOIN tasks t ON t.id = bt.task_id
+               WHERE bt.backlog_id = ? AND t.story_id IS NULL
+               ORDER BY bt.position ASC""",
+            [backlog_id],
+        )
+        return [
+            BacklogTaskItem(
+                backlog_id=row["backlog_id"],
+                task_id=row["task_id"],
+                position=row["position"],
+                added_at=row["added_at"],
+            )
+            for row in rows
+        ]
+
     async def get_active_sprint_with_stories(
         self, project_id: str
     ) -> tuple[Backlog | None, list[dict[str, Any]]]:

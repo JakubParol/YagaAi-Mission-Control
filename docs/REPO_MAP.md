@@ -89,3 +89,14 @@ FastAPI REST service with two domain modules:
 - ↑ [Docs Index](./INDEX.md)
 - ↑ [README.md](../README.md)
 - ↑ [AGENTS.md](../AGENTS.md)
+
+## MC-98 — Backlog Jira-like list rows (minimal)
+
+Defines the minimal rendering contract for backlog rows in the web planning backlog experience.
+
+| Item | Detail |
+|---|---|
+| Scope | Minimal Jira-like list row presentation for backlog stories |
+| Route | `/planning/backlog` |
+| Primary page | `apps/web/src/app/planning/backlog/page.tsx` |
+| Story detail dialog | `apps/web/src/components/planning/story-detail-dialog.tsx` |

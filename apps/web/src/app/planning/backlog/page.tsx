@@ -15,7 +15,8 @@ import { apiUrl } from "@/lib/api-client";
 import type { BacklogKind, BacklogStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
-import { StoryCard, type StoryCardStory } from "@/components/planning/story-card";
+import type { StoryCardStory } from "@/components/planning/story-card";
+import { BacklogRow } from "@/components/planning/backlog-row";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { cn } from "@/lib/utils";
 
@@ -85,15 +86,6 @@ function BacklogSection({
   const kindConf = KIND_CONFIG[backlog.kind] ?? KIND_CONFIG.BACKLOG;
 
   const total = stories.length;
-  const done = stories.filter((s) => s.status === "DONE").length;
-  const inProgress = stories.filter(
-    (s) =>
-      s.status === "IN_PROGRESS" ||
-      s.status === "CODE_REVIEW" ||
-      s.status === "VERIFY",
-  ).length;
-  const pctDone = total > 0 ? Math.round((done / total) * 100) : 0;
-
   const start = formatDate(backlog.start_date);
   const end = formatDate(backlog.end_date);
   const Chevron = collapsed ? ChevronRight : ChevronDown;
@@ -112,72 +104,47 @@ function BacklogSection({
         type="button"
         onClick={() => setCollapsed(!collapsed)}
         className={cn(
-          "w-full flex items-start justify-between gap-4 px-4 py-3.5",
+          "w-full flex items-center gap-3 px-4 py-2.5",
           "hover:bg-muted/20 transition-colors duration-150 text-left",
         )}
       >
-        <div className="flex items-start gap-3 min-w-0">
-          <Chevron className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-          <div className="space-y-1 min-w-0">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h3 className="text-sm font-semibold text-foreground">
-                {backlog.name}
-              </h3>
-              {isActiveSprint && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400">
-                  <Zap className="size-2.5" />
-                  Active Sprint
-                </span>
-              )}
-              <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {kindConf.label}
-              </span>
-              {backlog.status === "CLOSED" && (
-                <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
-                  Closed
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              {(start || end) && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="size-3" />
-                  {start && end ? `${start} – ${end}` : (start ?? end)}
-                </span>
-              )}
-              <span className="flex items-center gap-1">
-                <Hash className="size-3" />
-                {total} {total === 1 ? "story" : "stories"}
-              </span>
-            </div>
-          </div>
-        </div>
+        <Chevron className="size-4 shrink-0 text-muted-foreground" />
 
-        {/* Progress */}
-        {total > 0 && (
-          <div className="flex flex-col items-end gap-1.5 min-w-[120px] shrink-0 pt-0.5">
-            <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-              {done}/{total} done ({pctDone}%)
-            </span>
-            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
-              {done > 0 && (
-                <div
-                  className="bg-emerald-500 transition-all duration-300"
-                  style={{ width: `${(done / total) * 100}%` }}
-                />
-              )}
-              {inProgress > 0 && (
-                <div
-                  className="bg-blue-500/60 transition-all duration-300"
-                  style={{ width: `${(inProgress / total) * 100}%` }}
-                />
-              )}
-            </div>
-          </div>
+        <h3 className="text-sm font-semibold text-foreground">
+          {backlog.name}
+        </h3>
+
+        {isActiveSprint && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400">
+            <Zap className="size-2.5" />
+            Active
+          </span>
         )}
+
+        <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          {kindConf.label}
+        </span>
+
+        {backlog.status === "CLOSED" && (
+          <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+            Closed
+          </span>
+        )}
+
+        {(start || end) && (
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground ml-auto">
+            <Calendar className="size-3" />
+            {start && end ? `${start} – ${end}` : (start ?? end)}
+          </span>
+        )}
+
+        <span className="flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
+          <Hash className="size-3" />
+          {total}
+        </span>
       </button>
 
-      {/* Story list */}
+      {/* Row list */}
       {!collapsed && (
         <div className="border-t border-border/30">
           {stories.length === 0 ? (
@@ -185,11 +152,11 @@ function BacklogSection({
               No stories in this backlog
             </p>
           ) : (
-            <div className="grid grid-cols-1 gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="divide-y divide-border/10">
               {stories.map((story) => (
-                <StoryCard
+                <BacklogRow
                   key={story.id}
-                  story={story}
+                  item={story}
                   onClick={onStoryClick}
                 />
               ))}
@@ -228,7 +195,7 @@ export default function BacklogPage() {
     setFetchResult(null);
   }
 
-  // Derive state: no-project → loading (null result) → fetched result
+  // Derive state
   const state: PageState = !singleProjectId
     ? { kind: "no-project" }
     : fetchResult === null
@@ -272,7 +239,7 @@ export default function BacklogPage() {
 
         if (cancelled) return;
 
-        // Sort: active sprints first, then by kind (SPRINT > BACKLOG > IDEAS), closed last
+        // Sort: active sprints first, then by kind, closed last
         sections.sort((a, b) => {
           const aActive =
             a.backlog.kind === "SPRINT" && a.backlog.status === "ACTIVE"

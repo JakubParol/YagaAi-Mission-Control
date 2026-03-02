@@ -22,6 +22,17 @@ from app.shared.api.errors import ValidationError
 router = APIRouter(prefix="/backlogs", tags=["planning/backlogs"])
 
 
+def _validate_backlog_project_scope(backlog: BacklogResponse, project_id: str | None) -> None:
+    if project_id is None:
+        return
+    if project_id == "null":
+        if backlog.project_id is not None:
+            raise ValidationError("Backlog does not belong to global scope")
+        return
+    if backlog.project_id != project_id:
+        raise ValidationError(f"Backlog does not belong to project {project_id}")
+
+
 @router.post("", status_code=201)
 async def create_backlog(
     body: BacklogCreate,
@@ -138,6 +149,21 @@ async def list_backlog_stories(
 ) -> Envelope[list[SprintStoryResponse]]:
     stories = await service.get_backlog_stories(backlog_id)
     return Envelope(data=[SprintStoryResponse(**s) for s in stories])
+
+
+@router.get("/{backlog_id}/tasks")
+async def list_backlog_tasks(
+    backlog_id: str,
+    service: BacklogService = Depends(get_backlog_service),
+    project_id: str | None = Depends(resolve_project_key),
+) -> ListEnvelope[BacklogTaskItemResponse]:
+    backlog = await service.get_backlog(backlog_id)
+    _validate_backlog_project_scope(BacklogResponse(**backlog.__dict__), project_id)
+    tasks = await service.list_backlog_tasks(backlog_id)
+    return ListEnvelope(
+        data=[BacklogTaskItemResponse(**item.__dict__) for item in tasks],
+        meta=ListMeta(total=len(tasks), limit=len(tasks), offset=0),
+    )
 
 
 @router.delete("/{backlog_id}/stories/{story_id}", status_code=204)
