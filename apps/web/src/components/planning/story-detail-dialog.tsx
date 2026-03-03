@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Calendar,
@@ -49,6 +49,12 @@ interface TaskDraft {
   due_at: string;
 }
 
+interface TaskEditDraft extends TaskDraft {
+  status: ItemStatus;
+  is_blocked: boolean;
+  blocked_reason: string;
+}
+
 interface StoryDraft {
   title: string;
   story_type: string;
@@ -89,6 +95,15 @@ function initialTaskDraft(): TaskDraft {
     priority: "",
     estimate_points: "",
     due_at: "",
+  };
+}
+
+function initialTaskEditDraft(): TaskEditDraft {
+  return {
+    ...initialTaskDraft(),
+    status: "TODO",
+    is_blocked: false,
+    blocked_reason: "",
   };
 }
 
@@ -225,7 +240,7 @@ function mapTaskFromApi(raw: Record<string, unknown>): TaskItem {
   };
 }
 
-function toTaskDraft(task: TaskItem): TaskDraft {
+function toTaskEditDraft(task: TaskItem): TaskEditDraft {
   return {
     title: task.title,
     objective: task.objective ?? "",
@@ -233,6 +248,9 @@ function toTaskDraft(task: TaskItem): TaskDraft {
     priority: task.priority !== null ? String(task.priority) : "",
     estimate_points: task.estimate_points !== null ? String(task.estimate_points) : "",
     due_at: toDateInputValue(task.due_at),
+    status: task.status,
+    is_blocked: task.is_blocked,
+    blocked_reason: task.blocked_reason ?? "",
   };
 }
 
@@ -245,7 +263,7 @@ function TaskRow({
 }: {
   task: TaskItem;
   pending: boolean;
-  onEdit: () => void;
+  onEdit: (trigger: HTMLButtonElement) => void;
   onMarkDone: () => void;
   onDelete: () => void;
 }) {
@@ -285,7 +303,13 @@ function TaskRow({
       </span>
 
       <div className="flex justify-end gap-1">
-        <Button type="button" size="xs" variant="outline" disabled={pending} onClick={onEdit}>
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          disabled={pending}
+          onClick={(event) => onEdit(event.currentTarget)}
+        >
           Edit
         </Button>
         <Button
@@ -298,7 +322,15 @@ function TaskRow({
           <CheckCircle2 className="size-3" />
           Done
         </Button>
-        <Button type="button" size="xs" variant="destructive" disabled={pending} onClick={onDelete}>
+        <Button
+          type="button"
+          size="xs"
+          variant="destructive"
+          aria-label="Delete task"
+          title="Delete task"
+          disabled={pending}
+          onClick={onDelete}
+        >
           <Trash2 className="size-3" />
         </Button>
       </div>
@@ -307,12 +339,10 @@ function TaskRow({
 }
 
 function TaskForm({
-  mode,
   draft,
   disabled,
   onUpdate,
 }: {
-  mode: "create" | "edit";
   draft: TaskDraft;
   disabled: boolean;
   onUpdate: (field: keyof TaskDraft, value: string) => void;
@@ -393,11 +423,6 @@ function TaskForm({
         />
       </div>
 
-      {mode === "edit" && (
-        <p className="text-[11px] text-muted-foreground sm:col-span-2">
-          For status or blocked changes, use the full story page view.
-        </p>
-      )}
     </div>
   );
 }
@@ -424,7 +449,9 @@ function TaskManager({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createDraft, setCreateDraft] = useState<TaskDraft>(initialTaskDraft());
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<TaskDraft>(initialTaskDraft());
+  const [editDraft, setEditDraft] = useState<TaskEditDraft>(initialTaskEditDraft());
+  const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const lastEditTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const editingTask = useMemo(
     () => tasks.find((task) => task.id === editingTaskId) ?? null,
@@ -435,15 +462,29 @@ function TaskManager({
     setCreateDraft((prev) => ({ ...prev, [field]: value }));
   };
 
-  const updateEditDraft = (field: keyof TaskDraft, value: string) => {
+  const updateEditDraft = (field: keyof TaskEditDraft, value: string | boolean) => {
     setEditDraft((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const closeCreateDialog = () => {
+    setIsCreateOpen(false);
+    queueMicrotask(() => {
+      createButtonRef.current?.focus();
+    });
+  };
+
+  const closeEditDialog = () => {
+    setEditingTaskId(null);
+    queueMicrotask(() => {
+      lastEditTriggerRef.current?.focus();
+    });
   };
 
   const handleCreate = async () => {
     const created = await onCreate(createDraft);
     if (!created) return;
     setCreateDraft(initialTaskDraft());
-    setIsCreateOpen(false);
+    closeCreateDialog();
   };
 
   const handleEditSave = async () => {
@@ -458,29 +499,46 @@ function TaskManager({
     const estimate = parseNumberOrNull(editDraft.estimate_points);
     const dueAt = editDraft.due_at.trim() === "" ? null : editDraft.due_at.trim();
     const currentDueAt = toDateInputValue(editingTask.due_at);
+    const blockedReason = editDraft.blocked_reason.trim();
+    const normalizedBlockedReason = editDraft.is_blocked
+      ? blockedReason === ""
+        ? null
+        : blockedReason
+      : null;
+    const currentBlockedReason = editingTask.blocked_reason?.trim() || null;
 
     if (title === "") return;
     if (title !== editingTask.title) patch.title = title;
     if (objective !== editingTask.objective) patch.objective = objective;
     if (taskType !== editingTask.task_type) patch.task_type = taskType;
+    if (editDraft.status !== editingTask.status) patch.status = editDraft.status;
     if (priority !== editingTask.priority) patch.priority = priority;
     if (estimate !== editingTask.estimate_points) patch.estimate_points = estimate;
     if ((dueAt ?? "") !== currentDueAt) patch.due_at = dueAt;
+    if (editDraft.is_blocked !== editingTask.is_blocked) patch.is_blocked = editDraft.is_blocked;
+    if (normalizedBlockedReason !== currentBlockedReason) {
+      patch.blocked_reason = normalizedBlockedReason;
+    }
 
     if (Object.keys(patch).length === 0) {
-      setEditingTaskId(null);
+      closeEditDialog();
       return;
     }
 
     const saved = await onPatch(editingTask.id, patch);
-    if (saved) setEditingTaskId(null);
+    if (saved) closeEditDialog();
   };
 
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Tasks ({tasks.length})</h3>
-        <Button type="button" size="xs" onClick={() => setIsCreateOpen(true)}>
+        <Button
+          ref={createButtonRef}
+          type="button"
+          size="xs"
+          onClick={() => setIsCreateOpen(true)}
+        >
           <Plus className="size-3" />
           Create task
         </Button>
@@ -502,9 +560,10 @@ function TaskManager({
                 key={task.id}
                 task={task}
                 pending={pendingTaskIds.has(task.id)}
-                onEdit={() => {
+                onEdit={(trigger) => {
+                  lastEditTriggerRef.current = trigger;
                   setEditingTaskId(task.id);
-                  setEditDraft(toTaskDraft(task));
+                  setEditDraft(toTaskEditDraft(task));
                 }}
                 onMarkDone={() => onMarkDone(task.id)}
                 onDelete={() => onDelete(task.id)}
@@ -514,19 +573,27 @@ function TaskManager({
         )}
       </div>
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            setIsCreateOpen(true);
+            return;
+          }
+          closeCreateDialog();
+        }}
+      >
         <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Create task</DialogTitle>
           </DialogHeader>
           <TaskForm
-            mode="create"
             draft={createDraft}
             disabled={isCreating}
             onUpdate={updateCreateDraft}
           />
           <div className="mt-4 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+            <Button type="button" variant="outline" onClick={closeCreateDialog}>
               Cancel
             </Button>
             <Button
@@ -544,7 +611,7 @@ function TaskManager({
       <Dialog
         open={editingTask !== null}
         onOpenChange={(nextOpen) => {
-          if (!nextOpen) setEditingTaskId(null);
+          if (!nextOpen) closeEditDialog();
         }}
       >
         <DialogContent className="sm:max-w-xl" aria-describedby={undefined}>
@@ -554,13 +621,52 @@ function TaskManager({
           {editingTask ? (
             <>
               <TaskForm
-                mode="edit"
                 draft={editDraft}
                 disabled={pendingTaskIds.has(editingTask.id)}
-                onUpdate={updateEditDraft}
+                onUpdate={(field, value) => updateEditDraft(field, value)}
               />
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Status</label>
+                  <select
+                    value={editDraft.status}
+                    disabled={pendingTaskIds.has(editingTask.id)}
+                    onChange={(event) => updateEditDraft("status", event.target.value as ItemStatus)}
+                    className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
+                  >
+                    <option value="TODO">Todo</option>
+                    <option value="IN_PROGRESS">In progress</option>
+                    <option value="CODE_REVIEW">Code review</option>
+                    <option value="VERIFY">Verify</option>
+                    <option value="DONE">Done</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="inline-flex h-9 items-center gap-2 text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={editDraft.is_blocked}
+                      disabled={pendingTaskIds.has(editingTask.id)}
+                      onChange={(event) => updateEditDraft("is_blocked", event.target.checked)}
+                      className="size-4 rounded border-border/60 bg-background"
+                    />
+                    Blocked
+                  </label>
+                </div>
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-xs text-muted-foreground">Blocked reason</label>
+                  <textarea
+                    value={editDraft.blocked_reason}
+                    disabled={pendingTaskIds.has(editingTask.id) || !editDraft.is_blocked}
+                    onChange={(event) => updateEditDraft("blocked_reason", event.target.value)}
+                    rows={2}
+                    className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm focus-ring"
+                    placeholder="Leave empty when not blocked."
+                  />
+                </div>
+              </div>
               <div className="mt-4 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditingTaskId(null)}>
+                <Button type="button" variant="outline" onClick={closeEditDialog}>
                   Cancel
                 </Button>
                 <Button
