@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  Calendar,
   CheckCircle2,
+  Clock,
   ExternalLink,
   Loader2,
-  Pencil,
   Plus,
   Trash2,
   UserRound,
@@ -33,8 +34,7 @@ import {
   toTaskStatusDonePatch,
   type TaskPatch,
 } from "./task-optimistic";
-import { StoryView, type StoryDetail, type TaskItem } from "./story-view";
-import { StoryForm } from "./story-form";
+import type { StoryDetail, TaskItem } from "./story-view";
 
 type DialogState =
   | { kind: "loading"; forStoryId: string }
@@ -56,6 +56,30 @@ interface TaskDraft {
   due_at: string;
 }
 
+interface StoryDraft {
+  title: string;
+  story_type: string;
+  description: string;
+  priority: string;
+  epic_id: string;
+  blocked_reason: string;
+}
+
+interface EpicOption {
+  id: string;
+  key: string | null;
+  title: string;
+}
+
+interface NormalizedStory {
+  title: string;
+  story_type: string;
+  description: string | null;
+  priority: number | null;
+  epic_id: string | null;
+  blocked_reason: string | null;
+}
+
 const TASK_STATUS_OPTIONS: ItemStatus[] = [
   "TODO",
   "IN_PROGRESS",
@@ -65,6 +89,12 @@ const TASK_STATUS_OPTIONS: ItemStatus[] = [
 ];
 
 const TASK_TYPE_OPTIONS = ["CODING", "TESTING", "RESEARCH", "DOCS", "OPS"] as const;
+const STORY_TYPE_OPTIONS = [
+  { value: "USER_STORY", label: "Story" },
+  { value: "BUG", label: "Bug" },
+  { value: "SPIKE", label: "Spike" },
+  { value: "CHORE", label: "Chore" },
+] as const;
 
 function initialTaskDraft(): TaskDraft {
   return {
@@ -75,6 +105,66 @@ function initialTaskDraft(): TaskDraft {
     estimate_points: "",
     due_at: "",
   };
+}
+
+function toStoryDraft(story: StoryDetail): StoryDraft {
+  return {
+    title: story.title ?? "",
+    story_type: story.story_type ?? "USER_STORY",
+    description: story.description ?? "",
+    priority: story.priority !== null ? String(story.priority) : "",
+    epic_id: story.epic_id ?? "",
+    blocked_reason: story.blocked_reason ?? "",
+  };
+}
+
+function parsePriority(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeStoryDraft(draft: StoryDraft): NormalizedStory {
+  const title = draft.title.trim();
+  const description = draft.description.trim();
+  const blockedReason = draft.blocked_reason.trim();
+  const epicId = draft.epic_id.trim();
+  return {
+    title,
+    story_type: draft.story_type,
+    description: description === "" ? null : description,
+    priority: parsePriority(draft.priority),
+    epic_id: epicId === "" ? null : epicId,
+    blocked_reason: blockedReason === "" ? null : blockedReason,
+  };
+}
+
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function formatDateTime(iso: string | null): string | null {
+  if (!iso) return null;
+  try {
+    const date = new Date(iso);
+    return `${date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })} ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`;
+  } catch {
+    return iso;
+  }
 }
 
 function toDateInputValue(iso: string | null): string {
@@ -566,19 +656,22 @@ export function StoryDetailDialog({
     kind: "loading",
     forStoryId: storyId ?? "",
   }));
-  const [isEditing, setIsEditing] = useState(false);
-  const [reloadToken, setReloadToken] = useState(0);
+  const [storyDraft, setStoryDraft] = useState<StoryDraft | null>(null);
+  const [storyDraftForId, setStoryDraftForId] = useState<string | null>(null);
+  const [isSavingStory, setIsSavingStory] = useState(false);
+  const [storyError, setStoryError] = useState<string | null>(null);
+  const [epics, setEpics] = useState<EpicOption[]>([]);
+  const [isLoadingEpics, setIsLoadingEpics] = useState(false);
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [pendingTaskIds, setPendingTaskIds] = useState<Record<string, true>>({});
 
-  const viewState: DialogState =
-    open && storyId
-      ? state.forStoryId === storyId
-        ? state
-        : { kind: "loading", forStoryId: storyId }
-      : state;
+  const viewState: DialogState = useMemo(() => {
+    if (!open || !storyId) return state;
+    if (state.forStoryId === storyId) return state;
+    return { kind: "loading", forStoryId: storyId };
+  }, [open, state, storyId]);
 
   const pendingSet = useMemo(() => new Set(Object.keys(pendingTaskIds)), [pendingTaskIds]);
 
@@ -625,15 +718,115 @@ export function StoryDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [storyId, open, reloadToken]);
+  }, [storyId, open]);
+
+  useEffect(() => {
+    if (viewState.kind !== "ok") return;
+    if (storyDraftForId === viewState.story.id && storyDraft !== null) return;
+    setStoryDraft(toStoryDraft(viewState.story));
+    setStoryDraftForId(viewState.story.id);
+    setStoryError(null);
+  }, [storyDraft, storyDraftForId, viewState]);
+
+  useEffect(() => {
+    if (viewState.kind !== "ok" || !viewState.story.project_id) {
+      setEpics([]);
+      setIsLoadingEpics(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingEpics(true);
+
+    fetch(apiUrl(`/v1/planning/epics?project_id=${viewState.story.project_id}&limit=100&sort=priority`))
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((json) => {
+        if (cancelled) return;
+        const items = (json.data ?? []) as EpicOption[];
+        setEpics(items);
+      })
+      .catch(() => {
+        if (!cancelled) setEpics([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingEpics(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewState]);
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      setIsEditing(false);
+      setStoryDraft(null);
+      setStoryDraftForId(null);
+      setStoryError(null);
       setTaskError(null);
       setPendingTaskIds({});
     }
     onOpenChange(nextOpen);
+  };
+
+  const updateStoryDraft = (field: keyof StoryDraft, value: string) => {
+    setStoryDraft((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [field]: value };
+    });
+    setStoryError(null);
+  };
+
+  const saveStory = async () => {
+    if (viewState.kind !== "ok" || !storyDraft || isSavingStory) return;
+
+    const normalized = normalizeStoryDraft(storyDraft);
+    if (normalized.title === "") {
+      setStoryError("Story title is required.");
+      return;
+    }
+
+    setStoryError(null);
+    setIsSavingStory(true);
+
+    try {
+      const response = await fetch(apiUrl(`/v1/planning/stories/${viewState.story.id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: normalized.title,
+          story_type: normalized.story_type,
+          description: normalized.description,
+          priority: normalized.priority,
+          epic_id: normalized.epic_id,
+          is_blocked: normalized.blocked_reason !== null,
+          blocked_reason: normalized.blocked_reason,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await parseApiMessage(response));
+      }
+
+      const json = await response.json();
+      const updatedStory = json.data as StoryDetail;
+      setState((prev) => {
+        if (prev.kind !== "ok") return prev;
+        return {
+          ...prev,
+          story: updatedStory,
+        };
+      });
+      setStoryDraft(toStoryDraft(updatedStory));
+      setStoryDraftForId(updatedStory.id);
+      onStoryUpdated?.();
+    } catch (error) {
+      setStoryError(error instanceof Error ? error.message : "Failed to save story.");
+    } finally {
+      setIsSavingStory(false);
+    }
   };
 
   const withTaskPending = (taskId: string, pending: boolean) => {
@@ -946,64 +1139,138 @@ export function StoryDetailDialog({
 
         {viewState.kind === "ok" && (
           <>
-            <DialogHeader className="sr-only">
-              <DialogTitle>{viewState.story.title}</DialogTitle>
-            </DialogHeader>
-            {isEditing ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-foreground">Edit story</h2>
-                </div>
-                <StoryForm
-                  mode="edit"
-                  projectId={viewState.story.project_id ?? ""}
-                  storyId={viewState.story.id}
-                  initialValues={{
-                    title: viewState.story.title,
-                    story_type: viewState.story.story_type,
-                    description: viewState.story.description ?? "",
-                    priority:
-                      viewState.story.priority !== null
-                        ? String(viewState.story.priority)
-                        : "",
-                    epic_id: viewState.story.epic_id ?? "",
-                    blocked_reason: viewState.story.blocked_reason ?? "",
-                  }}
-                  submitLabel="Save story"
-                  onSaved={() => {
-                    setIsEditing(false);
-                    setReloadToken((prev) => prev + 1);
-                    onStoryUpdated?.();
-                  }}
-                  onCancel={() => setIsEditing(false)}
-                />
-              </div>
-            ) : (
-              <StoryView
-                story={viewState.story}
-                tasks={viewState.tasks}
-                headerActions={
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      onClick={() => setIsEditing(true)}
+            {storyDraft ? (
+              <>
+                <DialogHeader className="gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs tracking-wide text-muted-foreground">
+                      {viewState.story.key ?? "—"}
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        STATUS_STYLE[viewState.story.status].bg,
+                        STATUS_STYLE[viewState.story.status].text,
+                      )}
                     >
-                      <Pencil className="size-3" />
-                      Edit
-                    </Button>
+                      {STATUS_LABEL[viewState.story.status]}
+                    </span>
                     <a
                       href={`/planning/stories/${viewState.story.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <ExternalLink className="size-3.5" />
                       Open in new tab
                     </a>
                   </div>
-                }
-                tasksSection={
+                  <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-5">
+                  {storyError && (
+                    <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                      {storyError}
+                    </p>
+                  )}
+
+                  <div className="space-y-1">
+                    <label htmlFor="story-detail-title" className="text-xs text-muted-foreground">
+                      Title
+                    </label>
+                    <input
+                      id="story-detail-title"
+                      value={storyDraft.title}
+                      onChange={(event) => updateStoryDraft("title", event.target.value)}
+                      className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <label htmlFor="story-detail-type" className="text-xs text-muted-foreground">
+                        Type
+                      </label>
+                      <select
+                        id="story-detail-type"
+                        value={storyDraft.story_type}
+                        onChange={(event) => updateStoryDraft("story_type", event.target.value)}
+                        className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
+                      >
+                        {STORY_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label htmlFor="story-detail-priority" className="text-xs text-muted-foreground">
+                        Priority
+                      </label>
+                      <input
+                        id="story-detail-priority"
+                        type="number"
+                        min={0}
+                        value={storyDraft.priority}
+                        onChange={(event) => updateStoryDraft("priority", event.target.value)}
+                        className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label htmlFor="story-detail-epic" className="text-xs text-muted-foreground">
+                        Epic
+                      </label>
+                      <select
+                        id="story-detail-epic"
+                        value={storyDraft.epic_id}
+                        disabled={isLoadingEpics}
+                        onChange={(event) => updateStoryDraft("epic_id", event.target.value)}
+                        className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
+                      >
+                        <option value="">No epic</option>
+                        {epics.map((epic) => (
+                          <option key={epic.id} value={epic.id}>
+                            {epic.key ? `${epic.key} ${epic.title}` : epic.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="story-detail-description" className="text-xs text-muted-foreground">
+                      Description
+                    </label>
+                    <textarea
+                      id="story-detail-description"
+                      value={storyDraft.description}
+                      onChange={(event) => updateStoryDraft("description", event.target.value)}
+                      rows={4}
+                      className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus-ring"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label htmlFor="story-detail-blocked-reason" className="text-xs text-muted-foreground">
+                      Blocked reason
+                    </label>
+                    <textarea
+                      id="story-detail-blocked-reason"
+                      value={storyDraft.blocked_reason}
+                      onChange={(event) => updateStoryDraft("blocked_reason", event.target.value)}
+                      rows={2}
+                      placeholder="Leave empty to mark story as not blocked."
+                      className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus-ring"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Leave blocked reason empty when this story is not blocked.
+                    </p>
+                  </div>
+
                   <TaskManager
                     tasks={viewState.tasks}
                     agents={agents}
@@ -1017,8 +1284,30 @@ export function StoryDetailDialog({
                     onAssign={assignTask}
                     onUnassign={unassignTask}
                   />
-                }
-              />
+
+                  <div className="grid grid-cols-1 gap-2 border-t border-border/30 pt-3 text-xs text-muted-foreground sm:grid-cols-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Calendar className="size-3.5" />
+                      Created {formatDate(viewState.story.created_at) ?? "—"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="size-3.5" />
+                      Updated {formatDateTime(viewState.story.updated_at) ?? "—"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end border-t border-border/40 pt-3">
+                  <Button type="button" size="sm" onClick={saveStory} disabled={isSavingStory}>
+                    {isSavingStory && <Loader2 className="size-3 animate-spin" />}
+                    Save story
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
             )}
           </>
         )}
