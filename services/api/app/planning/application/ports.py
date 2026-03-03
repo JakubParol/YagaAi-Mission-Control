@@ -273,6 +273,25 @@ class BacklogRepository(ABC):
         self, project_id: str
     ) -> tuple[Backlog | None, list[dict[str, Any]]]: ...
 
+    @abstractmethod
+    async def get_active_sprint_backlog(self, project_id: str) -> Backlog | None: ...
+
+    @abstractmethod
+    async def get_product_backlog(self, project_id: str) -> Backlog | None: ...
+
+    @abstractmethod
+    async def get_story_backlog_item(self, story_id: str) -> tuple[str | None, int | None]: ...
+
+    @abstractmethod
+    async def move_story_item(
+        self,
+        *,
+        source_backlog_id: str,
+        target_backlog_id: str,
+        story_id: str,
+        target_position: int | None,
+    ) -> BacklogStoryItem: ...
+
 
 class TaskRepository(ABC):
     @abstractmethod
