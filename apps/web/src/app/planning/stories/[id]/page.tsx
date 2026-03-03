@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Pencil } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
+import { Button } from "@/components/ui/button";
+import { StoryForm } from "@/components/planning/story-form";
 import {
   StoryView,
   type StoryDetail,
@@ -22,6 +24,8 @@ export default function StoryPage() {
     kind: "loading",
     forId: id,
   }));
+  const [reloadToken, setReloadToken] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
 
   const viewState: PageState =
     state.forId === id ? state : { kind: "loading", forId: id };
@@ -57,7 +61,7 @@ export default function StoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, reloadToken]);
 
   if (viewState.kind === "loading") {
     return (
@@ -78,7 +82,41 @@ export default function StoryPage() {
 
   return (
     <div className="max-w-4xl">
-      <StoryView story={viewState.story} tasks={viewState.tasks} />
+      {isEditing ? (
+        <div className="rounded-md border border-border/40 bg-card/30 p-4">
+          <StoryForm
+            mode="edit"
+            projectId={viewState.story.project_id}
+            storyId={viewState.story.id}
+            initialValues={{
+              title: viewState.story.title,
+              story_type: viewState.story.story_type,
+              description: viewState.story.description ?? "",
+              priority:
+                viewState.story.priority !== null ? String(viewState.story.priority) : "",
+              epic_id: viewState.story.epic_id ?? "",
+              blocked_reason: viewState.story.blocked_reason ?? "",
+            }}
+            submitLabel="Save story"
+            onSaved={() => {
+              setIsEditing(false);
+              setReloadToken((prev) => prev + 1);
+            }}
+            onCancel={() => setIsEditing(false)}
+          />
+        </div>
+      ) : (
+        <StoryView
+          story={viewState.story}
+          tasks={viewState.tasks}
+          headerActions={
+            <Button variant="outline" size="xs" onClick={() => setIsEditing(true)}>
+              <Pencil className="size-3" />
+              Edit
+            </Button>
+          }
+        />
+      )}
     </div>
   );
 }

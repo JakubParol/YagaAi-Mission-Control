@@ -230,6 +230,7 @@ export default function BoardPage() {
         storyId={selectedStoryId}
         open={selectedStoryId !== null}
         onOpenChange={handleDialogClose}
+        onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
       />
     </>
   );

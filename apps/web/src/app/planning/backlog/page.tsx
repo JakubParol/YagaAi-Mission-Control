@@ -25,7 +25,14 @@ import { EmptyState } from "@/components/empty-state";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow } from "@/components/planning/backlog-row";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { StoryForm } from "@/components/planning/story-form";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   addStoryToActiveSprint,
@@ -102,6 +109,7 @@ function BacklogSection({
   onStoryClick,
   onAddToActiveSprint,
   onRemoveFromActiveSprint,
+  onCreateStory,
   pendingStoryIds,
 }: {
   section: BacklogWithStories;
@@ -109,6 +117,7 @@ function BacklogSection({
   onStoryClick: (storyId: string) => void;
   onAddToActiveSprint: (storyId: string) => void;
   onRemoveFromActiveSprint: (storyId: string) => void;
+  onCreateStory: (backlogId: string) => void;
   pendingStoryIds: ReadonlySet<string>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -217,7 +226,12 @@ function BacklogSection({
           )}
 
           {backlog.kind === "BACKLOG" && (
-            <Button variant="outline" size="xs" disabled title="Coming soon">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => onCreateStory(backlog.id)}
+              title="Create story"
+            >
               + Create
             </Button>
           )}
@@ -289,9 +303,12 @@ function BacklogSection({
             <Button
               variant="ghost"
               size="xs"
-              disabled
-              title="Coming soon"
+              disabled={backlog.kind !== "BACKLOG"}
+              title={backlog.kind === "BACKLOG" ? "Create story" : "Only product backlog supports story creation"}
               className="text-muted-foreground"
+              onClick={() => {
+                if (backlog.kind === "BACKLOG") onCreateStory(backlog.id);
+              }}
             >
               + Create
             </Button>
@@ -312,6 +329,7 @@ export default function BacklogPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [createBacklogId, setCreateBacklogId] = useState<string | null>(null);
   const prevProjectRef = useRef<string | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
@@ -440,6 +458,19 @@ export default function BacklogPage() {
     },
     [updateSprintMembership],
   );
+
+  const handleCreateStory = useCallback((backlogId: string) => {
+    setCreateBacklogId(backlogId);
+  }, []);
+
+  const handleCreateDialogChange = useCallback((open: boolean) => {
+    if (!open) setCreateBacklogId(null);
+  }, []);
+
+  const handleStorySaved = useCallback(() => {
+    setCreateBacklogId(null);
+    setReloadToken((prev) => prev + 1);
+  }, []);
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -605,6 +636,7 @@ export default function BacklogPage() {
               onStoryClick={handleStoryClick}
               onAddToActiveSprint={handleAddToActiveSprint}
               onRemoveFromActiveSprint={handleRemoveFromActiveSprint}
+              onCreateStory={handleCreateStory}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
             />
           ))}
@@ -619,7 +651,25 @@ export default function BacklogPage() {
         storyId={selectedStoryId}
         open={selectedStoryId !== null}
         onOpenChange={handleDialogClose}
+        onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
       />
+
+      <Dialog open={createBacklogId !== null} onOpenChange={handleCreateDialogChange}>
+        <DialogContent className="sm:max-w-2xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Create story</DialogTitle>
+          </DialogHeader>
+          {singleProjectId && createBacklogId && (
+            <StoryForm
+              mode="create"
+              projectId={singleProjectId}
+              backlogId={createBacklogId}
+              onSaved={handleStorySaved}
+              onCancel={() => setCreateBacklogId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
