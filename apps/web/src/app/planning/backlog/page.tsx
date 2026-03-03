@@ -6,11 +6,13 @@ import {
   ChevronDown,
   ChevronRight,
   CircleCheckBig,
+  Filter,
   MoreHorizontal,
   Hash,
   Layers,
   Loader2,
   Play,
+  Search,
   Zap,
 } from "lucide-react";
 
@@ -260,6 +262,7 @@ export default function BacklogPage() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const prevProjectRef = useRef<string | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
@@ -287,6 +290,52 @@ export default function BacklogPage() {
     : fetchResult === null
       ? { kind: "loading" }
       : fetchResult;
+
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredSections =
+    state.kind === "ok"
+      ? state.sections.map((section) => ({
+          ...section,
+          stories:
+            normalizedSearchQuery.length === 0
+              ? section.stories
+              : section.stories.filter((story) => {
+                  const key = (story.key ?? "").toLowerCase();
+                  const title = story.title.toLowerCase();
+                  return (
+                    key.includes(normalizedSearchQuery) ||
+                    title.includes(normalizedSearchQuery)
+                  );
+                }),
+        }))
+      : [];
+
+  const totalStoryCount =
+    state.kind === "ok"
+      ? state.sections.reduce((acc, section) => acc + section.stories.length, 0)
+      : 0;
+  const visibleStoryCount =
+    state.kind === "ok"
+      ? filteredSections.reduce((acc, section) => acc + section.stories.length, 0)
+      : 0;
+  const totalTaskCount =
+    state.kind === "ok"
+      ? state.sections.reduce(
+          (acc, section) =>
+            acc + section.stories.reduce((taskAcc, story) => taskAcc + story.task_count, 0),
+          0,
+        )
+      : 0;
+  const visibleTaskCount =
+    state.kind === "ok"
+      ? filteredSections.reduce(
+          (acc, section) =>
+            acc + section.stories.reduce((taskAcc, story) => taskAcc + story.task_count, 0),
+          0,
+        )
+      : 0;
+  const totalWorkItems = totalStoryCount + totalTaskCount;
+  const visibleWorkItems = visibleStoryCount + visibleTaskCount;
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -373,6 +422,29 @@ export default function BacklogPage() {
         </p>
       </div>
 
+      {state.kind === "ok" && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search backlog"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className={cn(
+                "h-8 w-full rounded-md border border-border/60 bg-background pl-8 pr-3 text-sm text-foreground",
+                "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              )}
+            />
+          </div>
+
+          <Button variant="outline" size="sm" disabled title="Coming soon">
+            <Filter className="size-3.5" />
+            Filter
+          </Button>
+        </div>
+      )}
+
       {state.kind === "no-project" && (
         <EmptyState
           icon="backlog"
@@ -405,7 +477,7 @@ export default function BacklogPage() {
 
       {state.kind === "ok" && (
         <div className="flex flex-col gap-3">
-          {state.sections.map((section) => (
+          {filteredSections.map((section) => (
             <BacklogSection
               key={section.backlog.id}
               section={section}
@@ -416,6 +488,10 @@ export default function BacklogPage() {
               onStoryClick={handleStoryClick}
             />
           ))}
+
+          <div className="mt-1 rounded-md border border-border/40 bg-card/20 px-3 py-2 text-xs text-muted-foreground">
+            {visibleWorkItems} of {totalWorkItems} work items visible | Estimate: - of -
+          </div>
         </div>
       )}
 
