@@ -93,20 +93,20 @@ export default function BoardPage() {
 
   const handleStoryStatusChange = useCallback(
     async (storyId: string, nextStatus: ItemStatus) => {
-      let previousStatus: ItemStatus | null = null;
+      if (state.kind !== "ok") return;
+      const existingStory = state.data.stories.find((item) => item.id === storyId);
+      if (!existingStory || existingStory.status === nextStatus) return;
+      const previousStatus: ItemStatus = existingStory.status;
 
       setState((prevState) => {
         if (prevState.kind !== "ok") return prevState;
         const result = applyOptimisticStoryStatus(prevState.data, storyId, nextStatus);
-        previousStatus = result.previousStatus;
         if (!result.previousStatus) return prevState;
         return {
           ...prevState,
           data: result.data,
         };
       });
-
-      if (!previousStatus) return;
 
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
 
@@ -138,7 +138,7 @@ export default function BoardPage() {
         });
       }
     },
-    [showErrorToast],
+    [showErrorToast, state],
   );
 
   return (
