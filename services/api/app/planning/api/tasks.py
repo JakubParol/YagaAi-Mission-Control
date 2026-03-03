@@ -36,7 +36,10 @@ async def create_task(
         estimate_points=body.estimate_points,
         due_at=body.due_at,
     )
-    return Envelope(data=TaskResponse(**task.__dict__))
+    return Envelope(
+        data=TaskResponse(**task.__dict__),
+        meta=await service.get_story_progress(task.story_id),
+    )
 
 
 @router.get("")
@@ -79,7 +82,8 @@ async def get_task_by_key(
         data=TaskDetailResponse(
             **task.__dict__,
             assignments=[TaskAssignmentResponse(**a.__dict__) for a in assignments],
-        )
+        ),
+        meta=await service.get_story_progress(task.story_id),
     )
 
 
@@ -93,7 +97,8 @@ async def get_task(
         data=TaskDetailResponse(
             **task.__dict__,
             assignments=[TaskAssignmentResponse(**a.__dict__) for a in assignments],
-        )
+        ),
+        meta=await service.get_story_progress(task.story_id),
     )
 
 
@@ -105,7 +110,10 @@ async def update_task(
 ) -> Envelope[TaskResponse]:
     data = body.model_dump(exclude_unset=True)
     task = await service.update_task(task_id, data)
-    return Envelope(data=TaskResponse(**task.__dict__))
+    return Envelope(
+        data=TaskResponse(**task.__dict__),
+        meta=await service.get_story_progress(task.story_id),
+    )
 
 
 @router.delete("/{task_id}", status_code=204)

@@ -69,6 +69,22 @@ def test_create_task_with_story(client) -> None:
     data = resp.json()["data"]
     assert data["story_id"] == "s1"
     assert data["key"] == "P1-1"
+    assert resp.json()["meta"] == {"story_task_count": 1, "story_done_task_count": 0}
+
+
+def test_create_task_with_story_infers_project_from_story(client) -> None:
+    resp = client.post(
+        "/v1/planning/tasks",
+        json={
+            "title": "Child Task",
+            "task_type": "TASK",
+            "story_id": "s1",
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    assert data["project_id"] == "p1"
+    assert data["key"] == "P1-1"
 
 
 def test_create_task_with_all_fields(client) -> None:
@@ -119,6 +135,15 @@ def test_create_task_nonexistent_story(client) -> None:
         json={"title": "Bad", "task_type": "TASK", "project_id": "p1", "story_id": "nope"},
     )
     assert resp.status_code == 400
+
+
+def test_create_task_story_project_conflict(client) -> None:
+    resp = client.post(
+        "/v1/planning/tasks",
+        json={"title": "Bad", "task_type": "TASK", "project_id": "p1", "story_id": "sp2"},
+    )
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "CONFLICT"
 
 
 def test_create_task_empty_title(client) -> None:
@@ -239,6 +264,7 @@ def test_get_task(client) -> None:
     assert data["id"] == task_id
     assert data["title"] == "My Task"
     assert data["assignments"] == []
+    assert resp.json()["meta"] == {}
 
 
 def test_get_task_not_found(client) -> None:
@@ -259,6 +285,19 @@ def test_get_task_includes_assignments(client) -> None:
     data = resp.json()["data"]
     assert len(data["assignments"]) == 1
     assert data["assignments"][0]["agent_id"] == "a1"
+
+
+def test_get_task_by_key_includes_story_progress_meta(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/tasks",
+        json={"title": "By Key", "task_type": "TASK", "project_id": "p1", "story_id": "s1"},
+    )
+    key = create_resp.json()["data"]["key"]
+    assert key is not None
+
+    resp = client.get(f"/v1/planning/tasks/by-key/{key}")
+    assert resp.status_code == 200
+    assert resp.json()["meta"] == {"story_task_count": 1, "story_done_task_count": 0}
 
 
 # ── Update ────────────────────────────────────────────────────────────────
@@ -287,6 +326,7 @@ def test_update_task_status_done_sets_completed_at(client) -> None:
     data = resp.json()["data"]
     assert data["status"] == "DONE"
     assert data["completed_at"] is not None
+    assert resp.json()["meta"] == {}
 
 
 def test_update_task_status_away_from_done_clears_completed_at(client) -> None:
@@ -310,6 +350,77 @@ def test_update_task_status_in_progress_sets_started_at(client) -> None:
     resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"status": "IN_PROGRESS"})
     assert resp.status_code == 200
     assert resp.json()["data"]["started_at"] is not None
+
+
+def test_update_task_returns_story_progress_meta(client) -> None:
+    task_1 = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T1", "task_type": "TASK", "project_id": "p1", "story_id": "s1"},
+    ).json()["data"]["id"]
+    task_2 = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T2", "task_type": "TASK", "project_id": "p1", "story_id": "s1"},
+    ).json()["data"]["id"]
+    assert task_2
+
+    resp = client.patch(f"/v1/planning/tasks/{task_1}", json={"status": "DONE"})
+    assert resp.status_code == 200
+    assert resp.json()["meta"] == {"story_task_count": 2, "story_done_task_count": 1}
+
+
+def test_update_task_story_project_conflict(client) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"story_id": "sp2"})
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "CONFLICT"
+
+
+def test_update_task_blocked_reason_requires_is_blocked(client) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    resp = client.patch(
+        f"/v1/planning/tasks/{task_id}",
+        json={"blocked_reason": "Waiting for dependency"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+
+
+def test_update_task_unblock_clears_blocked_reason(client) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    block = client.patch(
+        f"/v1/planning/tasks/{task_id}",
+        json={"is_blocked": True, "blocked_reason": "Waiting on review"},
+    )
+    assert block.status_code == 200
+    assert block.json()["data"]["blocked_reason"] == "Waiting on review"
+
+    unblock = client.patch(f"/v1/planning/tasks/{task_id}", json={"is_blocked": False})
+    assert unblock.status_code == 200
+    assert unblock.json()["data"]["blocked_reason"] is None
+
+
+def test_update_task_blocked_cannot_move_to_done(client) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    client.patch(f"/v1/planning/tasks/{task_id}", json={"is_blocked": True})
+    resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"status": "DONE"})
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
 
 
 def test_update_task_not_found(client) -> None:
