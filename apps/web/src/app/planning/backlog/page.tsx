@@ -5,19 +5,23 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  CircleCheckBig,
+  MoreHorizontal,
   Hash,
   Layers,
   Loader2,
+  Play,
   Zap,
 } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
-import type { BacklogKind, BacklogStatus } from "@/lib/planning/types";
+import type { BacklogKind, BacklogStatus, ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow } from "@/components/planning/backlog-row";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -70,6 +74,18 @@ function formatDate(d: string | null): string | null {
   }
 }
 
+function getSprintStatusCount(stories: StoryCardStory[], status: ItemStatus): number {
+  if (status === "IN_PROGRESS") {
+    return stories.filter(
+      (story) =>
+        story.status === "IN_PROGRESS" ||
+        story.status === "CODE_REVIEW" ||
+        story.status === "VERIFY",
+    ).length;
+  }
+  return stories.filter((story) => story.status === status).length;
+}
+
 // ─── Backlog Section ─────────────────────────────────────────────────
 
 function BacklogSection({
@@ -89,6 +105,12 @@ function BacklogSection({
   const start = formatDate(backlog.start_date);
   const end = formatDate(backlog.end_date);
   const Chevron = collapsed ? ChevronRight : ChevronDown;
+  const isSprint = backlog.kind === "SPRINT";
+  const todoCount = isSprint ? getSprintStatusCount(stories, "TODO") : 0;
+  const inProgressCount = isSprint ? getSprintStatusCount(stories, "IN_PROGRESS") : 0;
+  const doneCount = isSprint ? getSprintStatusCount(stories, "DONE") : 0;
+  const canCompleteSprint = isSprint && backlog.status === "ACTIVE";
+  const canStartSprint = isSprint && backlog.status !== "ACTIVE";
 
   return (
     <section
@@ -100,15 +122,19 @@ function BacklogSection({
       )}
     >
       {/* Header */}
-      <button
-        type="button"
-        onClick={() => setCollapsed(!collapsed)}
-        className={cn(
-          "w-full flex items-center gap-3 px-4 py-2.5",
-          "hover:bg-muted/20 transition-colors duration-150 text-left",
-        )}
-      >
-        <Chevron className="size-4 shrink-0 text-muted-foreground" />
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          className={cn(
+            "inline-flex items-center justify-center rounded-sm p-0.5",
+            "hover:bg-muted/40 transition-colors duration-150",
+            "focus-ring",
+          )}
+          aria-label={collapsed ? "Expand backlog section" : "Collapse backlog section"}
+        >
+          <Chevron className="size-4 shrink-0 text-muted-foreground" />
+        </button>
 
         <h3 className="text-sm font-semibold text-foreground">
           {backlog.name}
@@ -142,7 +168,55 @@ function BacklogSection({
           <Hash className="size-3" />
           {total}
         </span>
-      </button>
+
+        {isSprint && (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
+              TODO
+              <span className="tabular-nums">{todoCount}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-300">
+              IN_PROGRESS
+              <span className="tabular-nums">{inProgressCount}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+              DONE
+              <span className="tabular-nums">{doneCount}</span>
+            </span>
+          </div>
+        )}
+
+        <div className="ml-1 flex items-center gap-1">
+          {canCompleteSprint && (
+            <Button variant="outline" size="xs" disabled title="Coming soon">
+              <CircleCheckBig className="size-3" />
+              Complete sprint
+            </Button>
+          )}
+          {canStartSprint && (
+            <Button variant="outline" size="xs" disabled title="Coming soon">
+              <Play className="size-3" />
+              Start sprint
+            </Button>
+          )}
+
+          {backlog.kind === "BACKLOG" && (
+            <Button variant="outline" size="xs" disabled title="Coming soon">
+              + Create
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            disabled
+            title="Coming soon"
+            aria-label="More section actions"
+          >
+            <MoreHorizontal className="size-3" />
+          </Button>
+        </div>
+      </div>
 
       {/* Row list */}
       {!collapsed && (
@@ -162,6 +236,18 @@ function BacklogSection({
               ))}
             </div>
           )}
+
+          <div className="border-t border-border/20 px-3 py-1.5">
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled
+              title="Coming soon"
+              className="text-muted-foreground"
+            >
+              + Create
+            </Button>
+          </div>
         </div>
       )}
     </section>
