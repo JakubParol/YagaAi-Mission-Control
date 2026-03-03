@@ -89,11 +89,15 @@ It supports:
 - `name` TEXT NOT NULL
 - `description` TEXT NULL
 - `status` TEXT NOT NULL (`ACTIVE`/`ARCHIVED`)
+- `is_default` INTEGER NOT NULL DEFAULT 0
 - `repo_root` TEXT NULL (absolute path to the project's local repository root)
 - `created_by` TEXT NULL
 - `updated_by` TEXT NULL
 - `created_at` TEXT NOT NULL (ISO datetime)
 - `updated_at` TEXT NOT NULL (ISO datetime)
+
+Constraint:
+- at most one default project: partial unique on `is_default` where `is_default = 1`
 
 ## 2) `project_counters`
 

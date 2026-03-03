@@ -90,6 +90,7 @@ def _row_to_project(row: aiosqlite.Row) -> Project:
         name=row["name"],
         description=row["description"],
         status=ProjectStatus(row["status"]),
+        is_default=bool(row["is_default"]),
         repo_root=row["repo_root"],
         created_by=row["created_by"],
         updated_by=row["updated_by"],
@@ -292,6 +293,15 @@ class SqliteProjectRepository(ProjectRepository):
     def __init__(self, db: aiosqlite.Connection) -> None:
         self._db = db
 
+    async def _unset_default_projects(self, *, except_project_id: str | None = None) -> None:
+        if except_project_id:
+            await self._db.execute(
+                "UPDATE projects SET is_default = 0 WHERE is_default = 1 AND id != ?",
+                [except_project_id],
+            )
+            return
+        await self._db.execute("UPDATE projects SET is_default = 0 WHERE is_default = 1", [])
+
     async def list_all(
         self,
         *,
@@ -330,16 +340,19 @@ class SqliteProjectRepository(ProjectRepository):
         return await _exists(self._db, "SELECT 1 FROM projects WHERE key = ?", [key.upper()])
 
     async def create(self, project: Project) -> Project:
+        if project.is_default:
+            await self._unset_default_projects()
         await self._db.execute(
-            """INSERT INTO projects (id, key, name, description, status, repo_root,
+            """INSERT INTO projects (id, key, name, description, status, is_default, repo_root,
                created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 project.id,
                 project.key,
                 project.name,
                 project.description,
                 project.status,
+                1 if project.is_default else 0,
                 project.repo_root,
                 project.created_by,
                 project.updated_by,
@@ -351,7 +364,7 @@ class SqliteProjectRepository(ProjectRepository):
         return project
 
     async def update(self, project_id: str, data: dict[str, Any]) -> Project | None:
-        allowed = {"name", "description", "status", "repo_root", "updated_by", "updated_at"}
+        allowed = {"name", "description", "status", "is_default", "repo_root", "updated_by", "updated_at"}
         sets = []
         params: list[Any] = []
         for k, v in data.items():
@@ -361,6 +374,9 @@ class SqliteProjectRepository(ProjectRepository):
 
         if not sets:
             return await self.get_by_id(project_id)
+
+        if data.get("is_default") is True:
+            await self._unset_default_projects(except_project_id=project_id)
 
         params.append(project_id)
         await self._db.execute(_build_update_query("projects", sets), params)

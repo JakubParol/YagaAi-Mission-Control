@@ -47,6 +47,7 @@ class ProjectService:
         name: str,
         description: str | None = None,
         repo_root: str | None = None,
+        is_default: bool | None = None,
         actor: str | None = None,
     ) -> Project:
         if await self._project_repo.key_exists(key):
@@ -59,6 +60,7 @@ class ProjectService:
             name=name,
             description=description,
             status=ProjectStatus.ACTIVE,
+            is_default=bool(is_default),
             repo_root=repo_root,
             created_by=actor,
             updated_by=actor,

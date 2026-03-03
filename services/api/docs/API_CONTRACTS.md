@@ -145,7 +145,8 @@ Request:
   "key": "MC",                // required, unique, uppercase letters
   "name": "Mission Control",  // required
   "description": "...",       // optional
-  "repo_root": "/home/..."    // optional, absolute path to local repo root
+  "repo_root": "/home/...",   // optional, absolute path to local repo root
+  "is_default": true          // optional, makes this project the single default
 }
 ```
 
@@ -159,7 +160,14 @@ Query: `status`, `sort`, `limit`, `offset`.
 
 #### `PATCH /v1/planning/projects/{id}` — Update project
 
-Updatable: `name`, `description`, `status` (`ACTIVE`/`ARCHIVED`), `repo_root`.
+Updatable: `name`, `description`, `status` (`ACTIVE`/`ARCHIVED`), `repo_root`, `is_default`.
+
+Project response includes `is_default` on create/list/get/update.
+
+Single-default invariant:
+- At most one project can have `is_default=true`.
+- Setting one project to `is_default=true` automatically unsets any existing default project.
+- Setting `is_default=false` does not auto-promote another project.
 
 #### `DELETE /v1/planning/projects/{id}` — Delete project
 

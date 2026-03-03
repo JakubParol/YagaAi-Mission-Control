@@ -19,6 +19,7 @@ def test_create_project(client):
     assert data["key"] == "NEW"
     assert data["name"] == "New Project"
     assert data["status"] == "ACTIVE"
+    assert data["is_default"] is False
     assert data["description"] is None
     assert data["repo_root"] is None
 
@@ -31,12 +32,14 @@ def test_create_project_with_all_fields(client):
             "name": "Full Project",
             "description": "A description",
             "repo_root": "/home/user/repo",
+            "is_default": True,
         },
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["description"] == "A description"
     assert data["repo_root"] == "/home/user/repo"
+    assert data["is_default"] is True
 
 
 def test_create_project_creates_default_backlog(client):
@@ -96,6 +99,7 @@ def test_list_projects_seeded(client):
     body = resp.json()
     assert body["meta"]["total"] == 2
     assert len(body["data"]) == 2
+    assert all("is_default" in project for project in body["data"])
 
 
 def test_list_projects_filter_by_status(client):
@@ -136,6 +140,7 @@ def test_get_project(client):
     assert data["id"] == "p1"
     assert data["key"] == "P1"
     assert data["name"] == "Project 1"
+    assert data["is_default"] is False
 
 
 def test_get_project_not_found(client):
@@ -169,6 +174,62 @@ def test_update_project_repo_root(client):
     resp = client.patch(f"{PREFIX}/p1", json={"repo_root": "/new/path"})
     assert resp.status_code == 200
     assert resp.json()["data"]["repo_root"] == "/new/path"
+
+
+def test_update_project_set_default_switches_previous_default(client):
+    first = client.patch(f"{PREFIX}/p1", json={"is_default": True})
+    assert first.status_code == 200
+    assert first.json()["data"]["is_default"] is True
+
+    second = client.patch(f"{PREFIX}/p2", json={"is_default": True})
+    assert second.status_code == 200
+    assert second.json()["data"]["is_default"] is True
+
+    p1 = client.get(f"{PREFIX}/p1").json()["data"]
+    p2 = client.get(f"{PREFIX}/p2").json()["data"]
+    assert p1["is_default"] is False
+    assert p2["is_default"] is True
+
+
+def test_set_default_true_is_idempotent(client):
+    first = client.patch(f"{PREFIX}/p1", json={"is_default": True})
+    second = client.patch(f"{PREFIX}/p1", json={"is_default": True})
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    projects = client.get(PREFIX).json()["data"]
+    defaults = [project for project in projects if project["is_default"] is True]
+    assert len(defaults) == 1
+    assert defaults[0]["id"] == "p1"
+
+
+def test_set_default_false_does_not_auto_promote_other_project(client):
+    start = client.patch(f"{PREFIX}/p1", json={"is_default": True})
+    assert start.status_code == 200
+
+    unset = client.patch(f"{PREFIX}/p1", json={"is_default": False})
+    assert unset.status_code == 200
+    assert unset.json()["data"]["is_default"] is False
+
+    projects = client.get(PREFIX).json()["data"]
+    defaults = [project for project in projects if project["is_default"] is True]
+    assert defaults == []
+
+
+def test_create_project_with_default_true_unsets_existing_default(client):
+    first = client.patch(f"{PREFIX}/p1", json={"is_default": True})
+    assert first.status_code == 200
+
+    created = client.post(
+        PREFIX,
+        json={"key": "DFT", "name": "Default Project", "is_default": True},
+    )
+    assert created.status_code == 201
+    new_default = created.json()["data"]
+    assert new_default["is_default"] is True
+
+    previous_default = client.get(f"{PREFIX}/p1").json()["data"]
+    assert previous_default["is_default"] is False
 
 
 def test_update_project_not_found(client):

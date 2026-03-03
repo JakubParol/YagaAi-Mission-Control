@@ -21,6 +21,7 @@ FAKE_PROJECT = Project(
     name="Mission Control",
     description=None,
     status=ProjectStatus.ACTIVE,
+    is_default=False,
     repo_root=None,
     created_by=None,
     updated_by=None,

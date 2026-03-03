@@ -49,6 +49,7 @@ class Project:
     name: str
     description: str | None
     status: ProjectStatus
+    is_default: bool
     repo_root: str | None
     created_by: str | None
     updated_by: str | None

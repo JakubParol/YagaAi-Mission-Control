@@ -40,6 +40,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           name TEXT NOT NULL,
           description TEXT,
           status TEXT NOT NULL,
+          is_default INTEGER NOT NULL DEFAULT 0,
           repo_root TEXT,
           created_by TEXT,
           updated_by TEXT,
@@ -203,6 +204,9 @@ def _setup_test_db(tmp_path, monkeypatch):
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
           ON task_assignments(task_id) WHERE unassigned_at IS NULL;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
+          ON projects(is_default) WHERE is_default = 1;
         """)
 
     conn.executescript(f"""
