@@ -62,6 +62,16 @@ export const TYPE_CONFIG: Record<string, { icon: typeof Bug; label: string; colo
   USER_STORY: { icon: BookOpen, label: "Story", color: "text-primary" },
 };
 
+export const STORY_CARD_LAYOUT = {
+  footer: "flex flex-col gap-1.5",
+  metadataRow: "flex items-center justify-between gap-2",
+  metadataLeft: "flex min-w-0 items-center gap-1.5",
+  taskProgress: "min-h-4 min-w-[44px] text-right",
+  actionRow: "flex items-center justify-end gap-1.5",
+  statusSelect: "h-6 w-[108px]",
+  removeButton: "h-6 min-w-[72px]",
+} as const;
+
 function PriorityIndicator({ priority }: { priority: number | null }) {
   if (priority === null) return null;
 
@@ -156,10 +166,10 @@ export function StoryCard({
         {story.title}
       </p>
 
-      <div className="flex flex-col gap-1.5">
+      <div className={STORY_CARD_LAYOUT.footer}>
         {/* Metadata row: type + status + task progress */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-1.5">
+        <div className={STORY_CARD_LAYOUT.metadataRow} data-testid="story-card-metadata-row">
+          <div className={STORY_CARD_LAYOUT.metadataLeft}>
             <span className={cn("inline-flex items-center gap-1 text-[11px]", typeConf.color)}>
               <TypeIcon className="size-3" />
               {typeConf.label}
@@ -176,7 +186,7 @@ export function StoryCard({
             </span>
           </div>
 
-          <span className="min-h-4 min-w-[44px] text-right">
+          <span className={STORY_CARD_LAYOUT.taskProgress}>
             {story.task_count > 0 ? (
               <span
                 className={cn(
@@ -193,7 +203,7 @@ export function StoryCard({
         </div>
 
         {/* Action row: status selector + remove */}
-        <div className="flex items-center justify-end gap-1.5">
+        <div className={STORY_CARD_LAYOUT.actionRow} data-testid="story-card-action-row">
           <label htmlFor={labelId} className="sr-only">
             Change story status
           </label>
@@ -208,7 +218,8 @@ export function StoryCard({
               onStatusChange?.(story.id, nextStatus);
             }}
             className={cn(
-              "h-6 w-[108px] rounded border border-border/60 bg-background/80 px-1.5",
+              STORY_CARD_LAYOUT.statusSelect,
+              "rounded border border-border/60 bg-background/80 px-1.5",
               "text-[10px] text-muted-foreground",
               "focus-ring",
             )}
@@ -231,7 +242,8 @@ export function StoryCard({
               }}
               onKeyDown={(event) => event.stopPropagation()}
               className={cn(
-                "inline-flex h-6 min-w-[72px] items-center justify-center gap-1 rounded border border-border/60 bg-background/80 px-1.5 text-[10px] text-muted-foreground",
+                "inline-flex items-center justify-center gap-1 rounded border border-border/60 bg-background/80 px-1.5 text-[10px] text-muted-foreground",
+                STORY_CARD_LAYOUT.removeButton,
                 "focus-ring",
               )}
               title="Remove from active sprint"
