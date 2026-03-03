@@ -8,7 +8,7 @@ export default function StoryPage() {
   const { id } = useParams<{ id: string }>();
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full max-w-7xl px-2">
       <StoryDetailDialog storyId={id ?? null} embedded />
     </div>
   );

@@ -821,7 +821,7 @@ function StoryLabelManager({
           </div>
         )}
 
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-2">
           <select
             value={selectedLabelId}
             disabled={isLoading || attachableLabels.length === 0}
@@ -844,7 +844,7 @@ function StoryLabelManager({
             size="sm"
             disabled={!canAttach}
             onClick={onAttachLabel}
-            className="sm:w-auto"
+            className="w-full"
           >
             Attach label
           </Button>
@@ -1472,201 +1472,238 @@ export function StoryDetailDialog({
       {viewState.kind === "ok" && (
         <>
           {storyDraft ? (
-            <>
-              {embedded ? (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs tracking-wide text-muted-foreground">
-                      {viewState.story.key ?? "—"}
-                    </span>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        STATUS_STYLE[viewState.story.status].bg,
-                        STATUS_STYLE[viewState.story.status].text,
+            /* ── Unified two-column layout (embedded page + dialog) ── */
+            <div className="flex flex-col gap-5">
+                {/* Title bar */}
+                {embedded ? (
+                  <div className="rounded-2xl border border-border/30 bg-card/50 px-6 py-5 shadow-sm">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="font-mono text-xs tracking-wide text-muted-foreground">
+                        {viewState.story.key ?? "—"}
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          STATUS_STYLE[viewState.story.status].bg,
+                          STATUS_STYLE[viewState.story.status].text,
+                        )}
+                      >
+                        {STATUS_LABEL[viewState.story.status]}
+                      </span>
+                      {hasUnsavedStoryChanges && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={saveStory}
+                          disabled={isSavingStory}
+                          className="ml-auto"
+                        >
+                          {isSavingStory && <Loader2 className="size-3 animate-spin" />}
+                          Save
+                        </Button>
                       )}
-                    >
-                      {STATUS_LABEL[viewState.story.status]}
-                    </span>
+                    </div>
+                    <h2 className="sr-only">{viewState.story.title}</h2>
+                    <input
+                      id="story-detail-title"
+                      value={storyDraft.title}
+                      onChange={(event) => updateStoryDraft("title", event.target.value)}
+                      className="w-full border-0 bg-transparent text-xl font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-0"
+                      placeholder="Story title…"
+                    />
                   </div>
-                  <h2 className="sr-only">{viewState.story.title}</h2>
-                </div>
-              ) : (
-                <DialogHeader className="gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs tracking-wide text-muted-foreground">
-                      {viewState.story.key ?? "—"}
-                    </span>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        STATUS_STYLE[viewState.story.status].bg,
-                        STATUS_STYLE[viewState.story.status].text,
-                      )}
-                    >
-                      {STATUS_LABEL[viewState.story.status]}
-                    </span>
-                    <a
-                      href={`/planning/stories/${viewState.story.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <ExternalLink className="size-3.5" />
-                      Open in new tab
-                    </a>
-                  </div>
-                  <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
-                </DialogHeader>
-              )}
+                ) : (
+                  <DialogHeader className="gap-2">
+                    <div className="flex items-center gap-2 pr-8">
+                      <span className="font-mono text-xs tracking-wide text-muted-foreground">
+                        {viewState.story.key ?? "—"}
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          STATUS_STYLE[viewState.story.status].bg,
+                          STATUS_STYLE[viewState.story.status].text,
+                        )}
+                      >
+                        {STATUS_LABEL[viewState.story.status]}
+                      </span>
+                      <a
+                        href={`/planning/stories/${viewState.story.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <ExternalLink className="size-3.5" />
+                        Open in new tab
+                      </a>
+                    </div>
+                    <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
+                    <input
+                      id="story-detail-title"
+                      value={storyDraft.title}
+                      onChange={(event) => updateStoryDraft("title", event.target.value)}
+                      className="w-full border-0 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-0"
+                      placeholder="Story title…"
+                    />
+                  </DialogHeader>
+                )}
 
-              <div className="space-y-5">
                 {storyError && (
-                  <p className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+                  <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs text-red-300">
                     {storyError}
                   </p>
                 )}
 
-                <div className="space-y-1">
-                  <label htmlFor="story-detail-title" className="text-xs text-muted-foreground">
-                    Title
-                  </label>
-                  <input
-                    id="story-detail-title"
-                    value={storyDraft.title}
-                    onChange={(event) => updateStoryDraft("title", event.target.value)}
-                    className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-                  />
-                </div>
+                {/* Two-column body */}
+                <div className="flex items-start gap-5">
+                  {/* Left: description + tasks */}
+                  <div className="min-w-0 flex-[2] space-y-4">
+                    <div className="rounded-2xl border border-border/30 bg-card/50 p-6 shadow-sm">
+                      <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+                        Description
+                      </h3>
+                      <textarea
+                        id="story-detail-description"
+                        value={storyDraft.description}
+                        onChange={(event) => updateStoryDraft("description", event.target.value)}
+                        rows={14}
+                        placeholder="Write a description for this story…"
+                        className="w-full resize-y border-0 bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-0"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <label htmlFor="story-detail-type" className="text-xs text-muted-foreground">
-                      Type
-                    </label>
-                    <select
-                      id="story-detail-type"
-                      value={storyDraft.story_type}
-                      onChange={(event) => updateStoryDraft("story_type", event.target.value)}
-                      className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-                    >
-                      {STORY_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="rounded-2xl border border-border/30 bg-card/50 p-6 shadow-sm">
+                      <TaskManager
+                        tasks={viewState.tasks}
+                        isCreating={isCreatingTask}
+                        pendingTaskIds={pendingSet}
+                        error={taskError}
+                        onCreate={createTask}
+                        onPatch={patchTask}
+                        onMarkDone={markTaskDone}
+                        onDelete={deleteTask}
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <label htmlFor="story-detail-priority" className="text-xs text-muted-foreground">
-                      Priority
-                    </label>
-                    <input
-                      id="story-detail-priority"
-                      type="number"
-                      min={0}
-                      value={storyDraft.priority}
-                      onChange={(event) => updateStoryDraft("priority", event.target.value)}
-                      className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-                    />
+                  {/* Right: properties */}
+                  <div className="w-64 flex-none rounded-2xl border border-border/30 bg-card/50 p-5 shadow-sm">
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="story-detail-type"
+                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
+                        >
+                          Type
+                        </label>
+                        <select
+                          id="story-detail-type"
+                          value={storyDraft.story_type}
+                          onChange={(event) => updateStoryDraft("story_type", event.target.value)}
+                          className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
+                        >
+                          {STORY_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="story-detail-priority"
+                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
+                        >
+                          Priority
+                        </label>
+                        <input
+                          id="story-detail-priority"
+                          type="number"
+                          min={0}
+                          value={storyDraft.priority}
+                          onChange={(event) => updateStoryDraft("priority", event.target.value)}
+                          className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="story-detail-epic"
+                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
+                        >
+                          Epic
+                        </label>
+                        <select
+                          id="story-detail-epic"
+                          value={storyDraft.epic_id}
+                          disabled={isLoadingEpics}
+                          onChange={(event) => updateStoryDraft("epic_id", event.target.value)}
+                          className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
+                        >
+                          <option value="">No epic</option>
+                          {epics.map((epic) => (
+                            <option key={epic.id} value={epic.id}>
+                              {epic.key ? `${epic.key} ${epic.title}` : epic.title}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="border-t border-border/20 pt-4">
+                        <StoryLabelManager
+                          labels={storyLabels}
+                          availableLabels={availableLabels}
+                          selectedLabelId={selectedLabelId}
+                          isLoading={isLoadingLabels}
+                          pendingLabelIds={pendingLabelSet}
+                          error={labelError}
+                          onSelectLabel={setSelectedLabelId}
+                          onAttachLabel={attachLabel}
+                          onDetachLabel={detachLabel}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5 border-t border-border/20 pt-4">
+                        <label
+                          htmlFor="story-detail-blocked-reason"
+                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
+                        >
+                          Blocked reason
+                        </label>
+                        <textarea
+                          id="story-detail-blocked-reason"
+                          value={storyDraft.blocked_reason}
+                          onChange={(event) => updateStoryDraft("blocked_reason", event.target.value)}
+                          rows={2}
+                          placeholder="Leave empty if not blocked."
+                          className="w-full resize-none rounded-lg border border-border/50 bg-background/60 px-2.5 py-2 text-sm text-foreground focus-ring placeholder:text-muted-foreground/40"
+                        />
+                      </div>
+
+                      <div className="space-y-2 border-t border-border/20 pt-4 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <Calendar className="size-3.5 shrink-0" />
+                          Created {formatDate(viewState.story.created_at) ?? "—"}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="size-3.5 shrink-0" />
+                          Updated {formatDateTime(viewState.story.updated_at) ?? "—"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="space-y-1">
-                    <label htmlFor="story-detail-epic" className="text-xs text-muted-foreground">
-                      Epic
-                    </label>
-                    <select
-                      id="story-detail-epic"
-                      value={storyDraft.epic_id}
-                      disabled={isLoadingEpics}
-                      onChange={(event) => updateStoryDraft("epic_id", event.target.value)}
-                      className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-                    >
-                      <option value="">No epic</option>
-                      {epics.map((epic) => (
-                        <option key={epic.id} value={epic.id}>
-                          {epic.key ? `${epic.key} ${epic.title}` : epic.title}
-                        </option>
-                      ))}
-                    </select>
+                {!embedded && hasUnsavedStoryChanges && (
+                  <div className="flex justify-end border-t border-border/40 pt-3">
+                    <Button type="button" size="sm" onClick={saveStory} disabled={isSavingStory}>
+                      {isSavingStory && <Loader2 className="size-3 animate-spin" />}
+                      Save story
+                    </Button>
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="story-detail-description" className="text-xs text-muted-foreground">
-                    Description
-                  </label>
-                  <textarea
-                    id="story-detail-description"
-                    value={storyDraft.description}
-                    onChange={(event) => updateStoryDraft("description", event.target.value)}
-                    rows={4}
-                    className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus-ring"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label htmlFor="story-detail-blocked-reason" className="text-xs text-muted-foreground">
-                    Blocked reason
-                  </label>
-                  <textarea
-                    id="story-detail-blocked-reason"
-                    value={storyDraft.blocked_reason}
-                    onChange={(event) => updateStoryDraft("blocked_reason", event.target.value)}
-                    rows={2}
-                    placeholder="Leave empty to mark story as not blocked."
-                    className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm text-foreground focus-ring"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Leave blocked reason empty when this story is not blocked.
-                  </p>
-                </div>
-
-                <StoryLabelManager
-                  labels={storyLabels}
-                  availableLabels={availableLabels}
-                  selectedLabelId={selectedLabelId}
-                  isLoading={isLoadingLabels}
-                  pendingLabelIds={pendingLabelSet}
-                  error={labelError}
-                  onSelectLabel={setSelectedLabelId}
-                  onAttachLabel={attachLabel}
-                  onDetachLabel={detachLabel}
-                />
-
-                <TaskManager
-                  tasks={viewState.tasks}
-                  isCreating={isCreatingTask}
-                  pendingTaskIds={pendingSet}
-                  error={taskError}
-                  onCreate={createTask}
-                  onPatch={patchTask}
-                  onMarkDone={markTaskDone}
-                  onDelete={deleteTask}
-                />
-
-                <div className="grid grid-cols-1 gap-2 border-t border-border/30 pt-3 text-xs text-muted-foreground sm:grid-cols-2">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Calendar className="size-3.5" />
-                    Created {formatDate(viewState.story.created_at) ?? "—"}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Clock className="size-3.5" />
-                    Updated {formatDateTime(viewState.story.updated_at) ?? "—"}
-                  </span>
-                </div>
-              </div>
-
-              {hasUnsavedStoryChanges && (
-                <div className="mt-4 flex justify-end border-t border-border/40 pt-3">
-                  <Button type="button" size="sm" onClick={saveStory} disabled={isSavingStory}>
-                    {isSavingStory && <Loader2 className="size-3 animate-spin" />}
-                    Save story
-                  </Button>
-                </div>
-              )}
-            </>
+                )}
+            </div>
           ) : (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />
@@ -1678,11 +1715,7 @@ export function StoryDetailDialog({
   );
 
   if (embedded) {
-    return (
-      <div className="w-full rounded-lg border border-border/40 bg-card/30 p-6">
-        {dialogBody}
-      </div>
-    );
+    return <div className="w-full">{dialogBody}</div>;
   }
 
   return (
