@@ -7,6 +7,7 @@ import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
+import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
@@ -20,7 +21,7 @@ type BoardState =
   | { kind: "ok"; projectId: string; data: ActiveSprintData };
 
 export default function BoardPage() {
-  const { selectedProjectIds, allSelected } = usePlanningFilter();
+  const { selectedProjectIds, allSelected, selectedLabelIds } = usePlanningFilter();
   const [state, setState] = useState<BoardState>({ kind: "no-project" });
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
@@ -57,6 +58,17 @@ export default function BoardPage() {
     : state.kind !== "no-project" && state.projectId === singleProjectId
       ? state
       : { kind: "loading", projectId: singleProjectId };
+
+  const visibleState: BoardState =
+    viewState.kind === "ok"
+      ? {
+          ...viewState,
+          data: {
+            ...viewState.data,
+            stories: filterStoriesBySelectedLabels(viewState.data.stories, selectedLabelIds),
+          },
+        }
+      : viewState;
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -168,9 +180,15 @@ export default function BoardPage() {
         <p className="text-muted-foreground text-sm">
           Active sprint board for the selected project.
         </p>
+        {selectedLabelIds.length > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Filtered by {selectedLabelIds.length} label
+            {selectedLabelIds.length === 1 ? "" : "s"}.
+          </p>
+        )}
       </div>
 
-      {viewState.kind === "no-project" && (
+      {visibleState.kind === "no-project" && (
         <EmptyState
           icon="board"
           title="Select a project"
@@ -178,13 +196,13 @@ export default function BoardPage() {
         />
       )}
 
-      {viewState.kind === "loading" && (
+      {visibleState.kind === "loading" && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {viewState.kind === "no-sprint" && (
+      {visibleState.kind === "no-sprint" && (
         <EmptyState
           icon="board"
           title="No active sprint"
@@ -192,17 +210,17 @@ export default function BoardPage() {
         />
       )}
 
-      {viewState.kind === "error" && (
+      {visibleState.kind === "error" && (
         <EmptyState
           icon="default"
           title="Failed to load sprint"
-          description={viewState.message}
+          description={visibleState.message}
         />
       )}
 
-      {viewState.kind === "ok" && (
+      {visibleState.kind === "ok" && (
         <SprintBoard
-          data={viewState.data}
+          data={visibleState.data}
           onStoryClick={handleStoryClick}
           onStoryStatusChange={handleStoryStatusChange}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}

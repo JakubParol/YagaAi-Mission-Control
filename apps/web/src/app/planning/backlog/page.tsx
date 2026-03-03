@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronRight,
   CircleCheckBig,
-  Filter,
   ListPlus,
   MoreHorizontal,
   Hash,
@@ -34,6 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { matchesSelectedStoryLabels } from "@/components/planning/story-label-filter";
 import {
   addStoryToActiveSprint,
   removeStoryFromActiveSprint,
@@ -376,7 +376,7 @@ function BacklogSection({
 // ─── Page ────────────────────────────────────────────────────────────
 
 export default function BacklogPage() {
-  const { selectedProjectIds, allSelected } = usePlanningFilter();
+  const { selectedProjectIds, allSelected, selectedLabelIds } = usePlanningFilter();
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -433,15 +433,20 @@ export default function BacklogPage() {
       ? state.sections.map((section) => ({
           ...section,
           stories:
-            normalizedSearchQuery.length === 0
+            normalizedSearchQuery.length === 0 && selectedLabelIds.length === 0
               ? section.stories
               : section.stories.filter((story) => {
                   const key = (story.key ?? "").toLowerCase();
                   const title = story.title.toLowerCase();
-                  return (
+                  const matchesSearch =
+                    normalizedSearchQuery.length === 0 ||
                     key.includes(normalizedSearchQuery) ||
-                    title.includes(normalizedSearchQuery)
+                    title.includes(normalizedSearchQuery);
+                  const matchesLabels = matchesSelectedStoryLabels(
+                    story,
+                    selectedLabelIds,
                   );
+                  return matchesSearch && matchesLabels;
                 }),
         }))
       : [];
@@ -702,11 +707,11 @@ export default function BacklogPage() {
               )}
             />
           </div>
-
-          <Button variant="outline" size="sm" disabled title="Coming soon">
-            <Filter className="size-3.5" />
-            Filter
-          </Button>
+          {selectedLabelIds.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Label filter: {selectedLabelIds.length} selected
+            </p>
+          )}
         </div>
       )}
 
