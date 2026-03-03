@@ -9,6 +9,7 @@ import { usePlanningFilter } from "@/components/planning/planning-filter-context
 import { EmptyState } from "@/components/empty-state";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
 
 type BoardState =
   | { kind: "no-project" }
@@ -96,18 +97,12 @@ export default function BoardPage() {
 
       setState((prevState) => {
         if (prevState.kind !== "ok") return prevState;
-        const story = prevState.data.stories.find((item) => item.id === storyId);
-        if (!story || story.status === nextStatus) return prevState;
-
-        previousStatus = story.status;
+        const result = applyOptimisticStoryStatus(prevState.data, storyId, nextStatus);
+        previousStatus = result.previousStatus;
+        if (!result.previousStatus) return prevState;
         return {
           ...prevState,
-          data: {
-            ...prevState.data,
-            stories: prevState.data.stories.map((item) =>
-              item.id === storyId ? { ...item, status: nextStatus } : item,
-            ),
-          },
+          data: result.data,
         };
       });
 
@@ -131,12 +126,7 @@ export default function BoardPage() {
           if (prevState.kind !== "ok") return prevState;
           return {
             ...prevState,
-            data: {
-              ...prevState.data,
-              stories: prevState.data.stories.map((item) =>
-                item.id === storyId ? { ...item, status: fallbackStatus } : item,
-              ),
-            },
+            data: rollbackStoryStatus(prevState.data, storyId, fallbackStatus),
           };
         });
         showErrorToast("Failed to update story status. Changes were rolled back.");
