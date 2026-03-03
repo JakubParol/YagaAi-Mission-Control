@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
+import { StoryLabelChips, type StoryLabel } from "./story-label-chips";
 
 export interface StoryCardStory {
   id: string;
@@ -24,6 +25,8 @@ export interface StoryCardStory {
   position: number;
   task_count: number;
   done_task_count: number;
+  labels?: StoryLabel[];
+  label_ids?: string[];
 }
 
 export const STATUS_STYLE: Record<
@@ -181,6 +184,8 @@ export function StoryCard({
           ) : null}
         </span>
       </div>
+
+      <StoryLabelChips labels={story.labels} className="mt-1" />
     </div>
   );
 }

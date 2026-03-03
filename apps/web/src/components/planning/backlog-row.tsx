@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle2 } from "lucide-react";
 import type { StoryCardStory } from "./story-card";
 import { STATUS_STYLE, STATUS_LABEL, TYPE_CONFIG } from "./story-card";
+import { StoryLabelChips } from "./story-label-chips";
 
 export const BACKLOG_ROW_LAYOUT = {
   gridTemplate: "grid-cols-[auto_72px_minmax(0,1fr)_112px_240px_112px_36px_56px]",
@@ -62,9 +63,14 @@ export function BacklogRow({
       </span>
 
       {/* Summary */}
-      <span className="text-sm text-foreground truncate min-w-0 flex-1">
-        {item.title}
-      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-foreground">{item.title}</p>
+        <StoryLabelChips
+          labels={item.labels}
+          className="mt-1"
+          chipClassName="max-w-[7rem]"
+        />
+      </div>
 
       {/* Actions */}
       <span className={cn("shrink-0 flex justify-end", BACKLOG_ROW_LAYOUT.actions)}>
