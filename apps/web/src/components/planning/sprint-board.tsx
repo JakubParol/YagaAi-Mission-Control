@@ -44,12 +44,20 @@ function SprintHeader({
   backlog: SprintBacklog;
   stories: StoryCardStory[];
 }) {
-  const total = stories.length;
-  const done = stories.filter((s) => s.status === "DONE").length;
-  const inProgress = stories.filter(
-    (s) => s.status === "IN_PROGRESS" || s.status === "CODE_REVIEW" || s.status === "VERIFY"
-  ).length;
-  const pctDone = total > 0 ? Math.round((done / total) * 100) : 0;
+  const { total, done, inProgress, pctDone } = useMemo(() => {
+    const totalStories = stories.length;
+    const doneStories = stories.filter((s) => s.status === "DONE").length;
+    const inProgressStories = stories.filter(
+      (s) => s.status === "IN_PROGRESS" || s.status === "CODE_REVIEW" || s.status === "VERIFY"
+    ).length;
+    const donePercent = totalStories > 0 ? Math.round((doneStories / totalStories) * 100) : 0;
+    return {
+      total: totalStories,
+      done: doneStories,
+      inProgress: inProgressStories,
+      pctDone: donePercent,
+    };
+  }, [stories]);
 
   const formatDate = (d: string | null) => {
     if (!d) return null;
