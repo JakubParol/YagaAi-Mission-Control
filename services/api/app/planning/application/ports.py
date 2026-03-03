@@ -240,7 +240,7 @@ class BacklogRepository(ABC):
 
     @abstractmethod
     async def add_story_item(
-        self, backlog_id: str, story_id: str, position: int
+        self, backlog_id: str, story_id: str, position: int | None
     ) -> BacklogStoryItem: ...
 
     @abstractmethod

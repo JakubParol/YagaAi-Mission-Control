@@ -1003,14 +1003,27 @@ class SqliteBacklogRepository(BacklogRepository):
         return row["backlog_id"] if row else None
 
     async def add_story_item(
-        self, backlog_id: str, story_id: str, position: int
+        self, backlog_id: str, story_id: str, position: int | None
     ) -> BacklogStoryItem:
-        max_position = await _fetch_count(
-            self._db,
-            "SELECT COUNT(*) FROM backlog_stories WHERE backlog_id = ?",
-            [backlog_id],
-        )
-        normalized = min(position, max_position)
+        if position is None:
+            rows = await _fetch_all(
+                self._db,
+                "SELECT position FROM backlog_stories WHERE backlog_id = ? ORDER BY position ASC",
+                [backlog_id],
+            )
+            normalized = 0
+            for row in rows:
+                if row["position"] == normalized:
+                    normalized += 1
+                elif row["position"] > normalized:
+                    break
+        else:
+            max_position = await _fetch_count(
+                self._db,
+                "SELECT COUNT(*) FROM backlog_stories WHERE backlog_id = ?",
+                [backlog_id],
+            )
+            normalized = min(position, max_position)
         await self._db.execute(
             """UPDATE backlog_stories
                SET position = position + 1

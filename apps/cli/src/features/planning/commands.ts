@@ -400,17 +400,20 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
     .description("Add story to backlog")
     .requiredOption("--backlog-id <id>", "backlog id")
     .requiredOption("--story-id <id>", "story id")
-    .requiredOption("--position <n>", "position", (raw) => parseIntegerOption(raw, "position"))
+    .option("--position <n>", "position", (raw) => parseIntegerOption(raw, "position"))
     .action(
       async (
-        opts: { backlogId: string; storyId: string; position: number },
+        opts: { backlogId: string; storyId: string; position?: number },
         command: Command,
       ) => {
         const ctx = getContext(command);
         const payload = await ctx.client.post(
           `/v1/planning/backlogs/${opts.backlogId}/stories`,
           {
-            body: { story_id: opts.storyId, position: opts.position },
+            body: {
+              story_id: opts.storyId,
+              ...(opts.position !== undefined ? { position: opts.position } : {}),
+            },
           },
         );
         printPayload(payload, ctx.config.output);

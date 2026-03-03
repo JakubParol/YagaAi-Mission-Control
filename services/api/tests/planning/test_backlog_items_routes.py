@@ -28,6 +28,16 @@ def test_add_story_to_backlog(client) -> None:
     assert "added_at" in data
 
 
+def test_add_story_without_position_defaults_to_first_free(client) -> None:
+    resp_first = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1"})
+    assert resp_first.status_code == 200
+    assert resp_first.json()["data"]["position"] == 0
+
+    resp_second = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2"})
+    assert resp_second.status_code == 200
+    assert resp_second.json()["data"]["position"] == 1
+
+
 def test_add_story_position_normalized(client) -> None:
     """Position beyond current count is clamped to append."""
     resp = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 999})
