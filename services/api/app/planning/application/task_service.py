@@ -2,7 +2,7 @@ from typing import Any
 
 from app.planning.application.ports import TaskRepository
 from app.planning.domain.models import ItemStatus, Task, TaskAssignment
-from app.shared.api.errors import ConflictError, NotFoundError, ValidationError
+from app.shared.api.errors import BusinessRuleError, ConflictError, NotFoundError, ValidationError
 from app.shared.utils import new_uuid, utc_now
 
 
@@ -66,16 +66,22 @@ class TaskService:
         due_at: str | None = None,
         actor: str | None = None,
     ) -> Task:
-        key: str | None = None
+        if story_id:
+            story_exists, story_project_id = await self._task_repo.get_story_project_id(story_id)
+            if not story_exists:
+                raise ValidationError(f"Story {story_id} does not exist")
+            if project_id is None:
+                project_id = story_project_id
+            elif project_id != story_project_id:
+                raise ConflictError(
+                    f"Task project {project_id} conflicts with story {story_id} project {story_project_id}"
+                )
 
+        key: str | None = None
         if project_id:
             if not await self._task_repo.project_exists(project_id):
                 raise ValidationError(f"Project {project_id} does not exist")
             key = await self._task_repo.allocate_key(project_id)
-
-        if story_id:
-            if not await self._task_repo.story_exists(story_id):
-                raise ValidationError(f"Story {story_id} does not exist")
 
         now = utc_now()
         task = Task(
@@ -111,6 +117,8 @@ class TaskService:
             raise NotFoundError(f"Task {task_id} not found")
 
         now = utc_now()
+        next_is_blocked = data.get("is_blocked", existing.is_blocked)
+        blocked_reason = data.get("blocked_reason", existing.blocked_reason)
 
         if "status" in data:
             new_status = data["status"]
@@ -119,6 +127,9 @@ class TaskService:
                 raise ValidationError(
                     f"Invalid task status '{new_status}'. Allowed: {', '.join(sorted(valid))}"
                 )
+
+            if new_status == ItemStatus.DONE and next_is_blocked:
+                raise BusinessRuleError("Blocked task cannot be moved to DONE")
 
             if new_status == ItemStatus.DONE:
                 data["completed_at"] = now
@@ -130,8 +141,18 @@ class TaskService:
                 data["started_at"] = now
 
         if "story_id" in data and data["story_id"] is not None:
-            if not await self._task_repo.story_exists(data["story_id"]):
+            story_exists, story_project_id = await self._task_repo.get_story_project_id(data["story_id"])
+            if not story_exists:
                 raise ValidationError(f"Story {data['story_id']} does not exist")
+            if existing.project_id != story_project_id:
+                raise ConflictError(
+                    f"Task project {existing.project_id} conflicts with story {data['story_id']} project {story_project_id}"
+                )
+
+        if blocked_reason is not None and not next_is_blocked:
+            raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
+        if not next_is_blocked:
+            data["blocked_reason"] = None
 
         data["updated_by"] = actor
         data["updated_at"] = now
@@ -141,6 +162,15 @@ class TaskService:
             raise NotFoundError(f"Task {task_id} not found")
 
         return updated
+
+    async def get_story_progress(self, story_id: str | None) -> dict[str, int]:
+        if not story_id:
+            return {}
+        task_count, done_task_count = await self._task_repo.get_story_task_progress(story_id)
+        return {
+            "story_task_count": task_count,
+            "story_done_task_count": done_task_count,
+        }
 
     async def delete_task(self, task_id: str) -> None:
         deleted = await self._task_repo.delete(task_id)

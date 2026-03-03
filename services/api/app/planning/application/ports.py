@@ -359,3 +359,9 @@ class TaskRepository(ABC):
 
     @abstractmethod
     async def close_assignment(self, task_id: str, unassigned_at: str) -> bool: ...
+
+    @abstractmethod
+    async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]: ...
+
+    @abstractmethod
+    async def get_story_task_progress(self, story_id: str) -> tuple[int, int]: ...

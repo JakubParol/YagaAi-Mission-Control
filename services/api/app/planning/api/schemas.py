@@ -327,6 +327,7 @@ class TaskUpdate(BaseModel):
     task_type: str | None = Field(None, min_length=1, max_length=50)
     status: str | None = Field(None, pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$")
     is_blocked: bool | None = None
+    blocked_reason: str | None = None
     story_id: str | None = None
     priority: int | None = None
     estimate_points: float | None = None
