@@ -141,6 +141,30 @@ async def get_backlog(
     )
 
 
+@router.post("/{backlog_id}/start")
+async def start_sprint(
+    backlog_id: str,
+    project_id: str | None = Depends(resolve_project_key),
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogResponse]:
+    backlog = await service.get_backlog(backlog_id)
+    _validate_backlog_project_scope(backlog.project_id, project_id)
+    updated, meta = await service.start_sprint(backlog_id)
+    return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
+
+
+@router.post("/{backlog_id}/complete")
+async def complete_sprint(
+    backlog_id: str,
+    project_id: str | None = Depends(resolve_project_key),
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogResponse]:
+    backlog = await service.get_backlog(backlog_id)
+    _validate_backlog_project_scope(backlog.project_id, project_id)
+    updated, meta = await service.complete_sprint(backlog_id)
+    return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
+
+
 @router.patch("/{backlog_id}")
 async def update_backlog(
     backlog_id: str,

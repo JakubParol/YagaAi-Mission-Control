@@ -213,6 +213,68 @@ class BacklogService:
             raise NotFoundError(f"No active sprint found for project {project_id}")
         return backlog, stories
 
+    async def start_sprint(self, backlog_id: str, *, actor: str | None = None) -> tuple[Backlog, dict[str, Any]]:
+        backlog = await self.get_backlog(backlog_id)
+        if backlog.kind != BacklogKind.SPRINT:
+            raise BusinessRuleError(f"Backlog {backlog_id} is not a sprint")
+        if backlog.project_id is None:
+            raise BusinessRuleError("Sprint lifecycle transitions require a project-scoped backlog")
+        if backlog.status == BacklogStatus.ACTIVE:
+            raise BusinessRuleError(f"Sprint {backlog_id} is already ACTIVE")
+
+        active_sprint = await self._repo.get_active_sprint_backlog(backlog.project_id)
+        if active_sprint and active_sprint.id != backlog_id:
+            raise ConflictError(
+                f"Project {backlog.project_id} already has active sprint {active_sprint.id}"
+            )
+
+        updated = await self.update_backlog(
+            backlog_id,
+            {"status": BacklogStatus.ACTIVE.value},
+            actor=actor,
+        )
+        meta = await self._build_sprint_transition_meta(
+            backlog_id=backlog_id,
+            transition="START_SPRINT",
+            from_status=backlog.status.value,
+            to_status=BacklogStatus.ACTIVE.value,
+            active_sprint_id=backlog_id,
+        )
+        return updated, meta
+
+    async def complete_sprint(
+        self, backlog_id: str, *, actor: str | None = None
+    ) -> tuple[Backlog, dict[str, Any]]:
+        backlog = await self.get_backlog(backlog_id)
+        if backlog.kind != BacklogKind.SPRINT:
+            raise BusinessRuleError(f"Backlog {backlog_id} is not a sprint")
+        if backlog.project_id is None:
+            raise BusinessRuleError("Sprint lifecycle transitions require a project-scoped backlog")
+        if backlog.status != BacklogStatus.ACTIVE:
+            raise BusinessRuleError(f"Sprint {backlog_id} must be ACTIVE to complete")
+
+        sprint_stories = await self._repo.list_backlog_stories(backlog_id)
+        unfinished_story_ids = [story["id"] for story in sprint_stories if story["status"] != "DONE"]
+        if unfinished_story_ids:
+            preview = ", ".join(unfinished_story_ids[:5])
+            raise BusinessRuleError(
+                f"Cannot complete sprint {backlog_id}; unfinished stories ({len(unfinished_story_ids)}): {preview}"
+            )
+
+        updated = await self.update_backlog(
+            backlog_id,
+            {"status": BacklogStatus.CLOSED.value},
+            actor=actor,
+        )
+        meta = await self._build_sprint_transition_meta(
+            backlog_id=backlog_id,
+            transition="COMPLETE_SPRINT",
+            from_status=backlog.status.value,
+            to_status=BacklogStatus.CLOSED.value,
+            active_sprint_id=None,
+        )
+        return updated, meta
+
     async def move_story_to_active_sprint(
         self,
         *,
@@ -343,3 +405,25 @@ class BacklogService:
         expected = list(range(len(payload)))
         if positions != expected:
             raise BusinessRuleError("Positions must be contiguous starting from 0")
+
+    async def _build_sprint_transition_meta(
+        self,
+        *,
+        backlog_id: str,
+        transition: str,
+        from_status: str,
+        to_status: str,
+        active_sprint_id: str | None,
+    ) -> dict[str, Any]:
+        stories = await self._repo.list_backlog_stories(backlog_id)
+        story_count = len(stories)
+        done_story_count = len([story for story in stories if story["status"] == "DONE"])
+        return {
+            "transition": transition,
+            "from_status": from_status,
+            "to_status": to_status,
+            "story_count": story_count,
+            "done_story_count": done_story_count,
+            "unfinished_story_count": story_count - done_story_count,
+            "active_sprint_id": active_sprint_id,
+        }
