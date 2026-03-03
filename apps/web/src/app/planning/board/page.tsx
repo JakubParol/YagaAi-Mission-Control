@@ -9,6 +9,7 @@ import { usePlanningFilter } from "@/components/planning/planning-filter-context
 import { EmptyState } from "@/components/empty-state";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { removeStoryFromActiveSprint } from "../sprint-membership-actions";
 import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
 
 type BoardState =
@@ -24,6 +25,7 @@ export default function BoardPage() {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -89,7 +91,7 @@ export default function BoardPage() {
     return () => {
       cancelled = true;
     };
-  }, [singleProjectId]);
+  }, [reloadToken, singleProjectId]);
 
   const handleStoryStatusChange = useCallback(
     async (storyId: string, nextStatus: ItemStatus) => {
@@ -139,6 +141,30 @@ export default function BoardPage() {
       }
     },
     [showErrorToast, state],
+  );
+
+  const handleStoryRemoveFromSprint = useCallback(
+    async (storyId: string) => {
+      if (!singleProjectId) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+      try {
+        await removeStoryFromActiveSprint(singleProjectId, storyId);
+        setReloadToken((prev) => prev + 1);
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to remove story from active sprint.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [showErrorToast, singleProjectId],
   );
 
   return (
@@ -195,6 +221,7 @@ export default function BoardPage() {
           data={viewState.data}
           onStoryClick={handleStoryClick}
           onStoryStatusChange={handleStoryStatusChange}
+          onStoryRemoveFromSprint={handleStoryRemoveFromSprint}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
         />
       )}
