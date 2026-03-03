@@ -4,15 +4,9 @@ import test from "node:test";
 import { BACKLOG_ROW_LAYOUT } from "./backlog-row.js";
 import { STORY_CARD_LAYOUT } from "./story-card.js";
 
-test("story card footer keeps metadata and action rows split", () => {
-  assert.equal(STORY_CARD_LAYOUT.footer, "flex flex-col gap-1.5");
-  assert.equal(STORY_CARD_LAYOUT.metadataRow, "flex items-center justify-between gap-2");
-  assert.equal(STORY_CARD_LAYOUT.actionRow, "flex items-center justify-end gap-1.5");
-});
-
-test("story card action controls and task progress use stable sizing", () => {
-  assert.equal(STORY_CARD_LAYOUT.statusSelect, "h-6 w-[108px]");
-  assert.equal(STORY_CARD_LAYOUT.removeButton, "h-6 min-w-[72px]");
+test("story card keeps a single metadata row layout", () => {
+  assert.equal(STORY_CARD_LAYOUT.metadataRow, "flex items-center justify-between gap-2 mb-0.5");
+  assert.equal(STORY_CARD_LAYOUT.metadataLeft, "flex min-w-0 items-center gap-1.5");
   assert.equal(STORY_CARD_LAYOUT.taskProgress, "min-h-4 min-w-[44px] text-right");
 });
 

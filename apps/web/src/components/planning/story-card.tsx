@@ -7,8 +7,6 @@ import {
   BookOpen,
   ChevronUp,
   ChevronDown,
-  ListMinus,
-  Loader2,
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -47,14 +45,6 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   DONE: "Done",
 };
 
-export const STORY_STATUS_ORDER: readonly ItemStatus[] = [
-  "TODO",
-  "IN_PROGRESS",
-  "CODE_REVIEW",
-  "VERIFY",
-  "DONE",
-] as const;
-
 export const TYPE_CONFIG: Record<string, { icon: typeof Bug; label: string; color: string }> = {
   BUG: { icon: Bug, label: "Bug", color: "text-red-400" },
   SPIKE: { icon: FlaskConical, label: "Spike", color: "text-cyan-400" },
@@ -63,13 +53,9 @@ export const TYPE_CONFIG: Record<string, { icon: typeof Bug; label: string; colo
 };
 
 export const STORY_CARD_LAYOUT = {
-  footer: "flex flex-col gap-1.5",
-  metadataRow: "flex items-center justify-between gap-2",
+  metadataRow: "flex items-center justify-between gap-2 mb-0.5",
   metadataLeft: "flex min-w-0 items-center gap-1.5",
   taskProgress: "min-h-4 min-w-[44px] text-right",
-  actionRow: "flex items-center justify-end gap-1.5",
-  statusSelect: "h-6 w-[108px]",
-  removeButton: "h-6 min-w-[72px]",
 } as const;
 
 function PriorityIndicator({ priority }: { priority: number | null }) {
@@ -109,22 +95,17 @@ export function StoryCard({
   onClick,
   onDragStart,
   onDragEnd,
-  onStatusChange,
-  onRemoveFromSprint,
   disabled = false,
 }: {
   story: StoryCardStory;
   onClick?: (storyId: string) => void;
   onDragStart?: (storyId: string) => void;
   onDragEnd?: () => void;
-  onStatusChange?: (storyId: string, status: ItemStatus) => void;
-  onRemoveFromSprint?: (storyId: string) => void;
   disabled?: boolean;
 }) {
   const statusStyle = STATUS_STYLE[story.status];
   const typeConf = TYPE_CONFIG[story.story_type] ?? TYPE_CONFIG.USER_STORY;
   const TypeIcon = typeConf.icon;
-  const labelId = `story-status-${story.id}`;
 
   return (
     <div
@@ -166,98 +147,39 @@ export function StoryCard({
         {story.title}
       </p>
 
-      <div className={STORY_CARD_LAYOUT.footer}>
-        {/* Metadata row: type + status + task progress */}
-        <div className={STORY_CARD_LAYOUT.metadataRow} data-testid="story-card-metadata-row">
-          <div className={STORY_CARD_LAYOUT.metadataLeft}>
-            <span className={cn("inline-flex items-center gap-1 text-[11px]", typeConf.color)}>
-              <TypeIcon className="size-3" />
-              {typeConf.label}
-            </span>
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-                statusStyle.bg,
-                "text-muted-foreground",
-              )}
-            >
-              <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-              {STATUS_LABEL[story.status]}
-            </span>
-          </div>
-
-          <span className={STORY_CARD_LAYOUT.taskProgress}>
-            {story.task_count > 0 ? (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground",
-                  story.done_task_count === story.task_count && "text-emerald-400",
-                )}
-                title={`${story.done_task_count} of ${story.task_count} tasks done`}
-              >
-                <CheckCircle2 className="size-3" />
-                {story.done_task_count}/{story.task_count}
-              </span>
-            ) : null}
+      {/* Metadata row: type + status + task progress */}
+      <div className={STORY_CARD_LAYOUT.metadataRow} data-testid="story-card-metadata-row">
+        <div className={STORY_CARD_LAYOUT.metadataLeft}>
+          <span className={cn("inline-flex items-center gap-1 text-[11px]", typeConf.color)}>
+            <TypeIcon className="size-3" />
+            {typeConf.label}
+          </span>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+              statusStyle.bg,
+              "text-muted-foreground",
+            )}
+          >
+            <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+            {STATUS_LABEL[story.status]}
           </span>
         </div>
 
-        {/* Action row: status selector + remove */}
-        <div className={STORY_CARD_LAYOUT.actionRow} data-testid="story-card-action-row">
-          <label htmlFor={labelId} className="sr-only">
-            Change story status
-          </label>
-          <select
-            id={labelId}
-            value={story.status}
-            disabled={disabled}
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.stopPropagation()}
-            onChange={(event) => {
-              const nextStatus = event.target.value as ItemStatus;
-              onStatusChange?.(story.id, nextStatus);
-            }}
-            className={cn(
-              STORY_CARD_LAYOUT.statusSelect,
-              "rounded border border-border/60 bg-background/80 px-1.5",
-              "text-[10px] text-muted-foreground",
-              "focus-ring",
-            )}
-            aria-label="Change story status"
-          >
-            {STORY_STATUS_ORDER.map((status) => (
-              <option key={status} value={status}>
-                {STATUS_LABEL[status]}
-              </option>
-            ))}
-          </select>
-
-          {onRemoveFromSprint && (
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRemoveFromSprint(story.id);
-              }}
-              onKeyDown={(event) => event.stopPropagation()}
+        <span className={STORY_CARD_LAYOUT.taskProgress}>
+          {story.task_count > 0 ? (
+            <span
               className={cn(
-                "inline-flex items-center justify-center gap-1 rounded border border-border/60 bg-background/80 px-1.5 text-[10px] text-muted-foreground",
-                STORY_CARD_LAYOUT.removeButton,
-                "focus-ring",
+                "inline-flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground",
+                story.done_task_count === story.task_count && "text-emerald-400",
               )}
-              title="Remove from active sprint"
-              aria-label="Remove from active sprint"
+              title={`${story.done_task_count} of ${story.task_count} tasks done`}
             >
-              {disabled ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <ListMinus className="size-3" />
-              )}
-              Remove
-            </button>
-          )}
-        </div>
+              <CheckCircle2 className="size-3" />
+              {story.done_task_count}/{story.task_count}
+            </span>
+          ) : null}
+        </span>
       </div>
     </div>
   );

@@ -2,11 +2,7 @@ import { useMemo, useState, type DragEvent } from "react";
 import { Calendar, Target, Hash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
-import {
-  StoryCard,
-  STORY_STATUS_ORDER,
-  type StoryCardStory,
-} from "./story-card";
+import { StoryCard, type StoryCardStory } from "./story-card";
 
 // ─── Types (matches API response shape) ─────────────────────────────
 
@@ -33,7 +29,13 @@ const COLUMNS: { status: ItemStatus; label: string; accent: string }[] = [
   { status: "DONE", label: "Done", accent: "border-l-emerald-500" },
 ];
 
-const VALID_DROP_STATUSES = new Set<ItemStatus>(STORY_STATUS_ORDER);
+const VALID_DROP_STATUSES = new Set<ItemStatus>([
+  "TODO",
+  "IN_PROGRESS",
+  "CODE_REVIEW",
+  "VERIFY",
+  "DONE",
+]);
 
 // ─── Sprint Header ──────────────────────────────────────────────────
 
@@ -137,8 +139,6 @@ function BoardColumn({
   onDragOver,
   onDrop,
   onStoryClick,
-  onStatusChange,
-  onRemoveFromSprint,
   onCardDragStart,
   onCardDragEnd,
   pendingStoryIds,
@@ -151,8 +151,6 @@ function BoardColumn({
   onDragOver: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
   onDrop: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
   onStoryClick?: (storyId: string) => void;
-  onStatusChange?: (storyId: string, status: ItemStatus) => void;
-  onRemoveFromSprint?: (storyId: string) => void;
   onCardDragStart: (storyId: string) => void;
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
@@ -192,8 +190,6 @@ function BoardColumn({
               onClick={onStoryClick}
               onDragStart={onCardDragStart}
               onDragEnd={onCardDragEnd}
-              onStatusChange={onStatusChange}
-              onRemoveFromSprint={onRemoveFromSprint}
               disabled={pendingStoryIds.has(story.id)}
             />
           ))
@@ -209,13 +205,11 @@ export function SprintBoard({
   data,
   onStoryClick,
   onStoryStatusChange,
-  onStoryRemoveFromSprint,
   pendingStoryIds,
 }: {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
   onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
-  onStoryRemoveFromSprint?: (storyId: string) => void;
   pendingStoryIds?: ReadonlySet<string>;
 }) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
@@ -272,12 +266,6 @@ export function SprintBoard({
     onStoryStatusChange?.(draggedStoryId, status);
   };
 
-  const handleStatusChange = (storyId: string, status: ItemStatus) => {
-    const story = data.stories.find((item) => item.id === storyId);
-    if (!story || story.status === status) return;
-    onStoryStatusChange?.(storyId, status);
-  };
-
   return (
     <div>
       <SprintHeader backlog={data.backlog} stories={data.stories} />
@@ -294,8 +282,6 @@ export function SprintBoard({
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onStoryClick={onStoryClick}
-            onStatusChange={handleStatusChange}
-            onRemoveFromSprint={onStoryRemoveFromSprint}
             onCardDragStart={handleCardDragStart}
             onCardDragEnd={handleCardDragEnd}
             pendingStoryIds={pendingSet}
