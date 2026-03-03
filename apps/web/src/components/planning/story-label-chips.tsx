@@ -25,7 +25,7 @@ function normalizeHexColor(color: string): string | null {
   return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
 }
 
-function toLabelChipStyle(color: string | null): CSSProperties | undefined {
+export function toLabelChipStyle(color: string | null): CSSProperties | undefined {
   const normalized = normalizeHexColor(color?.trim() ?? "");
   if (!normalized) return undefined;
 

@@ -484,6 +484,12 @@ export default function BacklogPage() {
             section.backlog.kind === "SPRINT" && section.backlog.status === "ACTIVE",
         )
       : false;
+  const selectedStoryLabels =
+    state.kind === "ok" && selectedStoryId
+      ? state.sections
+          .flatMap((section) => section.stories)
+          .find((story) => story.id === selectedStoryId)?.labels
+      : undefined;
 
   const updateSprintMembership = useCallback(
     async (storyId: string, operation: "add" | "remove") => {
@@ -777,6 +783,7 @@ export default function BacklogPage() {
         storyId={selectedStoryId}
         open={selectedStoryId !== null}
         onOpenChange={handleDialogClose}
+        initialLabels={selectedStoryLabels}
         onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
       />
 

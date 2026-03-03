@@ -10,6 +10,7 @@ import {
   Loader2,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { STATUS_LABEL, STATUS_STYLE } from "./story-card";
+import { toLabelChipStyle, type StoryLabel } from "./story-label-chips";
 import {
   addOptimisticTask,
   applyOptimisticTaskPatch,
@@ -68,6 +70,10 @@ interface EpicOption {
   id: string;
   key: string | null;
   title: string;
+}
+
+interface BacklogOption {
+  id: string;
 }
 
 interface NormalizedStory {
@@ -219,6 +225,59 @@ async function parseApiMessage(response: Response): Promise<string> {
     // ignore and fallback below
   }
   return `Request failed. HTTP ${response.status}.`;
+}
+
+function mapStoryLabelsFromUnknown(value: unknown): StoryLabel[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const data = item as Record<string, unknown>;
+      if (typeof data.id !== "string" || typeof data.name !== "string") return null;
+      return {
+        id: data.id,
+        name: data.name,
+        color: typeof data.color === "string" ? data.color : null,
+      } satisfies StoryLabel;
+    })
+    .filter((item): item is StoryLabel => item !== null);
+}
+
+async function fetchStoryLabelsFromBacklogs(
+  storyId: string,
+  projectId: string,
+): Promise<{ found: boolean; labels: StoryLabel[] }> {
+  const backlogsResponse = await fetch(
+    apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100`),
+  );
+  if (!backlogsResponse.ok) {
+    throw new Error(await parseApiMessage(backlogsResponse));
+  }
+
+  const backlogsJson = (await backlogsResponse.json()) as {
+    data?: BacklogOption[];
+  };
+  const backlogs = backlogsJson.data ?? [];
+  if (backlogs.length === 0) return { found: false, labels: [] };
+
+  const sections = await Promise.all(
+    backlogs.map(async (backlog) => {
+      const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`));
+      if (!response.ok) return null;
+      const json = (await response.json()) as {
+        data?: Array<{ id?: unknown; labels?: unknown }>;
+      };
+      const stories = json.data ?? [];
+      const story = stories.find((item) => item.id === storyId);
+      if (!story) return null;
+      return {
+        found: true,
+        labels: mapStoryLabelsFromUnknown(story.labels),
+      };
+    }),
+  );
+
+  return sections.find((result) => result !== null) ?? { found: false, labels: [] };
 }
 
 function mapTaskFromApi(raw: Record<string, unknown>): TaskItem {
@@ -691,17 +750,123 @@ function TaskManager({
     </div>
   );
 }
+
+function StoryLabelManager({
+  labels,
+  availableLabels,
+  selectedLabelId,
+  isLoading,
+  pendingLabelIds,
+  error,
+  onSelectLabel,
+  onAttachLabel,
+  onDetachLabel,
+}: {
+  labels: StoryLabel[];
+  availableLabels: StoryLabel[];
+  selectedLabelId: string;
+  isLoading: boolean;
+  pendingLabelIds: ReadonlySet<string>;
+  error: string | null;
+  onSelectLabel: (labelId: string) => void;
+  onAttachLabel: () => void;
+  onDetachLabel: (labelId: string) => void;
+}) {
+  const attachedSet = useMemo(() => new Set(labels.map((label) => label.id)), [labels]);
+  const attachableLabels = useMemo(
+    () => availableLabels.filter((label) => !attachedSet.has(label.id)),
+    [attachedSet, availableLabels],
+  );
+  const canAttach = selectedLabelId !== "" && !pendingLabelIds.has(selectedLabelId);
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">Labels ({labels.length})</h3>
+        {isLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+      </div>
+
+      {error && (
+        <p className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {error}
+        </p>
+      )}
+
+      <div className="space-y-3 rounded-md border border-border/40 bg-card/20 p-3">
+        {labels.length === 0 ? (
+          <p className="text-xs italic text-muted-foreground">No labels attached to this story.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {labels.map((label) => (
+              <button
+                key={label.id}
+                type="button"
+                disabled={pendingLabelIds.has(label.id)}
+                onClick={() => onDetachLabel(label.id)}
+                title={`Detach "${label.name}"`}
+                style={toLabelChipStyle(label.color)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+                  "disabled:cursor-wait disabled:opacity-70",
+                )}
+              >
+                <span className="max-w-[12rem] truncate">{label.name}</span>
+                {pendingLabelIds.has(label.id) ? (
+                  <Loader2 className="size-2.5 animate-spin" />
+                ) : (
+                  <X className="size-2.5" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <select
+            value={selectedLabelId}
+            disabled={isLoading || attachableLabels.length === 0}
+            onChange={(event) => onSelectLabel(event.target.value)}
+            className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
+          >
+            <option value="">
+              {attachableLabels.length === 0
+                ? "No more labels to attach"
+                : "Select a label to attach"}
+            </option>
+            {attachableLabels.map((label) => (
+              <option key={label.id} value={label.id}>
+                {label.name}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!canAttach}
+            onClick={onAttachLabel}
+            className="sm:w-auto"
+          >
+            Attach label
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function StoryDetailDialog({
   storyId,
   open = false,
   onOpenChange,
   embedded = false,
+  initialLabels,
   onStoryUpdated,
 }: {
   storyId: string | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   embedded?: boolean;
+  initialLabels?: StoryLabel[];
   onStoryUpdated?: () => void;
 }) {
   const [state, setState] = useState<DialogState>(() => ({
@@ -717,6 +882,13 @@ export function StoryDetailDialog({
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [pendingTaskIds, setPendingTaskIds] = useState<Record<string, true>>({});
+  const [storyLabels, setStoryLabels] = useState<StoryLabel[]>([]);
+  const [storyLabelsForId, setStoryLabelsForId] = useState<string | null>(null);
+  const [availableLabels, setAvailableLabels] = useState<StoryLabel[]>([]);
+  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
+  const [selectedLabelId, setSelectedLabelId] = useState("");
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const [pendingLabelIds, setPendingLabelIds] = useState<Record<string, true>>({});
   const isActive = embedded ? storyId !== null : open;
 
   const viewState: DialogState = useMemo(() => {
@@ -726,11 +898,25 @@ export function StoryDetailDialog({
   }, [isActive, state, storyId]);
 
   const pendingSet = useMemo(() => new Set(Object.keys(pendingTaskIds)), [pendingTaskIds]);
+  const pendingLabelSet = useMemo(
+    () => new Set(Object.keys(pendingLabelIds)),
+    [pendingLabelIds],
+  );
   const activeStory = viewState.kind === "ok" ? viewState.story : null;
   const hasUnsavedStoryChanges = useMemo(
     () => activeStory !== null && storyDraft !== null && isStoryDirty(storyDraft, activeStory),
     [activeStory, storyDraft],
   );
+
+  useEffect(() => {
+    if (!storyId || !isActive) return;
+    if (storyLabelsForId === storyId) return;
+    setStoryLabels(initialLabels ?? []);
+    setStoryLabelsForId(storyId);
+    setSelectedLabelId("");
+    setLabelError(null);
+    setPendingLabelIds({});
+  }, [initialLabels, isActive, storyId, storyLabelsForId]);
 
   useEffect(() => {
     if (!storyId || !isActive) return;
@@ -749,13 +935,30 @@ export function StoryDetailDialog({
     ])
       .then(([storyJson, tasksJson]) => {
         if (cancelled) return;
+        const rawStory = storyJson.data as StoryDetail & {
+          labels?: unknown;
+          label_ids?: unknown;
+        };
+        const mappedStoryLabels = mapStoryLabelsFromUnknown(rawStory.labels);
+        const mappedLabelIds = Array.isArray(rawStory.label_ids)
+          ? rawStory.label_ids.filter((value): value is string => typeof value === "string")
+          : mappedStoryLabels.map((label) => label.id);
+        const mappedStory: StoryDetail = {
+          ...rawStory,
+          labels: mappedStoryLabels,
+          label_ids: mappedLabelIds,
+        };
         const mappedTasks = ((tasksJson.data ?? []) as Record<string, unknown>[]).map(mapTaskFromApi);
         setState({
           kind: "ok",
           forStoryId: storyId,
-          story: storyJson.data,
+          story: mappedStory,
           tasks: mappedTasks,
         });
+        if (mappedStoryLabels.length > 0) {
+          setStoryLabels(mappedStoryLabels);
+          setStoryLabelsForId(storyId);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -809,6 +1012,58 @@ export function StoryDetailDialog({
   }, [activeStory]);
 
   useEffect(() => {
+    if (!isActive || !storyId || !activeStory?.project_id) {
+      setAvailableLabels([]);
+      setIsLoadingLabels(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingLabels(true);
+
+    Promise.all([
+      fetch(apiUrl(`/v1/planning/labels?project_id=${activeStory.project_id}&limit=100`)).then(
+        async (response) => {
+          if (!response.ok) throw new Error(await parseApiMessage(response));
+          return response.json();
+        },
+      ),
+      fetchStoryLabelsFromBacklogs(storyId, activeStory.project_id),
+    ])
+      .then(([labelsJson, attachedFromBacklogs]) => {
+        if (cancelled) return;
+        const allLabels = mapStoryLabelsFromUnknown(labelsJson.data);
+        setAvailableLabels(allLabels);
+        if (attachedFromBacklogs.found) {
+          setStoryLabels(attachedFromBacklogs.labels);
+        } else if (activeStory.labels) {
+          setStoryLabels(activeStory.labels);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAvailableLabels([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLabels(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeStory, isActive, storyId]);
+
+  useEffect(() => {
+    if (!selectedLabelId) return;
+    if (storyLabels.some((label) => label.id === selectedLabelId)) {
+      setSelectedLabelId("");
+      return;
+    }
+    const labelExists = availableLabels.some((label) => label.id === selectedLabelId);
+    if (!labelExists) setSelectedLabelId("");
+  }, [availableLabels, selectedLabelId, storyLabels]);
+
+  useEffect(() => {
     if (!isActive || !hasUnsavedStoryChanges) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -835,6 +1090,12 @@ export function StoryDetailDialog({
       setStoryError(null);
       setTaskError(null);
       setPendingTaskIds({});
+      setStoryLabels([]);
+      setStoryLabelsForId(null);
+      setAvailableLabels([]);
+      setSelectedLabelId("");
+      setLabelError(null);
+      setPendingLabelIds({});
     }
     onOpenChange?.(nextOpen);
   };
@@ -904,6 +1165,92 @@ export function StoryDetailDialog({
       delete next[taskId];
       return next;
     });
+  };
+
+  const withLabelPending = (labelId: string, pending: boolean) => {
+    setPendingLabelIds((prev) => {
+      if (pending) return { ...prev, [labelId]: true };
+      const next = { ...prev };
+      delete next[labelId];
+      return next;
+    });
+  };
+
+  const attachLabel = async () => {
+    if (viewState.kind !== "ok" || selectedLabelId.trim() === "") return;
+    if (pendingLabelSet.has(selectedLabelId)) return;
+
+    const nextLabel = availableLabels.find((label) => label.id === selectedLabelId);
+    if (!nextLabel) {
+      setLabelError("Selected label is unavailable. Re-open the selector and try again.");
+      return;
+    }
+    if (storyLabels.some((label) => label.id === selectedLabelId)) {
+      setLabelError("Label is already attached to this story.");
+      return;
+    }
+
+    const previousLabels = storyLabels;
+    setLabelError(null);
+    withLabelPending(selectedLabelId, true);
+    setStoryLabels((prev) =>
+      [...prev, nextLabel].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setSelectedLabelId("");
+
+    try {
+      const response = await fetch(apiUrl(`/v1/planning/stories/${viewState.story.id}/labels`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label_id: nextLabel.id }),
+      });
+      if (!response.ok) {
+        throw new Error(await parseApiMessage(response));
+      }
+      onStoryUpdated?.();
+    } catch (error) {
+      setStoryLabels(previousLabels);
+      setLabelError(
+        error instanceof Error
+          ? `Failed to attach label: ${error.message}`
+          : "Failed to attach label.",
+      );
+    } finally {
+      withLabelPending(nextLabel.id, false);
+    }
+  };
+
+  const detachLabel = async (labelId: string) => {
+    if (viewState.kind !== "ok") return;
+    if (pendingLabelSet.has(labelId)) return;
+
+    const previousLabels = storyLabels;
+    const label = previousLabels.find((item) => item.id === labelId);
+    if (!label) return;
+
+    setLabelError(null);
+    withLabelPending(labelId, true);
+    setStoryLabels((prev) => prev.filter((item) => item.id !== labelId));
+
+    try {
+      const response = await fetch(
+        apiUrl(`/v1/planning/stories/${viewState.story.id}/labels/${labelId}`),
+        { method: "DELETE" },
+      );
+      if (!response.ok) {
+        throw new Error(await parseApiMessage(response));
+      }
+      onStoryUpdated?.();
+    } catch (error) {
+      setStoryLabels(previousLabels);
+      setLabelError(
+        error instanceof Error
+          ? `Failed to detach "${label.name}": ${error.message}`
+          : `Failed to detach "${label.name}".`,
+      );
+    } finally {
+      withLabelPending(labelId, false);
+    }
   };
 
   const createTask = async (draft: TaskDraft) => {
@@ -1275,6 +1622,18 @@ export function StoryDetailDialog({
                     Leave blocked reason empty when this story is not blocked.
                   </p>
                 </div>
+
+                <StoryLabelManager
+                  labels={storyLabels}
+                  availableLabels={availableLabels}
+                  selectedLabelId={selectedLabelId}
+                  isLoading={isLoadingLabels}
+                  pendingLabelIds={pendingLabelSet}
+                  error={labelError}
+                  onSelectLabel={setSelectedLabelId}
+                  onAttachLabel={attachLabel}
+                  onDetachLabel={detachLabel}
+                />
 
                 <TaskManager
                   tasks={viewState.tasks}

@@ -69,6 +69,10 @@ export default function BoardPage() {
           },
         }
       : viewState;
+  const selectedStoryLabels =
+    state.kind === "ok" && selectedStoryId
+      ? state.data.stories.find((story) => story.id === selectedStoryId)?.labels
+      : undefined;
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -231,6 +235,7 @@ export default function BoardPage() {
         storyId={selectedStoryId}
         open={selectedStoryId !== null}
         onOpenChange={handleDialogClose}
+        initialLabels={selectedStoryLabels}
         onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
       />
     </>
