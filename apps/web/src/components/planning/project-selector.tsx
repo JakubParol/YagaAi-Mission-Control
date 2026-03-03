@@ -17,12 +17,10 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { usePlanningFilter } from "./planning-filter-context";
-
-interface ProjectItem {
-  id: string;
-  key: string;
-  name: string;
-}
+import {
+  resolveInitialProjectSelection,
+  type ProjectSelectorItem,
+} from "./project-selector-init";
 
 export function ProjectSelector() {
   const { selectedProjectIds, setSelectedProjectIds } = usePlanningFilter();
@@ -30,7 +28,7 @@ export function ProjectSelector() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [projects, setProjects] = useState<ProjectSelectorItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const selectedId = selectedProjectIds.length === 1 ? selectedProjectIds[0] : null;
@@ -50,24 +48,25 @@ export function ProjectSelector() {
       })
       .then((json) => {
         if (!cancelled && json.data) {
-          const items: ProjectItem[] = json.data.map(
-            (p: { id: string; key: string; name: string }) => ({
+          const items: ProjectSelectorItem[] = json.data.map(
+            (p: { id: string; key: string; name: string; is_default: boolean }) => ({
               id: p.id,
               key: p.key,
               name: p.name,
+              is_default: p.is_default,
             }),
           );
           setProjects(items);
 
-          if (items.length > 0 && selectedProjectIds.length === 0) {
-            const projectKeyFromUrl = searchParams.get("project");
-            const match = projectKeyFromUrl
-              ? items.find((p) => p.key === projectKeyFromUrl)
-              : null;
-            const target = match ?? items[0];
-            setSelectedProjectIds([target.id]);
-            if (!match) {
-              updateUrlParam(target.key);
+          const initialSelection = resolveInitialProjectSelection({
+            projects: items,
+            selectedProjectIds,
+            projectKeyFromUrl: searchParams.get("project"),
+          });
+          if (initialSelection) {
+            setSelectedProjectIds([initialSelection.targetProject.id]);
+            if (initialSelection.shouldUpdateUrl) {
+              updateUrlParam(initialSelection.targetProject.key);
             }
           }
         }
