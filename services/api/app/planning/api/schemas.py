@@ -10,6 +10,7 @@ class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: str | None = None
     repo_root: str | None = None
+    is_default: bool | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -17,6 +18,7 @@ class ProjectUpdate(BaseModel):
     description: str | None = None
     status: str | None = Field(None, pattern=r"^(ACTIVE|ARCHIVED)$")
     repo_root: str | None = None
+    is_default: bool | None = None
 
 
 class ProjectResponse(BaseModel):
@@ -25,6 +27,7 @@ class ProjectResponse(BaseModel):
     name: str
     description: str | None
     status: str
+    is_default: bool
     repo_root: str | None
     created_by: str | None
     updated_by: str | None

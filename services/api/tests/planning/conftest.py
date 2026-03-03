@@ -40,6 +40,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           name TEXT NOT NULL,
           description TEXT,
           status TEXT NOT NULL,
+          is_default INTEGER NOT NULL DEFAULT 0,
           repo_root TEXT,
           created_by TEXT,
           updated_by TEXT,
