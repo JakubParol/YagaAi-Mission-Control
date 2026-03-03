@@ -1,8 +1,8 @@
-export { planningSettingsFixture } from "./fixtures.js";
+export { planningSettingsFixture } from "./fixtures";
 export {
   buildPlanningSettingsViewModel,
   getMockPlanningSettingsViewModel,
-} from "./adapter.js";
+} from "./adapter";
 export type {
   PlanningSettingsFixture,
   PlanningSettingsViewModel,
@@ -15,4 +15,4 @@ export type {
   SettingsStoryStatusHistory,
   SettingsTaskLabel,
   SettingsTaskStatusHistory,
-} from "./types.js";
+} from "./types";
