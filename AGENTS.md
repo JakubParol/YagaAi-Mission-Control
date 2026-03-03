@@ -81,7 +81,7 @@ When asked to plan and implement a User Story, execute the FULL workflow end-to-
 
 ### Phase 1: Implementation
 
-1. **Plan** — Prepare the implementation plan for the US.
+1. **Plan** — Prepare the implementation plan for the US.You have to split the whole User story into small atomic tasks
 2. **Create tasks** — Use `mc task create` to create tasks in the US based on the plan.
 3. **Start the story** — Before starting the first task, set the story to IN_PROGRESS via `mc story update`.
 4. **For each task:**
