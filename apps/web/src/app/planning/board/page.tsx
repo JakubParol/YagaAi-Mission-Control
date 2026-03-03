@@ -11,10 +11,10 @@ import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 
 type BoardState =
   | { kind: "no-project" }
-  | { kind: "loading" }
-  | { kind: "no-sprint" }
-  | { kind: "error"; message: string }
-  | { kind: "ok"; data: ActiveSprintData };
+  | { kind: "loading"; projectId: string }
+  | { kind: "no-sprint"; projectId: string }
+  | { kind: "error"; projectId: string; message: string }
+  | { kind: "ok"; projectId: string; data: ActiveSprintData };
 
 export default function BoardPage() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
@@ -34,19 +34,22 @@ export default function BoardPage() {
       ? selectedProjectIds[0]
       : null;
 
+  const viewState: BoardState = !singleProjectId
+    ? { kind: "no-project" }
+    : state.kind !== "no-project" && state.projectId === singleProjectId
+      ? state
+      : { kind: "loading", projectId: singleProjectId };
+
   useEffect(() => {
-    if (!singleProjectId) {
-      setState({ kind: "no-project" });
-      return;
-    }
+    if (!singleProjectId) return;
 
     let cancelled = false;
-    setState({ kind: "loading" });
 
     fetch(apiUrl(`/v1/planning/backlogs/active-sprint?project_id=${singleProjectId}`))
       .then((res) => {
         if (res.status === 404) {
-          if (!cancelled) setState({ kind: "no-sprint" });
+          if (!cancelled)
+            setState({ kind: "no-sprint", projectId: singleProjectId });
           return null;
         }
         if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -54,11 +57,15 @@ export default function BoardPage() {
       })
       .then((json) => {
         if (cancelled || !json) return;
-        setState({ kind: "ok", data: json.data });
+        setState({ kind: "ok", projectId: singleProjectId, data: json.data });
       })
       .catch((err) => {
         if (!cancelled) {
-          setState({ kind: "error", message: String(err) });
+          setState({
+            kind: "error",
+            projectId: singleProjectId,
+            message: String(err),
+          });
         }
       });
 
@@ -76,7 +83,7 @@ export default function BoardPage() {
         </p>
       </div>
 
-      {state.kind === "no-project" && (
+      {viewState.kind === "no-project" && (
         <EmptyState
           icon="board"
           title="Select a project"
@@ -84,13 +91,13 @@ export default function BoardPage() {
         />
       )}
 
-      {state.kind === "loading" && (
+      {viewState.kind === "loading" && (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       )}
 
-      {state.kind === "no-sprint" && (
+      {viewState.kind === "no-sprint" && (
         <EmptyState
           icon="board"
           title="No active sprint"
@@ -98,16 +105,16 @@ export default function BoardPage() {
         />
       )}
 
-      {state.kind === "error" && (
+      {viewState.kind === "error" && (
         <EmptyState
           icon="default"
           title="Failed to load sprint"
-          description={state.message}
+          description={viewState.message}
         />
       )}
 
-      {state.kind === "ok" && (
-        <SprintBoard data={state.data} onStoryClick={handleStoryClick} />
+      {viewState.kind === "ok" && (
+        <SprintBoard data={viewState.data} onStoryClick={handleStoryClick} />
       )}
 
       <StoryDetailDialog

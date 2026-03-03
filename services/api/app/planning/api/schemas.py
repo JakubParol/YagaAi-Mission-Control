@@ -223,6 +223,8 @@ class SprintStoryResponse(BaseModel):
     status: str
     priority: int | None
     story_type: str
+    epic_key: str | None = None
+    epic_title: str | None = None
     position: int
     task_count: int
     done_task_count: int

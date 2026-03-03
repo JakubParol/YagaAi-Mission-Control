@@ -12,19 +12,24 @@ import {
 } from "@/components/planning/story-view";
 
 type PageState =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ok"; story: StoryDetail; tasks: TaskItem[] };
+  | { kind: "loading"; forId: string }
+  | { kind: "error"; forId: string; message: string }
+  | { kind: "ok"; forId: string; story: StoryDetail; tasks: TaskItem[] };
 
 export default function StoryPage() {
   const { id } = useParams<{ id: string }>();
-  const [state, setState] = useState<PageState>({ kind: "loading" });
+  const [state, setState] = useState<PageState>(() => ({
+    kind: "loading",
+    forId: id,
+  }));
+
+  const viewState: PageState =
+    state.forId === id ? state : { kind: "loading", forId: id };
 
   useEffect(() => {
     if (!id) return;
 
     let cancelled = false;
-    setState({ kind: "loading" });
 
     Promise.all([
       fetch(apiUrl(`/v1/planning/stories/${id}`)).then((res) => {
@@ -38,10 +43,15 @@ export default function StoryPage() {
     ])
       .then(([storyJson, tasksJson]) => {
         if (!cancelled)
-          setState({ kind: "ok", story: storyJson.data, tasks: tasksJson.data ?? [] });
+          setState({
+            kind: "ok",
+            forId: id,
+            story: storyJson.data,
+            tasks: tasksJson.data ?? [],
+          });
       })
       .catch((err) => {
-        if (!cancelled) setState({ kind: "error", message: String(err) });
+        if (!cancelled) setState({ kind: "error", forId: id, message: String(err) });
       });
 
     return () => {
@@ -49,7 +59,7 @@ export default function StoryPage() {
     };
   }, [id]);
 
-  if (state.kind === "loading") {
+  if (viewState.kind === "loading") {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -57,18 +67,18 @@ export default function StoryPage() {
     );
   }
 
-  if (state.kind === "error") {
+  if (viewState.kind === "error") {
     return (
       <div className="py-12 text-center">
         <AlertTriangle className="mx-auto mb-2 size-6 text-destructive" />
-        <p className="text-sm text-muted-foreground">{state.message}</p>
+        <p className="text-sm text-muted-foreground">{viewState.message}</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl">
-      <StoryView story={state.story} tasks={state.tasks} />
+      <StoryView story={viewState.story} tasks={viewState.tasks} />
     </div>
   );
 }
