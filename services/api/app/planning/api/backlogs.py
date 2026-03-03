@@ -11,6 +11,8 @@ from app.planning.api.schemas import (
     BacklogStoryItemResponse,
     BacklogTaskItemResponse,
     BacklogUpdate,
+    SprintMembershipMoveRequest,
+    SprintMembershipMoveResponse,
     SprintStoryResponse,
 )
 from app.planning.application.backlog_service import BacklogService
@@ -91,6 +93,39 @@ async def get_active_sprint(
             stories=[SprintStoryResponse(**s) for s in stories],
         )
     )
+
+
+@router.post("/active-sprint/stories")
+async def add_story_to_active_sprint(
+    body: SprintMembershipMoveRequest,
+    project_id: str | None = Depends(resolve_project_key),
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[SprintMembershipMoveResponse]:
+    if not project_id:
+        raise ValidationError("Either project_id or project_key is required")
+    result = await service.move_story_to_active_sprint(
+        project_id=project_id,
+        story_id=body.story_id,
+        position=body.position,
+    )
+    return Envelope(data=SprintMembershipMoveResponse(**result))
+
+
+@router.delete("/active-sprint/stories/{story_id}")
+async def remove_story_from_active_sprint(
+    story_id: str,
+    project_id: str | None = Depends(resolve_project_key),
+    service: BacklogService = Depends(get_backlog_service),
+    position: int | None = Query(None, ge=0),
+) -> Envelope[SprintMembershipMoveResponse]:
+    if not project_id:
+        raise ValidationError("Either project_id or project_key is required")
+    result = await service.move_story_to_product_backlog(
+        project_id=project_id,
+        story_id=story_id,
+        position=position,
+    )
+    return Envelope(data=SprintMembershipMoveResponse(**result))
 
 
 @router.get("/{backlog_id}")

@@ -235,6 +235,21 @@ class ActiveSprintResponse(BaseModel):
     stories: list[SprintStoryResponse]
 
 
+class SprintMembershipMoveRequest(BaseModel):
+    story_id: str = Field(..., min_length=1)
+    position: int | None = Field(None, ge=0)
+
+
+class SprintMembershipMoveResponse(BaseModel):
+    story_id: str
+    project_id: str
+    source_backlog_id: str
+    target_backlog_id: str
+    source_position: int | None
+    target_position: int | None
+    moved: bool
+
+
 # ---------------------------------------------------------------------------
 # Stories
 # ---------------------------------------------------------------------------
