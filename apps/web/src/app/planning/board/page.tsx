@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/empty-state";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
+import { subscribeToSprintLifecycleChanged } from "../sprint-lifecycle-events";
 
 type BoardState =
   | { kind: "no-project" }
@@ -91,6 +92,14 @@ export default function BoardPage() {
       cancelled = true;
     };
   }, [reloadToken, singleProjectId]);
+
+  useEffect(() => {
+    if (!singleProjectId) return;
+    return subscribeToSprintLifecycleChanged((payload) => {
+      if (payload.projectId !== singleProjectId) return;
+      setReloadToken((prev) => prev + 1);
+    });
+  }, [singleProjectId]);
 
   const handleStoryStatusChange = useCallback(
     async (storyId: string, nextStatus: ItemStatus) => {
