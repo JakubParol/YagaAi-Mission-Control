@@ -1235,7 +1235,9 @@ class SqliteBacklogRepository(BacklogRepository):
                ORDER BY bs.position ASC""",
             [backlog_id],
         )
-        return [dict(r) for r in story_rows]
+        stories = [dict(r) for r in story_rows]
+        await self._attach_story_labels(stories)
+        return stories
 
     async def list_task_items(self, backlog_id: str) -> list[BacklogTaskItem]:
         rows = await _fetch_all(
@@ -1279,7 +1281,41 @@ class SqliteBacklogRepository(BacklogRepository):
             [backlog.id],
         )
         stories = [dict(r) for r in story_rows]
+        await self._attach_story_labels(stories)
         return backlog, stories
+
+    async def _attach_story_labels(self, stories: list[dict[str, Any]]) -> None:
+        if not stories:
+            return
+
+        story_ids = [story["id"] for story in stories]
+        placeholders = ",".join("?" for _ in story_ids)
+        label_rows = await _fetch_all(
+            self._db,
+            f"""
+            SELECT sl.story_id, l.id AS label_id, l.name, l.color
+            FROM story_labels sl
+            JOIN labels l ON l.id = sl.label_id
+            WHERE sl.story_id IN ({placeholders})
+            ORDER BY l.name ASC, l.id ASC
+            """,
+            story_ids,
+        )
+
+        labels_by_story: dict[str, list[dict[str, Any]]] = {story_id: [] for story_id in story_ids}
+        for row in label_rows:
+            labels_by_story[row["story_id"]].append(
+                {
+                    "id": row["label_id"],
+                    "name": row["name"],
+                    "color": row["color"],
+                }
+            )
+
+        for story in stories:
+            story_labels = labels_by_story.get(story["id"], [])
+            story["labels"] = story_labels
+            story["label_ids"] = [label["id"] for label in story_labels]
 
     async def get_active_sprint_backlog(self, project_id: str) -> Backlog | None:
         row = await _fetch_one(

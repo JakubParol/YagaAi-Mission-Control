@@ -10,9 +10,11 @@ Covers: GET /v1/planning/backlogs/active-sprint?project_id=...
 Note: Seed data (conftest) includes b2 = SPRINT/ACTIVE for project p1.
 Tests that need a clean slate for sprints use project p2 (no seeded sprint).
 """
+import sqlite3
 
 PREFIX = "/v1/planning/backlogs"
 ACTIVE_SPRINT_URL = f"{PREFIX}/active-sprint"
+TS = "2026-01-01T00:00:00Z"
 
 
 # ── Setup helpers ───────────────────────────────────────────────────────
@@ -88,6 +90,8 @@ def test_active_sprint_story_fields(client):
     assert "story_type" in story
     assert "position" in story
     assert "key" in story
+    assert "labels" in story
+    assert "label_ids" in story
 
 
 def test_active_sprint_empty_stories(client):
@@ -135,3 +139,32 @@ def test_active_sprint_nonexistent_project(client):
     """No sprint for unknown project → 404."""
     resp = client.get(f"{ACTIVE_SPRINT_URL}?project_id=nonexistent")
     assert resp.status_code == 404
+
+
+def test_active_sprint_reflects_story_label_mutation(client, _setup_test_db):
+    conn = sqlite3.connect(_setup_test_db)
+    conn.execute(
+        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
+        ("lbl-hotfix", "p1", "hotfix", "#ffaa00", TS),
+    )
+    conn.commit()
+    conn.close()
+
+    _add_story(client, "b2", "s1", 0)
+    attach_resp = client.post("/v1/planning/stories/s1/labels", json={"label_id": "lbl-hotfix"})
+    assert attach_resp.status_code == 201
+
+    first = client.get(f"{ACTIVE_SPRINT_URL}?project_id=p1")
+    assert first.status_code == 200
+    story = first.json()["data"]["stories"][0]
+    assert story["labels"] == [{"id": "lbl-hotfix", "name": "hotfix", "color": "#ffaa00"}]
+    assert story["label_ids"] == ["lbl-hotfix"]
+
+    detach_resp = client.delete("/v1/planning/stories/s1/labels/lbl-hotfix")
+    assert detach_resp.status_code == 204
+
+    second = client.get(f"{ACTIVE_SPRINT_URL}?project_id=p1")
+    assert second.status_code == 200
+    story_after = second.json()["data"]["stories"][0]
+    assert story_after["labels"] == []
+    assert story_after["label_ids"] == []
