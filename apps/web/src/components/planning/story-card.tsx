@@ -1,3 +1,4 @@
+import type { DragEvent } from "react";
 import {
   Bug,
   CheckCircle2,
@@ -44,6 +45,14 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   DONE: "Done",
 };
 
+export const STORY_STATUS_ORDER: readonly ItemStatus[] = [
+  "TODO",
+  "IN_PROGRESS",
+  "CODE_REVIEW",
+  "VERIFY",
+  "DONE",
+] as const;
+
 export const TYPE_CONFIG: Record<string, { icon: typeof Bug; label: string; color: string }> = {
   BUG: { icon: Bug, label: "Bug", color: "text-red-400" },
   SPIKE: { icon: FlaskConical, label: "Spike", color: "text-cyan-400" },
@@ -86,22 +95,48 @@ function PriorityIndicator({ priority }: { priority: number | null }) {
 export function StoryCard({
   story,
   onClick,
+  onDragStart,
+  onDragEnd,
+  onStatusChange,
+  disabled = false,
 }: {
   story: StoryCardStory;
   onClick?: (storyId: string) => void;
+  onDragStart?: (storyId: string) => void;
+  onDragEnd?: () => void;
+  onStatusChange?: (storyId: string, status: ItemStatus) => void;
+  disabled?: boolean;
 }) {
   const statusStyle = STATUS_STYLE[story.status];
   const typeConf = TYPE_CONFIG[story.story_type] ?? TYPE_CONFIG.USER_STORY;
   const TypeIcon = typeConf.icon;
+  const labelId = `story-status-${story.id}`;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      draggable={!disabled}
       onClick={() => onClick?.(story.id)}
+      onKeyDown={(event) => {
+        if (disabled) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick?.(story.id);
+        }
+      }}
+      onDragStart={(event: DragEvent<HTMLDivElement>) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", story.id);
+        onDragStart?.(story.id);
+      }}
+      onDragEnd={() => onDragEnd?.()}
       className={cn(
         "group w-full text-left rounded-lg border border-border/60 bg-card px-3 py-2.5",
         "hover:border-border hover:bg-card/80 transition-colors duration-150",
         "focus-ring",
+        disabled && "cursor-not-allowed opacity-70",
       )}
     >
       {/* Top row: key + priority */}
@@ -125,6 +160,35 @@ export function StoryCard({
         </span>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <label htmlFor={labelId} className="sr-only">
+              Change story status
+            </label>
+            <select
+              id={labelId}
+              value={story.status}
+              disabled={disabled}
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+              onChange={(event) => {
+                const nextStatus = event.target.value as ItemStatus;
+                onStatusChange?.(story.id, nextStatus);
+              }}
+              className={cn(
+                "h-6 rounded border border-border/60 bg-background/80 px-1.5",
+                "text-[10px] text-muted-foreground",
+                "focus-ring",
+              )}
+              aria-label="Change story status"
+            >
+              {STORY_STATUS_ORDER.map((status) => (
+                <option key={status} value={status}>
+                  {STATUS_LABEL[status]}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {story.task_count > 0 && (
             <span
               className={cn(
@@ -150,6 +214,6 @@ export function StoryCard({
           </span>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
