@@ -462,6 +462,68 @@ Response `200`:
 Returns `404` if no active sprint exists for the given project.
 Returns `422` if `project_id` is missing.
 
+#### `POST /v1/planning/backlogs/active-sprint/stories` — Add story to active sprint
+
+Moves a story from the project's product backlog (`kind=BACKLOG`) to the active sprint.
+Operation is idempotent when the story is already in the active sprint.
+
+Query: `project_id` or `project_key` (at least one required).
+
+Request:
+```jsonc
+{
+  "story_id": "...",
+  "position": 0 // optional; defaults to first free position in sprint
+}
+```
+
+Response `200`:
+```jsonc
+{
+  "data": {
+    "story_id": "...",
+    "project_id": "...",
+    "source_backlog_id": "...",
+    "target_backlog_id": "...",
+    "source_position": 1,
+    "target_position": 0,
+    "moved": true
+  }
+}
+```
+
+Error behavior:
+- `404 NOT_FOUND` when active sprint or story does not exist
+- `400 BUSINESS_RULE_VIOLATION` when story is not in product backlog for the project
+- `400 VALIDATION_ERROR` when project selector is missing
+
+#### `DELETE /v1/planning/backlogs/active-sprint/stories/{story_id}` — Remove story from active sprint
+
+Moves a story from active sprint back to product backlog.
+Operation is idempotent when the story is already in product backlog.
+
+Query: `project_id` or `project_key` (at least one required), `position` (optional target position in product backlog).
+
+Response `200`:
+```jsonc
+{
+  "data": {
+    "story_id": "...",
+    "project_id": "...",
+    "source_backlog_id": "...",
+    "target_backlog_id": "...",
+    "source_position": 0,
+    "target_position": 2,
+    "moved": true
+  }
+}
+```
+
+Error behavior:
+- `404 NOT_FOUND` when active sprint or story does not exist
+- `400 BUSINESS_RULE_VIOLATION` when story is not in active sprint for the project
+- `400 VALIDATION_ERROR` when project selector is missing
+
 ---
 
 ### 4.6) Assignments
