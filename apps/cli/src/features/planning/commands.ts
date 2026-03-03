@@ -330,12 +330,23 @@ function registerStandardResourceCommands(
     printPayload(payload, ctx.config.output);
   });
 
-  addPayloadOptions(
+  const createCommand = addPayloadOptions(
     resource
       .command("create")
       .description(`Create ${spec.name}; payload from --json/--file/--set`)
       .option("--project-id <id>", "project context for nested resources (required for epic)"),
-  ).action(async (opts: CreateOptions, command: Command) => {
+  );
+
+  if (spec.name === "project") {
+    createCommand.addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  mc project create --set key=MC --set name=\"Mission Control\" --set is_default=true\n" +
+        "  mc project create --json '{\"key\":\"MC\",\"name\":\"Mission Control\",\"is_default\":true}'",
+    );
+  }
+
+  createCommand.action(async (opts: CreateOptions, command: Command) => {
     const ctx = getContext(command);
     const payloadBody = buildPayload({
       json: opts.json,
@@ -351,7 +362,7 @@ function registerStandardResourceCommands(
     printPayload(payload, ctx.config.output);
   });
 
-  addPayloadOptions(
+  const updateCommand = addPayloadOptions(
     addSelectConvenienceOptions(
       resource
         .command("update")
@@ -359,7 +370,18 @@ function registerStandardResourceCommands(
         .option("--id <id>", "resource UUID")
         .option("--by <field=value>", "selector filter (repeatable)", collectOption, []),
     ),
-  ).action(async (opts: MutationOptions, command: Command) => {
+  );
+
+  if (spec.name === "project") {
+    updateCommand.addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  mc project update --id <uuid> --set is_default=true\n" +
+        "  mc project update --by key=MC --set is_default=false",
+    );
+  }
+
+  updateCommand.action(async (opts: MutationOptions, command: Command) => {
     const ctx = getContext(command);
     const target = await resolveTargetId(spec, opts, ctx.client);
     const payloadBody = buildPayload({
