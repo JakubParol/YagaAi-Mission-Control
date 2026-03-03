@@ -1093,9 +1093,13 @@ export function StoryDetailDialog({
     <>
       {viewState.kind === "loading" && (
         <>
-          <DialogHeader>
-            <DialogTitle className="sr-only">Loading story…</DialogTitle>
-          </DialogHeader>
+          {embedded ? (
+            <h2 className="sr-only">Loading story…</h2>
+          ) : (
+            <DialogHeader>
+              <DialogTitle className="sr-only">Loading story…</DialogTitle>
+            </DialogHeader>
+          )}
           <div className="flex items-center justify-center py-12">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
@@ -1104,9 +1108,13 @@ export function StoryDetailDialog({
 
       {viewState.kind === "error" && (
         <>
-          <DialogHeader>
-            <DialogTitle className="sr-only">Error</DialogTitle>
-          </DialogHeader>
+          {embedded ? (
+            <h2 className="sr-only">Error</h2>
+          ) : (
+            <DialogHeader>
+              <DialogTitle className="sr-only">Error</DialogTitle>
+            </DialogHeader>
+          )}
           <div className="py-8 text-center">
             <AlertTriangle className="mx-auto mb-2 size-6 text-destructive" />
             <p className="text-sm text-muted-foreground">{viewState.message}</p>
@@ -1118,21 +1126,39 @@ export function StoryDetailDialog({
         <>
           {storyDraft ? (
             <>
-              <DialogHeader className="gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs tracking-wide text-muted-foreground">
-                    {viewState.story.key ?? "—"}
-                  </span>
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                      STATUS_STYLE[viewState.story.status].bg,
-                      STATUS_STYLE[viewState.story.status].text,
-                    )}
-                  >
-                    {STATUS_LABEL[viewState.story.status]}
-                  </span>
-                  {!embedded && (
+              {embedded ? (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs tracking-wide text-muted-foreground">
+                      {viewState.story.key ?? "—"}
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        STATUS_STYLE[viewState.story.status].bg,
+                        STATUS_STYLE[viewState.story.status].text,
+                      )}
+                    >
+                      {STATUS_LABEL[viewState.story.status]}
+                    </span>
+                  </div>
+                  <h2 className="sr-only">{viewState.story.title}</h2>
+                </div>
+              ) : (
+                <DialogHeader className="gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs tracking-wide text-muted-foreground">
+                      {viewState.story.key ?? "—"}
+                    </span>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        STATUS_STYLE[viewState.story.status].bg,
+                        STATUS_STYLE[viewState.story.status].text,
+                      )}
+                    >
+                      {STATUS_LABEL[viewState.story.status]}
+                    </span>
                     <a
                       href={`/planning/stories/${viewState.story.id}`}
                       target="_blank"
@@ -1142,10 +1168,10 @@ export function StoryDetailDialog({
                       <ExternalLink className="size-3.5" />
                       Open in new tab
                     </a>
-                  )}
-                </div>
-                <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
-              </DialogHeader>
+                  </div>
+                  <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
+                </DialogHeader>
+              )}
 
               <div className="space-y-5">
                 {storyError && (
