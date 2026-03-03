@@ -204,6 +204,9 @@ def _setup_test_db(tmp_path, monkeypatch):
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
           ON task_assignments(task_id) WHERE unassigned_at IS NULL;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
+          ON projects(is_default) WHERE is_default = 1;
         """)
 
     conn.executescript(f"""

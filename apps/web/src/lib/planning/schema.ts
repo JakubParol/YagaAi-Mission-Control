@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name        TEXT NOT NULL,
   description TEXT,
   status      TEXT NOT NULL DEFAULT 'ACTIVE',
+  is_default  INTEGER NOT NULL DEFAULT 0,
   repo_root   TEXT,
   created_by  TEXT,
   updated_by  TEXT,
@@ -330,6 +331,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_default
   ON backlogs(project_id) WHERE is_default = 1;
 `;
 
+/** At most one default project across all projects */
+export const IDX_PROJECTS_DEFAULT = `
+CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
+  ON projects(is_default) WHERE is_default = 1;
+`;
+
 /** One active assignment per task */
 export const IDX_TASK_ASSIGNMENTS_ACTIVE = `
 CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
@@ -468,6 +475,7 @@ export const PLANNING_SCHEMA_STATEMENTS: string[] = [
   // Partial unique indexes
   IDX_STORIES_PROJECT_KEY,
   IDX_TASKS_PROJECT_KEY,
+  IDX_PROJECTS_DEFAULT,
   IDX_BACKLOGS_DEFAULT,
   IDX_TASK_ASSIGNMENTS_ACTIVE,
   IDX_LABELS_PROJECT_NAME,
