@@ -42,9 +42,14 @@ export interface TaskItem {
   key: string | null;
   title: string;
   objective: string | null;
+  task_type: string;
   status: ItemStatus;
   priority: number | null;
   is_blocked: boolean;
+  blocked_reason: string | null;
+  estimate_points: number | null;
+  due_at: string | null;
+  current_assignee_agent_id: string | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -160,10 +165,12 @@ export function StoryView({
   story,
   tasks,
   headerActions,
+  tasksSection,
 }: {
   story: StoryDetail;
   tasks: TaskItem[];
   headerActions?: React.ReactNode;
+  tasksSection?: React.ReactNode;
 }) {
   const statusStyle = STATUS_STYLE[story.status];
   const typeConf = TYPE_CONFIG[story.story_type] ?? TYPE_CONFIG.USER_STORY;
@@ -219,14 +226,18 @@ export function StoryView({
 
       {/* Tasks */}
       <div>
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-          <ListTodo className="size-4 text-muted-foreground" />
-          Tasks
-          <span className="text-xs font-normal text-muted-foreground">
-            ({tasks.length})
-          </span>
-        </h3>
-        <TaskList tasks={tasks} />
+        {tasksSection ?? (
+          <>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+              <ListTodo className="size-4 text-muted-foreground" />
+              Tasks
+              <span className="text-xs font-normal text-muted-foreground">
+                ({tasks.length})
+              </span>
+            </h3>
+            <TaskList tasks={tasks} />
+          </>
+        )}
       </div>
 
       {/* Metadata grid */}
