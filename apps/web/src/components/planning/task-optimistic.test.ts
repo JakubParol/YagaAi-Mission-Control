@@ -10,7 +10,7 @@ import {
   rollbackTaskPatch,
   toTaskStatusDonePatch,
 } from "./task-optimistic.js";
-import type { TaskItem } from "./story-view.js";
+import type { TaskItem } from "./story-types.js";
 
 function taskFixture(id: string, status: TaskItem["status"]): TaskItem {
   return {
