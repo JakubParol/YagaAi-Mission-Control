@@ -262,6 +262,7 @@ function BacklogSection({
                           }
                           onRemoveFromActiveSprint(story.id);
                         }}
+                        onKeyDown={(event) => event.stopPropagation()}
                         title={
                           canAddToActiveSprint
                             ? "Add to active sprint"
