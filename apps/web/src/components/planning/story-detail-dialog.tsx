@@ -534,7 +534,7 @@ function TaskManager({
         ) : (
           tasks.map((task) => (
             <TaskEditorRow
-              key={`${task.id}:${task.current_assignee_agent_id ?? "none"}`}
+              key={`${task.id}:${task.title}:${task.status}:${task.priority ?? ""}:${task.estimate_points ?? ""}:${task.due_at ?? ""}:${task.is_blocked ? "1" : "0"}:${task.blocked_reason ?? ""}:${task.task_type}:${task.current_assignee_agent_id ?? "none"}`}
               task={task}
               pending={pendingTaskIds.has(task.id)}
               agents={agents}
