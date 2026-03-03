@@ -1,7 +1,12 @@
+import { useMemo, useState, type DragEvent } from "react";
 import { Calendar, Target, Hash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
-import { StoryCard, type StoryCardStory } from "./story-card";
+import {
+  StoryCard,
+  STORY_STATUS_ORDER,
+  type StoryCardStory,
+} from "./story-card";
 
 // ─── Types (matches API response shape) ─────────────────────────────
 
@@ -28,6 +33,8 @@ const COLUMNS: { status: ItemStatus; label: string; accent: string }[] = [
   { status: "DONE", label: "Done", accent: "border-l-emerald-500" },
 ];
 
+const VALID_DROP_STATUSES = new Set<ItemStatus>(STORY_STATUS_ORDER);
+
 // ─── Sprint Header ──────────────────────────────────────────────────
 
 function SprintHeader({
@@ -37,12 +44,20 @@ function SprintHeader({
   backlog: SprintBacklog;
   stories: StoryCardStory[];
 }) {
-  const total = stories.length;
-  const done = stories.filter((s) => s.status === "DONE").length;
-  const inProgress = stories.filter(
-    (s) => s.status === "IN_PROGRESS" || s.status === "CODE_REVIEW" || s.status === "VERIFY"
-  ).length;
-  const pctDone = total > 0 ? Math.round((done / total) * 100) : 0;
+  const { total, done, inProgress, pctDone } = useMemo(() => {
+    const totalStories = stories.length;
+    const doneStories = stories.filter((s) => s.status === "DONE").length;
+    const inProgressStories = stories.filter(
+      (s) => s.status === "IN_PROGRESS" || s.status === "CODE_REVIEW" || s.status === "VERIFY"
+    ).length;
+    const donePercent = totalStories > 0 ? Math.round((doneStories / totalStories) * 100) : 0;
+    return {
+      total: totalStories,
+      done: doneStories,
+      inProgress: inProgressStories,
+      pctDone: donePercent,
+    };
+  }, [stories]);
 
   const formatDate = (d: string | null) => {
     if (!d) return null;
@@ -114,23 +129,42 @@ function SprintHeader({
 // ─── Board Column ───────────────────────────────────────────────────
 
 function BoardColumn({
+  status,
   label,
   accent,
   stories,
+  isDropTarget,
+  onDragOver,
+  onDrop,
   onStoryClick,
+  onStatusChange,
+  onCardDragStart,
+  onCardDragEnd,
+  pendingStoryIds,
 }: {
+  status: ItemStatus;
   label: string;
   accent: string;
   stories: StoryCardStory[];
+  isDropTarget: boolean;
+  onDragOver: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
   onStoryClick?: (storyId: string) => void;
+  onStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onCardDragStart: (storyId: string) => void;
+  onCardDragEnd: () => void;
+  pendingStoryIds: Set<string>;
 }) {
   return (
     <div
       className={cn(
         "flex flex-col rounded-lg border border-border/40 bg-muted/20",
         "border-l-2",
-        accent
+        accent,
+        isDropTarget && "ring-1 ring-blue-400/50 bg-blue-500/5",
       )}
+      onDragOver={(event) => onDragOver(status, event)}
+      onDrop={(event) => onDrop(status, event)}
     >
       {/* Column header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30">
@@ -149,7 +183,17 @@ function BoardColumn({
             No stories
           </div>
         ) : (
-          stories.map((story) => <StoryCard key={story.id} story={story} onClick={onStoryClick} />)
+          stories.map((story) => (
+            <StoryCard
+              key={story.id}
+              story={story}
+              onClick={onStoryClick}
+              onDragStart={onCardDragStart}
+              onDragEnd={onCardDragEnd}
+              onStatusChange={onStatusChange}
+              disabled={pendingStoryIds.has(story.id)}
+            />
+          ))
         )}
       </div>
     </div>
@@ -161,20 +205,73 @@ function BoardColumn({
 export function SprintBoard({
   data,
   onStoryClick,
+  onStoryStatusChange,
+  pendingStoryIds,
 }: {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
+  onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
+  pendingStoryIds?: ReadonlySet<string>;
 }) {
-  const byStatus = new Map<ItemStatus, StoryCardStory[]>();
-  for (const col of COLUMNS) {
-    byStatus.set(col.status, []);
-  }
-  for (const story of data.stories) {
-    const bucket = byStatus.get(story.status);
-    if (bucket) {
-      bucket.push(story);
+  const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
+  const [dropTargetStatus, setDropTargetStatus] = useState<ItemStatus | null>(null);
+  const pendingSet = useMemo(() => new Set(pendingStoryIds ?? []), [pendingStoryIds]);
+
+  const byStatus = useMemo(() => {
+    const grouped = new Map<ItemStatus, StoryCardStory[]>();
+    for (const col of COLUMNS) {
+      grouped.set(col.status, []);
     }
-  }
+    for (const story of data.stories) {
+      const bucket = grouped.get(story.status);
+      if (bucket) {
+        bucket.push(story);
+      }
+    }
+    return grouped;
+  }, [data.stories]);
+
+  const handleCardDragStart = (storyId: string) => {
+    setDraggingStoryId(storyId);
+  };
+
+  const handleCardDragEnd = () => {
+    setDraggingStoryId(null);
+    setDropTargetStatus(null);
+  };
+
+  const handleDragOver = (status: ItemStatus, event: DragEvent<HTMLDivElement>) => {
+    if (!draggingStoryId || pendingSet.has(draggingStoryId)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (dropTargetStatus !== status) {
+      setDropTargetStatus(status);
+    }
+  };
+
+  const handleDrop = (status: ItemStatus, event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const draggedStoryId = event.dataTransfer.getData("text/plain") || draggingStoryId;
+    setDropTargetStatus(null);
+    setDraggingStoryId(null);
+
+    if (!draggedStoryId || pendingSet.has(draggedStoryId) || !VALID_DROP_STATUSES.has(status)) {
+      return;
+    }
+
+    const draggedStory = data.stories.find((story) => story.id === draggedStoryId);
+    if (!draggedStory || draggedStory.status === status) {
+      return;
+    }
+
+    onStoryStatusChange?.(draggedStoryId, status);
+  };
+
+  const handleStatusChange = (storyId: string, status: ItemStatus) => {
+    const story = data.stories.find((item) => item.id === storyId);
+    if (!story || story.status === status) return;
+    onStoryStatusChange?.(storyId, status);
+  };
 
   return (
     <div>
@@ -184,10 +281,18 @@ export function SprintBoard({
         {COLUMNS.map((col) => (
           <BoardColumn
             key={col.status}
+            status={col.status}
             label={col.label}
             accent={col.accent}
             stories={byStatus.get(col.status) ?? []}
+            isDropTarget={dropTargetStatus === col.status}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
             onStoryClick={onStoryClick}
+            onStatusChange={handleStatusChange}
+            onCardDragStart={handleCardDragStart}
+            onCardDragEnd={handleCardDragEnd}
+            pendingStoryIds={pendingSet}
           />
         ))}
       </div>
