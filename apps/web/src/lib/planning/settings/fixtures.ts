@@ -1,0 +1,182 @@
+import type { PlanningSettingsFixture } from "./types.js";
+
+export const planningSettingsFixture: PlanningSettingsFixture = {
+  selected_project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+  projects: [
+    {
+      id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      key: "MC",
+      name: "Mission Control",
+      status: "ACTIVE",
+      repo_root: "/home/kuba/repos/mission-control",
+      is_default: 1,
+    },
+    {
+      id: "a14f2c9a-5ea4-4511-a506-a04dc9d62fcf",
+      key: "OPS",
+      name: "Operations Workspace",
+      status: "ARCHIVED",
+      repo_root: "/home/kuba/repos/operations-workspace",
+      is_default: 0,
+    },
+  ],
+  backlogs: [
+    {
+      id: "4b0eb8ec-f8ff-4bad-8e80-0506f3904dd0",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      name: "Product Backlog",
+      kind: "BACKLOG",
+      status: "ACTIVE",
+      is_default: 1,
+      start_date: null,
+      end_date: null,
+    },
+    {
+      id: "70695dbb-eafd-4d28-b5a8-c83c0cfbdb18",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      name: "Sprint 2026-03",
+      kind: "SPRINT",
+      status: "ACTIVE",
+      is_default: 0,
+      start_date: "2026-03-01",
+      end_date: "2026-03-14",
+    },
+    {
+      id: "98f16e64-ce9a-4dd0-9a22-d8e8b370ea6a",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      name: "Ideas",
+      kind: "IDEAS",
+      status: "ACTIVE",
+      is_default: 0,
+      start_date: null,
+      end_date: null,
+    },
+    {
+      id: "0d44f855-0dce-4261-88d6-f29127c86371",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      name: "Sprint 2026-02",
+      kind: "SPRINT",
+      status: "CLOSED",
+      is_default: 0,
+      start_date: "2026-02-10",
+      end_date: "2026-02-24",
+    },
+  ],
+  story_statuses: ["TODO", "IN_PROGRESS", "CODE_REVIEW", "VERIFY", "DONE"],
+  task_statuses: ["TODO", "IN_PROGRESS", "CODE_REVIEW", "VERIFY", "DONE"],
+  agents: [
+    {
+      id: "f1b8cb43-8198-4af5-b751-88ca98e2ce7a",
+      openclaw_key: "codex",
+      name: "Codex",
+      role: "implementation",
+      is_active: 1,
+    },
+    {
+      id: "47d34fd9-d3af-4724-b1c6-91d2bcdd1f4d",
+      openclaw_key: "explorer",
+      name: "Explorer",
+      role: "codebase-discovery",
+      is_active: 1,
+    },
+    {
+      id: "f98ec5af-cf3c-43f7-b4e7-255f2177d587",
+      openclaw_key: "legacy-worker",
+      name: "Legacy Worker",
+      role: "implementation",
+      is_active: 0,
+    },
+  ],
+  labels: [
+    {
+      id: "5e4ff988-cd09-47e0-a66e-40f8f0eefaf1",
+      project_id: null,
+      name: "security",
+      color: "#ef4444",
+    },
+    {
+      id: "7606a426-151f-4278-b043-676e58f42c11",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      name: "planning",
+      color: "#06b6d4",
+    },
+    {
+      id: "68512c39-4f22-4c34-b56b-4f1252dcb034",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      name: "ux",
+      color: "#f59e0b",
+    },
+  ],
+  story_labels: [
+    {
+      story_id: "918d7063-5297-431e-909c-e7a511844cc9",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+    {
+      story_id: "918d7063-5297-431e-909c-e7a511844cc9",
+      label_id: "68512c39-4f22-4c34-b56b-4f1252dcb034",
+    },
+    {
+      story_id: "d8287260-7bdf-40c7-a77c-83cf939a0b4f",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+  ],
+  task_labels: [
+    {
+      task_id: "87336606-0c2b-467e-aba9-f16079628e46",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+    {
+      task_id: "564b985e-1df3-4ca4-8648-9ae6cf4e21d5",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+    {
+      task_id: "8a3d002e-173b-4599-bcc9-6c70a3a16471",
+      label_id: "5e4ff988-cd09-47e0-a66e-40f8f0eefaf1",
+    },
+  ],
+  activity_log: [
+    {
+      id: "7d390e88-a9dc-4f4a-a257-8526cb922169",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      entity_type: "story",
+      entity_id: "918d7063-5297-431e-909c-e7a511844cc9",
+      actor_type: "human",
+      actor_id: "kuba",
+      event_name: "story.status.updated",
+      message: "Story moved to IN_PROGRESS",
+      created_at: "2026-03-03T16:24:49.252924+00:00",
+    },
+    {
+      id: "20838e5c-8cd9-4e04-a15f-5f4bcc80ba6d",
+      project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
+      entity_type: "task",
+      entity_id: "87336606-0c2b-467e-aba9-f16079628e46",
+      actor_type: "agent",
+      actor_id: "codex",
+      event_name: "task.status.updated",
+      message: "Task MC-207 completed",
+      created_at: "2026-03-03T16:25:31.142948+00:00",
+    },
+  ],
+  story_status_history: [
+    {
+      id: "59fcd8c0-8668-4f5d-9321-cd52f58c2a85",
+      story_id: "918d7063-5297-431e-909c-e7a511844cc9",
+      from_status: "TODO",
+      to_status: "IN_PROGRESS",
+      changed_by: "kuba",
+      changed_at: "2026-03-03T16:24:49.252924+00:00",
+    },
+  ],
+  task_status_history: [
+    {
+      id: "4384f05b-ce2d-495b-9235-fad86ac61e1f",
+      task_id: "87336606-0c2b-467e-aba9-f16079628e46",
+      from_status: "IN_PROGRESS",
+      to_status: "DONE",
+      changed_by: "codex",
+      changed_at: "2026-03-03T16:25:31.142948+00:00",
+    },
+  ],
+};
