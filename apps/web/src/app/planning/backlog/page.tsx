@@ -353,7 +353,10 @@ export default function BacklogPage() {
       })
       .then(async (json) => {
         if (cancelled) return;
-        const backlogs: BacklogItem[] = json.data;
+        const backlogs: BacklogItem[] = (json.data ?? []).filter(
+          (backlog: BacklogItem) =>
+            !(backlog.kind === "SPRINT" && backlog.status === "CLOSED"),
+        );
 
         if (backlogs.length === 0) {
           setFetchResult({ kind: "empty" });
