@@ -216,6 +216,12 @@ class BacklogReorderResponse(BaseModel):
     updated_task_count: int
 
 
+class SprintStoryLabelResponse(BaseModel):
+    id: str
+    name: str
+    color: str | None
+
+
 class SprintStoryResponse(BaseModel):
     id: str
     key: str | None
@@ -228,6 +234,8 @@ class SprintStoryResponse(BaseModel):
     position: int
     task_count: int
     done_task_count: int
+    labels: list[SprintStoryLabelResponse] = Field(default_factory=list)
+    label_ids: list[str] = Field(default_factory=list)
 
 
 class ActiveSprintResponse(BaseModel):
