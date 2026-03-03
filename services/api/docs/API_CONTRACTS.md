@@ -375,6 +375,60 @@ Use `project_id=null` to list global backlogs. `project_key` — same behavior a
 
 Includes story count, task count.
 
+#### `POST /v1/planning/backlogs/{id}/start` — Start sprint
+
+Transitions a sprint backlog from non-active state to `ACTIVE`.
+
+Query: optional `project_id` or `project_key` for project-scope validation.
+
+Response `200`:
+```jsonc
+{
+  "data": { "...backlog fields...", "status": "ACTIVE" },
+  "meta": {
+    "transition": "START_SPRINT",
+    "from_status": "CLOSED",
+    "to_status": "ACTIVE",
+    "story_count": 3,
+    "done_story_count": 1,
+    "unfinished_story_count": 2,
+    "active_sprint_id": "..."
+  }
+}
+```
+
+Validation/business rules:
+- `400 BUSINESS_RULE_VIOLATION` if backlog is not a sprint or is already active
+- `409 CONFLICT` if another sprint is already active for the same project
+- `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
+
+#### `POST /v1/planning/backlogs/{id}/complete` — Complete sprint
+
+Transitions an active sprint backlog to `CLOSED`.
+
+Query: optional `project_id` or `project_key` for project-scope validation.
+
+Response `200`:
+```jsonc
+{
+  "data": { "...backlog fields...", "status": "CLOSED" },
+  "meta": {
+    "transition": "COMPLETE_SPRINT",
+    "from_status": "ACTIVE",
+    "to_status": "CLOSED",
+    "story_count": 3,
+    "done_story_count": 3,
+    "unfinished_story_count": 0,
+    "active_sprint_id": null
+  }
+}
+```
+
+Guardrails:
+- `400 BUSINESS_RULE_VIOLATION` when sprint contains unfinished stories (`status != DONE`)
+- `400 BUSINESS_RULE_VIOLATION` when sprint is not active
+- `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
+
 #### `PATCH /v1/planning/backlogs/{id}` — Update backlog
 
 Updatable: `name`, `status`, `goal`, `start_date`, `end_date`, `metadata_json`.

@@ -57,6 +57,14 @@ def test_start_sprint_project_scope_validation(client) -> None:
     assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_start_sprint_by_project_key(client) -> None:
+    sprint_id = _create_sprint(client, project_id="p2", status="CLOSED")
+
+    resp = client.post(f"{PREFIX}/{sprint_id}/start?project_key=P2")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "ACTIVE"
+
+
 def test_complete_sprint_happy_path(client) -> None:
     _add_story_to_backlog(client, backlog_id="b2", story_id="s1")
     done_resp = client.patch("/v1/planning/stories/s1", json={"status": "DONE"})
@@ -96,3 +104,12 @@ def test_complete_sprint_rejects_non_sprint_backlog(client) -> None:
     resp = client.post(f"{PREFIX}/b1/complete?project_id=p1")
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+
+
+def test_complete_sprint_project_scope_validation(client) -> None:
+    _add_story_to_backlog(client, backlog_id="b2", story_id="s1")
+    client.patch("/v1/planning/stories/s1", json={"status": "DONE"})
+
+    resp = client.post(f"{PREFIX}/b2/complete?project_id=p2")
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
