@@ -1,4 +1,5 @@
 import type { ItemStatus } from "@/lib/planning/types";
+import type { StoryLabel } from "./story-label-chips";
 
 export interface StoryDetail {
   id: string;
@@ -18,6 +19,8 @@ export interface StoryDetail {
   started_at: string | null;
   completed_at: string | null;
   task_count: number;
+  labels?: StoryLabel[];
+  label_ids?: string[];
 }
 
 export interface TaskItem {
