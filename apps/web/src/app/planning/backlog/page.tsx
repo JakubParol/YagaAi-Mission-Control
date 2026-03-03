@@ -44,6 +44,7 @@ import {
   type SprintLifecycleOperation,
 } from "../sprint-lifecycle-actions";
 import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
+import { excludeClosedSprintBacklogs } from "./backlog-filters";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -607,7 +608,7 @@ export default function BacklogPage() {
       })
       .then(async (json) => {
         if (cancelled) return;
-        const backlogs: BacklogItem[] = json.data ?? [];
+        const backlogs: BacklogItem[] = excludeClosedSprintBacklogs(json.data ?? []);
 
         if (backlogs.length === 0) {
           setFetchResult({ kind: "empty" });
