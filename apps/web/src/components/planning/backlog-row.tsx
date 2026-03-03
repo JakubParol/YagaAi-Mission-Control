@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2 } from "lucide-react";
@@ -11,22 +12,31 @@ import { STATUS_STYLE, STATUS_LABEL, TYPE_CONFIG } from "./story-card";
 export function BacklogRow({
   item,
   onClick,
+  actions,
 }: {
   item: StoryCardStory;
   onClick?: (id: string) => void;
+  actions?: ReactNode;
 }) {
   const statusStyle = STATUS_STYLE[item.status];
   const typeConf = TYPE_CONFIG[item.story_type] ?? TYPE_CONFIG.USER_STORY;
   const TypeIcon = typeConf.icon;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(item.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick?.(item.id);
+        }
+      }}
       className={cn(
         "group w-full flex items-center gap-3 px-3 py-2 text-left",
         "hover:bg-muted/30 transition-colors duration-100",
-        
+        "cursor-pointer",
         "focus-ring",
       )}
     >
@@ -44,6 +54,11 @@ export function BacklogRow({
       {/* Summary */}
       <span className="text-sm text-foreground truncate min-w-0 flex-1">
         {item.title}
+      </span>
+
+      {/* Actions */}
+      <span className="shrink-0 w-[128px] flex justify-end">
+        {actions}
       </span>
 
       {/* Epic */}
@@ -94,6 +109,6 @@ export function BacklogRow({
           </span>
         ) : null}
       </span>
-    </button>
+    </div>
   );
 }

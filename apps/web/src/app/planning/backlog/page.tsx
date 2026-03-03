@@ -7,10 +7,12 @@ import {
   ChevronRight,
   CircleCheckBig,
   Filter,
+  ListPlus,
   MoreHorizontal,
   Hash,
   Layers,
   Loader2,
+  ListMinus,
   Play,
   Search,
   Zap,
@@ -25,6 +27,10 @@ import { BacklogRow } from "@/components/planning/backlog-row";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  addStoryToActiveSprint,
+  removeStoryFromActiveSprint,
+} from "../sprint-membership-actions";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -94,10 +100,16 @@ function BacklogSection({
   section,
   isActiveSprint,
   onStoryClick,
+  onAddToActiveSprint,
+  onRemoveFromActiveSprint,
+  pendingStoryIds,
 }: {
   section: BacklogWithStories;
   isActiveSprint: boolean;
   onStoryClick: (storyId: string) => void;
+  onAddToActiveSprint: (storyId: string) => void;
+  onRemoveFromActiveSprint: (storyId: string) => void;
+  pendingStoryIds: ReadonlySet<string>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const { backlog, stories } = section;
@@ -113,6 +125,8 @@ function BacklogSection({
   const doneCount = isSprint ? getSprintStatusCount(stories, "DONE") : 0;
   const canCompleteSprint = isSprint && backlog.status === "ACTIVE";
   const canStartSprint = isSprint && backlog.status !== "ACTIVE";
+  const canAddToActiveSprint = backlog.kind === "BACKLOG";
+  const canRemoveFromActiveSprint = isActiveSprint;
 
   return (
     <section
@@ -234,6 +248,37 @@ function BacklogSection({
                   key={story.id}
                   item={story}
                   onClick={onStoryClick}
+                  actions={
+                    canAddToActiveSprint || canRemoveFromActiveSprint ? (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        disabled={pendingStoryIds.has(story.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (canAddToActiveSprint) {
+                            onAddToActiveSprint(story.id);
+                            return;
+                          }
+                          onRemoveFromActiveSprint(story.id);
+                        }}
+                        title={
+                          canAddToActiveSprint
+                            ? "Add to active sprint"
+                            : "Remove from active sprint"
+                        }
+                      >
+                        {pendingStoryIds.has(story.id) ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : canAddToActiveSprint ? (
+                          <ListPlus className="size-3" />
+                        ) : (
+                          <ListMinus className="size-3" />
+                        )}
+                        {canAddToActiveSprint ? "Add" : "Remove"}
+                      </Button>
+                    ) : null
+                  }
                 />
               ))}
             </div>
@@ -263,6 +308,9 @@ export default function BacklogPage() {
   const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [reloadToken, setReloadToken] = useState(0);
+  const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const prevProjectRef = useRef<string | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
@@ -273,6 +321,18 @@ export default function BacklogPage() {
     if (!open) setSelectedStoryId(null);
   }, []);
 
+  const showErrorToast = useCallback((message: string) => {
+    setErrorToast(message);
+  }, []);
+
+  useEffect(() => {
+    if (!errorToast) return;
+    const timeoutId = window.setTimeout(() => {
+      setErrorToast(null);
+    }, 3500);
+    return () => window.clearTimeout(timeoutId);
+  }, [errorToast]);
+
   const singleProjectId =
     !allSelected && selectedProjectIds.length === 1
       ? selectedProjectIds[0]
@@ -282,6 +342,7 @@ export default function BacklogPage() {
   if (prevProjectRef.current !== singleProjectId) {
     prevProjectRef.current = singleProjectId;
     setFetchResult(null);
+    setPendingStoryIds({});
   }
 
   // Derive state
@@ -336,6 +397,48 @@ export default function BacklogPage() {
       : 0;
   const totalWorkItems = totalStoryCount + totalTaskCount;
   const visibleWorkItems = visibleStoryCount + visibleTaskCount;
+
+  const updateSprintMembership = useCallback(
+    async (storyId: string, operation: "add" | "remove") => {
+      if (!singleProjectId) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+      try {
+        if (operation === "add") {
+          await addStoryToActiveSprint(singleProjectId, storyId);
+        } else {
+          await removeStoryFromActiveSprint(singleProjectId, storyId);
+        }
+        setReloadToken((prev) => prev + 1);
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to update sprint membership.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [showErrorToast, singleProjectId],
+  );
+
+  const handleAddToActiveSprint = useCallback(
+    (storyId: string) => {
+      void updateSprintMembership(storyId, "add");
+    },
+    [updateSprintMembership],
+  );
+
+  const handleRemoveFromActiveSprint = useCallback(
+    (storyId: string) => {
+      void updateSprintMembership(storyId, "remove");
+    },
+    [updateSprintMembership],
+  );
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -411,10 +514,20 @@ export default function BacklogPage() {
     return () => {
       cancelled = true;
     };
-  }, [singleProjectId]);
+  }, [reloadToken, singleProjectId]);
 
   return (
     <>
+      {errorToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-4 top-4 z-50 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-200 shadow-lg"
+        >
+          {errorToast}
+        </div>
+      )}
+
       <div className="mb-6">
         <div className="flex items-center gap-2.5 mb-1">
           <Layers className="size-6 text-muted-foreground" />
@@ -489,6 +602,9 @@ export default function BacklogPage() {
                 section.backlog.status === "ACTIVE"
               }
               onStoryClick={handleStoryClick}
+              onAddToActiveSprint={handleAddToActiveSprint}
+              onRemoveFromActiveSprint={handleRemoveFromActiveSprint}
+              pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
             />
           ))}
 
