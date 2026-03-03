@@ -38,6 +38,12 @@ import {
   addStoryToActiveSprint,
   removeStoryFromActiveSprint,
 } from "../sprint-membership-actions";
+import {
+  completeSprint,
+  startSprint,
+  type SprintLifecycleOperation,
+} from "../sprint-lifecycle-actions";
+import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -106,19 +112,31 @@ function getSprintStatusCount(stories: StoryCardStory[], status: ItemStatus): nu
 function BacklogSection({
   section,
   isActiveSprint,
+  hasAnyActiveSprint,
   onStoryClick,
   onAddToActiveSprint,
   onRemoveFromActiveSprint,
+  onStartSprint,
+  onCompleteSprint,
   onCreateStory,
   pendingStoryIds,
+  pendingSprintIds,
 }: {
   section: BacklogWithStories;
   isActiveSprint: boolean;
+  hasAnyActiveSprint: boolean;
   onStoryClick: (storyId: string) => void;
   onAddToActiveSprint: (storyId: string) => void;
   onRemoveFromActiveSprint: (storyId: string) => void;
+  onStartSprint: (backlogId: string, backlogName: string) => void;
+  onCompleteSprint: (
+    backlogId: string,
+    backlogName: string,
+    unfinishedStoryCount: number,
+  ) => void;
   onCreateStory: (backlogId: string) => void;
   pendingStoryIds: ReadonlySet<string>;
+  pendingSprintIds: ReadonlySet<string>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const { backlog, stories } = section;
@@ -136,6 +154,11 @@ function BacklogSection({
   const canStartSprint = isSprint && backlog.status !== "ACTIVE";
   const canAddToActiveSprint = backlog.kind === "BACKLOG";
   const canRemoveFromActiveSprint = isActiveSprint;
+  const isSprintPending = pendingSprintIds.has(backlog.id);
+  const isStartBlockedByActive = canStartSprint && hasAnyActiveSprint;
+  const unfinishedStoryCount = isSprint
+    ? stories.filter((story) => story.status !== "DONE").length
+    : 0;
 
   return (
     <section
@@ -213,14 +236,44 @@ function BacklogSection({
 
         <div className="ml-1 flex items-center gap-1">
           {canCompleteSprint && (
-            <Button variant="outline" size="xs" disabled title="Coming soon">
-              <CircleCheckBig className="size-3" />
+            <Button
+              variant="outline"
+              size="xs"
+              disabled={isSprintPending}
+              title={
+                unfinishedStoryCount > 0
+                  ? `${unfinishedStoryCount} stories must be DONE before completing sprint`
+                  : "Complete sprint"
+              }
+              onClick={() =>
+                onCompleteSprint(backlog.id, backlog.name, unfinishedStoryCount)
+              }
+            >
+              {isSprintPending ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <CircleCheckBig className="size-3" />
+              )}
               Complete sprint
             </Button>
           )}
           {canStartSprint && (
-            <Button variant="outline" size="xs" disabled title="Coming soon">
-              <Play className="size-3" />
+            <Button
+              variant="outline"
+              size="xs"
+              disabled={isSprintPending || isStartBlockedByActive}
+              title={
+                isStartBlockedByActive
+                  ? "Complete the current active sprint before starting another."
+                  : "Start sprint"
+              }
+              onClick={() => onStartSprint(backlog.id, backlog.name)}
+            >
+              {isSprintPending ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Play className="size-3" />
+              )}
               Start sprint
             </Button>
           )}
@@ -328,6 +381,7 @@ export default function BacklogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
+  const [pendingSprintIds, setPendingSprintIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [createBacklogId, setCreateBacklogId] = useState<string | null>(null);
   const prevProjectRef = useRef<string | null>(null);
@@ -362,6 +416,7 @@ export default function BacklogPage() {
     prevProjectRef.current = singleProjectId;
     setFetchResult(null);
     setPendingStoryIds({});
+    setPendingSprintIds({});
   }
 
   // Derive state
@@ -416,6 +471,13 @@ export default function BacklogPage() {
       : 0;
   const totalWorkItems = totalStoryCount + totalTaskCount;
   const visibleWorkItems = visibleStoryCount + visibleTaskCount;
+  const hasAnyActiveSprint =
+    state.kind === "ok"
+      ? state.sections.some(
+          (section) =>
+            section.backlog.kind === "SPRINT" && section.backlog.status === "ACTIVE",
+        )
+      : false;
 
   const updateSprintMembership = useCallback(
     async (storyId: string, operation: "add" | "remove") => {
@@ -445,6 +507,33 @@ export default function BacklogPage() {
     [showErrorToast, singleProjectId],
   );
 
+  const updateSprintLifecycle = useCallback(
+    async (backlogId: string, operation: SprintLifecycleOperation) => {
+      if (!singleProjectId) return;
+      setPendingSprintIds((prev) => ({ ...prev, [backlogId]: true }));
+      try {
+        if (operation === "start") {
+          await startSprint(singleProjectId, backlogId);
+        } else {
+          await completeSprint(singleProjectId, backlogId);
+        }
+        emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId, operation });
+        setReloadToken((prev) => prev + 1);
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to update sprint status.",
+        );
+      } finally {
+        setPendingSprintIds((prev) => {
+          const next = { ...prev };
+          delete next[backlogId];
+          return next;
+        });
+      }
+    },
+    [showErrorToast, singleProjectId],
+  );
+
   const handleAddToActiveSprint = useCallback(
     (storyId: string) => {
       void updateSprintMembership(storyId, "add");
@@ -462,6 +551,36 @@ export default function BacklogPage() {
   const handleCreateStory = useCallback((backlogId: string) => {
     setCreateBacklogId(backlogId);
   }, []);
+
+  const handleStartSprint = useCallback(
+    (backlogId: string, backlogName: string) => {
+      const confirmed = window.confirm(
+        `Start sprint "${backlogName}"?\n\nThis sprint will become the active sprint board.`,
+      );
+      if (!confirmed) return;
+      void updateSprintLifecycle(backlogId, "start");
+    },
+    [updateSprintLifecycle],
+  );
+
+  const handleCompleteSprint = useCallback(
+    (backlogId: string, backlogName: string, unfinishedStoryCount: number) => {
+      if (unfinishedStoryCount > 0) {
+        const noun = unfinishedStoryCount === 1 ? "story is" : "stories are";
+        showErrorToast(
+          `Cannot complete sprint "${backlogName}". ${unfinishedStoryCount} ${noun} not DONE.`,
+        );
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Complete sprint "${backlogName}"?\n\nThis will close the sprint and remove it from the active board.`,
+      );
+      if (!confirmed) return;
+      void updateSprintLifecycle(backlogId, "complete");
+    },
+    [showErrorToast, updateSprintLifecycle],
+  );
 
   const handleCreateDialogChange = useCallback((open: boolean) => {
     if (!open) setCreateBacklogId(null);
@@ -488,10 +607,7 @@ export default function BacklogPage() {
       })
       .then(async (json) => {
         if (cancelled) return;
-        const backlogs: BacklogItem[] = (json.data ?? []).filter(
-          (backlog: BacklogItem) =>
-            !(backlog.kind === "SPRINT" && backlog.status === "CLOSED"),
-        );
+        const backlogs: BacklogItem[] = json.data ?? [];
 
         if (backlogs.length === 0) {
           setFetchResult({ kind: "empty" });
@@ -633,11 +749,15 @@ export default function BacklogPage() {
                 section.backlog.kind === "SPRINT" &&
                 section.backlog.status === "ACTIVE"
               }
+              hasAnyActiveSprint={hasAnyActiveSprint}
               onStoryClick={handleStoryClick}
               onAddToActiveSprint={handleAddToActiveSprint}
               onRemoveFromActiveSprint={handleRemoveFromActiveSprint}
+              onStartSprint={handleStartSprint}
+              onCompleteSprint={handleCompleteSprint}
               onCreateStory={handleCreateStory}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
+              pendingSprintIds={new Set(Object.keys(pendingSprintIds))}
             />
           ))}
 
