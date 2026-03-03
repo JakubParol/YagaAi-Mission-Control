@@ -651,6 +651,7 @@ export default function BacklogPage() {
         storyId={selectedStoryId}
         open={selectedStoryId !== null}
         onOpenChange={handleDialogClose}
+        onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
       />
 
       <Dialog open={createBacklogId !== null} onOpenChange={handleCreateDialogChange}>

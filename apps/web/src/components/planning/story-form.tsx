@@ -34,7 +34,7 @@ interface EpicOption {
 
 interface StoryFormProps {
   mode: StoryFormMode;
-  projectId: string;
+  projectId: string | null;
   backlogId?: string;
   storyId?: string;
   initialValues?: Partial<StoryFormValues>;
@@ -145,6 +145,12 @@ export function StoryForm({
   }, [initialValues]);
 
   useEffect(() => {
+    if (!projectId) {
+      setEpics([]);
+      setIsLoadingEpics(false);
+      return;
+    }
+
     let cancelled = false;
     setIsLoadingEpics(true);
 
@@ -188,6 +194,10 @@ export function StoryForm({
       setFormError("Backlog context is required to create a story.");
       return;
     }
+    if (mode === "create" && !projectId) {
+      setFormError("Project context is required to create a story.");
+      return;
+    }
     if (mode === "edit" && !storyId) {
       setFormError("Story id is required for edit mode.");
       return;
@@ -211,7 +221,7 @@ export function StoryForm({
     };
 
     if (mode === "create") {
-      payload.project_id = projectId;
+      payload.project_id = projectId!;
     } else {
       payload.is_blocked = normalizedBlockedReason.length > 0;
       payload.blocked_reason =
