@@ -34,7 +34,7 @@ export function BacklogRow({
         }
       }}
       className={cn(
-        "group w-full flex items-center gap-3 px-3 py-2 text-left",
+        "group grid w-full grid-cols-[auto_72px_minmax(0,1fr)_112px_240px_112px_36px_56px] items-center gap-3 px-3 py-2 text-left",
         "hover:bg-muted/30 transition-colors duration-100",
         "cursor-pointer",
         "focus-ring",
@@ -57,7 +57,7 @@ export function BacklogRow({
       </span>
 
       {/* Actions */}
-      <span className="shrink-0 w-[128px] flex justify-end">
+      <span className="shrink-0 w-[112px] flex justify-end">
         {actions}
       </span>
 
@@ -79,15 +79,17 @@ export function BacklogRow({
       </span>
 
       {/* Status pill */}
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0",
-          statusStyle.bg,
-          statusStyle.text,
-        )}
-      >
-        <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-        {STATUS_LABEL[item.status]}
+      <span className="w-[112px] shrink-0">
+        <span
+          className={cn(
+            "inline-flex w-full items-center justify-start gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+            statusStyle.bg,
+            statusStyle.text,
+          )}
+        >
+          <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+          {STATUS_LABEL[item.status]}
+        </span>
       </span>
 
       {/* SP */}
