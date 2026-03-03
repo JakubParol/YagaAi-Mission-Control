@@ -7,6 +7,8 @@ import {
   BookOpen,
   ChevronUp,
   ChevronDown,
+  ListMinus,
+  Loader2,
   Minus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -98,6 +100,7 @@ export function StoryCard({
   onDragStart,
   onDragEnd,
   onStatusChange,
+  onRemoveFromSprint,
   disabled = false,
 }: {
   story: StoryCardStory;
@@ -105,6 +108,7 @@ export function StoryCard({
   onDragStart?: (storyId: string) => void;
   onDragEnd?: () => void;
   onStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onRemoveFromSprint?: (storyId: string) => void;
   disabled?: boolean;
 }) {
   const statusStyle = STATUS_STYLE[story.status];
@@ -188,6 +192,31 @@ export function StoryCard({
               ))}
             </select>
           </div>
+
+          {onRemoveFromSprint && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemoveFromSprint(story.id);
+              }}
+              onKeyDown={(event) => event.stopPropagation()}
+              className={cn(
+                "inline-flex h-6 items-center gap-1 rounded border border-border/60 bg-background/80 px-1.5 text-[10px] text-muted-foreground",
+                "focus-ring",
+              )}
+              title="Remove from active sprint"
+              aria-label="Remove from active sprint"
+            >
+              {disabled ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <ListMinus className="size-3" />
+              )}
+              Remove
+            </button>
+          )}
 
           {story.task_count > 0 && (
             <span

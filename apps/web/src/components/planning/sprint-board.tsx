@@ -138,6 +138,7 @@ function BoardColumn({
   onDrop,
   onStoryClick,
   onStatusChange,
+  onRemoveFromSprint,
   onCardDragStart,
   onCardDragEnd,
   pendingStoryIds,
@@ -151,6 +152,7 @@ function BoardColumn({
   onDrop: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
   onStoryClick?: (storyId: string) => void;
   onStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onRemoveFromSprint?: (storyId: string) => void;
   onCardDragStart: (storyId: string) => void;
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
@@ -191,6 +193,7 @@ function BoardColumn({
               onDragStart={onCardDragStart}
               onDragEnd={onCardDragEnd}
               onStatusChange={onStatusChange}
+              onRemoveFromSprint={onRemoveFromSprint}
               disabled={pendingStoryIds.has(story.id)}
             />
           ))
@@ -206,11 +209,13 @@ export function SprintBoard({
   data,
   onStoryClick,
   onStoryStatusChange,
+  onStoryRemoveFromSprint,
   pendingStoryIds,
 }: {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
   onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onStoryRemoveFromSprint?: (storyId: string) => void;
   pendingStoryIds?: ReadonlySet<string>;
 }) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
@@ -290,6 +295,7 @@ export function SprintBoard({
             onDrop={handleDrop}
             onStoryClick={onStoryClick}
             onStatusChange={handleStatusChange}
+            onRemoveFromSprint={onStoryRemoveFromSprint}
             onCardDragStart={handleCardDragStart}
             onCardDragEnd={handleCardDragEnd}
             pendingStoryIds={pendingSet}
