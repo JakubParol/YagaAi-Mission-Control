@@ -118,6 +118,7 @@ class TaskService:
 
         now = utc_now()
         next_is_blocked = data.get("is_blocked", existing.is_blocked)
+        blocked_reason_in_payload = "blocked_reason" in data
         blocked_reason = data.get("blocked_reason", existing.blocked_reason)
 
         if "status" in data:
@@ -149,7 +150,7 @@ class TaskService:
                     f"Task project {existing.project_id} conflicts with story {data['story_id']} project {story_project_id}"
                 )
 
-        if blocked_reason is not None and not next_is_blocked:
+        if blocked_reason_in_payload and blocked_reason is not None and not next_is_blocked:
             raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
         if not next_is_blocked:
             data["blocked_reason"] = None
