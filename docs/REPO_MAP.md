@@ -100,3 +100,15 @@ Defines the minimal rendering contract for backlog rows in the web planning back
 | Route | `/planning/backlog` |
 | Primary page | `apps/web/src/app/planning/backlog/page.tsx` |
 | Story detail dialog | `apps/web/src/components/planning/story-detail-dialog.tsx` |
+
+## MC-206 — Planning settings mocked scaffold (v1)
+
+Defines the initial settings experience for Planning with schema-aligned mocked data and an adapter boundary for future API integration.
+
+| Item | Detail |
+|---|---|
+| Scope | Mocked settings sections for project/backlog/workflow/assignment/labels/audit |
+| Route | `/planning/settings` |
+| Primary page | `apps/web/src/app/planning/settings/page.tsx` |
+| Mock fixtures + adapter | `apps/web/src/lib/planning/settings/` |
+| Persistence behavior | UI-only placeholders; actions labeled `Coming soon` |

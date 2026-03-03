@@ -1,5 +1,5 @@
-import type { PlanningSettingsFixture, PlanningSettingsViewModel } from "./types";
-import { planningSettingsFixture } from "./fixtures";
+import type { PlanningSettingsFixture, PlanningSettingsViewModel } from "./types.js";
+import { planningSettingsFixture } from "./fixtures.js";
 
 const BACKLOG_KINDS_ORDER = ["BACKLOG", "SPRINT", "IDEAS"] as const;
 
