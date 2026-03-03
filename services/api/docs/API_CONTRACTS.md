@@ -476,7 +476,7 @@ Returns `200`.
 #### `GET /v1/planning/backlogs/{id}/stories` — List stories in a backlog
 
 Returns stories belonging to the given backlog, ordered by `position ASC`.
-Story objects match the active sprint story shape (`id`, `key`, `title`, `status`, `priority`, `story_type`, `position`, `task_count`, `done_task_count`).
+Story objects match the active sprint story shape (`id`, `key`, `title`, `status`, `priority`, `story_type`, `position`, `task_count`, `done_task_count`, `labels`, `label_ids`).
 
 Response `200`:
 ```jsonc
@@ -491,7 +491,11 @@ Response `200`:
       "story_type": "feature",
       "position": 0,
       "task_count": 3,
-      "done_task_count": 1
+      "done_task_count": 1,
+      "labels": [
+        { "id": "...", "name": "bug", "color": "#ff0000" }
+      ],
+      "label_ids": ["..."]
     }
   ]
 }
@@ -530,7 +534,11 @@ Response `200`:
         "status": "IN_PROGRESS",
         "priority": 1,
         "story_type": "feature",
-        "position": 0
+        "position": 0,
+        "labels": [
+          { "id": "...", "name": "bug", "color": "#ff0000" }
+        ],
+        "label_ids": ["..."]
       }
     ]
   }
@@ -661,7 +669,28 @@ Hard delete. Removes from all story/task associations. Returns `204`.
 { "label_id": "..." }
 ```
 
+Response `201`:
+```jsonc
+{
+  "data": {
+    "story_id": "...",
+    "label_id": "..."
+  }
+}
+```
+
+Errors:
+- `404 NOT_FOUND` when story does not exist
+- `400 VALIDATION_ERROR` when label does not exist
+- `409 CONFLICT` when label is already attached
+
 #### `DELETE /v1/planning/stories/{id}/labels/{label_id}` — Detach label from story
+
+Returns `204`.
+
+Errors:
+- `404 NOT_FOUND` when story does not exist
+- `404 NOT_FOUND` when label is not attached to the story
 
 #### `POST /v1/planning/tasks/{id}/labels` — Attach label to task
 
