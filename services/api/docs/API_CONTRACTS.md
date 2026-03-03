@@ -236,6 +236,21 @@ Request:
 
 `status` defaults to `TODO`. `key` auto-generated if `project_id` is set.
 
+Create response `meta` includes story progress counters when `story_id` is set:
+```jsonc
+{
+  "meta": {
+    "story_task_count": 3,
+    "story_done_task_count": 1
+  }
+}
+```
+
+Validation/conflict semantics:
+- `400 VALIDATION_ERROR` when `project_id` or `story_id` does not exist
+- `409 CONFLICT` when `project_id` conflicts with the story's project
+- When `story_id` is provided without `project_id`, project is inferred from the story
+
 #### `GET /v1/planning/stories` — List stories
 
 Query: `project_id`, `project_key`, `epic_id`, `status`, `is_blocked`, `story_type`, `sort`, `limit`, `offset`.
@@ -304,15 +319,24 @@ Returns `404` if no task matches the key.
 #### `GET /v1/planning/tasks/{id}` — Get task
 
 Includes: current assignment (if any), labels.
+Response `meta` includes story progress counters when the task belongs to a story.
 
 #### `PATCH /v1/planning/tasks/{id}` — Update task
 
-Updatable: `project_id`, `story_id`, `title`, `objective`, `task_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `metadata_json`.
+Updatable: `story_id`, `title`, `objective`, `task_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `metadata_json`.
 
 Side effects:
 - Status change to `DONE` auto-closes active assignment.
-- Status change triggers parent story/epic status re-derivation.
-- Setting `project_id` on project-less task triggers key generation and removal from global backlog.
+- `completed_at` is set on transition to `DONE` and cleared on transition away from `DONE`.
+- `started_at` is set on first transition to `IN_PROGRESS`.
+- Unblocking (`is_blocked=false`) clears `blocked_reason`.
+
+Validation/conflict semantics:
+- `400 BUSINESS_RULE_VIOLATION` when setting `blocked_reason` while `is_blocked` is false
+- `400 BUSINESS_RULE_VIOLATION` when moving a blocked task to `DONE`
+- `409 CONFLICT` when changing `story_id` to a story in a different project
+
+Update response `meta` includes story progress counters when the task belongs to a story.
 
 #### `DELETE /v1/planning/tasks/{id}` — Delete task
 

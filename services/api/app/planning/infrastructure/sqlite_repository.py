@@ -1446,6 +1446,28 @@ class SqliteTaskRepository(TaskRepository):
     async def story_exists(self, story_id: str) -> bool:
         return await _exists(self._db, "SELECT 1 FROM stories WHERE id = ?", [story_id])
 
+    async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]:
+        row = await _fetch_one(self._db, "SELECT project_id FROM stories WHERE id = ?", [story_id])
+        if not row:
+            return False, None
+        return True, row["project_id"]
+
+    async def get_story_task_progress(self, story_id: str) -> tuple[int, int]:
+        row = await _fetch_one(
+            self._db,
+            """
+            SELECT
+              COUNT(*) AS task_count,
+              SUM(CASE WHEN status = 'DONE' THEN 1 ELSE 0 END) AS done_task_count
+            FROM tasks
+            WHERE story_id = ?
+            """,
+            [story_id],
+        )
+        if not row:
+            return 0, 0
+        return row["task_count"] or 0, row["done_task_count"] or 0
+
     async def agent_exists(self, agent_id: str) -> bool:
         return await _exists(self._db, "SELECT 1 FROM agents WHERE id = ?", [agent_id])
 
