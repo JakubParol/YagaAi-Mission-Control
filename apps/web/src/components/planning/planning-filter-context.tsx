@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 interface PlanningFilterState {
   selectedProjectIds: string[];
@@ -19,13 +19,19 @@ const PlanningFilterContext = createContext<PlanningFilterState | null>(null);
 export function PlanningFilterProvider({ children }: { children: React.ReactNode }) {
   // Empty array = "all projects selected". Toggling off the last project
   // resets to [] which means "all" — this is intentional to avoid an empty view.
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+  const [selectedProjectIds, setSelectedProjectIdsState] = useState<string[]>([]);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
+  const setSelectedProjectIds = useCallback((ids: string[]) => {
+    setSelectedProjectIdsState(ids);
+    setSelectedLabelIds((prev) => (prev.length === 0 ? prev : []));
+  }, []);
+
   const toggleProject = useCallback((id: string) => {
-    setSelectedProjectIds((prev) =>
+    setSelectedProjectIdsState((prev) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
+    setSelectedLabelIds((prev) => (prev.length === 0 ? prev : []));
   }, []);
 
   const toggleLabel = useCallback((id: string) => {
@@ -39,11 +45,6 @@ export function PlanningFilterProvider({ children }: { children: React.ReactNode
   }, []);
 
   const singleProjectId = selectedProjectIds.length === 1 ? selectedProjectIds[0] : null;
-  const projectScopeKey = selectedProjectIds.slice().sort().join(",");
-
-  useEffect(() => {
-    setSelectedLabelIds([]);
-  }, [projectScopeKey]);
 
   const value = useMemo(
     () => ({
@@ -61,7 +62,7 @@ export function PlanningFilterProvider({ children }: { children: React.ReactNode
       clearLabels,
       selectedLabelIds,
       selectedProjectIds,
-      setSelectedLabelIds,
+      setSelectedProjectIds,
       singleProjectId,
       toggleLabel,
       toggleProject,

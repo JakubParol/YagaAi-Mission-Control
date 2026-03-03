@@ -32,18 +32,15 @@ function toColorDotStyle(color: string | null): { backgroundColor?: string } {
 export function LabelFilter() {
   const { selectedLabelIds, toggleLabel, clearLabels, singleProjectId } = usePlanningFilter();
   const [open, setOpen] = useState(false);
-  const [labels, setLabels] = useState<LabelItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [labelsState, setLabelsState] = useState<{
+    projectId: string;
+    items: LabelItem[];
+  } | null>(null);
 
   useEffect(() => {
-    if (!singleProjectId) {
-      setLabels([]);
-      setLoading(false);
-      return;
-    }
+    if (!singleProjectId) return;
 
     let cancelled = false;
-    setLoading(true);
 
     fetch(apiUrl(`/v1/planning/labels?project_id=${singleProjectId}&limit=100`))
       .then((response) => {
@@ -52,13 +49,18 @@ export function LabelFilter() {
       })
       .then((json) => {
         if (cancelled) return;
-        setLabels((json.data ?? []) as LabelItem[]);
+        setLabelsState({
+          projectId: singleProjectId,
+          items: (json.data ?? []) as LabelItem[],
+        });
       })
       .catch(() => {
-        if (!cancelled) setLabels([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLabelsState({
+            projectId: singleProjectId,
+            items: [],
+          });
+        }
       });
 
     return () => {
@@ -66,14 +68,17 @@ export function LabelFilter() {
     };
   }, [singleProjectId]);
 
+  const visibleLabels =
+    singleProjectId && labelsState?.projectId === singleProjectId
+      ? labelsState.items
+      : [];
   const selectedCount = selectedLabelIds.length;
   const triggerLabel = useMemo(() => {
     if (!singleProjectId) return "Labels";
-    if (loading) return "Labels...";
     if (selectedCount === 0) return "Filter labels";
     if (selectedCount === 1) return "1 label";
     return `${selectedCount} labels`;
-  }, [loading, selectedCount, singleProjectId]);
+  }, [selectedCount, singleProjectId]);
 
   const selectedSet = useMemo(() => new Set(selectedLabelIds), [selectedLabelIds]);
   const canClear = selectedCount > 0;
@@ -103,7 +108,7 @@ export function LabelFilter() {
                 No labels found.
               </CommandEmpty>
               <CommandGroup>
-                {labels.map((label) => (
+                {visibleLabels.map((label) => (
                   <CommandItem
                     key={label.id}
                     value={label.name}
