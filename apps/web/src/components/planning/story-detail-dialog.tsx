@@ -140,6 +140,30 @@ function normalizeStoryDraft(draft: StoryDraft): NormalizedStory {
   };
 }
 
+function normalizeStory(story: StoryDetail): NormalizedStory {
+  return {
+    title: story.title.trim(),
+    story_type: story.story_type,
+    description: story.description?.trim() || null,
+    priority: story.priority,
+    epic_id: story.epic_id,
+    blocked_reason: story.blocked_reason?.trim() || null,
+  };
+}
+
+function isStoryDirty(draft: StoryDraft, story: StoryDetail): boolean {
+  const normalizedDraft = normalizeStoryDraft(draft);
+  const normalizedStory = normalizeStory(story);
+  return (
+    normalizedDraft.title !== normalizedStory.title ||
+    normalizedDraft.story_type !== normalizedStory.story_type ||
+    normalizedDraft.description !== normalizedStory.description ||
+    normalizedDraft.priority !== normalizedStory.priority ||
+    normalizedDraft.epic_id !== normalizedStory.epic_id ||
+    normalizedDraft.blocked_reason !== normalizedStory.blocked_reason
+  );
+}
+
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
   try {
@@ -674,6 +698,11 @@ export function StoryDetailDialog({
   }, [open, state, storyId]);
 
   const pendingSet = useMemo(() => new Set(Object.keys(pendingTaskIds)), [pendingTaskIds]);
+  const activeStory = viewState.kind === "ok" ? viewState.story : null;
+  const hasUnsavedStoryChanges = useMemo(
+    () => activeStory !== null && storyDraft !== null && isStoryDirty(storyDraft, activeStory),
+    [activeStory, storyDraft],
+  );
 
   useEffect(() => {
     if (!storyId || !open) return;
@@ -721,15 +750,15 @@ export function StoryDetailDialog({
   }, [storyId, open]);
 
   useEffect(() => {
-    if (viewState.kind !== "ok") return;
-    if (storyDraftForId === viewState.story.id && storyDraft !== null) return;
-    setStoryDraft(toStoryDraft(viewState.story));
-    setStoryDraftForId(viewState.story.id);
+    if (!activeStory) return;
+    if (storyDraftForId === activeStory.id && storyDraft !== null) return;
+    setStoryDraft(toStoryDraft(activeStory));
+    setStoryDraftForId(activeStory.id);
     setStoryError(null);
-  }, [storyDraft, storyDraftForId, viewState]);
+  }, [activeStory, storyDraft, storyDraftForId]);
 
   useEffect(() => {
-    if (viewState.kind !== "ok" || !viewState.story.project_id) {
+    if (!activeStory?.project_id) {
       setEpics([]);
       setIsLoadingEpics(false);
       return;
@@ -738,7 +767,7 @@ export function StoryDetailDialog({
     let cancelled = false;
     setIsLoadingEpics(true);
 
-    fetch(apiUrl(`/v1/planning/epics?project_id=${viewState.story.project_id}&limit=100&sort=priority`))
+    fetch(apiUrl(`/v1/planning/epics?project_id=${activeStory.project_id}&limit=100&sort=priority`))
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
@@ -758,10 +787,30 @@ export function StoryDetailDialog({
     return () => {
       cancelled = true;
     };
-  }, [viewState]);
+  }, [activeStory]);
+
+  useEffect(() => {
+    if (!open || !hasUnsavedStoryChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedStoryChanges, open]);
 
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
+      if (hasUnsavedStoryChanges) {
+        const confirmed = window.confirm(
+          "You have unsaved story changes. Discard changes and close?",
+        );
+        if (!confirmed) return;
+      }
       setStoryDraft(null);
       setStoryDraftForId(null);
       setStoryError(null);
@@ -1297,12 +1346,14 @@ export function StoryDetailDialog({
                   </div>
                 </div>
 
-                <div className="mt-4 flex justify-end border-t border-border/40 pt-3">
-                  <Button type="button" size="sm" onClick={saveStory} disabled={isSavingStory}>
-                    {isSavingStory && <Loader2 className="size-3 animate-spin" />}
-                    Save story
-                  </Button>
-                </div>
+                {hasUnsavedStoryChanges && (
+                  <div className="mt-4 flex justify-end border-t border-border/40 pt-3">
+                    <Button type="button" size="sm" onClick={saveStory} disabled={isSavingStory}>
+                      {isSavingStory && <Loader2 className="size-3 animate-spin" />}
+                      Save story
+                    </Button>
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex items-center justify-center py-10">
