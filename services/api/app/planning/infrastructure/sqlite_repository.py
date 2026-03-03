@@ -994,6 +994,16 @@ class SqliteBacklogRepository(BacklogRepository):
         )
         return row["backlog_id"] if row else None
 
+    async def get_story_backlog_item(self, story_id: str) -> tuple[str | None, int | None]:
+        row = await _fetch_one(
+            self._db,
+            "SELECT backlog_id, position FROM backlog_stories WHERE story_id = ?",
+            [story_id],
+        )
+        if not row:
+            return None, None
+        return row["backlog_id"], row["position"]
+
     async def task_backlog_id(self, task_id: str) -> str | None:
         row = await _fetch_one(
             self._db,
@@ -1065,6 +1075,74 @@ class SqliteBacklogRepository(BacklogRepository):
         )
         await self._db.commit()
         return True
+
+    async def move_story_item(
+        self,
+        *,
+        source_backlog_id: str,
+        target_backlog_id: str,
+        story_id: str,
+        target_position: int | None,
+    ) -> BacklogStoryItem:
+        row = await _fetch_one(
+            self._db,
+            "SELECT position FROM backlog_stories WHERE backlog_id = ? AND story_id = ?",
+            [source_backlog_id, story_id],
+        )
+        if not row:
+            raise ValueError(f"Story {story_id} is not in backlog {source_backlog_id}")
+
+        source_position = row["position"]
+        await self._db.execute(
+            "DELETE FROM backlog_stories WHERE backlog_id = ? AND story_id = ?",
+            [source_backlog_id, story_id],
+        )
+        await self._db.execute(
+            """UPDATE backlog_stories
+               SET position = position - 1
+               WHERE backlog_id = ? AND position > ?""",
+            [source_backlog_id, source_position],
+        )
+
+        if target_position is None:
+            rows = await _fetch_all(
+                self._db,
+                "SELECT position FROM backlog_stories WHERE backlog_id = ? ORDER BY position ASC",
+                [target_backlog_id],
+            )
+            normalized = 0
+            for target_row in rows:
+                if target_row["position"] == normalized:
+                    normalized += 1
+                elif target_row["position"] > normalized:
+                    break
+        else:
+            max_position = await _fetch_count(
+                self._db,
+                "SELECT COUNT(*) FROM backlog_stories WHERE backlog_id = ?",
+                [target_backlog_id],
+            )
+            normalized = min(target_position, max_position)
+
+        await self._db.execute(
+            """UPDATE backlog_stories
+               SET position = position + 1
+               WHERE backlog_id = ? AND position >= ?""",
+            [target_backlog_id, normalized],
+        )
+        added_at = utc_now()
+        await self._db.execute(
+            """INSERT INTO backlog_stories (backlog_id, story_id, position, added_at)
+               VALUES (?, ?, ?, ?)""",
+            [target_backlog_id, story_id, normalized, added_at],
+        )
+        await self._db.commit()
+        return BacklogStoryItem(
+            backlog_id=target_backlog_id,
+            story_id=story_id,
+            position=normalized,
+            added_at=added_at,
+        )
 
     async def add_task_item(self, backlog_id: str, task_id: str, position: int) -> BacklogTaskItem:
         max_position = await _fetch_count(
@@ -1182,15 +1260,9 @@ class SqliteBacklogRepository(BacklogRepository):
     async def get_active_sprint_with_stories(
         self, project_id: str
     ) -> tuple[Backlog | None, list[dict[str, Any]]]:
-        row = await _fetch_one(
-            self._db,
-            "SELECT * FROM backlogs WHERE project_id = ? "
-            "AND kind = 'SPRINT' AND status = 'ACTIVE' LIMIT 1",
-            [project_id],
-        )
-        if not row:
+        backlog = await self.get_active_sprint_backlog(project_id)
+        if not backlog:
             return None, []
-        backlog = _row_to_backlog(row)
         story_rows = await _fetch_all(
             self._db,
             """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
@@ -1208,6 +1280,25 @@ class SqliteBacklogRepository(BacklogRepository):
         )
         stories = [dict(r) for r in story_rows]
         return backlog, stories
+
+    async def get_active_sprint_backlog(self, project_id: str) -> Backlog | None:
+        row = await _fetch_one(
+            self._db,
+            "SELECT * FROM backlogs WHERE project_id = ? "
+            "AND kind = 'SPRINT' AND status = 'ACTIVE' ORDER BY created_at ASC, id ASC LIMIT 1",
+            [project_id],
+        )
+        return _row_to_backlog(row) if row else None
+
+    async def get_product_backlog(self, project_id: str) -> Backlog | None:
+        row = await _fetch_one(
+            self._db,
+            "SELECT * FROM backlogs WHERE project_id = ? "
+            "AND kind = 'BACKLOG' AND status = 'ACTIVE' "
+            "ORDER BY is_default DESC, created_at ASC, id ASC LIMIT 1",
+            [project_id],
+        )
+        return _row_to_backlog(row) if row else None
 
 
 # ---------------------------------------------------------------------------
