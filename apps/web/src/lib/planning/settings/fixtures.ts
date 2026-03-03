@@ -1,4 +1,4 @@
-import type { PlanningSettingsFixture } from "./types.js";
+import type { PlanningSettingsFixture } from "./types";
 
 export const planningSettingsFixture: PlanningSettingsFixture = {
   selected_project_id: "17dcdfd3-8b65-480f-b254-22835537c6a8",
