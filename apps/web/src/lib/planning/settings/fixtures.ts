@@ -108,14 +108,32 @@ export const planningSettingsFixture: PlanningSettingsFixture = {
     },
   ],
   story_labels: [
-    { story_id: "MC-206", label_id: "7606a426-151f-4278-b043-676e58f42c11" },
-    { story_id: "MC-206", label_id: "68512c39-4f22-4c34-b56b-4f1252dcb034" },
-    { story_id: "MC-171", label_id: "7606a426-151f-4278-b043-676e58f42c11" },
+    {
+      story_id: "918d7063-5297-431e-909c-e7a511844cc9",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+    {
+      story_id: "918d7063-5297-431e-909c-e7a511844cc9",
+      label_id: "68512c39-4f22-4c34-b56b-4f1252dcb034",
+    },
+    {
+      story_id: "d8287260-7bdf-40c7-a77c-83cf939a0b4f",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
   ],
   task_labels: [
-    { task_id: "MC-207", label_id: "7606a426-151f-4278-b043-676e58f42c11" },
-    { task_id: "MC-208", label_id: "7606a426-151f-4278-b043-676e58f42c11" },
-    { task_id: "MC-210", label_id: "5e4ff988-cd09-47e0-a66e-40f8f0eefaf1" },
+    {
+      task_id: "87336606-0c2b-467e-aba9-f16079628e46",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+    {
+      task_id: "564b985e-1df3-4ca4-8648-9ae6cf4e21d5",
+      label_id: "7606a426-151f-4278-b043-676e58f42c11",
+    },
+    {
+      task_id: "8a3d002e-173b-4599-bcc9-6c70a3a16471",
+      label_id: "5e4ff988-cd09-47e0-a66e-40f8f0eefaf1",
+    },
   ],
   activity_log: [
     {
