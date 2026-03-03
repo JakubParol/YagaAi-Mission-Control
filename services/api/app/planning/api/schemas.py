@@ -174,7 +174,7 @@ class BacklogResponse(BaseModel):
 
 class BacklogAddStory(BaseModel):
     story_id: str = Field(..., min_length=1)
-    position: int = Field(..., ge=0)
+    position: int | None = Field(None, ge=0)
 
 
 class BacklogAddTask(BaseModel):

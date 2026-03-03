@@ -113,7 +113,7 @@ class BacklogService:
         self,
         backlog_id: str,
         story_id: str,
-        position: int,
+        position: int | None,
     ) -> BacklogStoryItem:
         backlog = await self.get_backlog(backlog_id)
         exists, story_project_id = await self._repo.get_story_project_id(story_id)
