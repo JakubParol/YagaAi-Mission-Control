@@ -44,8 +44,7 @@ export function StoryLabelChips({
 }: StoryLabelChipsProps) {
   if (!labels || labels.length === 0) return null;
 
-  const visible = labels.slice(0, Math.max(maxVisible, 0));
-  const overflowCount = Math.max(labels.length - visible.length, 0);
+  const { visible, overflowCount } = splitVisibleStoryLabels(labels, maxVisible);
   const allNames = labels.map((label) => label.name).join(", ");
 
   return (
@@ -74,4 +73,16 @@ export function StoryLabelChips({
       )}
     </div>
   );
+}
+
+export function splitVisibleStoryLabels(
+  labels: readonly StoryLabel[],
+  maxVisible: number,
+): { visible: StoryLabel[]; overflowCount: number } {
+  const normalizedMax = Math.max(maxVisible, 0);
+  const visible = labels.slice(0, normalizedMax);
+  return {
+    visible,
+    overflowCount: Math.max(labels.length - visible.length, 0),
+  };
 }
