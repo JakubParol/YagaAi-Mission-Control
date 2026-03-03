@@ -60,6 +60,29 @@ function toPlainObject(error: unknown): Record<string, unknown> {
   };
 }
 
+function formatApiDetails(details: unknown): string[] {
+  if (!Array.isArray(details)) {
+    return [];
+  }
+
+  const lines: string[] = [];
+  for (const entry of details) {
+    if (entry && typeof entry === "object") {
+      const obj = entry as { field?: unknown; message?: unknown };
+      const field = typeof obj.field === "string" && obj.field.trim() ? obj.field : null;
+      const message =
+        typeof obj.message === "string" && obj.message.trim()
+          ? obj.message
+          : JSON.stringify(entry);
+      lines.push(field ? `${field}: ${message}` : message);
+      continue;
+    }
+    lines.push(String(entry));
+  }
+
+  return lines;
+}
+
 export function printCliError(error: unknown, outputMode: OutputMode): void {
   const payload = toPlainObject(error);
 
@@ -76,6 +99,14 @@ export function printCliError(error: unknown, outputMode: OutputMode): void {
     const code = payload.code;
     if (status !== undefined || code !== undefined) {
       console.error(`HTTP: ${status ?? "?"}${code ? ` (${String(code)})` : ""}`);
+    }
+
+    const details = formatApiDetails(payload.details);
+    if (details.length > 0) {
+      console.error("Details:");
+      for (const detail of details) {
+        console.error(`- ${detail}`);
+      }
     }
   }
 }

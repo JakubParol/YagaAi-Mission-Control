@@ -25,6 +25,7 @@ npm install
 
 # Development (runs via tsx, no build needed)
 npm run dev -- project list
+npm run dev -- project create --set key=MC --set name="Mission Control" --set is_default=true
 
 # Build
 npm run build

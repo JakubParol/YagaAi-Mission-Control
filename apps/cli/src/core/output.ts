@@ -68,6 +68,7 @@ const KEY_PRIORITY = [
   "name",
   "title",
   "status",
+  "is_default",
   "priority",
   "project_id",
   "epic_id",

@@ -56,8 +56,11 @@ All commands that accept `--project-id`, `--epic-id`, or `--story-id` also accep
 ```bash
 mc project list --limit 20 --offset 0
 mc project create --set key=MC --set name="Mission Control"
+mc project create --set key=MC --set name="Mission Control" --set is_default=true
 mc project get --id <uuid>
 mc project get --by key=MC
+mc project update --by key=MC --set is_default=true
+mc project update --by key=MC --set is_default=false
 mc task list --project-key MC --status TODO,IN_PROGRESS --sort priority,-updated_at
 mc story list --project-key MC --epic-key MC-1
 mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"

@@ -40,6 +40,32 @@ export function extractApiError(payload: unknown): {
 
   const maybeError = (payload as { error?: unknown }).error;
   if (!isObject(maybeError)) {
+    const detail = (payload as { detail?: unknown }).detail;
+    if (Array.isArray(detail)) {
+      const normalized = detail.map((entry) => {
+        if (!isObject(entry)) {
+          return { message: String(entry) };
+        }
+        const msg = typeof entry.msg === "string" ? entry.msg : "Validation error";
+        const loc = Array.isArray(entry.loc)
+          ? entry.loc
+              .filter((part): part is string | number =>
+                typeof part === "string" || typeof part === "number",
+              )
+              .map(String)
+              .filter((part) => part !== "body")
+              .join(".")
+          : "";
+
+        return loc ? { field: loc, message: msg } : { message: msg };
+      });
+      return { code: "UNPROCESSABLE_ENTITY", message: "Validation failed", details: normalized };
+    }
+
+    if (typeof detail === "string" && detail.trim()) {
+      return { message: detail };
+    }
+
     return {};
   }
 
