@@ -5,6 +5,15 @@ import { CheckCircle2 } from "lucide-react";
 import type { StoryCardStory } from "./story-card";
 import { STATUS_STYLE, STATUS_LABEL, TYPE_CONFIG } from "./story-card";
 
+export const BACKLOG_ROW_LAYOUT = {
+  gridTemplate: "grid-cols-[auto_72px_minmax(0,1fr)_112px_240px_112px_36px_56px]",
+  actions: "w-[112px]",
+  epic: "w-[240px]",
+  status: "w-[112px]",
+  storyPoints: "w-[36px]",
+  taskProgress: "w-[56px]",
+} as const;
+
 /**
  * A single compact row in the Jira-like backlog list.
  * Columns: type icon | key | summary | epic | status pill | SP | task progress
@@ -34,7 +43,8 @@ export function BacklogRow({
         }
       }}
       className={cn(
-        "group w-full flex items-center gap-3 px-3 py-2 text-left",
+        "group grid w-full items-center gap-3 px-3 py-2 text-left",
+        BACKLOG_ROW_LAYOUT.gridTemplate,
         "hover:bg-muted/30 transition-colors duration-100",
         "cursor-pointer",
         "focus-ring",
@@ -57,12 +67,12 @@ export function BacklogRow({
       </span>
 
       {/* Actions */}
-      <span className="shrink-0 w-[128px] flex justify-end">
+      <span className={cn("shrink-0 flex justify-end", BACKLOG_ROW_LAYOUT.actions)}>
         {actions}
       </span>
 
       {/* Epic */}
-      <span className="shrink-0 w-[240px]">
+      <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.epic)}>
         {item.epic_key && item.epic_title ? (
           <Badge
             variant="outline"
@@ -79,24 +89,26 @@ export function BacklogRow({
       </span>
 
       {/* Status pill */}
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0",
-          statusStyle.bg,
-          statusStyle.text,
-        )}
-      >
-        <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-        {STATUS_LABEL[item.status]}
+      <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.status)}>
+        <span
+          className={cn(
+            "inline-flex w-full items-center justify-start gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+            statusStyle.bg,
+            statusStyle.text,
+          )}
+        >
+          <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+          {STATUS_LABEL[item.status]}
+        </span>
       </span>
 
       {/* SP */}
-      <span className="shrink-0 w-[36px] text-center text-[11px] text-muted-foreground">
+      <span className={cn("shrink-0 text-center text-[11px] text-muted-foreground", BACKLOG_ROW_LAYOUT.storyPoints)}>
         -
       </span>
 
       {/* Task progress */}
-      <span className="shrink-0 w-[52px] text-right">
+      <span className={cn("shrink-0 text-right", BACKLOG_ROW_LAYOUT.taskProgress)}>
         {item.task_count > 0 ? (
           <span
             className={cn(
