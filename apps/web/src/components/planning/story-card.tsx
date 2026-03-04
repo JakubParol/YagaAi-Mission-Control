@@ -50,6 +50,7 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
 
 export const TYPE_CONFIG: Record<string, { icon: typeof Bug; label: string; color: string }> = {
   BUG: { icon: Bug, label: "Bug", color: "text-red-400" },
+  TASK: { icon: CheckCircle2, label: "Task", color: "text-blue-300" },
   SPIKE: { icon: FlaskConical, label: "Spike", color: "text-cyan-400" },
   CHORE: { icon: Wrench, label: "Chore", color: "text-slate-400" },
   USER_STORY: { icon: BookOpen, label: "Story", color: "text-primary" },
