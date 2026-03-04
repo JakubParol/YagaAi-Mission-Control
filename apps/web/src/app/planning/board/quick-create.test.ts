@@ -50,7 +50,7 @@ test("buildStoryCreatePayload trims subject and includes assignee metadata", () 
   })
 })
 
-test("createTodoQuickItem performs create + attach flow and returns TODO story card data", async () => {
+test("createTodoQuickItem performs create + product backlog + sprint attach flow and returns TODO story card data", async () => {
   const originalFetch = globalThis.fetch
   const requestUrls: string[] = []
   const requestBodies: unknown[] = []
@@ -72,6 +72,12 @@ test("createTodoQuickItem performs create + attach flow and returns TODO story c
       })
     }
 
+    if (requestUrls.length === 2) {
+      return jsonResponse(200, {
+        data: [{ id: "b-product", is_default: true, created_at: "2026-03-01T00:00:00Z" }],
+      })
+    }
+
     return jsonResponse(200, { data: { story_id: "s-1", backlog_id: "b-1", position: 0 } })
   }) as typeof fetch
 
@@ -83,13 +89,19 @@ test("createTodoQuickItem performs create + attach flow and returns TODO story c
       assigneeAgentId: "agent-2",
     })
 
-    assert.equal(requestUrls.length, 2)
+    assert.equal(requestUrls.length, 4)
     assert.equal(requestUrls[0].endsWith("/v1/planning/stories"), true)
+    assert.equal(requestUrls[1].includes("/v1/planning/backlogs?project_id=p1"), true)
     assert.equal(
-      requestUrls[1].includes("/v1/planning/backlogs/active-sprint/stories?project_id=p1"),
+      requestUrls[2].includes("/v1/planning/backlogs/b-product/stories"),
       true,
     )
-    assert.deepEqual(requestBodies[1], { story_id: "s-1", position: 0 })
+    assert.equal(
+      requestUrls[3].includes("/v1/planning/backlogs/active-sprint/stories?project_id=p1"),
+      true,
+    )
+    assert.deepEqual(requestBodies[2], { story_id: "s-1" })
+    assert.deepEqual(requestBodies[3], { story_id: "s-1", position: 0 })
     assert.equal(created.id, "s-1")
     assert.equal(created.status, "TODO")
     assert.equal(created.story_type, "BUG")
@@ -146,6 +158,14 @@ test("maps attach not-found errors to active sprint guidance", async () => {
   globalThis.fetch = (async () => {
     callCount += 1
     if (callCount === 1) return jsonResponse(201, { data: { id: "s-2", title: "Task 2" } })
+    if (callCount === 2) {
+      return jsonResponse(200, {
+        data: [{ id: "b-product", is_default: true, created_at: "2026-03-01T00:00:00Z" }],
+      })
+    }
+    if (callCount === 3) {
+      return jsonResponse(200, { data: { story_id: "s-2", backlog_id: "b-product", position: 0 } })
+    }
     return jsonResponse(404, { error: { code: "NOT_FOUND", message: "No active sprint" } })
   }) as typeof fetch
 
@@ -167,11 +187,74 @@ test("maps attach not-found errors to active sprint guidance", async () => {
   }
 })
 
+test("quick-add create flow order supports USER_STORY, TASK and BUG without sprint membership violations", async () => {
+  const originalFetch = globalThis.fetch
+  const workTypes = ["USER_STORY", "TASK", "BUG"] as const
+
+  try {
+    for (const workType of workTypes) {
+      const requestUrls: string[] = []
+      const requestBodies: unknown[] = []
+
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        requestUrls.push(String(input))
+        requestBodies.push(init?.body ? JSON.parse(String(init.body)) : null)
+        const callIndex = requestUrls.length
+
+        if (callIndex === 1) {
+          return jsonResponse(201, {
+            data: { id: `s-${workType}`, title: `${workType} item`, story_type: workType },
+          })
+        }
+        if (callIndex === 2) {
+          return jsonResponse(200, {
+            data: [{ id: "b-product", is_default: true, created_at: "2026-03-01T00:00:00Z" }],
+          })
+        }
+        return jsonResponse(200, { data: {} })
+      }) as typeof fetch
+
+      const created = await createTodoQuickItem({
+        projectId: "p1",
+        subject: `${workType} title`,
+        workType,
+        assigneeAgentId: null,
+      })
+
+      assert.equal(created.story_type, workType)
+      assert.equal(requestUrls.length, 4)
+      assert.equal(requestUrls[1].includes("/v1/planning/backlogs?project_id=p1"), true)
+      assert.equal(requestUrls[2].includes("/v1/planning/backlogs/b-product/stories"), true)
+      assert.equal(
+        requestUrls[3].includes("/v1/planning/backlogs/active-sprint/stories?project_id=p1"),
+        true,
+      )
+      assert.deepEqual(
+        requestBodies[0],
+        {
+          title: `${workType} title`,
+          story_type: workType,
+          project_id: "p1",
+          metadata_json: null,
+        },
+      )
+      assert.deepEqual(requestBodies[2], { story_id: `s-${workType}` })
+    }
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test("toQuickCreateErrorMessage falls back to phase-specific generic text", async () => {
   const createMessage = await toQuickCreateErrorMessage(jsonResponse(500, {}), "create")
+  const prepareMessage = await toQuickCreateErrorMessage(jsonResponse(500, {}), "prepare")
   const attachMessage = await toQuickCreateErrorMessage(jsonResponse(500, {}), "attach")
 
   assert.equal(createMessage, "Failed to create work item. HTTP 500.")
+  assert.equal(
+    prepareMessage,
+    "Work item was created but could not be prepared for sprint membership. HTTP 500.",
+  )
   assert.equal(
     attachMessage,
     "Work item was created but could not be added to the active sprint. HTTP 500.",

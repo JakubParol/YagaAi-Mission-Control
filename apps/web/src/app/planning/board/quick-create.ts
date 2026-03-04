@@ -29,7 +29,7 @@ interface ApiErrorPayload {
   }>;
 }
 
-type QuickCreatePhase = "create" | "attach";
+type QuickCreatePhase = "create" | "prepare" | "attach";
 
 export function validateQuickCreateSubject(subject: string): string | null {
   if (subject.trim().length === 0) {
@@ -97,20 +97,31 @@ export async function toQuickCreateErrorMessage(
   const apiMessage = payload.error?.message
 
   if (code === "VALIDATION_ERROR") {
+    if (phase === "prepare") {
+      return "Work item could not be prepared for sprint membership."
+    }
     return "Select a single project before creating work."
   }
 
   if (code === "NOT_FOUND") {
-    return phase === "create"
-      ? "Project context was not found. Refresh and try again."
-      : "Active sprint was not found for the selected project."
+    if (phase === "create") {
+      return "Project context was not found. Refresh and try again."
+    }
+    if (phase === "prepare") {
+      return "Product backlog was not found for the selected project."
+    }
+    return "Active sprint was not found for the selected project."
   }
 
   if (code === "BUSINESS_RULE_VIOLATION") {
     if (apiMessage && apiMessage.trim().length > 0) return apiMessage
-    return phase === "create"
-      ? "Work item cannot be created with the provided values."
-      : "Work item was created but could not be added to the active sprint."
+    if (phase === "create") {
+      return "Work item cannot be created with the provided values."
+    }
+    if (phase === "prepare") {
+      return "Work item could not be prepared for sprint membership."
+    }
+    return "Work item was created but could not be added to the active sprint."
   }
 
   if (code === "FORBIDDEN") {
@@ -123,9 +134,72 @@ export async function toQuickCreateErrorMessage(
 
   if (apiMessage && apiMessage.trim().length > 0) return apiMessage
 
-  return phase === "create"
-    ? `Failed to create work item. HTTP ${response.status}.`
-    : `Work item was created but could not be added to the active sprint. HTTP ${response.status}.`
+  if (phase === "create") {
+    return `Failed to create work item. HTTP ${response.status}.`
+  }
+  if (phase === "prepare") {
+    return `Work item was created but could not be prepared for sprint membership. HTTP ${response.status}.`
+  }
+  return `Work item was created but could not be added to the active sprint. HTTP ${response.status}.`
+}
+
+interface BacklogListEnvelope {
+  data?: Array<{
+    id?: string;
+    is_default?: boolean;
+    created_at?: string;
+  }>;
+}
+
+function selectProductBacklogId(backlogs: NonNullable<BacklogListEnvelope["data"]>): string | null {
+  if (backlogs.length === 0) return null
+
+  const defaultBacklog = backlogs.find((backlog) => backlog.id && backlog.is_default)
+  if (defaultBacklog?.id) return defaultBacklog.id
+
+  const sorted = [...backlogs]
+    .filter((backlog): backlog is { id: string; created_at?: string } => Boolean(backlog.id))
+    .sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")))
+  return sorted[0]?.id ?? null
+}
+
+async function resolveProductBacklogId(projectId: string): Promise<string> {
+  const response = await fetch(
+    apiUrl(
+      `/v1/planning/backlogs?project_id=${projectId}&kind=BACKLOG&status=ACTIVE&limit=100&offset=0&sort=created_at`,
+    ),
+  )
+  if (!response.ok) {
+    throw new Error(await toQuickCreateErrorMessage(response, "prepare"))
+  }
+
+  const body = (await response.json()) as BacklogListEnvelope
+  const backlogId = selectProductBacklogId(body.data ?? [])
+  if (!backlogId) {
+    throw new Error("Product backlog was not found for the selected project.")
+  }
+  return backlogId
+}
+
+async function ensureProductBacklogMembership(
+  productBacklogId: string,
+  storyId: string,
+): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${productBacklogId}/stories`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ story_id: storyId }),
+  })
+  if (response.ok) return
+
+  const payload = await parseApiError(response.clone())
+  const code = payload.error?.code
+  const message = payload.error?.message ?? ""
+  if (code === "CONFLICT" && message.includes("already belongs to backlog")) {
+    return
+  }
+
+  throw new Error(await toQuickCreateErrorMessage(response, "prepare"))
 }
 
 interface StoryCreateEnvelope {
@@ -158,6 +232,9 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
   if (!createdStory?.id) {
     throw new Error("Work item was created but response has no story id.")
   }
+
+  const productBacklogId = await resolveProductBacklogId(input.projectId)
+  await ensureProductBacklogMembership(productBacklogId, createdStory.id)
 
   const attachResponse = await fetch(
     apiUrl(`/v1/planning/backlogs/active-sprint/stories?project_id=${input.projectId}`),
