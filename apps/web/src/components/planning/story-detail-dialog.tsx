@@ -23,6 +23,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  ThemedSelect,
+  type ThemedSelectOption,
+} from "@/components/ui/themed-select";
 import { STATUS_LABEL, STATUS_STYLE } from "./story-card";
 import { toLabelChipStyle, type StoryLabel } from "./story-label-chips";
 import {
@@ -777,6 +781,10 @@ function StoryLabelManager({
     () => availableLabels.filter((label) => !attachedSet.has(label.id)),
     [attachedSet, availableLabels],
   );
+  const attachableOptions = useMemo<ThemedSelectOption[]>(
+    () => attachableLabels.map((label) => ({ value: label.id, label: label.name })),
+    [attachableLabels],
+  );
   const canAttach = selectedLabelId !== "" && !pendingLabelIds.has(selectedLabelId);
 
   return (
@@ -822,23 +830,17 @@ function StoryLabelManager({
         )}
 
         <div className="flex flex-col gap-2">
-          <select
+          <ThemedSelect
             value={selectedLabelId}
-            disabled={isLoading || attachableLabels.length === 0}
-            onChange={(event) => onSelectLabel(event.target.value)}
-            className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-          >
-            <option value="">
-              {attachableLabels.length === 0
+            options={attachableOptions}
+            placeholder={
+              attachableLabels.length === 0
                 ? "No more labels to attach"
-                : "Select a label to attach"}
-            </option>
-            {attachableLabels.map((label) => (
-              <option key={label.id} value={label.id}>
-                {label.name}
-              </option>
-            ))}
-          </select>
+                : "Select a label to attach"
+            }
+            disabled={isLoading || attachableLabels.length === 0}
+            onValueChange={onSelectLabel}
+          />
           <Button
             type="button"
             size="sm"
