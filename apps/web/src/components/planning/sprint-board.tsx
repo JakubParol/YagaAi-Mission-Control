@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
-import { Calendar, Target, Hash, Loader2, Plus, UserRound } from "lucide-react";
+import { Calendar, Target, Hash, Loader2, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
@@ -238,8 +238,7 @@ function TodoQuickCreate({
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-ring"
           onClick={openForm}
         >
-          <Plus className="size-3" />
-          Create
+          + Create
         </button>
       </div>
     );
