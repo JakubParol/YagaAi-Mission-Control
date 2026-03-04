@@ -34,6 +34,21 @@ test("renders combobox trigger with placeholder when no value selected", () => {
   assert.match(markup, /aria-expanded="false"/);
 });
 
+test("renders custom selected value content when renderValue is provided", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(ThemedSelect, {
+      value: "api",
+      options: OPTIONS,
+      placeholder: "Select",
+      renderValue: (option: ThemedSelectOption) =>
+        React.createElement("span", null, `Selected: ${option.label}`),
+      onValueChange: () => {},
+    }),
+  );
+
+  assert.match(markup, /Selected: API/);
+});
+
 test("resolveInitialHighlightIndex prioritizes selected option and falls back to first enabled", () => {
   assert.equal(resolveInitialHighlightIndex(OPTIONS, "web"), 2);
   assert.equal(resolveInitialHighlightIndex(OPTIONS, "cli"), 0);

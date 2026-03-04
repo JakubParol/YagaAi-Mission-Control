@@ -7,6 +7,7 @@ export interface QuickCreateAssigneeOption {
   id: string;
   name: string;
   role: string | null;
+  avatar: string | null;
   openclaw_key: string;
 }
 
