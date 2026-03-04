@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Calendar,
   ChevronDown,
@@ -77,6 +77,11 @@ type FetchResult =
   | { kind: "empty" }
   | { kind: "error"; message: string }
   | { kind: "ok"; sections: BacklogWithStories[] };
+
+interface ScopedFetchResult {
+  projectId: string;
+  result: FetchResult;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -401,7 +406,7 @@ function BacklogSection({
 
 export default function BacklogPage() {
   const { selectedProjectIds, allSelected, selectedLabelIds } = usePlanningFilter();
-  const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
+  const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
@@ -418,7 +423,6 @@ export default function BacklogPage() {
   const [createBoardEndDate, setCreateBoardEndDate] = useState("");
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [createBoardError, setCreateBoardError] = useState<string | null>(null);
-  const prevProjectRef = useRef<string | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -445,14 +449,10 @@ export default function BacklogPage() {
       ? selectedProjectIds[0]
       : null;
 
-  // Reset fetch result when project changes (synchronous, no effect needed)
-  if (prevProjectRef.current !== singleProjectId) {
-    prevProjectRef.current = singleProjectId;
-    setFetchResult(null);
-    setPendingStoryIds({});
-    setPendingSprintIds({});
-    setPendingBoardIds({});
-  }
+  const fetchResult =
+    singleProjectId && fetchResultState?.projectId === singleProjectId
+      ? fetchResultState.result
+      : null;
 
   // Derive state
   const state: PageState = !singleProjectId
@@ -518,11 +518,19 @@ export default function BacklogPage() {
             section.backlog.kind === "SPRINT" && section.backlog.status === "ACTIVE",
         )
       : false;
+  const activeSelectedStoryId =
+    state.kind === "ok" &&
+    selectedStoryId &&
+    state.sections.some((section) =>
+      section.stories.some((story) => story.id === selectedStoryId),
+    )
+      ? selectedStoryId
+      : null;
   const selectedStoryLabels =
-    state.kind === "ok" && selectedStoryId
+    state.kind === "ok" && activeSelectedStoryId
       ? state.sections
           .flatMap((section) => section.stories)
-          .find((story) => story.id === selectedStoryId)?.labels
+          .find((story) => story.id === activeSelectedStoryId)?.labels
       : undefined;
 
   const updateSprintMembership = useCallback(
@@ -779,7 +787,10 @@ export default function BacklogPage() {
         const backlogs: BacklogItem[] = excludeClosedSprintBacklogs(json.data ?? []);
 
         if (backlogs.length === 0) {
-          setFetchResult({ kind: "empty" });
+          setFetchResultState({
+            projectId: singleProjectId,
+            result: { kind: "empty" },
+          });
           return;
         }
 
@@ -820,11 +831,17 @@ export default function BacklogPage() {
           return aKind - bKind;
         });
 
-        setFetchResult({ kind: "ok", sections });
+        setFetchResultState({
+          projectId: singleProjectId,
+          result: { kind: "ok", sections },
+        });
       })
       .catch((err) => {
         if (!cancelled) {
-          setFetchResult({ kind: "error", message: String(err) });
+          setFetchResultState({
+            projectId: singleProjectId,
+            result: { kind: "error", message: String(err) },
+          });
         }
       });
 
@@ -951,8 +968,8 @@ export default function BacklogPage() {
       )}
 
       <StoryDetailDialog
-        storyId={selectedStoryId}
-        open={selectedStoryId !== null}
+        storyId={activeSelectedStoryId}
+        open={activeSelectedStoryId !== null}
         onOpenChange={handleDialogClose}
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => setReloadToken((prev) => prev + 1)}

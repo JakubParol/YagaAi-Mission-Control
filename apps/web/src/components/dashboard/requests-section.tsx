@@ -10,22 +10,27 @@ import type { LLMRequest, LLMRequestsResponse } from "@/lib/dashboard-types";
 
 function RequestRow({ req }: { req: LLMRequest }) {
   const [expanded, setExpanded] = useState(false);
+  const detailsId = `request-details-${req.id}`;
 
   return (
     <>
-      <tr
-        onClick={() => setExpanded(!expanded)}
-        className="cursor-pointer border-b border-border transition-colors hover:bg-white/[0.02]"
-      >
+      <tr className="border-b border-border transition-colors hover:bg-white/[0.02]">
         <td className="px-4 py-3 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="focus-ring inline-flex items-center gap-1 rounded-sm"
+            aria-expanded={expanded}
+            aria-controls={detailsId}
+            aria-label={expanded ? "Hide request details" : "Show request details"}
+          >
             {expanded ? (
               <ChevronDown className="h-3 w-3" />
             ) : (
               <ChevronRight className="h-3 w-3" />
             )}
             {timeAgo(req.startTime)}
-          </span>
+          </button>
         </td>
         <td className="px-4 py-3 font-mono text-xs text-foreground">
           {req.model ?? "—"}
@@ -45,7 +50,7 @@ function RequestRow({ req }: { req: LLMRequest }) {
       </tr>
       {expanded && (
         <tr className="border-b border-border bg-muted/30">
-          <td colSpan={6} className="px-4 py-3">
+          <td id={detailsId} colSpan={6} className="px-4 py-3">
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
               <div>
                 <span className="text-muted-foreground">ID: </span>

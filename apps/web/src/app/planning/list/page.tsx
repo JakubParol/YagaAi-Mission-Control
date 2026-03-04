@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Filter, Group, ListTodo, Loader2, Search } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -36,6 +36,11 @@ type FetchResult =
   | { kind: "empty" }
   | { kind: "error"; message: string }
   | { kind: "ok"; rows: PlanningListRow[] };
+
+interface ScopedFetchResult {
+  projectId: string;
+  result: FetchResult;
+}
 
 type PageState =
   | { kind: "no-project" }
@@ -98,23 +103,20 @@ function ItemTypeBadge({ rowType }: { rowType: PlanningListRow["row_type"] }) {
 
 export default function PlanningListPage() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
-  const [fetchResult, setFetchResult] = useState<FetchResult | null>(null);
+  const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [selectedTaskRow, setSelectedTaskRow] = useState<PlanningListRow | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
-  const previousProjectRef = useRef<string | null>(null);
 
   const singleProjectId =
     !allSelected && selectedProjectIds.length === 1
       ? selectedProjectIds[0]
       : null;
 
-  if (previousProjectRef.current !== singleProjectId) {
-    previousProjectRef.current = singleProjectId;
-    setFetchResult(null);
-    setSelectedStoryId(null);
-    setSelectedTaskRow(null);
-  }
+  const fetchResult =
+    singleProjectId && fetchResultState?.projectId === singleProjectId
+      ? fetchResultState.result
+      : null;
 
   const state: PageState = !singleProjectId
     ? { kind: "no-project" }
@@ -169,13 +171,19 @@ export default function PlanningListPage() {
         });
 
         if (cancelled) return;
-        setFetchResult(rows.length === 0 ? { kind: "empty" } : { kind: "ok", rows });
+        setFetchResultState({
+          projectId: singleProjectId,
+          result: rows.length === 0 ? { kind: "empty" } : { kind: "ok", rows },
+        });
       } catch (error) {
         if (cancelled) return;
-        setFetchResult({
-          kind: "error",
-          message:
-            error instanceof Error ? error.message : "Failed to load planning list items.",
+        setFetchResultState({
+          projectId: singleProjectId,
+          result: {
+            kind: "error",
+            message:
+              error instanceof Error ? error.message : "Failed to load planning list items.",
+          },
         });
       }
     })();
@@ -193,9 +201,21 @@ export default function PlanningListPage() {
     if (!open) setSelectedTaskRow(null);
   }, []);
 
+  const activeSelectedStoryId =
+    state.kind === "ok" &&
+    selectedStoryId &&
+    state.rows.some((row) => row.row_type === "story" && row.id === selectedStoryId)
+      ? selectedStoryId
+      : null;
+  const activeSelectedTaskRow =
+    state.kind === "ok" &&
+    selectedTaskRow &&
+    state.rows.some((row) => row.row_type === "task" && row.id === selectedTaskRow.id)
+      ? selectedTaskRow
+      : null;
   const selectedStoryLabels =
-    state.kind === "ok" && selectedStoryId
-      ? state.rows.find((row) => row.row_type === "story" && row.id === selectedStoryId)
+    state.kind === "ok" && activeSelectedStoryId
+      ? state.rows.find((row) => row.row_type === "story" && row.id === activeSelectedStoryId)
           ?.labels
       : undefined;
 
@@ -398,33 +418,33 @@ export default function PlanningListPage() {
       )}
 
       <StoryDetailDialog
-        storyId={selectedStoryId}
-        open={selectedStoryId !== null}
+        storyId={activeSelectedStoryId}
+        open={activeSelectedStoryId !== null}
         onOpenChange={handleStoryDialogChange}
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
       />
 
-      <Dialog open={selectedTaskRow !== null} onOpenChange={handleTaskDialogChange}>
+      <Dialog open={activeSelectedTaskRow !== null} onOpenChange={handleTaskDialogChange}>
         <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>{selectedTaskRow?.title ?? "Task details"}</DialogTitle>
+            <DialogTitle>{activeSelectedTaskRow?.title ?? "Task details"}</DialogTitle>
           </DialogHeader>
-          {selectedTaskRow && (
+          {activeSelectedTaskRow && (
             <div className="space-y-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{selectedTaskRow.key ?? "No key"}</Badge>
-                <Badge variant="secondary">{STATUS_LABEL[selectedTaskRow.status]}</Badge>
-                <Badge variant="outline">{selectedTaskRow.task_type ?? "Task"}</Badge>
+                <Badge variant="outline">{activeSelectedTaskRow.key ?? "No key"}</Badge>
+                <Badge variant="secondary">{STATUS_LABEL[activeSelectedTaskRow.status]}</Badge>
+                <Badge variant="outline">{activeSelectedTaskRow.task_type ?? "Task"}</Badge>
               </div>
               <p className="text-muted-foreground">
-                {selectedTaskRow.objective?.trim()
-                  ? selectedTaskRow.objective
+                {activeSelectedTaskRow.objective?.trim()
+                  ? activeSelectedTaskRow.objective
                   : "No task objective provided."}
               </p>
               <p className="text-xs text-muted-foreground">
-                Priority: {getPriorityLabel(selectedTaskRow.priority)} | Updated:{" "}
-                {formatUpdatedAt(selectedTaskRow.updated_at)}
+                Priority: {getPriorityLabel(activeSelectedTaskRow.priority)} | Updated:{" "}
+                {formatUpdatedAt(activeSelectedTaskRow.updated_at)}
               </p>
               <p className="text-xs text-amber-300">
                 Read-only preview. Full standalone task detail is {COMING_SOON_LABEL.toLowerCase()}
