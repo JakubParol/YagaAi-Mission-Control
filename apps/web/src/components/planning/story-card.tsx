@@ -1,10 +1,6 @@
 import type { DragEvent } from "react";
 import {
-  Bug,
   CheckCircle2,
-  FlaskConical,
-  Wrench,
-  BookOpen,
   ChevronUp,
   ChevronDown,
   Minus,
@@ -12,6 +8,10 @@ import {
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryLabelChips, type StoryLabel } from "./story-label-chips";
+import {
+  STORY_TYPE_CONFIG,
+  StoryTypeBadge,
+} from "./story-type-badge";
 
 export interface StoryCardStory {
   id: string;
@@ -48,13 +48,7 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   DONE: "Done",
 };
 
-export const TYPE_CONFIG: Record<string, { icon: typeof Bug; label: string; color: string }> = {
-  BUG: { icon: Bug, label: "Bug", color: "text-red-400" },
-  TASK: { icon: CheckCircle2, label: "Task", color: "text-blue-300" },
-  SPIKE: { icon: FlaskConical, label: "Spike", color: "text-cyan-400" },
-  CHORE: { icon: Wrench, label: "Chore", color: "text-slate-400" },
-  USER_STORY: { icon: BookOpen, label: "Story", color: "text-primary" },
-};
+export const TYPE_CONFIG = STORY_TYPE_CONFIG;
 
 export const STORY_CARD_LAYOUT = {
   metadataRow: "flex items-center justify-between gap-2 mb-0.5",
@@ -108,8 +102,6 @@ export function StoryCard({
   disabled?: boolean;
 }) {
   const statusStyle = STATUS_STYLE[story.status];
-  const typeConf = TYPE_CONFIG[story.story_type] ?? TYPE_CONFIG.USER_STORY;
-  const TypeIcon = typeConf.icon;
 
   return (
     <div
@@ -154,10 +146,7 @@ export function StoryCard({
       {/* Metadata row: type + status + task progress */}
       <div className={STORY_CARD_LAYOUT.metadataRow} data-testid="story-card-metadata-row">
         <div className={STORY_CARD_LAYOUT.metadataLeft}>
-          <span className={cn("inline-flex items-center gap-1 text-[11px]", typeConf.color)}>
-            <TypeIcon className="size-3" />
-            {typeConf.label}
-          </span>
+          <StoryTypeBadge storyType={story.story_type} variant="plain" />
           <span
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
