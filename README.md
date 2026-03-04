@@ -38,7 +38,10 @@ npm install
 
 # Configure
 cp .env.example .env.local
-# Edit LANGFUSE_* vars as needed
+# Ensure local DB path:
+# MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
+# Ensure local API URL:
+# NEXT_PUBLIC_API_URL=http://localhost:8080
 
 npm run dev
 ```

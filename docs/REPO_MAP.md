@@ -26,7 +26,7 @@ The Next.js application serving the Mission Control dashboard.
 | Planning schema | `apps/web/src/lib/planning/` — v1 DB schema, types, repository |
 | API routes | `apps/web/src/app/api/` — Next.js API routes (dashboard data) |
 | Database | `data/mission-control.db` (SQLite, shared) |
-| Config | `apps/web/.env.local` — `LANGFUSE_*` |
+| Config | `apps/web/.env.local` — `MC_DB_PATH`, `NEXT_PUBLIC_API_URL`, `LANGFUSE_*` |
 | AGENTS.md | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
 
 ---

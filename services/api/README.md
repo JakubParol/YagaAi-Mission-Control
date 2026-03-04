@@ -7,6 +7,11 @@ FastAPI REST service for Mission Control — planning and observability modules.
 ```bash
 cd services/api
 poetry install
+
+# Optional local override (recommended)
+cp .env.example .env.local
+# set MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
+
 poetry run uvicorn app.main:app --reload --port 8080
 ```
 

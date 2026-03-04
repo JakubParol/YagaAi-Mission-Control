@@ -5,10 +5,16 @@ from dotenv import load_dotenv
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Load .env into os.environ so both MC_API_* (pydantic prefix) and
+# Load local env files into os.environ so both MC_API_* (pydantic prefix) and
 # shared vars (MC_DB_PATH, LANGFUSE_*) are available.
-_env_file = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(_env_file, override=False)
+#
+# Precedence:
+# 1) Process env (e.g. systemd EnvironmentFile in production)
+# 2) services/api/.env.local (local developer overrides)
+# 3) services/api/.env
+_env_dir = Path(__file__).resolve().parent.parent
+for _env_name in (".env.local", ".env"):
+    load_dotenv(_env_dir / _env_name, override=False)
 
 
 class Settings(BaseSettings):

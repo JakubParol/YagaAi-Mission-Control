@@ -166,10 +166,11 @@ class Settings(BaseSettings):
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
 
-    model_config = SettingsConfigDict(env_prefix="MC_API_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="MC_API_")
 ```
 
-All config from env vars prefixed `MC_API_`. No config files beyond `.env` for local dev.
+All config from env vars prefixed `MC_API_`.
+Local dev can use `services/api/.env.local` (preferred) or `.env`.
 
 ---
 
