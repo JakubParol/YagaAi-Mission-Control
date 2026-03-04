@@ -1,54 +1,55 @@
 ---
 name: mission-control-api-contract-check
-description: API contract consistency workflow for Mission Control. Use when changing services/api endpoints, schemas, DTO fields, enums, or status logic to keep docs, CLI, and web clients aligned.
+description: API contract consistency workflow for Mission Control. Use when changing services/api endpoints, schemas, DTO fields, enums, filters, or status logic to keep docs, CLI, and web clients aligned and classify breaking vs non-breaking impact.
 ---
 
-# Mission Control API Contract Check
+# Mission Control API Contract Check (v2)
 
-Use this when API shape or behavior changes.
+Use this whenever API shape or behavior may change.
 
 ## 1) Identify contract impact
 
-Check if change affects:
+Check for impact on:
 - endpoint paths/methods,
 - request/response fields,
-- enum/status values,
+- enums/status values,
 - filtering/query parameters,
 - error payload semantics.
 
-## 2) Update API docs and model docs
+Classify change as:
+- **non-breaking**, or
+- **breaking** (requires migration/update in callers).
 
-Update relevant docs when needed:
+## 2) Update docs when needed
+
+Update relevant docs:
 - `services/api/docs/API_CONTRACTS.md`
 - `docs/ENTITY_MODEL_V1.md`
 - `docs/WORKFLOW_LOGIC_V1.md`
 
-Keep wording concrete: old behavior vs new behavior.
+Describe old vs new behavior concretely.
 
 ## 3) Verify CLI compatibility
 
-Inspect `apps/cli` commands/options touching changed endpoints.
-- Ensure option names and payload fields still match API.
-- Ensure list/get/create/update flows remain valid.
-- Update command help examples when behavior changed.
+Inspect `apps/cli` commands/options for affected endpoints:
+- payload fields and flags still match API,
+- list/get/create/update flows remain valid,
+- help/examples updated when command behavior changes.
 
 ## 4) Verify web compatibility
 
-Inspect `apps/web` callers/types for affected routes and fields.
-- Update typed models and mapping logic.
-- Confirm no stale assumptions about statuses/enums.
+Inspect `apps/web` API callers/types/mappers:
+- update typed models and mapping logic,
+- remove stale enum/status assumptions,
+- verify affected screens still render expected states.
 
 ## 5) Regression checks
 
-Run:
-- API quality gates/tests,
-- relevant CLI and web lint/type checks (when touched).
+Run API gates and any touched client gates.
 
-## 6) Contract report
+## 6) Contract report format
 
-Return a short compatibility report:
-- API changes,
-- docs updated,
-- CLI impact,
-- web impact,
-- migration notes/backward compatibility.
+Return:
+1) change class: `non-breaking` or `breaking`,
+2) API/doc/CLI/web deltas,
+3) migration/follow-up actions (if breaking).

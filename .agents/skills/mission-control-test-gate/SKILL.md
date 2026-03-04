@@ -1,23 +1,22 @@
 ---
 name: mission-control-test-gate
-description: Path-aware quality gate for Mission Control changes. Use after coding in /home/kuba/repos/mission-control to run the right lint/typecheck/test commands for apps/web, apps/cli, and services/api, then report evidence.
+description: Path-aware quality gate for Mission Control changes. Use after coding in /home/kuba/repos/mission-control to run deterministic lint/typecheck/test commands for apps/web, apps/cli, and services/api, then return evidence.
 ---
 
-# Mission Control Test Gate
+# Mission Control Test Gate (v2)
 
 Run validation based on changed paths.
 
 ## 1) Detect touched modules
 
-- Web changes: `apps/web/**`
-- CLI changes: `apps/cli/**`
-- API changes: `services/api/**`
+Map changed files to modules:
+- Web: `apps/web/**`
+- CLI: `apps/cli/**`
+- API: `services/api/**`
 
 ## 2) Run module gates
 
 ### Web
-
-Run:
 
 ```bash
 cd apps/web
@@ -26,8 +25,6 @@ cd apps/web
 
 ### CLI
 
-Run:
-
 ```bash
 cd apps/cli
 ./scripts/lint.sh
@@ -35,28 +32,28 @@ cd apps/cli
 
 ### API
 
-Run:
-
 ```bash
 cd services/api
 ./scripts/lint.sh
 poetry run pytest
 ```
 
-## 3) Keep failures actionable
+## 3) Failure handling (mandatory)
 
-If any command fails:
-- capture exact failing command and error,
-- fix root cause,
-- rerun only failed gate first,
-- then rerun full relevant gate for confidence.
+If any gate fails:
+1. capture failing command + exact error,
+2. fix root cause,
+3. rerun failed gate,
+4. rerun full relevant module gate for confidence.
 
-## 4) Evidence in final report
+Do not report DONE if gates are still failing.
 
-Always include:
+## 4) Evidence format
+
+Return:
 - commands executed,
 - pass/fail per module,
-- notable warnings/deviations,
-- remaining risk (if partial coverage).
+- key failure fixes (if any),
+- residual risk (if partial).
 
-If no code files changed, state `No code validation required`.
+If no code files changed, return: `No code validation required`.
