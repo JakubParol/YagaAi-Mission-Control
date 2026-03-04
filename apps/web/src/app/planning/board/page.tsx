@@ -10,6 +10,11 @@ import { EmptyState } from "@/components/empty-state";
 import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import {
+  createTodoQuickItem,
+  type QuickCreateAssigneeOption,
+  type QuickCreateSubmitInput,
+} from "./quick-create";
 import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
 import { subscribeToSprintLifecycleChanged } from "../sprint-lifecycle-events";
 
@@ -20,6 +25,15 @@ type BoardState =
   | { kind: "error"; projectId: string; message: string }
   | { kind: "ok"; projectId: string; data: ActiveSprintData };
 
+interface AgentListEnvelope {
+  data?: Array<{
+    id?: string;
+    name?: string;
+    role?: string | null;
+    openclaw_key?: string;
+  }>;
+}
+
 export default function BoardPage() {
   const { selectedProjectIds, allSelected, selectedLabelIds } = usePlanningFilter();
   const [state, setState] = useState<BoardState>({ kind: "no-project" });
@@ -27,6 +41,7 @@ export default function BoardPage() {
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [assigneeOptions, setAssigneeOptions] = useState<QuickCreateAssigneeOption[]>([]);
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -110,6 +125,40 @@ export default function BoardPage() {
   }, [reloadToken, singleProjectId]);
 
   useEffect(() => {
+    if (!singleProjectId) {
+      setAssigneeOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name"))
+      .then((response) => {
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        return response.json();
+      })
+      .then((json) => {
+        if (cancelled) return;
+        const body = json as AgentListEnvelope;
+        const parsed = (body.data ?? [])
+          .filter((item) => item.id && item.name && item.openclaw_key)
+          .map((item) => ({
+            id: item.id!,
+            name: item.name!,
+            role: item.role ?? null,
+            openclaw_key: item.openclaw_key!,
+          }));
+        setAssigneeOptions(parsed);
+      })
+      .catch(() => {
+        if (!cancelled) setAssigneeOptions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [singleProjectId]);
+
+  useEffect(() => {
     if (!singleProjectId) return;
     return subscribeToSprintLifecycleChanged((payload) => {
       if (payload.projectId !== singleProjectId) return;
@@ -166,6 +215,38 @@ export default function BoardPage() {
     },
     [showErrorToast, state],
   );
+
+  const handleTodoQuickCreate = useCallback(
+    async (input: Omit<QuickCreateSubmitInput, "projectId">) => {
+      if (!singleProjectId) {
+        throw new Error("Select a single project before creating work.")
+      }
+
+      const created = await createTodoQuickItem({
+        ...input,
+        projectId: singleProjectId,
+      })
+
+      setState((prevState) => {
+        if (prevState.kind !== "ok" || prevState.projectId !== singleProjectId) {
+          return prevState
+        }
+
+        const shiftedStories = prevState.data.stories.map((story) =>
+          story.status === "TODO" ? { ...story, position: story.position + 1 } : story,
+        )
+
+        return {
+          ...prevState,
+          data: {
+            ...prevState.data,
+            stories: [created, ...shiftedStories],
+          },
+        }
+      })
+    },
+    [singleProjectId],
+  )
 
   return (
     <>
@@ -228,6 +309,8 @@ export default function BoardPage() {
           onStoryClick={handleStoryClick}
           onStoryStatusChange={handleStoryStatusChange}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
+          onTodoQuickCreate={handleTodoQuickCreate}
+          assigneeOptions={assigneeOptions}
         />
       )}
 

@@ -1,8 +1,21 @@
-import { useMemo, useState, type DragEvent } from "react";
-import { Calendar, Target, Hash } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
+import { Calendar, Target, Hash, Loader2, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  isQuickCreateCancelKey,
+  isQuickCreateSubmitKey,
+  validateQuickCreateSubject,
+  type QuickCreateAssigneeOption,
+  type QuickCreateSubmitInput,
+  type QuickCreateWorkType,
+} from "@/app/planning/board/quick-create";
 
 // ─── Types (matches API response shape) ─────────────────────────────
 
@@ -36,6 +49,12 @@ const VALID_DROP_STATUSES = new Set<ItemStatus>([
   "VERIFY",
   "DONE",
 ]);
+
+const QUICK_CREATE_TYPE_OPTIONS: ReadonlyArray<{ value: QuickCreateWorkType; label: string }> = [
+  { value: "USER_STORY", label: "User Story" },
+  { value: "TASK", label: "Task" },
+  { value: "BUG", label: "Bug" },
+];
 
 // ─── Sprint Header ──────────────────────────────────────────────────
 
@@ -128,6 +147,229 @@ function SprintHeader({
   );
 }
 
+function TodoQuickCreate({
+  assigneeOptions,
+  onTodoQuickCreate,
+}: {
+  assigneeOptions: readonly QuickCreateAssigneeOption[];
+  onTodoQuickCreate: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [workType, setWorkType] = useState<QuickCreateWorkType>("USER_STORY");
+  const [assigneeAgentId, setAssigneeAgentId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isAssigneePickerOpen, setIsAssigneePickerOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, [isOpen]);
+
+  const selectedAssignee = useMemo(
+    () => assigneeOptions.find((option) => option.id === assigneeAgentId) ?? null,
+    [assigneeAgentId, assigneeOptions],
+  );
+
+  const resetForm = () => {
+    setSubject("");
+    setWorkType("USER_STORY");
+    setAssigneeAgentId(null);
+    setErrorMessage(null);
+  };
+
+  const openForm = () => {
+    setIsOpen(true);
+    setErrorMessage(null);
+  };
+
+  const handleCancel = () => {
+    if (isSubmitting) return;
+    setIsAssigneePickerOpen(false);
+    resetForm();
+    setIsOpen(false);
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting) return;
+
+    const validationMessage = validateQuickCreateSubject(subject);
+    if (validationMessage) {
+      setErrorMessage(validationMessage);
+      inputRef.current?.focus();
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await onTodoQuickCreate({ subject, workType, assigneeAgentId });
+      resetForm();
+      setIsOpen(true);
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to create work item.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (isQuickCreateCancelKey(event.key)) {
+      event.preventDefault();
+      handleCancel();
+      return;
+    }
+
+    if (isQuickCreateSubmitKey(event.key, event.shiftKey)) {
+      return;
+    }
+  };
+
+  if (!isOpen) {
+    return (
+      <div className="px-2 pt-2">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-ring"
+          onClick={openForm}
+        >
+          + Create
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 pt-2">
+      <form
+        className="rounded-md border border-border/60 bg-card/80 p-2"
+        onSubmit={handleSubmit}
+        onKeyDown={handleFormKeyDown}
+      >
+        <input
+          ref={inputRef}
+          value={subject}
+          disabled={isSubmitting}
+          placeholder="What needs to be done?"
+          onChange={(event) => {
+            setSubject(event.target.value);
+            if (errorMessage) setErrorMessage(null);
+          }}
+          className="h-8 w-full rounded-md border border-border/60 bg-background px-2 text-xs text-foreground focus-ring"
+          aria-label="Subject"
+        />
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select
+            value={workType}
+            disabled={isSubmitting}
+            onChange={(event) => setWorkType(event.target.value as QuickCreateWorkType)}
+            className="h-7 rounded-md border border-border/60 bg-background px-2 text-[11px] text-foreground focus-ring"
+            aria-label="Work type"
+          >
+            {QUICK_CREATE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <Popover open={isAssigneePickerOpen} onOpenChange={setIsAssigneePickerOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                aria-label="Select assignee"
+                title="Select assignee"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground transition-colors hover:text-foreground focus-ring disabled:opacity-60"
+              >
+                <UserRound className="size-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-56 p-2">
+              <div className="space-y-1">
+                <p className="px-1 text-[11px] font-medium text-muted-foreground">Assignee</p>
+                <button
+                  type="button"
+                  className={cn(
+                    "w-full rounded-sm px-2 py-1 text-left text-xs transition-colors",
+                    assigneeAgentId === null
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                  )}
+                  onClick={() => {
+                    setAssigneeAgentId(null);
+                    setIsAssigneePickerOpen(false);
+                  }}
+                >
+                  Unassigned
+                </button>
+                {assigneeOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={cn(
+                      "w-full rounded-sm px-2 py-1 text-left text-xs transition-colors",
+                      assigneeAgentId === option.id
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                    )}
+                    onClick={() => {
+                      setAssigneeAgentId(option.id);
+                      setIsAssigneePickerOpen(false);
+                    }}
+                  >
+                    <span className="block truncate">{option.name}</span>
+                    {option.role && (
+                      <span className="block truncate text-[10px] text-muted-foreground/80">
+                        {option.role}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <span className="max-w-[110px] truncate text-[11px] text-muted-foreground" title={selectedAssignee?.name ?? "Unassigned"}>
+            {selectedAssignee?.name ?? "Unassigned"}
+          </span>
+
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              className="h-7 rounded-md px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-ring disabled:opacity-60"
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/50 focus-ring disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isSubmitting && <Loader2 className="size-3 animate-spin" />}
+              Create
+            </button>
+          </div>
+        </div>
+
+        {errorMessage && (
+          <p className="mt-2 rounded-sm border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] text-red-300">
+            {errorMessage}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
+
 // ─── Board Column ───────────────────────────────────────────────────
 
 function BoardColumn({
@@ -142,6 +384,8 @@ function BoardColumn({
   onCardDragStart,
   onCardDragEnd,
   pendingStoryIds,
+  onTodoQuickCreate,
+  assigneeOptions,
 }: {
   status: ItemStatus;
   label: string;
@@ -154,6 +398,8 @@ function BoardColumn({
   onCardDragStart: (storyId: string) => void;
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
+  onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
+  assigneeOptions: readonly QuickCreateAssigneeOption[];
 }) {
   return (
     <div
@@ -175,6 +421,10 @@ function BoardColumn({
           {stories.length}
         </span>
       </div>
+
+      {status === "TODO" && onTodoQuickCreate && (
+        <TodoQuickCreate assigneeOptions={assigneeOptions} onTodoQuickCreate={onTodoQuickCreate} />
+      )}
 
       {/* Cards */}
       <div className="flex flex-col gap-2 p-2 min-h-[120px]">
@@ -206,11 +456,15 @@ export function SprintBoard({
   onStoryClick,
   onStoryStatusChange,
   pendingStoryIds,
+  onTodoQuickCreate,
+  assigneeOptions = [],
 }: {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
   onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
   pendingStoryIds?: ReadonlySet<string>;
+  onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
+  assigneeOptions?: readonly QuickCreateAssigneeOption[];
 }) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
   const [dropTargetStatus, setDropTargetStatus] = useState<ItemStatus | null>(null);
@@ -285,6 +539,8 @@ export function SprintBoard({
             onCardDragStart={handleCardDragStart}
             onCardDragEnd={handleCardDragEnd}
             pendingStoryIds={pendingSet}
+            onTodoQuickCreate={col.status === "TODO" ? onTodoQuickCreate : undefined}
+            assigneeOptions={assigneeOptions}
           />
         ))}
       </div>
