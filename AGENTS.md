@@ -80,7 +80,7 @@ When the user asks you to work with planning entities (projects, epics, stories,
 Task delivery workflow is maintained in skill:
 - `.agents/skills/mission-control-delivery-flow/SKILL.md`
 
-When asked to deliver a US/bug end-to-end, use that skill as the execution playbook.
+When asked to deliver (or even just to code something) a US/task/bug end-to-end, use that skill as the execution playbook.
 
 ### Policy anchors (still mandatory)
 
