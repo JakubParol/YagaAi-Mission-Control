@@ -13,6 +13,7 @@ import {
   ThemedSelect,
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
+import { AvatarOption } from "@/components/planning/avatar-option";
 import {
   isQuickCreateCancelKey,
   isQuickCreateSubmitKey,
@@ -62,6 +63,13 @@ const QUICK_CREATE_TYPE_OPTIONS: ReadonlyArray<{ value: QuickCreateWorkType; lab
 ];
 
 const UNASSIGNED_OPTION = "__UNASSIGNED__";
+
+type AssigneePickerOption = ThemedSelectOption & {
+  name: string;
+  role: string | null;
+  avatar: string | null;
+  isUnassigned?: boolean;
+};
 
 // ─── Sprint Header ──────────────────────────────────────────────────
 
@@ -165,12 +173,22 @@ function TodoQuickCreate({
     () => QUICK_CREATE_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
     [],
   );
-  const assigneePickerOptions = useMemo<ThemedSelectOption[]>(
+  const assigneePickerOptions = useMemo<AssigneePickerOption[]>(
     () => [
-      { value: UNASSIGNED_OPTION, label: "Unassigned" },
+      {
+        value: UNASSIGNED_OPTION,
+        label: "Unassigned",
+        name: "Unassigned",
+        role: null,
+        avatar: null,
+        isUnassigned: true,
+      },
       ...assigneeOptions.map((option) => ({
         value: option.id,
         label: option.role ? `${option.name} · ${option.role}` : option.name,
+        name: option.name,
+        role: option.role,
+        avatar: option.avatar,
       })),
     ],
     [assigneeOptions],
@@ -321,6 +339,28 @@ function TodoQuickCreate({
                   options={assigneePickerOptions}
                   placeholder="Select assignee"
                   disabled={isSubmitting}
+                  renderOption={(option) => {
+                    const assignee = option as AssigneePickerOption;
+                    if (assignee.isUnassigned) return "Unassigned";
+                    return (
+                      <AvatarOption
+                        name={assignee.name}
+                        role={assignee.role}
+                        avatar={assignee.avatar}
+                      />
+                    );
+                  }}
+                  renderValue={(option) => {
+                    const assignee = option as AssigneePickerOption;
+                    if (assignee.isUnassigned) return "Unassigned";
+                    return (
+                      <AvatarOption
+                        name={assignee.name}
+                        avatar={assignee.avatar}
+                        compact
+                      />
+                    );
+                  }}
                   onValueChange={(value) => {
                     setAssigneeAgentId(value === UNASSIGNED_OPTION ? null : value);
                     setIsAssigneePickerOpen(false);

@@ -31,6 +31,7 @@ interface AgentListEnvelope {
     id?: string;
     name?: string;
     role?: string | null;
+    avatar?: string | null;
     openclaw_key?: string;
   }>;
 }
@@ -160,6 +161,7 @@ export default function BoardPage() {
             id: item.id!,
             name: item.name!,
             role: item.role ?? null,
+            avatar: item.avatar ?? null,
             openclaw_key: item.openclaw_key!,
           }));
         setAssigneeOptions(parsed);

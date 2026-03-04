@@ -12,6 +12,12 @@ export interface ThemedSelectOption {
   disabled?: boolean;
 }
 
+interface ThemedSelectRenderState {
+  selected: boolean;
+  highlighted: boolean;
+  disabled: boolean;
+}
+
 interface ThemedSelectProps {
   value: string;
   options: readonly ThemedSelectOption[];
@@ -22,6 +28,11 @@ interface ThemedSelectProps {
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
+  renderValue?: (option: ThemedSelectOption) => React.ReactNode;
+  renderOption?: (
+    option: ThemedSelectOption,
+    state: ThemedSelectRenderState,
+  ) => React.ReactNode;
   onValueChange: (value: string) => void;
 }
 
@@ -100,6 +111,8 @@ export function ThemedSelect({
   className,
   triggerClassName,
   contentClassName,
+  renderValue,
+  renderOption,
   onValueChange,
 }: ThemedSelectProps) {
   const [open, setOpen] = React.useState(false);
@@ -203,8 +216,17 @@ export function ThemedSelect({
           )}
           onKeyDown={handleTriggerKeyDown}
         >
-          <span className={cn("truncate text-left", !selectedOption && "text-muted-foreground")}>
-            {selectedOption ? selectedOption.label : placeholder}
+          <span
+            className={cn(
+              "min-w-0 grow text-left",
+              !selectedOption && "truncate text-muted-foreground",
+            )}
+          >
+            {selectedOption
+              ? (renderValue ? renderValue(selectedOption) : (
+                <span className="truncate">{selectedOption.label}</span>
+              ))
+              : placeholder}
           </span>
           <ChevronsUpDown className="ml-2 size-3.5 shrink-0 text-muted-foreground/80" />
         </button>
@@ -228,6 +250,12 @@ export function ThemedSelect({
               {options.map((option, index) => {
                 const selected = option.value === value;
                 const highlighted = index === highlightedIndex;
+                const disabledOption = Boolean(option.disabled);
+                const optionState: ThemedSelectRenderState = {
+                  selected,
+                  highlighted,
+                  disabled: disabledOption,
+                };
 
                 return (
                   <button
@@ -236,7 +264,7 @@ export function ThemedSelect({
                     type="button"
                     role="option"
                     aria-selected={selected}
-                    disabled={option.disabled}
+                    disabled={disabledOption}
                     data-highlighted={highlighted || undefined}
                     className={cn(
                       "focus-ring flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
@@ -245,12 +273,14 @@ export function ThemedSelect({
                       "disabled:cursor-not-allowed disabled:opacity-50",
                     )}
                     onMouseEnter={() => {
-                      if (option.disabled) return;
+                      if (disabledOption) return;
                       setHighlightedIndex(index);
                     }}
                     onClick={() => selectOption(option)}
                   >
-                    <span className="grow truncate">{option.label}</span>
+                    <span className="min-w-0 grow truncate">
+                      {renderOption ? renderOption(option, optionState) : option.label}
+                    </span>
                     {selected ? (
                       <Check className="size-3.5 text-primary" aria-hidden="true" />
                     ) : null}
