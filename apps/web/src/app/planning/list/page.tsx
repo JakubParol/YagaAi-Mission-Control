@@ -5,6 +5,7 @@ import { BookOpen, Filter, Group, ListTodo, Loader2, Search } from "lucide-react
 
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { STATUS_LABEL, STATUS_STYLE } from "@/components/planning/story-card";
 import { Badge } from "@/components/ui/badge";
@@ -106,7 +107,6 @@ export default function PlanningListPage() {
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [selectedTaskRow, setSelectedTaskRow] = useState<PlanningListRow | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
 
   const singleProjectId =
     !allSelected && selectedProjectIds.length === 1
@@ -124,58 +124,74 @@ export default function PlanningListPage() {
       ? { kind: "loading" }
       : fetchResult;
 
+  const fetchListResult = useCallback(async (projectId: string): Promise<FetchResult> => {
+    const [stories, tasks, epics, backlogs] = await Promise.all([
+      fetchList<PlanningStoryApiItem>(
+        `/v1/planning/stories?project_id=${projectId}&limit=100&sort=-updated_at`,
+      ),
+      fetchList<PlanningTaskApiItem>(
+        `/v1/planning/tasks?project_id=${projectId}&limit=100&sort=-updated_at`,
+      ),
+      fetchList<PlanningEpicApiItem>(
+        `/v1/planning/epics?project_id=${projectId}&limit=100`,
+      ),
+      fetchList<PlanningBacklogApiItem>(
+        `/v1/planning/backlogs?project_id=${projectId}&limit=100`,
+      ),
+    ]);
+
+    const backlogStoryGroups = await Promise.all(
+      backlogs.map((backlog) =>
+        fetchList<PlanningBacklogStoryApiItem>(
+          `/v1/planning/backlogs/${backlog.id}/stories`,
+        ).catch(() => []),
+      ),
+    );
+
+    const backlogStoryById = new Map<string, PlanningBacklogStoryApiItem>();
+    for (const group of backlogStoryGroups) {
+      for (const story of group) {
+        if (!backlogStoryById.has(story.id)) {
+          backlogStoryById.set(story.id, story);
+        }
+      }
+    }
+
+    const rows = buildPlanningListRows({
+      stories,
+      backlogStories: [...backlogStoryById.values()],
+      standaloneTaskCandidates: tasks,
+      epics,
+    });
+
+    return rows.length === 0 ? { kind: "empty" } : { kind: "ok", rows };
+  }, []);
+
+  const refreshCurrentView = useCallback(async () => {
+    if (!singleProjectId) {
+      throw new Error("Select a single project before refreshing.");
+    }
+    const result = await fetchListResult(singleProjectId);
+    setFetchResultState({
+      projectId: singleProjectId,
+      result,
+    });
+  }, [fetchListResult, singleProjectId]);
+
   useEffect(() => {
     if (!singleProjectId) return;
 
     let cancelled = false;
 
-    void (async () => {
-      try {
-        const [stories, tasks, epics, backlogs] = await Promise.all([
-          fetchList<PlanningStoryApiItem>(
-            `/v1/planning/stories?project_id=${singleProjectId}&limit=100&sort=-updated_at`,
-          ),
-          fetchList<PlanningTaskApiItem>(
-            `/v1/planning/tasks?project_id=${singleProjectId}&limit=100&sort=-updated_at`,
-          ),
-          fetchList<PlanningEpicApiItem>(
-            `/v1/planning/epics?project_id=${singleProjectId}&limit=100`,
-          ),
-          fetchList<PlanningBacklogApiItem>(
-            `/v1/planning/backlogs?project_id=${singleProjectId}&limit=100`,
-          ),
-        ]);
-
-        const backlogStoryGroups = await Promise.all(
-          backlogs.map((backlog) =>
-            fetchList<PlanningBacklogStoryApiItem>(
-              `/v1/planning/backlogs/${backlog.id}/stories`,
-            ).catch(() => []),
-          ),
-        );
-
-        const backlogStoryById = new Map<string, PlanningBacklogStoryApiItem>();
-        for (const group of backlogStoryGroups) {
-          for (const story of group) {
-            if (!backlogStoryById.has(story.id)) {
-              backlogStoryById.set(story.id, story);
-            }
-          }
-        }
-
-        const rows = buildPlanningListRows({
-          stories,
-          backlogStories: [...backlogStoryById.values()],
-          standaloneTaskCandidates: tasks,
-          epics,
-        });
-
+    void fetchListResult(singleProjectId)
+      .then((result) => {
         if (cancelled) return;
         setFetchResultState({
           projectId: singleProjectId,
-          result: rows.length === 0 ? { kind: "empty" } : { kind: "ok", rows },
+          result,
         });
-      } catch (error) {
+      })
+      .catch((error) => {
         if (cancelled) return;
         setFetchResultState({
           projectId: singleProjectId,
@@ -185,13 +201,12 @@ export default function PlanningListPage() {
               error instanceof Error ? error.message : "Failed to load planning list items.",
           },
         });
-      }
-    })();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [reloadToken, singleProjectId]);
+  }, [fetchListResult, singleProjectId]);
 
   const handleStoryDialogChange = useCallback((open: boolean) => {
     if (!open) setSelectedStoryId(null);
@@ -221,14 +236,20 @@ export default function PlanningListPage() {
 
   return (
     <>
-      <div className="mb-6">
-        <div className="flex items-center gap-2.5 mb-1">
-          <ListTodo className="size-6 text-muted-foreground" />
-          <h1 className="text-3xl font-bold text-foreground">List</h1>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <ListTodo className="size-6 text-muted-foreground" />
+            <h1 className="text-3xl font-bold text-foreground">List</h1>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Unified project view of stories and standalone tasks.
+          </p>
         </div>
-        <p className="text-muted-foreground text-sm">
-          Unified project view of stories and standalone tasks.
-        </p>
+        <PlanningRefreshControl
+          onRefresh={refreshCurrentView}
+          disabled={!singleProjectId}
+        />
       </div>
 
       {singleProjectId && (
@@ -422,7 +443,9 @@ export default function PlanningListPage() {
         open={activeSelectedStoryId !== null}
         onOpenChange={handleStoryDialogChange}
         initialLabels={selectedStoryLabels}
-        onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
+        onStoryUpdated={() => {
+          void refreshCurrentView().catch(() => undefined);
+        }}
       />
 
       <Dialog open={activeSelectedTaskRow !== null} onOpenChange={handleTaskDialogChange}>

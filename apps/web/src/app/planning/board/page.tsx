@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { EmptyState } from "@/components/empty-state";
 import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
@@ -40,7 +41,6 @@ export default function BoardPage() {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [assigneeOptions, setAssigneeOptions] = useState<QuickCreateAssigneeOption[]>([]);
 
   const handleStoryClick = useCallback((storyId: string) => {
@@ -89,40 +89,55 @@ export default function BoardPage() {
       ? state.data.stories.find((story) => story.id === selectedStoryId)?.labels
       : undefined;
 
+  const fetchBoardState = useCallback(async (projectId: string): Promise<BoardState> => {
+    setPendingStoryIds({});
+    const response = await fetch(
+      apiUrl(`/v1/planning/backlogs/active-sprint?project_id=${projectId}`),
+    );
+
+    if (response.status === 404) {
+      return { kind: "no-sprint", projectId };
+    }
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const json = await response.json();
+    return { kind: "ok", projectId, data: json.data };
+  }, []);
+
+  const refreshCurrentView = useCallback(async () => {
+    if (!singleProjectId) {
+      throw new Error("Select a single project before refreshing.");
+    }
+    const nextState = await fetchBoardState(singleProjectId);
+    setState(nextState);
+  }, [fetchBoardState, singleProjectId]);
+
   useEffect(() => {
     if (!singleProjectId) return;
 
     let cancelled = false;
-    setPendingStoryIds({});
 
-    fetch(apiUrl(`/v1/planning/backlogs/active-sprint?project_id=${singleProjectId}`))
-      .then((res) => {
-        if (res.status === 404) {
-          if (!cancelled)
-            setState({ kind: "no-sprint", projectId: singleProjectId });
-          return null;
-        }
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        return res.json();
+    void fetchBoardState(singleProjectId)
+      .then((nextState) => {
+        if (cancelled) return;
+        setState(nextState);
       })
-      .then((json) => {
-        if (cancelled || !json) return;
-        setState({ kind: "ok", projectId: singleProjectId, data: json.data });
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setState({
-            kind: "error",
-            projectId: singleProjectId,
-            message: String(err),
-          });
-        }
+      .catch((error) => {
+        if (cancelled) return;
+        setState({
+          kind: "error",
+          projectId: singleProjectId,
+          message: String(error),
+        });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [reloadToken, singleProjectId]);
+  }, [fetchBoardState, singleProjectId]);
 
   useEffect(() => {
     if (!singleProjectId) {
@@ -162,9 +177,9 @@ export default function BoardPage() {
     if (!singleProjectId) return;
     return subscribeToSprintLifecycleChanged((payload) => {
       if (payload.projectId !== singleProjectId) return;
-      setReloadToken((prev) => prev + 1);
+      void refreshCurrentView().catch(() => undefined);
     });
-  }, [singleProjectId]);
+  }, [refreshCurrentView, singleProjectId]);
 
   const handleStoryStatusChange = useCallback(
     async (storyId: string, nextStatus: ItemStatus) => {
@@ -260,17 +275,23 @@ export default function BoardPage() {
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-1">Board</h1>
-        <p className="text-muted-foreground text-sm">
-          Active sprint board for the selected project.
-        </p>
-        {selectedLabelIds.length > 0 && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Filtered by {selectedLabelIds.length} label
-            {selectedLabelIds.length === 1 ? "" : "s"}.
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-1">Board</h1>
+          <p className="text-muted-foreground text-sm">
+            Active sprint board for the selected project.
           </p>
-        )}
+          {selectedLabelIds.length > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Filtered by {selectedLabelIds.length} label
+              {selectedLabelIds.length === 1 ? "" : "s"}.
+            </p>
+          )}
+        </div>
+        <PlanningRefreshControl
+          onRefresh={refreshCurrentView}
+          disabled={!singleProjectId}
+        />
       </div>
 
       {visibleState.kind === "no-project" && (
@@ -319,7 +340,9 @@ export default function BoardPage() {
         open={selectedStoryId !== null}
         onOpenChange={handleDialogClose}
         initialLabels={selectedStoryLabels}
-        onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
+        onStoryUpdated={() => {
+          void refreshCurrentView().catch(() => undefined);
+        }}
       />
     </>
   );

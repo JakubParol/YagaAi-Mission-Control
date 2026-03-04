@@ -22,6 +22,7 @@ import { apiUrl } from "@/lib/api-client";
 import type { BacklogKind, BacklogStatus, ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
+import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow } from "@/components/planning/backlog-row";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
@@ -409,7 +410,6 @@ export default function BacklogPage() {
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [reloadToken, setReloadToken] = useState(0);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [pendingSprintIds, setPendingSprintIds] = useState<Record<string, true>>({});
   const [pendingBoardIds, setPendingBoardIds] = useState<Record<string, true>>({});
@@ -533,6 +533,62 @@ export default function BacklogPage() {
           .find((story) => story.id === activeSelectedStoryId)?.labels
       : undefined;
 
+  const fetchBacklogResult = useCallback(async (projectId: string): Promise<FetchResult> => {
+    const response = await fetch(
+      apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100`),
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    const json = await response.json();
+    const backlogs: BacklogItem[] = excludeClosedSprintBacklogs(json.data ?? []);
+
+    if (backlogs.length === 0) {
+      return { kind: "empty" };
+    }
+
+    const sections: BacklogWithStories[] = await Promise.all(
+      backlogs.map(async (backlog) => {
+        const storiesResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`));
+        if (!storiesResponse.ok) return { backlog, stories: [] };
+        const body = await storiesResponse.json();
+        return { backlog, stories: body.data ?? [] };
+      }),
+    );
+
+    sections.sort((a, b) => {
+      const aActive = a.backlog.kind === "SPRINT" && a.backlog.status === "ACTIVE" ? 1 : 0;
+      const bActive = b.backlog.kind === "SPRINT" && b.backlog.status === "ACTIVE" ? 1 : 0;
+      if (aActive !== bActive) return bActive - aActive;
+
+      const statusOrder = { ACTIVE: 0, CLOSED: 1 };
+      const aStatus = statusOrder[a.backlog.status] ?? 0;
+      const bStatus = statusOrder[b.backlog.status] ?? 0;
+      if (aStatus !== bStatus) return aStatus - bStatus;
+
+      const kindOrder = { SPRINT: 0, BACKLOG: 1, IDEAS: 2 };
+      const aKind = kindOrder[a.backlog.kind] ?? 1;
+      const bKind = kindOrder[b.backlog.kind] ?? 1;
+      return aKind - bKind;
+    });
+
+    return { kind: "ok", sections };
+  }, []);
+
+  const refreshCurrentView = useCallback(async () => {
+    if (!singleProjectId) {
+      throw new Error("Select a single project before refreshing.");
+    }
+
+    const result = await fetchBacklogResult(singleProjectId);
+    setFetchResultState({
+      projectId: singleProjectId,
+      result,
+    });
+  }, [fetchBacklogResult, singleProjectId]);
+
   const updateSprintMembership = useCallback(
     async (storyId: string, operation: "add" | "remove") => {
       if (!singleProjectId) return;
@@ -543,7 +599,7 @@ export default function BacklogPage() {
         } else {
           await removeStoryFromActiveSprint(singleProjectId, storyId);
         }
-        setReloadToken((prev) => prev + 1);
+        await refreshCurrentView();
       } catch (error) {
         showErrorToast(
           error instanceof Error
@@ -558,7 +614,7 @@ export default function BacklogPage() {
         });
       }
     },
-    [showErrorToast, singleProjectId],
+    [refreshCurrentView, showErrorToast, singleProjectId],
   );
 
   const updateSprintLifecycle = useCallback(
@@ -572,7 +628,7 @@ export default function BacklogPage() {
           await completeSprint(singleProjectId, backlogId);
         }
         emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId, operation });
-        setReloadToken((prev) => prev + 1);
+        await refreshCurrentView();
       } catch (error) {
         showErrorToast(
           error instanceof Error ? error.message : "Failed to update sprint status.",
@@ -585,7 +641,7 @@ export default function BacklogPage() {
         });
       }
     },
-    [showErrorToast, singleProjectId],
+    [refreshCurrentView, showErrorToast, singleProjectId],
   );
 
   const handleAddToActiveSprint = useCallback(
@@ -669,8 +725,12 @@ export default function BacklogPage() {
 
   const handleStorySaved = useCallback(() => {
     setCreateBacklogId(null);
-    setReloadToken((prev) => prev + 1);
-  }, []);
+    void refreshCurrentView().catch((error) => {
+      showErrorToast(
+        error instanceof Error ? error.message : "Failed to refresh backlog data.",
+      );
+    });
+  }, [refreshCurrentView, showErrorToast]);
 
   const handleCreateBoardSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
@@ -716,7 +776,7 @@ export default function BacklogPage() {
         });
         setCreateBoardOpen(false);
         resetCreateBoardForm();
-        setReloadToken((prev) => prev + 1);
+        await refreshCurrentView();
       } catch (error) {
         setCreateBoardError(
           error instanceof Error ? error.message : "Failed to create board.",
@@ -733,6 +793,7 @@ export default function BacklogPage() {
       createBoardStartDate,
       isCreatingBoard,
       resetCreateBoardForm,
+      refreshCurrentView,
       singleProjectId,
     ],
   );
@@ -752,7 +813,7 @@ export default function BacklogPage() {
       setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
       try {
         await deleteBoard(backlogId);
-        setReloadToken((prev) => prev + 1);
+        await refreshCurrentView();
       } catch (error) {
         showErrorToast(
           error instanceof Error ? error.message : "Failed to delete board.",
@@ -765,7 +826,7 @@ export default function BacklogPage() {
         });
       }
     },
-    [showErrorToast],
+    [refreshCurrentView, showErrorToast],
   );
 
   useEffect(() => {
@@ -773,82 +834,26 @@ export default function BacklogPage() {
 
     let cancelled = false;
 
-    fetch(
-      apiUrl(
-        `/v1/planning/backlogs?project_id=${singleProjectId}&limit=100`,
-      ),
-    )
-      .then((res) => {
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        return res.json();
-      })
-      .then(async (json) => {
+    void fetchBacklogResult(singleProjectId)
+      .then((result) => {
         if (cancelled) return;
-        const backlogs: BacklogItem[] = excludeClosedSprintBacklogs(json.data ?? []);
-
-        if (backlogs.length === 0) {
-          setFetchResultState({
-            projectId: singleProjectId,
-            result: { kind: "empty" },
-          });
-          return;
-        }
-
-        // Fetch stories for each backlog in parallel
-        const sections: BacklogWithStories[] = await Promise.all(
-          backlogs.map(async (backlog) => {
-            const res = await fetch(
-              apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`),
-            );
-            if (!res.ok) return { backlog, stories: [] };
-            const body = await res.json();
-            return { backlog, stories: body.data ?? [] };
-          }),
-        );
-
-        if (cancelled) return;
-
-        // Sort: active sprints first, then by kind, closed last
-        sections.sort((a, b) => {
-          const aActive =
-            a.backlog.kind === "SPRINT" && a.backlog.status === "ACTIVE"
-              ? 1
-              : 0;
-          const bActive =
-            b.backlog.kind === "SPRINT" && b.backlog.status === "ACTIVE"
-              ? 1
-              : 0;
-          if (aActive !== bActive) return bActive - aActive;
-
-          const statusOrder = { ACTIVE: 0, CLOSED: 1 };
-          const aStatus = statusOrder[a.backlog.status] ?? 0;
-          const bStatus = statusOrder[b.backlog.status] ?? 0;
-          if (aStatus !== bStatus) return aStatus - bStatus;
-
-          const kindOrder = { SPRINT: 0, BACKLOG: 1, IDEAS: 2 };
-          const aKind = kindOrder[a.backlog.kind] ?? 1;
-          const bKind = kindOrder[b.backlog.kind] ?? 1;
-          return aKind - bKind;
-        });
-
         setFetchResultState({
           projectId: singleProjectId,
-          result: { kind: "ok", sections },
+          result,
         });
       })
-      .catch((err) => {
-        if (!cancelled) {
-          setFetchResultState({
-            projectId: singleProjectId,
-            result: { kind: "error", message: String(err) },
-          });
-        }
+      .catch((error) => {
+        if (cancelled) return;
+        setFetchResultState({
+          projectId: singleProjectId,
+          result: { kind: "error", message: String(error) },
+        });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [reloadToken, singleProjectId]);
+  }, [fetchBacklogResult, singleProjectId]);
 
   return (
     <>
@@ -862,14 +867,20 @@ export default function BacklogPage() {
         </div>
       )}
 
-      <div className="mb-6">
-        <div className="flex items-center gap-2.5 mb-1">
-          <Layers className="size-6 text-muted-foreground" />
-          <h1 className="text-3xl font-bold text-foreground">Backlog</h1>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1">
+            <Layers className="size-6 text-muted-foreground" />
+            <h1 className="text-3xl font-bold text-foreground">Backlog</h1>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            All backlogs and their stories for the selected project.
+          </p>
         </div>
-        <p className="text-muted-foreground text-sm">
-          All backlogs and their stories for the selected project.
-        </p>
+        <PlanningRefreshControl
+          onRefresh={refreshCurrentView}
+          disabled={!singleProjectId}
+        />
       </div>
 
       {singleProjectId && (
@@ -972,7 +983,13 @@ export default function BacklogPage() {
         open={activeSelectedStoryId !== null}
         onOpenChange={handleDialogClose}
         initialLabels={selectedStoryLabels}
-        onStoryUpdated={() => setReloadToken((prev) => prev + 1)}
+        onStoryUpdated={() => {
+          void refreshCurrentView().catch((error) => {
+            showErrorToast(
+              error instanceof Error ? error.message : "Failed to refresh backlog data.",
+            );
+          });
+        }}
       />
 
       <Dialog open={createBacklogId !== null} onOpenChange={handleCreateDialogChange}>
