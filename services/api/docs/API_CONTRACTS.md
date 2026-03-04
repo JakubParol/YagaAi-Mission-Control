@@ -631,14 +631,26 @@ Query: `key`, `openclaw_key`, `is_active`, `source`, `sort`, `limit`, `offset`.
 `openclaw_key` is an alias of `key` for compatibility with CLI filtering.
 
 Agent response fields include:
-- `id`, `openclaw_key`, `name`, `role`, `worker_type`, `avatar`, `is_active`, `source`,
+- `id`, `openclaw_key`, `name`, `last_name`, `initials`, `role`, `worker_type`, `avatar`, `is_active`, `source`,
   `metadata_json`, `last_synced_at`, `created_at`, `updated_at`.
 
 `avatar` is optional and accepts:
 - `http`/`https` URL, or
 - path-like value (for local/static assets), without spaces.
 
-Create/update payloads accept `avatar` (set string, clear with `null` or empty string).
+`last_name` is optional text (trimmed, max 200 chars).  
+`initials` is optional text (trimmed, uppercased, letters `A-Z` only, max 10 chars).
+
+Create/update payloads accept:
+- `avatar` (set string, clear with `null` or empty string),
+- `last_name` (set string, clear with `null` or empty string),
+- `initials` (set string, clear with `null` or empty string).
+
+Fallback rendering contract (for API consumers):
+- if `avatar` is present and loadable, render avatar image,
+- else if `initials` is present, render `initials`,
+- else if `name` and `last_name` are present, derive initials from both,
+- else use first letter of `name`.
 
 #### `POST /v1/planning/agents/sync` — Sync agents from OpenClaw config
 
@@ -660,7 +672,7 @@ Response `200`:
 
 Behavior:
 - Upserts by `openclaw_key` with `source=openclaw_json`.
-- Updates mutable fields (`name`, `role`, `worker_type`, `avatar`, `is_active`, `metadata_json`) and `last_synced_at`.
+- Updates mutable fields (`name`, `last_name`, `initials`, `role`, `worker_type`, `avatar`, `is_active`, `metadata_json`) and `last_synced_at`.
 - Deactivates missing `openclaw_json` agents (`is_active=false`); manual agents are untouched.
 - Idempotent: re-running with unchanged config does not create/update/deactivate records (timestamps may still refresh per sync policy).
 

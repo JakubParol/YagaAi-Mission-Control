@@ -182,6 +182,8 @@ def _setup_test_db(tmp_path, monkeypatch):
           id             TEXT PRIMARY KEY,
           openclaw_key   TEXT NOT NULL UNIQUE,
           name           TEXT NOT NULL,
+          last_name      TEXT,
+          initials       TEXT,
           role           TEXT,
           worker_type    TEXT,
           avatar         TEXT,
@@ -241,10 +243,10 @@ def _setup_test_db(tmp_path, monkeypatch):
           ('tp2', 'p2', 'Task P2', 'TASK', 'TODO', '{TS}', '{TS}'),
           ('tg', NULL, 'Global Task', 'TASK', 'TODO', '{TS}', '{TS}');
 
-        INSERT INTO agents (id, openclaw_key, name, role, avatar, is_active, source, created_at, updated_at)
+        INSERT INTO agents (id, openclaw_key, name, last_name, initials, role, avatar, is_active, source, created_at, updated_at)
         VALUES
-          ('a1', 'agent-1', 'Agent Alpha', 'developer', 'https://cdn.example.com/agent-1.png', 1, 'manual', '{TS}', '{TS}'),
-          ('a2', 'agent-2', 'Agent Beta', 'reviewer', NULL, 1, 'manual', '{TS}', '{TS}');
+          ('a1', 'agent-1', 'Agent', 'Alpha', 'AA', 'developer', 'https://cdn.example.com/agent-1.png', 1, 'manual', '{TS}', '{TS}'),
+          ('a2', 'agent-2', 'Agent', 'Beta', NULL, 'reviewer', NULL, 1, 'manual', '{TS}', '{TS}');
         """)
     conn.close()
 

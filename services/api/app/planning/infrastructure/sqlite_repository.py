@@ -147,10 +147,14 @@ def _row_to_story(row: aiosqlite.Row) -> Story:
 
 def _row_to_agent(row: aiosqlite.Row) -> Agent:
     avatar = row["avatar"] if "avatar" in row.keys() else None
+    last_name = row["last_name"] if "last_name" in row.keys() else None
+    initials = row["initials"] if "initials" in row.keys() else None
     return Agent(
         id=row["id"],
         openclaw_key=row["openclaw_key"],
         name=row["name"],
+        last_name=last_name,
+        initials=initials,
         role=row["role"],
         worker_type=row["worker_type"],
         avatar=avatar,
@@ -765,13 +769,15 @@ class SqliteAgentRepository(AgentRepository):
 
     async def create(self, agent: Agent) -> Agent:
         await self._db.execute(
-            """INSERT INTO agents (id, openclaw_key, name, role, worker_type,
+            """INSERT INTO agents (id, openclaw_key, name, last_name, initials, role, worker_type,
                avatar, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 agent.id,
                 agent.openclaw_key,
                 agent.name,
+                agent.last_name,
+                agent.initials,
                 agent.role,
                 agent.worker_type,
                 agent.avatar,
@@ -789,6 +795,8 @@ class SqliteAgentRepository(AgentRepository):
     async def update(self, agent_id: str, data: dict[str, Any]) -> Agent | None:
         allowed = {
             "name",
+            "last_name",
+            "initials",
             "role",
             "worker_type",
             "avatar",

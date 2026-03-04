@@ -26,7 +26,8 @@ npm install
 # Development (runs via tsx, no build needed)
 npm run dev -- project list
 npm run dev -- project create --set key=MC --set name="Mission Control" --set is_default=true
-npm run dev -- agent create --set openclaw_key=codex --set name=Codex --set avatar=https://cdn.example.com/codex.png
+npm run dev -- agent create --set openclaw_key=codex --set name=Codex --set last_name=Coder --set initials=CC --set avatar=https://cdn.example.com/codex.png
+npm run dev -- agent update --by key=codex --set initials=CD
 npm run dev -- agent update --by key=codex --set avatar=null
 
 # Build

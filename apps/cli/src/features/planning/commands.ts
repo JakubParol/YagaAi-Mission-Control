@@ -349,9 +349,10 @@ function registerStandardResourceCommands(
   if (spec.name === "agent") {
     createCommand.addHelpText(
       "after",
-      "\nExamples:\n" +
-        "  mc agent create --set openclaw_key=codex --set name=Codex --set avatar=https://cdn.example.com/codex.png\n" +
-        "  mc agent create --json '{\"openclaw_key\":\"codex\",\"name\":\"Codex\",\"avatar\":\"/avatars/codex.png\"}'",
+      "\nFallback precedence: avatar -> initials -> derived(name + last_name) -> first letter of name.\n" +
+        "\nExamples:\n" +
+        "  mc agent create --set openclaw_key=codex --set name=Codex --set last_name=Coder --set initials=CC --set avatar=https://cdn.example.com/codex.png\n" +
+        "  mc agent create --json '{\"openclaw_key\":\"codex\",\"name\":\"Codex\",\"last_name\":\"Coder\",\"initials\":\"CC\",\"avatar\":\"/avatars/codex.png\"}'",
     );
   }
 
@@ -393,9 +394,12 @@ function registerStandardResourceCommands(
   if (spec.name === "agent") {
     updateCommand.addHelpText(
       "after",
-      "\nExamples:\n" +
-        "  mc agent update --id <uuid> --set avatar=/avatars/codex-v2.png\n" +
+      "\nFallback precedence: avatar -> initials -> derived(name + last_name) -> first letter of name.\n" +
+        "\nExamples:\n" +
+        "  mc agent update --id <uuid> --set initials=CD --set avatar=/avatars/codex-v2.png\n" +
         "  mc agent update --by key=codex --set avatar=null\n" +
+        "  mc agent update --by key=codex --set last_name=\n" +
+        "  mc agent update --by key=codex --set initials=\n" +
         "  mc agent update --by key=codex --set avatar=",
     );
   }

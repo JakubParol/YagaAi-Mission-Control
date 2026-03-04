@@ -67,6 +67,8 @@ const KEY_PRIORITY = [
   "openclaw_key",
   "id",
   "name",
+  "last_name",
+  "initials",
   "avatar",
   "title",
   "status",

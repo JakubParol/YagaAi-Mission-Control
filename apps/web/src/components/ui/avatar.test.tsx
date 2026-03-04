@@ -5,7 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { Avatar, buildAvatarFallbackText } from "./avatar.js";
 
-test("buildAvatarFallbackText returns uppercase first character with fallback", () => {
+test("buildAvatarFallbackText applies fallback precedence", () => {
+  assert.equal(buildAvatarFallbackText("alice", "zephyr", "az"), "AZ");
+  assert.equal(buildAvatarFallbackText("alice", "zephyr", null), "AZ");
   assert.equal(buildAvatarFallbackText("alice"), "A");
   assert.equal(buildAvatarFallbackText("  bob"), "B");
   assert.equal(buildAvatarFallbackText(""), "?");

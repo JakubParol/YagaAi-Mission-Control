@@ -32,3 +32,32 @@ test("AvatarOption falls back to initials when avatar is missing", () => {
   assert.match(markup, />B</);
   assert.match(markup, /Bob/);
 });
+
+test("AvatarOption prioritizes explicit initials over derived values", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(AvatarOption, {
+      name: "Bob",
+      lastName: "Builder",
+      initials: "bb",
+      role: null,
+      avatar: null,
+    }),
+  );
+
+  assert.doesNotMatch(markup, /<img/);
+  assert.match(markup, />BB</);
+});
+
+test("AvatarOption derives initials from name and last name when provided", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(AvatarOption, {
+      name: "Bob",
+      lastName: "Builder",
+      role: null,
+      avatar: null,
+    }),
+  );
+
+  assert.doesNotMatch(markup, /<img/);
+  assert.match(markup, />BB</);
+});

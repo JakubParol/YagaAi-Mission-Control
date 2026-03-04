@@ -179,6 +179,8 @@ export interface UpdateBacklogInput {
 export interface CreateAgentInput {
   openclaw_key: string;
   name: string;
+  last_name?: string | null;
+  initials?: string | null;
   role?: string | null;
   worker_type?: string | null;
   avatar?: string | null;
@@ -190,6 +192,8 @@ export interface CreateAgentInput {
 
 export interface UpdateAgentInput {
   name?: string;
+  last_name?: string | null;
+  initials?: string | null;
   role?: string | null;
   worker_type?: string | null;
   avatar?: string | null;
@@ -750,13 +754,15 @@ export class PlanningRepository {
 
     this.db
       .prepare(
-        `INSERT INTO agents (id, openclaw_key, name, role, worker_type, avatar, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO agents (id, openclaw_key, name, last_name, initials, role, worker_type, avatar, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         input.openclaw_key,
         input.name,
+        input.last_name ?? null,
+        input.initials ?? null,
         input.role ?? null,
         input.worker_type ?? null,
         input.avatar ?? null,
@@ -798,6 +804,8 @@ export class PlanningRepository {
     const values: unknown[] = [];
 
     if (input.name !== undefined) { fields.push("name = ?"); values.push(input.name); }
+    if (input.last_name !== undefined) { fields.push("last_name = ?"); values.push(input.last_name); }
+    if (input.initials !== undefined) { fields.push("initials = ?"); values.push(input.initials); }
     if (input.role !== undefined) { fields.push("role = ?"); values.push(input.role); }
     if (input.worker_type !== undefined) { fields.push("worker_type = ?"); values.push(input.worker_type); }
     if (input.avatar !== undefined) { fields.push("avatar = ?"); values.push(input.avatar); }

@@ -30,6 +30,8 @@ interface AgentListEnvelope {
   data?: Array<{
     id?: string;
     name?: string;
+    last_name?: string | null;
+    initials?: string | null;
     role?: string | null;
     avatar?: string | null;
     openclaw_key?: string;
@@ -160,6 +162,8 @@ export default function BoardPage() {
           .map((item) => ({
             id: item.id!,
             name: item.name!,
+            last_name: item.last_name ?? null,
+            initials: item.initials ?? null,
             role: item.role ?? null,
             avatar: item.avatar ?? null,
             openclaw_key: item.openclaw_key!,

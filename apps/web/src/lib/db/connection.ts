@@ -47,6 +47,26 @@ export function getDbStatus(): DbStatus {
 
 let _db: Database.Database | null = null;
 
+function ensureAgentColumns(db: Database.Database): void {
+  const existing = new Set<string>();
+  const rows = db.prepare("PRAGMA table_info(agents)").all() as Array<{ name?: string }>;
+  for (const row of rows) {
+    if (typeof row.name === "string") {
+      existing.add(row.name);
+    }
+  }
+
+  const migrations: Array<{ name: string; sql: string }> = [
+    { name: "avatar", sql: "ALTER TABLE agents ADD COLUMN avatar TEXT" },
+    { name: "last_name", sql: "ALTER TABLE agents ADD COLUMN last_name TEXT" },
+    { name: "initials", sql: "ALTER TABLE agents ADD COLUMN initials TEXT" },
+  ];
+  for (const migration of migrations) {
+    if (existing.has(migration.name)) continue;
+    db.exec(migration.sql);
+  }
+}
+
 /**
  * Returns the singleton SQLite database connection.
  * When using the default path, auto-creates the database on first access.
@@ -80,6 +100,7 @@ export function getDb(): Database.Database {
   for (const sql of PLANNING_SCHEMA_STATEMENTS) {
     _db.exec(sql);
   }
+  ensureAgentColumns(_db);
 
   return _db;
 }

@@ -230,6 +230,8 @@ Constraints:
 - `id` TEXT PK (UUID)
 - `openclaw_key` TEXT NOT NULL UNIQUE
 - `name` TEXT NOT NULL
+- `last_name` TEXT NULL
+- `initials` TEXT NULL
 - `role` TEXT NULL
 - `worker_type` TEXT NULL
 - `avatar` TEXT NULL

@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS agents (
   id             TEXT PRIMARY KEY,
   openclaw_key   TEXT NOT NULL UNIQUE,
   name           TEXT NOT NULL,
+  last_name      TEXT,
+  initials       TEXT CHECK (initials IS NULL OR (length(initials) >= 1 AND length(initials) <= 10 AND initials NOT GLOB '*[^A-Z]*')),
   role           TEXT,
   worker_type    TEXT,
   avatar         TEXT,
