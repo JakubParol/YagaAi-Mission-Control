@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
-import { Calendar, Target, Hash, Loader2, UserRound } from "lucide-react";
+import { Calendar, Target, Hash, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
@@ -14,6 +14,8 @@ import {
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
 import { AvatarOption } from "@/components/planning/avatar-option";
+import { StoryTypeBadge } from "@/components/planning/story-type-badge";
+import { AssigneeAvatarTooltip } from "@/components/planning/assignee-avatar-tooltip";
 import {
   isQuickCreateCancelKey,
   isQuickCreateSubmitKey,
@@ -63,6 +65,11 @@ const QUICK_CREATE_TYPE_OPTIONS: ReadonlyArray<{ value: QuickCreateWorkType; lab
 ];
 
 const UNASSIGNED_OPTION = "__UNASSIGNED__";
+
+export const TODO_QUICK_CREATE_LAYOUT = {
+  controlsRow: "flex min-w-0 items-center gap-2",
+  actionsRow: "flex w-full items-center justify-end gap-1",
+} as const;
 
 type AssigneePickerOption = ThemedSelectOption & {
   name: string;
@@ -217,6 +224,7 @@ function TodoQuickCreate({
     () => assigneeOptions.find((option) => option.id === assigneeAgentId) ?? null,
     [assigneeAgentId, assigneeOptions],
   );
+  const selectedAssigneeName = selectedAssignee?.name ?? "Unassigned";
 
   const resetForm = () => {
     setSubject("");
@@ -311,13 +319,17 @@ function TodoQuickCreate({
           aria-label="Subject"
         />
 
-        <div className="mt-2 grid gap-2">
-          <div className="flex items-center gap-2">
+        <div className="mt-2 grid min-w-0 gap-2">
+          <div className={TODO_QUICK_CREATE_LAYOUT.controlsRow}>
             <ThemedSelect
               value={workType}
               options={typeOptions}
               placeholder="Work type"
               disabled={isSubmitting}
+              renderOption={(option) => <StoryTypeBadge storyType={option.value} variant="badge" />}
+              renderValue={(option) => (
+                <StoryTypeBadge storyType={option.value} variant="badge" className="max-w-[124px]" />
+              )}
               onValueChange={(value) => setWorkType(value as QuickCreateWorkType)}
               triggerClassName="h-8 min-w-[140px] px-2 text-xs"
               contentClassName="w-[220px]"
@@ -330,10 +342,15 @@ function TodoQuickCreate({
                   variant="outline"
                   size="icon-xs"
                   disabled={isSubmitting}
-                  aria-label="Select assignee"
-                  title="Select assignee"
+                  aria-label={`Select assignee. Current assignee: ${selectedAssigneeName}`}
+                  className="group/assignee relative"
                 >
-                  <UserRound className="size-3.5" />
+                  <AssigneeAvatarTooltip
+                    name={selectedAssigneeName}
+                    lastName={selectedAssignee?.last_name ?? null}
+                    initials={selectedAssignee?.initials ?? null}
+                    avatar={selectedAssignee?.avatar ?? null}
+                  />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-[280px] p-2">
@@ -379,16 +396,9 @@ function TodoQuickCreate({
                 />
               </PopoverContent>
             </Popover>
-
-            <span
-              className="max-w-[150px] truncate text-xs text-muted-foreground"
-              title={selectedAssignee?.name ?? "Unassigned"}
-            >
-              {selectedAssignee?.name ?? "Unassigned"}
-            </span>
           </div>
 
-          <div className="flex items-center justify-end gap-1">
+          <div className={TODO_QUICK_CREATE_LAYOUT.actionsRow}>
             <Button
               type="button"
               variant="ghost"

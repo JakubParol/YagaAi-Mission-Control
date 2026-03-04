@@ -3,8 +3,9 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2 } from "lucide-react";
 import type { StoryCardStory } from "./story-card";
-import { STATUS_STYLE, STATUS_LABEL, TYPE_CONFIG } from "./story-card";
+import { STATUS_STYLE, STATUS_LABEL } from "./story-card";
 import { StoryLabelChips } from "./story-label-chips";
+import { resolveStoryTypeVisualConfig } from "./story-type-badge";
 
 export const BACKLOG_ROW_LAYOUT = {
   gridTemplate: "grid-cols-[auto_72px_minmax(0,1fr)_112px_240px_112px_36px_56px]",
@@ -29,7 +30,7 @@ export function BacklogRow({
   actions?: ReactNode;
 }) {
   const statusStyle = STATUS_STYLE[item.status];
-  const typeConf = TYPE_CONFIG[item.story_type] ?? TYPE_CONFIG.USER_STORY;
+  const typeConf = resolveStoryTypeVisualConfig(item.story_type);
   const TypeIcon = typeConf.icon;
 
   return (
