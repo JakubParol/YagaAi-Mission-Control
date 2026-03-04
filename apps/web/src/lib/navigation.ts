@@ -22,6 +22,7 @@ export const navModules: NavModule[] = [
     subPages: [
       { href: "/planning/board", label: "Board" },
       { href: "/planning/backlog", label: "Backlog" },
+      { href: "/planning/list", label: "List" },
       { href: "/planning/settings", label: "Settings" },
     ],
   },
