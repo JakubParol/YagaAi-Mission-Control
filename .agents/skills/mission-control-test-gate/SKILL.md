@@ -20,6 +20,7 @@ Map changed files to modules:
 
 ```bash
 cd apps/web
+./scripts/lint.sh --fix
 ./scripts/lint.sh
 ```
 
@@ -27,6 +28,7 @@ cd apps/web
 
 ```bash
 cd apps/cli
+./scripts/lint.sh --fix
 ./scripts/lint.sh
 ```
 
@@ -34,6 +36,7 @@ cd apps/cli
 
 ```bash
 cd services/api
+./scripts/lint.sh --fix
 ./scripts/lint.sh
 poetry run pytest
 ```
@@ -47,6 +50,12 @@ If any gate fails:
 4. rerun full relevant module gate for confidence.
 
 Do not report DONE if gates are still failing.
+
+## Zero-warnings policy and quality standard
+
+- Apply strict zero-warnings quality bar: resolve warnings at source, not by suppression.
+- Do not use `# noqa`, blanket disables, lint-ignore comments, or config weakening to hide issues unless user explicitly approves an exception.
+- Keep fixes senior-level: preserve intent, improve clarity, avoid hacky workarounds.
 
 ## 4) Evidence format
 

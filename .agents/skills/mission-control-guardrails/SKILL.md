@@ -10,7 +10,7 @@ Apply this workflow for every Mission Control task.
 ## 1) Scope and safety boundaries
 
 - Work only in `/home/kuba/repos/mission-control` unless user explicitly states another path.
-- Do not run deploy/release/infra actions.
+- Do not run deploy/release/infra actions unless explicitly required by current `AGENTS.md` workflow or directly requested by the user.
 - Do not modify production secrets or credentials.
 - Prefer minimal-diff changes over broad rewrites.
 
