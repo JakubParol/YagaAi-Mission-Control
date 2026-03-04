@@ -7,13 +7,14 @@ import {
   ChevronRight,
   CircleCheckBig,
   ListPlus,
-  MoreHorizontal,
   Hash,
   Layers,
   Loader2,
   ListMinus,
+  Plus,
   Play,
   Search,
+  Trash2,
   Zap,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ import {
 } from "../sprint-lifecycle-actions";
 import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
 import { excludeClosedSprintBacklogs } from "./backlog-filters";
+import { createBoard, deleteBoard } from "./board-actions";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -84,6 +86,12 @@ const KIND_CONFIG: Record<BacklogKind, { label: string; accent: string }> = {
   IDEAS: { label: "Ideas", accent: "border-l-violet-500" },
 };
 
+const BOARD_KIND_OPTIONS: readonly { value: BacklogKind; label: string }[] = [
+  { value: "BACKLOG", label: "Backlog" },
+  { value: "SPRINT", label: "Sprint" },
+  { value: "IDEAS", label: "Ideas" },
+];
+
 function formatDate(d: string | null): string | null {
   if (!d) return null;
   try {
@@ -120,8 +128,10 @@ function BacklogSection({
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
+  onDeleteBoard,
   pendingStoryIds,
   pendingSprintIds,
+  pendingBoardIds,
 }: {
   section: BacklogWithStories;
   isActiveSprint: boolean;
@@ -136,8 +146,10 @@ function BacklogSection({
     unfinishedStoryCount: number,
   ) => void;
   onCreateStory: (backlogId: string) => void;
+  onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
   pendingStoryIds: ReadonlySet<string>;
   pendingSprintIds: ReadonlySet<string>;
+  pendingBoardIds: ReadonlySet<string>;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const { backlog, stories } = section;
@@ -156,7 +168,9 @@ function BacklogSection({
   const canAddToActiveSprint = backlog.kind === "BACKLOG";
   const canRemoveFromActiveSprint = isActiveSprint;
   const isSprintPending = pendingSprintIds.has(backlog.id);
+  const isBoardDeletePending = pendingBoardIds.has(backlog.id);
   const isStartBlockedByActive = canStartSprint && hasAnyActiveSprint;
+  const canDeleteBoard = !backlog.is_default;
   const unfinishedStoryCount = isSprint
     ? stories.filter((story) => story.status !== "DONE").length
     : 0;
@@ -203,6 +217,11 @@ function BacklogSection({
         {backlog.status === "CLOSED" && (
           <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
             Closed
+          </span>
+        )}
+        {backlog.is_default && (
+          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300 uppercase tracking-wider">
+            Default
           </span>
         )}
 
@@ -293,11 +312,16 @@ function BacklogSection({
           <Button
             variant="ghost"
             size="icon-xs"
-            disabled
-            title="Coming soon"
-            aria-label="More section actions"
+            disabled={isBoardDeletePending || !canDeleteBoard}
+            title={canDeleteBoard ? "Delete board" : "Default board cannot be deleted"}
+            aria-label="Delete board"
+            onClick={() => onDeleteBoard(backlog.id, backlog.name, backlog.is_default)}
           >
-            <MoreHorizontal className="size-3" />
+            {isBoardDeletePending ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Trash2 className="size-3" />
+            )}
           </Button>
         </div>
       </div>
@@ -383,8 +407,17 @@ export default function BacklogPage() {
   const [reloadToken, setReloadToken] = useState(0);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [pendingSprintIds, setPendingSprintIds] = useState<Record<string, true>>({});
+  const [pendingBoardIds, setPendingBoardIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [createBacklogId, setCreateBacklogId] = useState<string | null>(null);
+  const [createBoardOpen, setCreateBoardOpen] = useState(false);
+  const [createBoardName, setCreateBoardName] = useState("");
+  const [createBoardKind, setCreateBoardKind] = useState<BacklogKind>("BACKLOG");
+  const [createBoardGoal, setCreateBoardGoal] = useState("");
+  const [createBoardStartDate, setCreateBoardStartDate] = useState("");
+  const [createBoardEndDate, setCreateBoardEndDate] = useState("");
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+  const [createBoardError, setCreateBoardError] = useState<string | null>(null);
   const prevProjectRef = useRef<string | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
@@ -418,6 +451,7 @@ export default function BacklogPage() {
     setFetchResult(null);
     setPendingStoryIds({});
     setPendingSprintIds({});
+    setPendingBoardIds({});
   }
 
   // Derive state
@@ -598,10 +632,133 @@ export default function BacklogPage() {
     if (!open) setCreateBacklogId(null);
   }, []);
 
+  const resetCreateBoardForm = useCallback(() => {
+    setCreateBoardName("");
+    setCreateBoardKind("BACKLOG");
+    setCreateBoardGoal("");
+    setCreateBoardStartDate("");
+    setCreateBoardEndDate("");
+    setCreateBoardError(null);
+  }, []);
+
+  const handleCreateBoardDialogChange = useCallback(
+    (open: boolean) => {
+      setCreateBoardOpen(open);
+      if (!open) resetCreateBoardForm();
+    },
+    [resetCreateBoardForm],
+  );
+
+  const handleCreateBoardKindChange = useCallback((kind: BacklogKind) => {
+    setCreateBoardKind(kind);
+    setCreateBoardError(null);
+    if (kind !== "SPRINT") {
+      setCreateBoardGoal("");
+      setCreateBoardStartDate("");
+      setCreateBoardEndDate("");
+    }
+  }, []);
+
   const handleStorySaved = useCallback(() => {
     setCreateBacklogId(null);
     setReloadToken((prev) => prev + 1);
   }, []);
+
+  const handleCreateBoardSubmit = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!singleProjectId || isCreatingBoard) return;
+
+      const trimmedName = createBoardName.trim();
+      if (trimmedName.length === 0) {
+        setCreateBoardError("Board name is required.");
+        return;
+      }
+
+      if (
+        createBoardKind === "SPRINT" &&
+        createBoardStartDate &&
+        createBoardEndDate &&
+        createBoardStartDate > createBoardEndDate
+      ) {
+        setCreateBoardError("Sprint end date must be on or after start date.");
+        return;
+      }
+
+      setIsCreatingBoard(true);
+      setCreateBoardError(null);
+
+      try {
+        await createBoard({
+          projectId: singleProjectId,
+          name: trimmedName,
+          kind: createBoardKind,
+          goal:
+            createBoardKind === "SPRINT" && createBoardGoal.trim().length > 0
+              ? createBoardGoal.trim()
+              : null,
+          startDate:
+            createBoardKind === "SPRINT" && createBoardStartDate
+              ? createBoardStartDate
+              : null,
+          endDate:
+            createBoardKind === "SPRINT" && createBoardEndDate
+              ? createBoardEndDate
+              : null,
+        });
+        setCreateBoardOpen(false);
+        resetCreateBoardForm();
+        setReloadToken((prev) => prev + 1);
+      } catch (error) {
+        setCreateBoardError(
+          error instanceof Error ? error.message : "Failed to create board.",
+        );
+      } finally {
+        setIsCreatingBoard(false);
+      }
+    },
+    [
+      createBoardEndDate,
+      createBoardGoal,
+      createBoardKind,
+      createBoardName,
+      createBoardStartDate,
+      isCreatingBoard,
+      resetCreateBoardForm,
+      singleProjectId,
+    ],
+  );
+
+  const handleDeleteBoard = useCallback(
+    async (backlogId: string, backlogName: string, isDefault: boolean) => {
+      if (isDefault) {
+        showErrorToast("Default board cannot be deleted.");
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Delete board "${backlogName}"?\n\nThis action cannot be undone.`,
+      );
+      if (!confirmed) return;
+
+      setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
+      try {
+        await deleteBoard(backlogId);
+        setReloadToken((prev) => prev + 1);
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to delete board.",
+        );
+      } finally {
+        setPendingBoardIds((prev) => {
+          const next = { ...prev };
+          delete next[backlogId];
+          return next;
+        });
+      }
+    },
+    [showErrorToast],
+  );
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -698,22 +855,34 @@ export default function BacklogPage() {
         </p>
       </div>
 
-      {state.kind === "ok" && (
+      {singleProjectId && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search backlog"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className={cn(
-                "h-8 w-full rounded-md border border-border/60 bg-background pl-8 pr-3 text-sm text-foreground",
-                "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-              )}
-            />
-          </div>
-          {selectedLabelIds.length > 0 && (
+          {state.kind === "ok" && (
+            <div className="relative min-w-[220px] flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search backlog"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className={cn(
+                  "h-8 w-full rounded-md border border-border/60 bg-background pl-8 pr-3 text-sm text-foreground",
+                  "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                )}
+              />
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleCreateBoardDialogChange(true)}
+            className={cn("gap-1.5", state.kind === "ok" && "ml-auto")}
+          >
+            <Plus className="size-3.5" />
+            Create board
+          </Button>
+          {state.kind === "ok" && selectedLabelIds.length > 0 && (
             <p className="text-xs text-muted-foreground">
               Label filter: {selectedLabelIds.length} selected
             </p>
@@ -768,8 +937,10 @@ export default function BacklogPage() {
               onStartSprint={handleStartSprint}
               onCompleteSprint={handleCompleteSprint}
               onCreateStory={handleCreateStory}
+              onDeleteBoard={handleDeleteBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
               pendingSprintIds={new Set(Object.keys(pendingSprintIds))}
+              pendingBoardIds={new Set(Object.keys(pendingBoardIds))}
             />
           ))}
 
@@ -801,6 +972,146 @@ export default function BacklogPage() {
               onCancel={() => setCreateBacklogId(null)}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createBoardOpen} onOpenChange={handleCreateBoardDialogChange}>
+        <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Create board</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleCreateBoardSubmit}>
+            <div className="space-y-1.5">
+              <label htmlFor="board-name" className="text-xs font-medium text-muted-foreground">
+                Name
+              </label>
+              <input
+                id="board-name"
+                type="text"
+                value={createBoardName}
+                onChange={(event) => {
+                  setCreateBoardName(event.target.value);
+                  if (createBoardError) setCreateBoardError(null);
+                }}
+                placeholder="e.g. Sprint 14"
+                autoComplete="off"
+                className={cn(
+                  "h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground",
+                  "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                )}
+                disabled={isCreatingBoard}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="board-kind" className="text-xs font-medium text-muted-foreground">
+                Kind
+              </label>
+              <select
+                id="board-kind"
+                value={createBoardKind}
+                onChange={(event) =>
+                  handleCreateBoardKindChange(event.target.value as BacklogKind)
+                }
+                className={cn(
+                  "h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                )}
+                disabled={isCreatingBoard}
+              >
+                {BOARD_KIND_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {createBoardKind === "SPRINT" && (
+              <>
+                <div className="space-y-1.5">
+                  <label htmlFor="board-goal" className="text-xs font-medium text-muted-foreground">
+                    Goal (optional)
+                  </label>
+                  <input
+                    id="board-goal"
+                    type="text"
+                    value={createBoardGoal}
+                    onChange={(event) => setCreateBoardGoal(event.target.value)}
+                    placeholder="Sprint goal"
+                    autoComplete="off"
+                    className={cn(
+                      "h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground",
+                      "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    )}
+                    disabled={isCreatingBoard}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="board-start-date" className="text-xs font-medium text-muted-foreground">
+                      Start date (optional)
+                    </label>
+                    <input
+                      id="board-start-date"
+                      type="date"
+                      value={createBoardStartDate}
+                      onChange={(event) => setCreateBoardStartDate(event.target.value)}
+                      className={cn(
+                        "h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      )}
+                      disabled={isCreatingBoard}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="board-end-date" className="text-xs font-medium text-muted-foreground">
+                      End date (optional)
+                    </label>
+                    <input
+                      id="board-end-date"
+                      type="date"
+                      value={createBoardEndDate}
+                      onChange={(event) => setCreateBoardEndDate(event.target.value)}
+                      className={cn(
+                        "h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                      )}
+                      disabled={isCreatingBoard}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {createBoardError && (
+              <p role="alert" className="text-xs text-red-400">
+                {createBoardError}
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => handleCreateBoardDialogChange(false)}
+                disabled={isCreatingBoard}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreatingBoard}>
+                {isCreatingBoard ? (
+                  <>
+                    <Loader2 className="mr-1 size-3.5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create board"
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </>
