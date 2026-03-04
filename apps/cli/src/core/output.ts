@@ -64,8 +64,10 @@ function terminalWidth(): number {
 
 const KEY_PRIORITY = [
   "key",
+  "openclaw_key",
   "id",
   "name",
+  "avatar",
   "title",
   "status",
   "is_default",
