@@ -346,6 +346,15 @@ function registerStandardResourceCommands(
     );
   }
 
+  if (spec.name === "agent") {
+    createCommand.addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  mc agent create --set openclaw_key=codex --set name=Codex --set avatar=https://cdn.example.com/codex.png\n" +
+        "  mc agent create --json '{\"openclaw_key\":\"codex\",\"name\":\"Codex\",\"avatar\":\"/avatars/codex.png\"}'",
+    );
+  }
+
   createCommand.action(async (opts: CreateOptions, command: Command) => {
     const ctx = getContext(command);
     const payloadBody = buildPayload({
@@ -378,6 +387,16 @@ function registerStandardResourceCommands(
       "\nExamples:\n" +
         "  mc project update --id <uuid> --set is_default=true\n" +
         "  mc project update --by key=MC --set is_default=false",
+    );
+  }
+
+  if (spec.name === "agent") {
+    updateCommand.addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  mc agent update --id <uuid> --set avatar=/avatars/codex-v2.png\n" +
+        "  mc agent update --by key=codex --set avatar=null\n" +
+        "  mc agent update --by key=codex --set avatar=",
     );
   }
 
