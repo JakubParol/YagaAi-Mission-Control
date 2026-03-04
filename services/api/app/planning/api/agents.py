@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 
-from app.planning.api.schemas import AgentCreate, AgentResponse, AgentUpdate
+from app.planning.api.schemas import AgentCreate, AgentResponse, AgentSyncResponse, AgentUpdate
 from app.planning.application.agent_service import AgentService
 from app.planning.dependencies import get_agent_service
 from app.planning.domain.models import AgentSource
@@ -29,6 +29,7 @@ async def create_agent(
 @router.get("")
 async def list_agents(
     service: AgentService = Depends(get_agent_service),
+    openclaw_key: str | None = Query(None),
     key: str | None = Query(None),
     is_active: bool | None = Query(None),
     source: str | None = Query(None),
@@ -37,12 +38,25 @@ async def list_agents(
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[AgentResponse]:
     items, total = await service.list_agents(
-        key=key, is_active=is_active, source=source, limit=limit, offset=offset, sort=sort
+        openclaw_key=openclaw_key or key,
+        is_active=is_active,
+        source=source,
+        limit=limit,
+        offset=offset,
+        sort=sort,
     )
     return ListEnvelope(
         data=[AgentResponse(**a.__dict__) for a in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
+
+
+@router.post("/sync")
+async def sync_agents(
+    service: AgentService = Depends(get_agent_service),
+) -> Envelope[AgentSyncResponse]:
+    summary = await service.sync_agents_from_openclaw()
+    return Envelope(data=AgentSyncResponse(**summary))
 
 
 @router.get("/{agent_id}")

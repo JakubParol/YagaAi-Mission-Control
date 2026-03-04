@@ -4,8 +4,10 @@ PREFIX = "/v1/planning/backlogs"
 MOVE_IN_URL = f"{PREFIX}/active-sprint/stories"
 
 
-def _add_story_to_backlog(client, backlog_id: str, story_id: str, position: int | None = None) -> None:
-    payload = {"story_id": story_id}
+def _add_story_to_backlog(
+    client, backlog_id: str, story_id: str, position: int | None = None
+) -> None:
+    payload: dict[str, str | int] = {"story_id": story_id}
     if position is not None:
         payload["position"] = position
     resp = client.post(f"{PREFIX}/{backlog_id}/stories", json=payload)

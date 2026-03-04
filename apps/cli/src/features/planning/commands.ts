@@ -586,6 +586,17 @@ function registerLabelCommands(resource: Command, getContext: ContextFactory): v
     });
 }
 
+function registerAgentCommands(resource: Command, getContext: ContextFactory): void {
+  resource
+    .command("sync")
+    .description("Sync agents from openclaw.json")
+    .action(async (_opts: unknown, command: Command) => {
+      const ctx = getContext(command);
+      const payload = await ctx.client.post("/v1/planning/agents/sync");
+      printPayload(payload, ctx.config.output);
+    });
+}
+
 function registerTaskCommands(resource: Command, getContext: ContextFactory): void {
   const taskSpec = PLANNING_RESOURCES.task;
 
@@ -669,6 +680,10 @@ export function registerPlanningCommands(program: Command, getContext: ContextFa
 
     if (name === "task") {
       registerTaskCommands(resource, getContext);
+    }
+
+    if (name === "agent") {
+      registerAgentCommands(resource, getContext);
     }
 
     if (name === "label") {

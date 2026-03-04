@@ -27,7 +27,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | `story` | `list`, `get`, `create`, `update`, `delete` |
 | `task` | `list`, `get`, `create`, `update`, `delete`, `assign`, `unassign`, `assignments` |
 | `backlog` | `list`, `get`, `create`, `update`, `delete`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder`, `active-sprint` |
-| `agent` | `list`, `get`, `create`, `update`, `delete` |
+| `agent` | `list`, `get`, `create`, `update`, `delete`, `sync` |
 | `label` | `list`, `get`, `create`, `update`, `delete`, `attach-story`, `detach-story`, `attach-task`, `detach-task` |
 
 ## Observability Commands
@@ -67,6 +67,7 @@ mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"
 mc task assignments --id <uuid>
 mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
 mc backlog active-sprint --project-key MC
+mc agent sync
 mc label attach-task --task-id <uuid> --label-id <uuid>
 mc obs costs --days 7
 mc obs requests list --model claude-sonnet-4-20250514 --limit 50

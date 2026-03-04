@@ -1,4 +1,5 @@
 """Integration tests for GET /v1/planning/backlogs/{backlog_id}/stories."""
+
 import sqlite3
 
 PREFIX = "/v1/planning/backlogs"

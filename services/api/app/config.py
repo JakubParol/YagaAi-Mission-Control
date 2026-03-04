@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     db_path: str = ""
+    openclaw_config_path: str = str(Path.home() / ".openclaw" / "openclaw.json")
     langfuse_host: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
@@ -28,6 +29,10 @@ class Settings(BaseSettings):
     def resolve_shared_env_vars(self) -> "Settings":
         if not self.db_path:
             self.db_path = os.environ.get("MC_DB_PATH", "")
+        if not self.openclaw_config_path:
+            self.openclaw_config_path = os.environ.get(
+                "OPENCLAW_CONFIG_PATH", str(Path.home() / ".openclaw" / "openclaw.json")
+            )
         if not self.langfuse_host:
             self.langfuse_host = os.environ.get("LANGFUSE_HOST", "")
         if not self.langfuse_public_key:
