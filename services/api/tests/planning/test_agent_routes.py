@@ -5,6 +5,8 @@ Covers: POST /v1/planning/agents, GET list, GET single,
 PATCH update, DELETE, plus validation and filtering.
 """
 
+import json
+
 PREFIX = "/v1/planning/agents"
 
 
@@ -208,3 +210,131 @@ def test_list_agents_filter_by_key_no_match(client):
     body = resp.json()
     assert body["meta"]["total"] == 0
     assert body["data"] == []
+
+
+def test_list_agents_filter_by_openclaw_key_alias(client):
+    resp = client.get(f"{PREFIX}?openclaw_key=agent-1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 1
+    assert body["data"][0]["openclaw_key"] == "agent-1"
+
+
+def _write_openclaw_config(tmp_path, agents):
+    path = tmp_path / "openclaw.json"
+    payload = {"agents": {"list": agents}}
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+# ── Sync ───────────────────────────────────────────────────────────────────
+
+
+def test_sync_agents_upsert_and_deactivate(client, tmp_path, monkeypatch):
+    from app.config import settings
+
+    path = _write_openclaw_config(
+        tmp_path,
+        [
+            {
+                "id": "main",
+                "name": "james",
+                "role": "lead",
+                "worker_type": "worker",
+                "active": True,
+            },
+            {
+                "id": "naomi",
+                "name": "naomi",
+                "role": "reviewer",
+                "worker_type": "worker",
+                "active": True,
+            },
+        ],
+    )
+    monkeypatch.setattr(settings, "openclaw_config_path", str(path))
+
+    # Existing OpenClaw-sourced entry should be updated in place.
+    existing = client.post(
+        PREFIX,
+        json={
+            "openclaw_key": "james",
+            "name": "James Old",
+            "role": "old",
+            "worker_type": "legacy",
+            "source": "openclaw_json",
+            "metadata_json": '{"old":true}',
+        },
+    )
+    assert existing.status_code == 201
+    james_id = existing.json()["data"]["id"]
+
+    # Existing OpenClaw-sourced entry absent in config should be deactivated.
+    stale = client.post(
+        PREFIX,
+        json={
+            "openclaw_key": "legacy-openclaw",
+            "name": "Legacy",
+            "source": "openclaw_json",
+        },
+    )
+    assert stale.status_code == 201
+    stale_id = stale.json()["data"]["id"]
+
+    resp = client.post(f"{PREFIX}/sync")
+    assert resp.status_code == 200
+    summary = resp.json()["data"]
+    assert summary == {
+        "created": 1,
+        "updated": 1,
+        "deactivated": 1,
+        "unchanged": 0,
+        "errors": 0,
+    }
+
+    james = client.get(f"{PREFIX}/{james_id}").json()["data"]
+    assert james["name"] == "james"
+    assert james["role"] == "lead"
+    assert james["worker_type"] == "worker"
+    assert james["source"] == "openclaw_json"
+    assert james["is_active"] is True
+    assert james["last_synced_at"] is not None
+
+    stale_agent = client.get(f"{PREFIX}/{stale_id}").json()["data"]
+    assert stale_agent["is_active"] is False
+    assert stale_agent["source"] == "openclaw_json"
+
+    # Seeded manual record stays untouched by deactivation pass.
+    manual = client.get(f"{PREFIX}/a1").json()["data"]
+    assert manual["source"] == "manual"
+    assert manual["is_active"] is True
+
+    naomi = client.get(PREFIX, params={"key": "naomi"}).json()["data"][0]
+    assert naomi["name"] == "naomi"
+    assert naomi["source"] == "openclaw_json"
+
+
+def test_sync_agents_is_idempotent(client, tmp_path, monkeypatch):
+    from app.config import settings
+
+    path = _write_openclaw_config(
+        tmp_path,
+        [
+            {"name": "james", "id": "main"},
+            {"name": "naomi", "id": "naomi"},
+        ],
+    )
+    monkeypatch.setattr(settings, "openclaw_config_path", str(path))
+
+    first = client.post(f"{PREFIX}/sync")
+    assert first.status_code == 200
+    assert first.json()["data"]["created"] == 2
+
+    second = client.post(f"{PREFIX}/sync")
+    assert second.status_code == 200
+    summary = second.json()["data"]
+    assert summary["created"] == 0
+    assert summary["updated"] == 0
+    assert summary["deactivated"] == 0
+    assert summary["errors"] == 0
+    assert summary["unchanged"] == 2

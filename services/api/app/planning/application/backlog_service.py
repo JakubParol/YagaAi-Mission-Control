@@ -213,7 +213,9 @@ class BacklogService:
             raise NotFoundError(f"No active sprint found for project {project_id}")
         return backlog, stories
 
-    async def start_sprint(self, backlog_id: str, *, actor: str | None = None) -> tuple[Backlog, dict[str, Any]]:
+    async def start_sprint(
+        self, backlog_id: str, *, actor: str | None = None
+    ) -> tuple[Backlog, dict[str, Any]]:
         backlog = await self.get_backlog(backlog_id)
         if backlog.kind != BacklogKind.SPRINT:
             raise BusinessRuleError(f"Backlog {backlog_id} is not a sprint")
@@ -254,7 +256,9 @@ class BacklogService:
             raise BusinessRuleError(f"Sprint {backlog_id} must be ACTIVE to complete")
 
         sprint_stories = await self._repo.list_backlog_stories(backlog_id)
-        unfinished_story_ids = [story["id"] for story in sprint_stories if story["status"] != "DONE"]
+        unfinished_story_ids = [
+            story["id"] for story in sprint_stories if story["status"] != "DONE"
+        ]
         if unfinished_story_ids:
             preview = ", ".join(unfinished_story_ids[:5])
             raise BusinessRuleError(

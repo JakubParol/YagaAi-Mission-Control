@@ -92,7 +92,7 @@ class AgentRepository(ABC):
     async def list_all(
         self,
         *,
-        key: str | None = None,
+        openclaw_key: str | None = None,
         is_active: bool | None = None,
         source: str | None = None,
         limit: int = 20,
@@ -104,6 +104,12 @@ class AgentRepository(ABC):
     async def get_by_id(self, agent_id: str) -> Agent | None: ...
 
     @abstractmethod
+    async def get_by_openclaw_key(self, openclaw_key: str) -> Agent | None: ...
+
+    @abstractmethod
+    async def list_by_source(self, source: str) -> list[Agent]: ...
+
+    @abstractmethod
     async def create(self, agent: Agent) -> Agent: ...
 
     @abstractmethod
@@ -111,6 +117,11 @@ class AgentRepository(ABC):
 
     @abstractmethod
     async def delete(self, agent_id: str) -> bool: ...
+
+
+class OpenClawAgentSourcePort(ABC):
+    @abstractmethod
+    async def list_agents(self) -> list[dict[str, Any]]: ...
 
 
 class LabelRepository(ABC):

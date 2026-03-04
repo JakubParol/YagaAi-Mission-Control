@@ -620,7 +620,43 @@ Error behavior:
 
 ---
 
-### 4.6) Assignments
+### 4.6) Agents
+
+**Base path:** `/v1/planning/agents`
+
+#### `GET /v1/planning/agents` — List agents
+
+Query: `key`, `openclaw_key`, `is_active`, `source`, `sort`, `limit`, `offset`.
+
+`openclaw_key` is an alias of `key` for compatibility with CLI filtering.
+
+#### `POST /v1/planning/agents/sync` — Sync agents from OpenClaw config
+
+Reads OpenClaw agent definitions from server-side `openclaw.json` and applies deterministic upsert/deactivation logic.
+
+Response `200`:
+
+```jsonc
+{
+  "data": {
+    "created": 1,
+    "updated": 2,
+    "deactivated": 1,
+    "unchanged": 4,
+    "errors": 0
+  }
+}
+```
+
+Behavior:
+- Upserts by `openclaw_key` with `source=openclaw_json`.
+- Updates mutable fields (`name`, `role`, `worker_type`, `is_active`, `metadata_json`) and `last_synced_at`.
+- Deactivates missing `openclaw_json` agents (`is_active=false`); manual agents are untouched.
+- Idempotent: re-running with unchanged config does not create/update/deactivate records (timestamps may still refresh per sync policy).
+
+---
+
+### 4.7) Assignments
 
 **Base path:** `/v1/planning/tasks/{task_id}/assignments`
 
@@ -645,7 +681,7 @@ Sets `unassigned_at` on active assignment. Returns `204`. Returns `404` if no ac
 
 ---
 
-### 4.7) Labels
+### 4.8) Labels
 
 **Base path:** `/v1/planning/labels`
 

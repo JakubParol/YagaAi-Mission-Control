@@ -10,6 +10,7 @@ Covers: GET /v1/planning/backlogs/active-sprint?project_id=...
 Note: Seed data (conftest) includes b2 = SPRINT/ACTIVE for project p1.
 Tests that need a clean slate for sprints use project p2 (no seeded sprint).
 """
+
 import sqlite3
 
 PREFIX = "/v1/planning/backlogs"

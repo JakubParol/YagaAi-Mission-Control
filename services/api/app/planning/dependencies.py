@@ -1,6 +1,7 @@
 import aiosqlite
 from fastapi import Depends, Query
 
+from app.config import settings
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
 from app.planning.application.epic_service import EpicService
@@ -8,6 +9,7 @@ from app.planning.application.label_service import LabelService
 from app.planning.application.project_service import ProjectService
 from app.planning.application.story_service import StoryService
 from app.planning.application.task_service import TaskService
+from app.planning.infrastructure.openclaw_source import FileOpenClawAgentSource
 from app.planning.infrastructure.sqlite_repository import (
     SqliteAgentRepository,
     SqliteBacklogRepository,
@@ -33,7 +35,10 @@ async def get_project_service(
 async def get_agent_service(
     db: aiosqlite.Connection = Depends(get_db),
 ) -> AgentService:
-    return AgentService(SqliteAgentRepository(db))
+    return AgentService(
+        repo=SqliteAgentRepository(db),
+        openclaw_source=FileOpenClawAgentSource(settings.openclaw_config_path),
+    )
 
 
 async def get_label_service(

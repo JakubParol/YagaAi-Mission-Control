@@ -116,6 +116,14 @@ class AgentResponse(BaseModel):
     updated_at: str
 
 
+class AgentSyncResponse(BaseModel):
+    created: int
+    updated: int
+    deactivated: int
+    unchanged: int
+    errors: int
+
+
 # ---------------------------------------------------------------------------
 # Labels
 # ---------------------------------------------------------------------------

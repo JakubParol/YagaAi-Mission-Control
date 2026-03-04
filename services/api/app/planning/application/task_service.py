@@ -142,7 +142,9 @@ class TaskService:
                 data["started_at"] = now
 
         if "story_id" in data and data["story_id"] is not None:
-            story_exists, story_project_id = await self._task_repo.get_story_project_id(data["story_id"])
+            story_exists, story_project_id = await self._task_repo.get_story_project_id(
+                data["story_id"]
+            )
             if not story_exists:
                 raise ValidationError(f"Story {data['story_id']} does not exist")
             if existing.project_id != story_project_id:

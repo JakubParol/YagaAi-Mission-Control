@@ -101,7 +101,7 @@ Implementation:
 | Idempotency key enforcement | Header reserved, not enforced | v2 |
 | Optimistic locking (ETag/version) | SQLite serialization sufficient for v1 | v2 |
 | Comments & attachments endpoints | Lower priority, entities exist in DB | v1.1 |
-| Agents CRUD | Agents are synced from openclaw.json, read-only in v1 | v1.1 |
+| Agents sync | `POST /v1/planning/agents/sync` upserts/deactivates by OpenClaw config; manual agents remain untouched | v1.1 |
 | Prometheus metrics | Structured logs sufficient for v1 | v2 |
 
 ---
