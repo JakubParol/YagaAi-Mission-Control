@@ -3,11 +3,16 @@ import { Calendar, Target, Hash, Loader2, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  ThemedSelect,
+  type ThemedSelectOption,
+} from "@/components/ui/themed-select";
 import {
   isQuickCreateCancelKey,
   isQuickCreateSubmitKey,
@@ -55,6 +60,8 @@ const QUICK_CREATE_TYPE_OPTIONS: ReadonlyArray<{ value: QuickCreateWorkType; lab
   { value: "TASK", label: "Task" },
   { value: "BUG", label: "Bug" },
 ];
+
+const UNASSIGNED_OPTION = "__UNASSIGNED__";
 
 // ─── Sprint Header ──────────────────────────────────────────────────
 
@@ -154,6 +161,20 @@ function TodoQuickCreate({
   assigneeOptions: readonly QuickCreateAssigneeOption[];
   onTodoQuickCreate: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
 }) {
+  const typeOptions = useMemo<ThemedSelectOption[]>(
+    () => QUICK_CREATE_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    [],
+  );
+  const assigneePickerOptions = useMemo<ThemedSelectOption[]>(
+    () => [
+      { value: UNASSIGNED_OPTION, label: "Unassigned" },
+      ...assigneeOptions.map((option) => ({
+        value: option.id,
+        label: option.role ? `${option.name} · ${option.role}` : option.name,
+      })),
+    ],
+    [assigneeOptions],
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [workType, setWorkType] = useState<QuickCreateWorkType>("USER_STORY");
@@ -233,13 +254,15 @@ function TodoQuickCreate({
   if (!isOpen) {
     return (
       <div className="px-2 pt-2">
-        <button
+        <Button
           type="button"
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-ring"
+          variant="ghost"
+          size="xs"
+          className="text-muted-foreground"
           onClick={openForm}
         >
           + Create
-        </button>
+        </Button>
       </div>
     );
   }
@@ -264,99 +287,77 @@ function TodoQuickCreate({
           aria-label="Subject"
         />
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <select
-            value={workType}
-            disabled={isSubmitting}
-            onChange={(event) => setWorkType(event.target.value as QuickCreateWorkType)}
-            className="h-7 rounded-md border border-border/60 bg-background px-2 text-[11px] text-foreground focus-ring"
-            aria-label="Work type"
-          >
-            {QUICK_CREATE_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+        <div className="mt-2 grid gap-2">
+          <div className="flex items-center gap-2">
+            <ThemedSelect
+              value={workType}
+              options={typeOptions}
+              placeholder="Work type"
+              disabled={isSubmitting}
+              onValueChange={(value) => setWorkType(value as QuickCreateWorkType)}
+              triggerClassName="h-8 min-w-[140px] px-2 text-xs"
+              contentClassName="w-[220px]"
+            />
 
-          <Popover open={isAssigneePickerOpen} onOpenChange={setIsAssigneePickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                disabled={isSubmitting}
-                aria-label="Select assignee"
-                title="Select assignee"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-background text-muted-foreground transition-colors hover:text-foreground focus-ring disabled:opacity-60"
-              >
-                <UserRound className="size-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-56 p-2">
-              <div className="space-y-1">
-                <p className="px-1 text-[11px] font-medium text-muted-foreground">Assignee</p>
-                <button
+            <Popover open={isAssigneePickerOpen} onOpenChange={setIsAssigneePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
                   type="button"
-                  className={cn(
-                    "w-full rounded-sm px-2 py-1 text-left text-xs transition-colors",
-                    assigneeAgentId === null
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                  )}
-                  onClick={() => {
-                    setAssigneeAgentId(null);
+                  variant="outline"
+                  size="icon-xs"
+                  disabled={isSubmitting}
+                  aria-label="Select assignee"
+                  title="Select assignee"
+                >
+                  <UserRound className="size-3.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[280px] p-2">
+                <p className="mb-2 px-1 text-[11px] font-medium text-muted-foreground">
+                  Assignee
+                </p>
+                <ThemedSelect
+                  value={assigneeAgentId ?? UNASSIGNED_OPTION}
+                  options={assigneePickerOptions}
+                  placeholder="Select assignee"
+                  disabled={isSubmitting}
+                  onValueChange={(value) => {
+                    setAssigneeAgentId(value === UNASSIGNED_OPTION ? null : value);
                     setIsAssigneePickerOpen(false);
                   }}
-                >
-                  Unassigned
-                </button>
-                {assigneeOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={cn(
-                      "w-full rounded-sm px-2 py-1 text-left text-xs transition-colors",
-                      assigneeAgentId === option.id
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                    )}
-                    onClick={() => {
-                      setAssigneeAgentId(option.id);
-                      setIsAssigneePickerOpen(false);
-                    }}
-                  >
-                    <span className="block truncate">{option.name}</span>
-                    {option.role && (
-                      <span className="block truncate text-[10px] text-muted-foreground/80">
-                        {option.role}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
+                  triggerClassName="h-8 text-xs"
+                />
+              </PopoverContent>
+            </Popover>
 
-          <span className="max-w-[110px] truncate text-[11px] text-muted-foreground" title={selectedAssignee?.name ?? "Unassigned"}>
-            {selectedAssignee?.name ?? "Unassigned"}
-          </span>
+            <span
+              className="max-w-[150px] truncate text-xs text-muted-foreground"
+              title={selectedAssignee?.name ?? "Unassigned"}
+            >
+              {selectedAssignee?.name ?? "Unassigned"}
+            </span>
+          </div>
 
-          <div className="ml-auto flex items-center gap-1">
-            <button
+          <div className="flex items-center justify-end gap-1">
+            <Button
               type="button"
+              variant="ghost"
+              size="xs"
               disabled={isSubmitting}
-              className="h-7 rounded-md px-2 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-ring disabled:opacity-60"
               onClick={handleCancel}
+              className="text-muted-foreground"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              size="xs"
               disabled={isSubmitting}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-border/60 bg-background px-2 text-[11px] font-medium text-foreground transition-colors hover:bg-muted/50 focus-ring disabled:cursor-not-allowed disabled:opacity-70"
+              className="min-w-[72px]"
             >
               {isSubmitting && <Loader2 className="size-3 animate-spin" />}
               Create
-            </button>
+            </Button>
           </div>
         </div>
 
