@@ -6,6 +6,8 @@ export type QuickCreateWorkType = "USER_STORY" | "TASK" | "BUG";
 export interface QuickCreateAssigneeOption {
   id: string;
   name: string;
+  last_name: string | null;
+  initials: string | null;
   role: string | null;
   avatar: string | null;
   openclaw_key: string;

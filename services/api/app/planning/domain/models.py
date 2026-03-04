@@ -62,6 +62,8 @@ class Agent:
     id: str
     openclaw_key: str
     name: str
+    last_name: str | None
+    initials: str | None
     role: str | None
     worker_type: str | None
     avatar: str | None

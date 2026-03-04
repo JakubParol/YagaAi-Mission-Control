@@ -154,6 +154,8 @@ export interface Agent {
   id: string;
   openclaw_key: string;
   name: string;
+  last_name: string | null;
+  initials: string | null;
   role: string | null;
   worker_type: string | null;
   avatar: string | null;

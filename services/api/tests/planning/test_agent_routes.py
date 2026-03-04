@@ -24,6 +24,8 @@ def test_create_agent(client):
     assert data["name"] == "New Agent"
     assert data["is_active"] is True
     assert data["source"] == "manual"
+    assert data["last_name"] is None
+    assert data["initials"] is None
     assert data["role"] is None
     assert data["worker_type"] is None
     assert data["avatar"] is None
@@ -35,6 +37,8 @@ def test_create_agent_with_all_fields(client):
         json={
             "openclaw_key": "full-agent",
             "name": "Full Agent",
+            "last_name": "Runner",
+            "initials": "fr",
             "role": "researcher",
             "worker_type": "llm",
             "avatar": "https://cdn.example.com/full-agent.png",
@@ -45,6 +49,8 @@ def test_create_agent_with_all_fields(client):
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
+    assert data["last_name"] == "Runner"
+    assert data["initials"] == "FR"
     assert data["role"] == "researcher"
     assert data["worker_type"] == "llm"
     assert data["avatar"] == "https://cdn.example.com/full-agent.png"
@@ -80,6 +86,15 @@ def test_create_agent_invalid_avatar(client):
     assert any(err["loc"][-1] == "avatar" for err in resp.json()["detail"])
 
 
+def test_create_agent_invalid_initials(client):
+    resp = client.post(
+        PREFIX,
+        json={"openclaw_key": "x", "name": "X", "initials": "A1"},
+    )
+    assert resp.status_code == 422
+    assert any(err["loc"][-1] == "initials" for err in resp.json()["detail"])
+
+
 # ── List ─────────────────────────────────────────────────────────────────
 
 
@@ -90,6 +105,8 @@ def test_list_agents_seeded(client):
     assert body["meta"]["total"] == 2
     assert len(body["data"]) == 2
     assert "avatar" in body["data"][0]
+    assert "last_name" in body["data"][0]
+    assert "initials" in body["data"][0]
 
 
 def test_list_agents_filter_active(client):
@@ -143,7 +160,9 @@ def test_get_agent(client):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["id"] == "a1"
-    assert data["name"] == "Agent Alpha"
+    assert data["name"] == "Agent"
+    assert data["last_name"] == "Alpha"
+    assert data["initials"] == "AA"
     assert data["role"] == "developer"
     assert data["avatar"] == "https://cdn.example.com/agent-1.png"
 
@@ -167,6 +186,30 @@ def test_update_agent_role(client):
     resp = client.patch(f"{PREFIX}/a1", json={"role": "tester"})
     assert resp.status_code == 200
     assert resp.json()["data"]["role"] == "tester"
+
+
+def test_update_agent_last_name(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"last_name": "Prime"})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["last_name"] == "Prime"
+
+
+def test_update_agent_clear_last_name_with_empty_string(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"last_name": ""})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["last_name"] is None
+
+
+def test_update_agent_initials(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"initials": "ap"})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["initials"] == "AP"
+
+
+def test_update_agent_clear_initials_with_empty_string(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"initials": ""})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["initials"] is None
 
 
 def test_update_agent_avatar(client):
@@ -213,6 +256,12 @@ def test_update_agent_invalid_avatar(client):
     resp = client.patch(f"{PREFIX}/a1", json={"avatar": "?? bad avatar ??"})
     assert resp.status_code == 422
     assert any(err["loc"][-1] == "avatar" for err in resp.json()["detail"])
+
+
+def test_update_agent_invalid_initials(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"initials": "AP-1"})
+    assert resp.status_code == 422
+    assert any(err["loc"][-1] == "initials" for err in resp.json()["detail"])
 
 
 # ── Delete ───────────────────────────────────────────────────────────────
@@ -277,6 +326,8 @@ def test_sync_agents_upsert_and_deactivate(client, tmp_path, monkeypatch):
             {
                 "id": "main",
                 "name": "james",
+                "lastName": "bond",
+                "initials": "jb",
                 "role": "lead",
                 "worker_type": "worker",
                 "active": True,
@@ -332,6 +383,8 @@ def test_sync_agents_upsert_and_deactivate(client, tmp_path, monkeypatch):
 
     james = client.get(f"{PREFIX}/{james_id}").json()["data"]
     assert james["name"] == "james"
+    assert james["last_name"] == "bond"
+    assert james["initials"] == "JB"
     assert james["role"] == "lead"
     assert james["worker_type"] == "worker"
     assert james["avatar"] is None

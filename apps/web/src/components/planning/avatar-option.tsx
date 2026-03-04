@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 
 interface AvatarOptionProps {
   name: string;
+  lastName?: string | null;
+  initials?: string | null;
   avatar: string | null;
   role?: string | null;
   className?: string;
@@ -11,6 +13,8 @@ interface AvatarOptionProps {
 
 export function AvatarOption({
   name,
+  lastName = null,
+  initials = null,
   avatar,
   role = null,
   className,
@@ -21,6 +25,8 @@ export function AvatarOption({
       <Avatar
         src={avatar}
         name={name}
+        lastName={lastName}
+        initials={initials}
         alt={`${name} avatar`}
         decorative
         className={compact ? "size-4 text-[9px]" : undefined}

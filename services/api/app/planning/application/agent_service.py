@@ -1,10 +1,14 @@
 import json
+import re
 from typing import Any
 
 from app.planning.application.ports import AgentRepository, OpenClawAgentSourcePort
 from app.planning.domain.models import Agent, AgentSource
 from app.shared.api.errors import NotFoundError, ValidationError
 from app.shared.utils import new_uuid, utc_now
+
+_INITIALS_RE = re.compile(r"^[A-Z]{1,10}$")
+_NAME_PART_MAX_LEN = 200
 
 
 class AgentService:
@@ -46,6 +50,8 @@ class AgentService:
         *,
         openclaw_key: str,
         name: str,
+        last_name: str | None = None,
+        initials: str | None = None,
         role: str | None = None,
         worker_type: str | None = None,
         avatar: str | None = None,
@@ -58,6 +64,8 @@ class AgentService:
             id=new_uuid(),
             openclaw_key=openclaw_key,
             name=name,
+            last_name=last_name,
+            initials=initials,
             role=role,
             worker_type=worker_type,
             avatar=avatar,
@@ -129,6 +137,8 @@ class AgentService:
                     id=new_uuid(),
                     openclaw_key=openclaw_key,
                     name=normalized["name"],
+                    last_name=normalized["last_name"],
+                    initials=normalized["initials"],
                     role=normalized["role"],
                     worker_type=normalized["worker_type"],
                     avatar=normalized["avatar"],
@@ -145,6 +155,8 @@ class AgentService:
 
             changed = (
                 existing.name != normalized["name"]
+                or existing.last_name != normalized["last_name"]
+                or existing.initials != normalized["initials"]
                 or existing.role != normalized["role"]
                 or existing.worker_type != normalized["worker_type"]
                 or existing.avatar != normalized["avatar"]
@@ -157,6 +169,8 @@ class AgentService:
                 existing.id,
                 {
                     "name": normalized["name"],
+                    "last_name": normalized["last_name"],
+                    "initials": normalized["initials"],
                     "role": normalized["role"],
                     "worker_type": normalized["worker_type"],
                     "avatar": normalized["avatar"],
@@ -198,6 +212,14 @@ class AgentService:
             raise ValueError("Agent entry is missing key/name/id")
 
         name = AgentService._first_non_empty_string(raw.get("name"), openclaw_key) or openclaw_key
+        last_name = AgentService._optional_last_name(
+            raw.get("last_name"),
+            raw.get("lastName"),
+            raw.get("family_name"),
+            raw.get("familyName"),
+            raw.get("surname"),
+        )
+        initials = AgentService._optional_initials(raw.get("initials"))
         role = AgentService._optional_string(raw.get("role"))
         worker_type = AgentService._first_non_empty_string(
             raw.get("worker_type"),
@@ -219,6 +241,8 @@ class AgentService:
         return {
             "openclaw_key": openclaw_key,
             "name": name,
+            "last_name": last_name,
+            "initials": initials,
             "role": role,
             "worker_type": worker_type,
             "avatar": avatar,
@@ -242,6 +266,28 @@ class AgentService:
             stripped = value.strip()
             return stripped or None
         return None
+
+    @staticmethod
+    def _optional_last_name(*values: Any) -> str | None:
+        value = AgentService._first_non_empty_string(*values)
+        if value is None:
+            return None
+        if len(value) > _NAME_PART_MAX_LEN:
+            raise ValueError("last_name must be at most 200 characters")
+        return value
+
+    @staticmethod
+    def _optional_initials(value: Any) -> str | None:
+        text = AgentService._optional_string(value)
+        if text is None:
+            return None
+
+        initials = text.upper()
+        if len(initials) > 10:
+            raise ValueError("initials must be at most 10 characters")
+        if not _INITIALS_RE.fullmatch(initials):
+            raise ValueError("initials must contain only letters A-Z")
+        return initials
 
     @staticmethod
     def _to_bool(value: Any) -> bool | None:

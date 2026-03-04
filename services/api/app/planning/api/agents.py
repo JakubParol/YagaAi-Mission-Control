@@ -17,6 +17,8 @@ async def create_agent(
     agent = await service.create_agent(
         openclaw_key=body.openclaw_key,
         name=body.name,
+        last_name=body.last_name,
+        initials=body.initials,
         role=body.role,
         worker_type=body.worker_type,
         avatar=body.avatar,

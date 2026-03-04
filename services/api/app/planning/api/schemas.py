@@ -5,6 +5,42 @@ from pydantic import BaseModel, Field, field_validator
 
 _AVATAR_PATH_RE = re.compile(r"^(?:\.{1,2}/|/)?[A-Za-z0-9._~%-]+(?:/[A-Za-z0-9._~%-]+)*$")
 _AVATAR_MAX_LEN = 1024
+_NAME_MAX_LEN = 200
+_INITIALS_MAX_LEN = 10
+_INITIALS_RE = re.compile(r"^[A-Z]{1,10}$")
+
+
+def _normalize_optional_name_part(
+    value: str | None,
+    *,
+    field_name: str,
+    max_length: int = _NAME_MAX_LEN,
+) -> str | None:
+    if value is None:
+        return None
+
+    text = value.strip()
+    if text == "":
+        return None
+
+    if len(text) > max_length:
+        raise ValueError(f"{field_name} must be at most {max_length} characters")
+    return text
+
+
+def _normalize_initials(value: str | None) -> str | None:
+    normalized = _normalize_optional_name_part(
+        value,
+        field_name="initials",
+        max_length=_INITIALS_MAX_LEN,
+    )
+    if normalized is None:
+        return None
+
+    initials = normalized.upper()
+    if not _INITIALS_RE.fullmatch(initials):
+        raise ValueError("initials must contain only letters A-Z")
+    return initials
 
 
 def _normalize_avatar(value: str | None) -> str | None:
@@ -115,6 +151,8 @@ class EpicDetailResponse(EpicResponse):
 class AgentCreate(BaseModel):
     openclaw_key: str = Field(..., min_length=1, max_length=100)
     name: str = Field(..., min_length=1, max_length=200)
+    last_name: str | None = None
+    initials: str | None = None
     role: str | None = None
     worker_type: str | None = None
     avatar: str | None = None
@@ -127,9 +165,21 @@ class AgentCreate(BaseModel):
     def validate_avatar(cls, value: str | None) -> str | None:
         return _normalize_avatar(value)
 
+    @field_validator("last_name")
+    @classmethod
+    def validate_last_name(cls, value: str | None) -> str | None:
+        return _normalize_optional_name_part(value, field_name="last_name")
+
+    @field_validator("initials")
+    @classmethod
+    def validate_initials(cls, value: str | None) -> str | None:
+        return _normalize_initials(value)
+
 
 class AgentUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
+    last_name: str | None = None
+    initials: str | None = None
     role: str | None = None
     worker_type: str | None = None
     avatar: str | None = None
@@ -142,11 +192,23 @@ class AgentUpdate(BaseModel):
     def validate_avatar(cls, value: str | None) -> str | None:
         return _normalize_avatar(value)
 
+    @field_validator("last_name")
+    @classmethod
+    def validate_last_name(cls, value: str | None) -> str | None:
+        return _normalize_optional_name_part(value, field_name="last_name")
+
+    @field_validator("initials")
+    @classmethod
+    def validate_initials(cls, value: str | None) -> str | None:
+        return _normalize_initials(value)
+
 
 class AgentResponse(BaseModel):
     id: str
     openclaw_key: str
     name: str
+    last_name: str | None
+    initials: str | None
     role: str | None
     worker_type: str | None
     avatar: str | None

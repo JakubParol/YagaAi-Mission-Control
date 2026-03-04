@@ -5,22 +5,55 @@ import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
-export function buildAvatarFallbackText(name: string | null | undefined): string {
-  const normalized = name?.trim();
-  if (!normalized) return "?";
+function firstDisplayLetter(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
   const first = normalized[0];
-  return first ? first.toUpperCase() : "?";
+  return first ? first.toUpperCase() : null;
+}
+
+export function buildAvatarFallbackText(
+  name: string | null | undefined,
+  lastName: string | null | undefined = null,
+  initials: string | null | undefined = null,
+): string {
+  const normalizedInitials = initials?.trim();
+  if (normalizedInitials) {
+    return normalizedInitials.toUpperCase();
+  }
+
+  const firstNameLetter = firstDisplayLetter(name);
+  const lastNameLetter = firstDisplayLetter(lastName);
+  if (firstNameLetter && lastNameLetter) {
+    return `${firstNameLetter}${lastNameLetter}`;
+  }
+
+  if (firstNameLetter) {
+    return firstNameLetter;
+  }
+
+  return "?";
 }
 
 interface AvatarProps {
   src?: string | null;
   name?: string | null;
+  lastName?: string | null;
+  initials?: string | null;
   alt?: string;
   decorative?: boolean;
   className?: string;
 }
 
-export function Avatar({ src, name, alt, decorative = false, className }: AvatarProps) {
+export function Avatar({
+  src,
+  name,
+  lastName = null,
+  initials = null,
+  alt,
+  decorative = false,
+  className,
+}: AvatarProps) {
   const normalizedSrc = src?.trim() ? src.trim() : null;
   const [failed, setFailed] = React.useState(false);
 
@@ -28,8 +61,9 @@ export function Avatar({ src, name, alt, decorative = false, className }: Avatar
     setFailed(false);
   }, [normalizedSrc]);
 
-  const fallbackText = buildAvatarFallbackText(name);
-  const fallbackLabel = alt?.trim() || name?.trim() || "Avatar";
+  const fallbackText = buildAvatarFallbackText(name, lastName, initials);
+  const displayName = [name?.trim(), lastName?.trim()].filter(Boolean).join(" ");
+  const fallbackLabel = alt?.trim() || displayName || "Avatar";
   const showImage = Boolean(normalizedSrc && !failed);
 
   return (

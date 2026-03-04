@@ -68,8 +68,10 @@ mc task assignments --id <uuid>
 mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
 mc backlog active-sprint --project-key MC
 mc agent list --output json
-mc agent create --set openclaw_key=codex --set name=Codex --set avatar=https://cdn.example.com/codex.png
+mc agent create --set openclaw_key=codex --set name=Codex --set last_name=Coder --set initials=CC --set avatar=https://cdn.example.com/codex.png
 mc agent update --by key=codex --set avatar=null
+mc agent update --by key=codex --set last_name=
+mc agent update --by key=codex --set initials=
 mc agent update --by key=codex --set avatar=
 mc agent sync
 mc label attach-task --task-id <uuid> --label-id <uuid>
@@ -77,6 +79,8 @@ mc obs costs --days 7
 mc obs requests list --model claude-sonnet-4-20250514 --limit 50
 mc obs import run
 ```
+
+Agent fallback precedence for consumers is: `avatar` -> `initials` -> derived initials from `name` + `last_name` -> first letter of `name`.
 
 ## Output Modes
 

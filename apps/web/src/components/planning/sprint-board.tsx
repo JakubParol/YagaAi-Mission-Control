@@ -66,6 +66,8 @@ const UNASSIGNED_OPTION = "__UNASSIGNED__";
 
 type AssigneePickerOption = ThemedSelectOption & {
   name: string;
+  lastName: string | null;
+  initials: string | null;
   role: string | null;
   avatar: string | null;
   isUnassigned?: boolean;
@@ -179,6 +181,8 @@ function TodoQuickCreate({
         value: UNASSIGNED_OPTION,
         label: "Unassigned",
         name: "Unassigned",
+        lastName: null,
+        initials: null,
         role: null,
         avatar: null,
         isUnassigned: true,
@@ -187,6 +191,8 @@ function TodoQuickCreate({
         value: option.id,
         label: option.role ? `${option.name} · ${option.role}` : option.name,
         name: option.name,
+        lastName: option.last_name,
+        initials: option.initials,
         role: option.role,
         avatar: option.avatar,
       })),
@@ -345,6 +351,8 @@ function TodoQuickCreate({
                     return (
                       <AvatarOption
                         name={assignee.name}
+                        lastName={assignee.lastName}
+                        initials={assignee.initials}
                         role={assignee.role}
                         avatar={assignee.avatar}
                       />
@@ -356,6 +364,8 @@ function TodoQuickCreate({
                     return (
                       <AvatarOption
                         name={assignee.name}
+                        lastName={assignee.lastName}
+                        initials={assignee.initials}
                         avatar={assignee.avatar}
                         compact
                       />
