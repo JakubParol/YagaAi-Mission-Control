@@ -64,6 +64,7 @@ class Agent:
     name: str
     role: str | None
     worker_type: str | None
+    avatar: str | None
     is_active: bool
     source: AgentSource
     metadata_json: str | None

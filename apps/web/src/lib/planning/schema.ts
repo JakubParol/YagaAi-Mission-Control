@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS agents (
   name           TEXT NOT NULL,
   role           TEXT,
   worker_type    TEXT,
+  avatar         TEXT,
   is_active      INTEGER NOT NULL DEFAULT 1,
   source         TEXT NOT NULL DEFAULT 'manual',
   metadata_json  TEXT,

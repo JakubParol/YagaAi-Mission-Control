@@ -48,6 +48,7 @@ class AgentService:
         name: str,
         role: str | None = None,
         worker_type: str | None = None,
+        avatar: str | None = None,
         is_active: bool = True,
         source: AgentSource = AgentSource.MANUAL,
         metadata_json: str | None = None,
@@ -59,6 +60,7 @@ class AgentService:
             name=name,
             role=role,
             worker_type=worker_type,
+            avatar=avatar,
             is_active=is_active,
             source=source,
             metadata_json=metadata_json,
@@ -129,6 +131,7 @@ class AgentService:
                     name=normalized["name"],
                     role=normalized["role"],
                     worker_type=normalized["worker_type"],
+                    avatar=normalized["avatar"],
                     is_active=normalized["is_active"],
                     source=AgentSource.OPENCLAW_JSON,
                     metadata_json=normalized["metadata_json"],
@@ -144,6 +147,7 @@ class AgentService:
                 existing.name != normalized["name"]
                 or existing.role != normalized["role"]
                 or existing.worker_type != normalized["worker_type"]
+                or existing.avatar != normalized["avatar"]
                 or existing.is_active != normalized["is_active"]
                 or existing.metadata_json != normalized["metadata_json"]
                 or existing.source != AgentSource.OPENCLAW_JSON
@@ -155,6 +159,7 @@ class AgentService:
                     "name": normalized["name"],
                     "role": normalized["role"],
                     "worker_type": normalized["worker_type"],
+                    "avatar": normalized["avatar"],
                     "is_active": normalized["is_active"],
                     "metadata_json": normalized["metadata_json"],
                     "source": AgentSource.OPENCLAW_JSON,
@@ -199,6 +204,7 @@ class AgentService:
             raw.get("workerType"),
             raw.get("type"),
         )
+        avatar = AgentService._optional_string(raw.get("avatar"))
         active = AgentService._to_bool(raw.get("is_active"))
         if active is None:
             active = AgentService._to_bool(raw.get("active"))
@@ -215,6 +221,7 @@ class AgentService:
             "name": name,
             "role": role,
             "worker_type": worker_type,
+            "avatar": avatar,
             "is_active": active,
             "metadata_json": metadata_json,
         }

@@ -232,6 +232,7 @@ Constraints:
 - `name` TEXT NOT NULL
 - `role` TEXT NULL
 - `worker_type` TEXT NULL
+- `avatar` TEXT NULL
 - `is_active` INTEGER NOT NULL
 - `source` TEXT NOT NULL (`openclaw_json`/`manual`)
 - `metadata_json` TEXT NULL

@@ -26,6 +26,7 @@ def test_create_agent(client):
     assert data["source"] == "manual"
     assert data["role"] is None
     assert data["worker_type"] is None
+    assert data["avatar"] is None
 
 
 def test_create_agent_with_all_fields(client):
@@ -36,6 +37,7 @@ def test_create_agent_with_all_fields(client):
             "name": "Full Agent",
             "role": "researcher",
             "worker_type": "llm",
+            "avatar": "https://cdn.example.com/full-agent.png",
             "is_active": False,
             "source": "openclaw_json",
             "metadata_json": '{"tier": "premium"}',
@@ -45,6 +47,7 @@ def test_create_agent_with_all_fields(client):
     data = resp.json()["data"]
     assert data["role"] == "researcher"
     assert data["worker_type"] == "llm"
+    assert data["avatar"] == "https://cdn.example.com/full-agent.png"
     assert data["is_active"] is False
     assert data["source"] == "openclaw_json"
     assert data["metadata_json"] == '{"tier": "premium"}'
@@ -68,6 +71,15 @@ def test_create_agent_invalid_source(client):
     assert resp.status_code == 422
 
 
+def test_create_agent_invalid_avatar(client):
+    resp = client.post(
+        PREFIX,
+        json={"openclaw_key": "x", "name": "X", "avatar": "not a valid avatar"},
+    )
+    assert resp.status_code == 422
+    assert any(err["loc"][-1] == "avatar" for err in resp.json()["detail"])
+
+
 # ── List ─────────────────────────────────────────────────────────────────
 
 
@@ -77,6 +89,7 @@ def test_list_agents_seeded(client):
     body = resp.json()
     assert body["meta"]["total"] == 2
     assert len(body["data"]) == 2
+    assert "avatar" in body["data"][0]
 
 
 def test_list_agents_filter_active(client):
@@ -132,6 +145,7 @@ def test_get_agent(client):
     assert data["id"] == "a1"
     assert data["name"] == "Agent Alpha"
     assert data["role"] == "developer"
+    assert data["avatar"] == "https://cdn.example.com/agent-1.png"
 
 
 def test_get_agent_not_found(client):
@@ -155,6 +169,24 @@ def test_update_agent_role(client):
     assert resp.json()["data"]["role"] == "tester"
 
 
+def test_update_agent_avatar(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"avatar": "/avatars/alpha.png"})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["avatar"] == "/avatars/alpha.png"
+
+
+def test_update_agent_clear_avatar(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"avatar": None})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["avatar"] is None
+
+
+def test_update_agent_clear_avatar_with_empty_string(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"avatar": ""})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["avatar"] is None
+
+
 def test_update_agent_deactivate(client):
     resp = client.patch(f"{PREFIX}/a1", json={"is_active": False})
     assert resp.status_code == 200
@@ -175,6 +207,12 @@ def test_update_agent_not_found(client):
 def test_update_agent_invalid_source(client):
     resp = client.patch(f"{PREFIX}/a1", json={"source": "invalid"})
     assert resp.status_code == 422
+
+
+def test_update_agent_invalid_avatar(client):
+    resp = client.patch(f"{PREFIX}/a1", json={"avatar": "?? bad avatar ??"})
+    assert resp.status_code == 422
+    assert any(err["loc"][-1] == "avatar" for err in resp.json()["detail"])
 
 
 # ── Delete ───────────────────────────────────────────────────────────────
@@ -296,6 +334,7 @@ def test_sync_agents_upsert_and_deactivate(client, tmp_path, monkeypatch):
     assert james["name"] == "james"
     assert james["role"] == "lead"
     assert james["worker_type"] == "worker"
+    assert james["avatar"] is None
     assert james["source"] == "openclaw_json"
     assert james["is_active"] is True
     assert james["last_synced_at"] is not None
