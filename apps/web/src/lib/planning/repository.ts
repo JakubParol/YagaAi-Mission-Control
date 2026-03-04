@@ -181,6 +181,7 @@ export interface CreateAgentInput {
   name: string;
   role?: string | null;
   worker_type?: string | null;
+  avatar?: string | null;
   is_active?: number;
   source?: AgentSource;
   metadata_json?: string | null;
@@ -191,6 +192,7 @@ export interface UpdateAgentInput {
   name?: string;
   role?: string | null;
   worker_type?: string | null;
+  avatar?: string | null;
   is_active?: number;
   source?: AgentSource;
   metadata_json?: string | null;
@@ -748,8 +750,8 @@ export class PlanningRepository {
 
     this.db
       .prepare(
-        `INSERT INTO agents (id, openclaw_key, name, role, worker_type, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO agents (id, openclaw_key, name, role, worker_type, avatar, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -757,6 +759,7 @@ export class PlanningRepository {
         input.name,
         input.role ?? null,
         input.worker_type ?? null,
+        input.avatar ?? null,
         input.is_active ?? 1,
         input.source ?? "manual",
         input.metadata_json ?? null,
@@ -797,6 +800,7 @@ export class PlanningRepository {
     if (input.name !== undefined) { fields.push("name = ?"); values.push(input.name); }
     if (input.role !== undefined) { fields.push("role = ?"); values.push(input.role); }
     if (input.worker_type !== undefined) { fields.push("worker_type = ?"); values.push(input.worker_type); }
+    if (input.avatar !== undefined) { fields.push("avatar = ?"); values.push(input.avatar); }
     if (input.is_active !== undefined) { fields.push("is_active = ?"); values.push(input.is_active); }
     if (input.source !== undefined) { fields.push("source = ?"); values.push(input.source); }
     if (input.metadata_json !== undefined) { fields.push("metadata_json = ?"); values.push(input.metadata_json); }

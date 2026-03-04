@@ -630,6 +630,16 @@ Query: `key`, `openclaw_key`, `is_active`, `source`, `sort`, `limit`, `offset`.
 
 `openclaw_key` is an alias of `key` for compatibility with CLI filtering.
 
+Agent response fields include:
+- `id`, `openclaw_key`, `name`, `role`, `worker_type`, `avatar`, `is_active`, `source`,
+  `metadata_json`, `last_synced_at`, `created_at`, `updated_at`.
+
+`avatar` is optional and accepts:
+- `http`/`https` URL, or
+- path-like value (for local/static assets), without spaces.
+
+Create/update payloads accept `avatar` (set string, clear with `null` or empty string).
+
 #### `POST /v1/planning/agents/sync` — Sync agents from OpenClaw config
 
 Reads OpenClaw agent definitions from server-side `openclaw.json` and applies deterministic upsert/deactivation logic.
@@ -650,7 +660,7 @@ Response `200`:
 
 Behavior:
 - Upserts by `openclaw_key` with `source=openclaw_json`.
-- Updates mutable fields (`name`, `role`, `worker_type`, `is_active`, `metadata_json`) and `last_synced_at`.
+- Updates mutable fields (`name`, `role`, `worker_type`, `avatar`, `is_active`, `metadata_json`) and `last_synced_at`.
 - Deactivates missing `openclaw_json` agents (`is_active=false`); manual agents are untouched.
 - Idempotent: re-running with unchanged config does not create/update/deactivate records (timestamps may still refresh per sync policy).
 

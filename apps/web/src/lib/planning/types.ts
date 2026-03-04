@@ -156,6 +156,7 @@ export interface Agent {
   name: string;
   role: string | null;
   worker_type: string | null;
+  avatar: string | null;
   is_active: number;
   source: AgentSource;
   metadata_json: string | null;

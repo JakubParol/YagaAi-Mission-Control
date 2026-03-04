@@ -19,6 +19,7 @@ async def create_agent(
         name=body.name,
         role=body.role,
         worker_type=body.worker_type,
+        avatar=body.avatar,
         is_active=body.is_active,
         source=AgentSource(body.source),
         metadata_json=body.metadata_json,

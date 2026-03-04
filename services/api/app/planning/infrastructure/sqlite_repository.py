@@ -146,12 +146,14 @@ def _row_to_story(row: aiosqlite.Row) -> Story:
 
 
 def _row_to_agent(row: aiosqlite.Row) -> Agent:
+    avatar = row["avatar"] if "avatar" in row.keys() else None
     return Agent(
         id=row["id"],
         openclaw_key=row["openclaw_key"],
         name=row["name"],
         role=row["role"],
         worker_type=row["worker_type"],
+        avatar=avatar,
         is_active=bool(row["is_active"]),
         source=AgentSource(row["source"]),
         metadata_json=row["metadata_json"],
@@ -764,14 +766,15 @@ class SqliteAgentRepository(AgentRepository):
     async def create(self, agent: Agent) -> Agent:
         await self._db.execute(
             """INSERT INTO agents (id, openclaw_key, name, role, worker_type,
-               is_active, source, metadata_json, last_synced_at, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               avatar, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 agent.id,
                 agent.openclaw_key,
                 agent.name,
                 agent.role,
                 agent.worker_type,
+                agent.avatar,
                 1 if agent.is_active else 0,
                 agent.source,
                 agent.metadata_json,
@@ -788,6 +791,7 @@ class SqliteAgentRepository(AgentRepository):
             "name",
             "role",
             "worker_type",
+            "avatar",
             "is_active",
             "source",
             "metadata_json",

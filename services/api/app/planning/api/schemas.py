@@ -1,4 +1,33 @@
-from pydantic import BaseModel, Field
+import re
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, Field, field_validator
+
+_AVATAR_PATH_RE = re.compile(r"^(?:\.{1,2}/|/)?[A-Za-z0-9._~%-]+(?:/[A-Za-z0-9._~%-]+)*$")
+_AVATAR_MAX_LEN = 1024
+
+
+def _normalize_avatar(value: str | None) -> str | None:
+    if value is None:
+        return None
+
+    avatar = value.strip()
+    if avatar == "":
+        return None
+
+    if len(avatar) > _AVATAR_MAX_LEN:
+        raise ValueError(f"avatar must be at most {_AVATAR_MAX_LEN} characters")
+
+    if "://" in avatar:
+        parsed = urlparse(avatar)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("avatar URL must use http/https and include a host")
+        return avatar
+
+    if not _AVATAR_PATH_RE.fullmatch(avatar):
+        raise ValueError("avatar must be an http/https URL or a path-like value without spaces")
+    return avatar
+
 
 # ---------------------------------------------------------------------------
 # Projects
@@ -88,18 +117,30 @@ class AgentCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     role: str | None = None
     worker_type: str | None = None
+    avatar: str | None = None
     is_active: bool = True
     source: str = Field("manual", pattern=r"^(openclaw_json|manual)$")
     metadata_json: str | None = None
+
+    @field_validator("avatar")
+    @classmethod
+    def validate_avatar(cls, value: str | None) -> str | None:
+        return _normalize_avatar(value)
 
 
 class AgentUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     role: str | None = None
     worker_type: str | None = None
+    avatar: str | None = None
     is_active: bool | None = None
     source: str | None = Field(None, pattern=r"^(openclaw_json|manual)$")
     metadata_json: str | None = None
+
+    @field_validator("avatar")
+    @classmethod
+    def validate_avatar(cls, value: str | None) -> str | None:
+        return _normalize_avatar(value)
 
 
 class AgentResponse(BaseModel):
@@ -108,6 +149,7 @@ class AgentResponse(BaseModel):
     name: str
     role: str | None
     worker_type: str | None
+    avatar: str | None
     is_active: bool
     source: str
     metadata_json: str | None
