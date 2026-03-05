@@ -1,6 +1,5 @@
 import type { ItemStatus } from "@/lib/planning/types";
 
-export const LIST_GROUP_OPTIONS = ["None", "Status", "Assignee", "Epic"] as const;
 export const COMING_SOON_LABEL = "Coming soon";
 
 export interface PlanningListLabel {
@@ -12,6 +11,7 @@ export interface PlanningListLabel {
 export interface PlanningStoryApiItem {
   id: string;
   epic_id: string | null;
+  current_assignee_agent_id: string | null;
   key: string | null;
   title: string;
   story_type: string;
@@ -35,6 +35,7 @@ export interface PlanningBacklogStoryApiItem {
 export interface PlanningTaskApiItem {
   id: string;
   story_id: string | null;
+  current_assignee_agent_id: string | null;
   key: string | null;
   title: string;
   objective: string | null;
@@ -57,9 +58,11 @@ export interface PlanningListRow {
   title: string;
   status: ItemStatus;
   priority: number | null;
+  epic_id: string | null;
   epic_key: string | null;
   epic_title: string | null;
   labels: PlanningListLabel[];
+  current_assignee_agent_id: string | null;
   updated_at: string;
   story_type: string | null;
   task_type: string | null;
@@ -90,9 +93,11 @@ function toStoryRows(
       title: story.title,
       status: story.status,
       priority: story.priority,
+      epic_id: story.epic_id,
       epic_key: backlogStory?.epic_key ?? epic?.key ?? null,
       epic_title: backlogStory?.epic_title ?? epic?.title ?? null,
       labels: backlogStory?.labels ?? [],
+      current_assignee_agent_id: story.current_assignee_agent_id,
       updated_at: story.updated_at,
       story_type: story.story_type,
       task_type: null,
@@ -111,9 +116,11 @@ function toStandaloneTaskRows(tasks: PlanningTaskApiItem[]): PlanningListRow[] {
       title: task.title,
       status: task.status,
       priority: task.priority,
+      epic_id: null,
       epic_key: null,
       epic_title: null,
       labels: [],
+      current_assignee_agent_id: task.current_assignee_agent_id,
       updated_at: task.updated_at,
       story_type: null,
       task_type: task.task_type,
