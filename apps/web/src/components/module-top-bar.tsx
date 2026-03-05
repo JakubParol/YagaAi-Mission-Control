@@ -20,7 +20,7 @@ export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
   const pathname = usePathname();
 
   return (
-    <div className="px-4 pb-3 pt-4 sm:px-6">
+    <div className="sticky top-14 z-30 px-4 pb-3 pt-4 sm:px-6 lg:top-0">
       <FloatingCard
         as="nav"
         aria-label="Module navigation"
