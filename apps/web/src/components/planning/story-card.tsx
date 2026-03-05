@@ -1,4 +1,4 @@
-import type { DragEvent } from "react";
+import type { DragEvent, ReactNode } from "react";
 import {
   CheckCircle2,
   ChevronUp,
@@ -94,12 +94,14 @@ export function StoryCard({
   onDragStart,
   onDragEnd,
   disabled = false,
+  actions,
 }: {
   story: StoryCardStory;
   onClick?: (storyId: string) => void;
   onDragStart?: (storyId: string) => void;
   onDragEnd?: () => void;
   disabled?: boolean;
+  actions?: ReactNode;
 }) {
   const statusStyle = STATUS_STYLE[story.status];
 
@@ -135,7 +137,10 @@ export function StoryCard({
         <span className="font-mono text-[11px] tracking-wide text-muted-foreground">
           {story.key ?? "—"}
         </span>
-        <PriorityIndicator priority={story.priority} />
+        <div className="flex items-center gap-0.5">
+          <PriorityIndicator priority={story.priority} />
+          {actions}
+        </div>
       </div>
 
       {/* Title */}

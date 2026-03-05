@@ -6,6 +6,7 @@ import { BookOpen, Filter, Group, ListTodo, Loader2, Search } from "lucide-react
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
+import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { STATUS_LABEL, STATUS_STYLE } from "@/components/planning/story-card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiUrl } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { deleteStory } from "../story-actions";
 import {
   buildPlanningListRows,
   COMING_SOON_LABEL,
@@ -55,7 +57,7 @@ interface ListEnvelope<T> {
 }
 
 const HEADER_GRID_TEMPLATE =
-  "grid-cols-[116px_84px_minmax(0,1fr)_112px_72px_172px_220px_136px]";
+  "grid-cols-[116px_84px_minmax(0,1fr)_112px_72px_172px_220px_136px_44px]";
 
 async function fetchList<T>(path: string): Promise<T[]> {
   const response = await fetch(apiUrl(path));
@@ -107,6 +109,8 @@ export default function PlanningListPage() {
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [selectedTaskRow, setSelectedTaskRow] = useState<PlanningListRow | null>(null);
+  const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
+  const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const singleProjectId =
     !allSelected && selectedProjectIds.length === 1
@@ -179,6 +183,14 @@ export default function PlanningListPage() {
   }, [fetchListResult, singleProjectId]);
 
   useEffect(() => {
+    if (!errorToast) return;
+    const timeoutId = window.setTimeout(() => {
+      setErrorToast(null);
+    }, 3500);
+    return () => window.clearTimeout(timeoutId);
+  }, [errorToast]);
+
+  useEffect(() => {
     if (!singleProjectId) return;
 
     let cancelled = false;
@@ -216,6 +228,32 @@ export default function PlanningListPage() {
     if (!open) setSelectedTaskRow(null);
   }, []);
 
+  const handleStoryDelete = useCallback(
+    async (storyId: string) => {
+      if (pendingStoryIds[storyId]) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+
+      try {
+        await deleteStory(storyId);
+        if (selectedStoryId === storyId) {
+          setSelectedStoryId(null);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        setErrorToast(
+          error instanceof Error ? error.message : "Failed to delete story.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingStoryIds, refreshCurrentView, selectedStoryId],
+  );
+
   const activeSelectedStoryId =
     state.kind === "ok" &&
     selectedStoryId &&
@@ -236,6 +274,16 @@ export default function PlanningListPage() {
 
   return (
     <>
+      {errorToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-4 top-4 z-50 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-200 shadow-lg"
+        >
+          {errorToast}
+        </div>
+      )}
+
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
@@ -344,6 +392,7 @@ export default function PlanningListPage() {
             <span>Epic</span>
             <span>Labels</span>
             <span>Updated</span>
+            <span className="text-right">Actions</span>
           </header>
 
           <div className="divide-y divide-border/20">
@@ -355,33 +404,63 @@ export default function PlanningListPage() {
                   : "—";
               const epicText =
                 row.epic_key && row.epic_title ? `${row.epic_key} ${row.epic_title}` : "—";
+              const isStoryRow = row.row_type === "story";
+              const isStoryDeletePending = isStoryRow && Boolean(pendingStoryIds[row.id]);
+              const openRowDetails = () => {
+                if (row.row_type === "story") {
+                  setSelectedStoryId(row.id);
+                } else {
+                  setSelectedTaskRow(row);
+                }
+              };
 
               return (
-                <button
+                <div
                   key={`${row.row_type}:${row.id}`}
-                  type="button"
-                  onClick={() =>
-                    row.row_type === "story"
-                      ? setSelectedStoryId(row.id)
-                      : setSelectedTaskRow(row)
-                  }
+                  role="button"
+                  tabIndex={isStoryDeletePending ? -1 : 0}
+                  aria-disabled={isStoryDeletePending}
+                  onClick={() => {
+                    if (isStoryDeletePending) return;
+                    openRowDetails();
+                  }}
+                  onKeyDown={(event) => {
+                    if (isStoryDeletePending) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openRowDetails();
+                    }
+                  }}
                   className={cn(
                     "w-full text-left transition-colors duration-100 hover:bg-muted/25 focus-ring",
                     "px-3 py-2.5",
+                    isStoryDeletePending && "cursor-progress opacity-70",
                   )}
                 >
                   <div className="flex items-center justify-between gap-2 md:hidden">
                     <ItemTypeBadge rowType={row.row_type} />
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        statusStyle.bg,
-                        statusStyle.text,
+                    <div className="flex items-center gap-1">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          statusStyle.bg,
+                          statusStyle.text,
+                        )}
+                      >
+                        <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+                        {STATUS_LABEL[row.status]}
+                      </span>
+                      {isStoryRow && (
+                        <StoryActionsMenu
+                          storyId={row.id}
+                          storyKey={row.key}
+                          storyTitle={row.title}
+                          onDelete={handleStoryDelete}
+                          disabled={isStoryDeletePending}
+                          isDeleting={isStoryDeletePending}
+                        />
                       )}
-                    >
-                      <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-                      {STATUS_LABEL[row.status]}
-                    </span>
+                    </div>
                   </div>
 
                   <div className="mt-2 space-y-1 md:hidden">
@@ -430,8 +509,20 @@ export default function PlanningListPage() {
                     <span className="text-xs text-muted-foreground">
                       {formatUpdatedAt(row.updated_at)}
                     </span>
+                    <div className="justify-self-end">
+                      {isStoryRow && (
+                        <StoryActionsMenu
+                          storyId={row.id}
+                          storyKey={row.key}
+                          storyTitle={row.title}
+                          onDelete={handleStoryDelete}
+                          disabled={isStoryDeletePending}
+                          isDeleting={isStoryDeletePending}
+                        />
+                      )}
+                    </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

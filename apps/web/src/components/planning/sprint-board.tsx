@@ -3,6 +3,7 @@ import { Calendar, Target, Hash, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
+import { StoryActionsMenu } from "./story-actions-menu";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -445,6 +446,7 @@ function BoardColumn({
   onCardDragStart,
   onCardDragEnd,
   pendingStoryIds,
+  onStoryDelete,
   onTodoQuickCreate,
   assigneeOptions,
 }: {
@@ -459,6 +461,7 @@ function BoardColumn({
   onCardDragStart: (storyId: string) => void;
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
+  onStoryDelete?: (storyId: string) => Promise<void> | void;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions: readonly QuickCreateAssigneeOption[];
 }) {
@@ -494,16 +497,31 @@ function BoardColumn({
             No stories
           </div>
         ) : (
-          stories.map((story) => (
-            <StoryCard
-              key={story.id}
-              story={story}
-              onClick={onStoryClick}
-              onDragStart={onCardDragStart}
-              onDragEnd={onCardDragEnd}
-              disabled={pendingStoryIds.has(story.id)}
-            />
-          ))
+          stories.map((story) => {
+            const isPending = pendingStoryIds.has(story.id);
+            return (
+              <StoryCard
+                key={story.id}
+                story={story}
+                onClick={onStoryClick}
+                onDragStart={onCardDragStart}
+                onDragEnd={onCardDragEnd}
+                disabled={isPending}
+                actions={
+                  onStoryDelete ? (
+                    <StoryActionsMenu
+                      storyId={story.id}
+                      storyKey={story.key}
+                      storyTitle={story.title}
+                      onDelete={onStoryDelete}
+                      disabled={isPending}
+                      isDeleting={isPending}
+                    />
+                  ) : undefined
+                }
+              />
+            );
+          })
         )}
       </div>
     </div>
@@ -516,6 +534,7 @@ export function SprintBoard({
   data,
   onStoryClick,
   onStoryStatusChange,
+  onStoryDelete,
   pendingStoryIds,
   onTodoQuickCreate,
   assigneeOptions = [],
@@ -523,6 +542,7 @@ export function SprintBoard({
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
   onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onStoryDelete?: (storyId: string) => Promise<void> | void;
   pendingStoryIds?: ReadonlySet<string>;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions?: readonly QuickCreateAssigneeOption[];
@@ -600,6 +620,7 @@ export function SprintBoard({
             onCardDragStart={handleCardDragStart}
             onCardDragEnd={handleCardDragEnd}
             pendingStoryIds={pendingSet}
+            onStoryDelete={onStoryDelete}
             onTodoQuickCreate={col.status === "TODO" ? onTodoQuickCreate : undefined}
             assigneeOptions={assigneeOptions}
           />
