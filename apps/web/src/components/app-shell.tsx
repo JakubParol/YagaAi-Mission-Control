@@ -1,5 +1,13 @@
+'use client';
+
+import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
+import {
+  SIDEBAR_COLLAPSED_STORAGE_KEY,
+  parseSidebarCollapsedPreference,
+  serializeSidebarCollapsedPreference,
+} from "@/lib/sidebar-preference";
 
 function MobileHeader() {
   return (
@@ -12,13 +20,41 @@ function MobileHeader() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    const persisted = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+    return parseSidebarCollapsedPreference(persisted);
+  });
+
+  function handleSidebarToggle() {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(
+        SIDEBAR_COLLAPSED_STORAGE_KEY,
+        serializeSidebarCollapsedPreference(next),
+      );
+      return next;
+    });
+  }
+
   return (
     <div className="relative min-h-screen bg-background">
       {/* Desktop sidebar */}
-      <Sidebar />
+      <Sidebar
+        collapsed={isSidebarCollapsed}
+        onToggleCollapsed={handleSidebarToggle}
+      />
 
       {/* Main content — offset for floating sidebar */}
-      <div className="relative flex min-h-screen flex-col lg:pl-72">
+      <div
+        className={
+          isSidebarCollapsed
+            ? "relative flex min-h-screen flex-col lg:pl-24"
+            : "relative flex min-h-screen flex-col lg:pl-72"
+        }
+      >
         {/* Mobile header */}
         <MobileHeader />
 
