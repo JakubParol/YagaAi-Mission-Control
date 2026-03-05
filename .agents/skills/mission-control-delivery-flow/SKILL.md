@@ -12,6 +12,7 @@ Execute this flow when the user asks to deliver a story/bug end-to-end.
 - Work in `/home/kuba/repos/mission-control` unless user explicitly says otherwise.
 - Read repo/project AGENTS/docs as required by AGENTS policy.
 - For planning entities use `mc` CLI only.
+- By planning element we are colling UserStory or Task or Bug
 
 ## Planning operation preflight (mandatory)
 
@@ -23,9 +24,19 @@ Before any planning command/mutation:
 
 Prefer `--output json` for deterministic parsing.
 
+## Phase 0 - Preparation
+
+1. Read the planning element details using the MC CLI by element code.
+2. If the planning element is not attached to the current sprint in the MC project, attach it.
+3. If it is not attached to an epic, attach the story to an epic – you can get the list of epics and choose the best one.
+4. Add labels to the user story.
+5. Checkout `main`.
+6. Pull the latest changes.
+7. Create a new implementation branch using the planning element code and a short description.
+
 ## Phase 1 — Implementation
 
-1. **Plan atomic tasks** for the target US/bug.
+1. **Plan atomic tasks** for the target planning element
 2. **Create tasks** in the story via `mc task create`.
 3. **Start story**: set story `IN_PROGRESS` via `mc story update`.
 4. For each task:
@@ -41,9 +52,9 @@ Prefer `--output json` for deterministic parsing.
 
 ## Phase 3 — Review and fixes
 
-7. Run `/review-pr` (self-review).
-8. Fix all findings (including small issues), commit and push.
-9. Run `/review-pr` again; fix remaining findings. Max two review rounds unless user requests more.
+7. Run `/review-pr` (self-review) or perform CodeReview by yourself if /review-pr is not avaiable.
+8. Each finding must be injected into the PR as a comment with gh cli
+9. Fix all findings (including small issues), resolve comments in PR, commit and push.
 
 ## Phase 4 — Merge and deploy
 
