@@ -97,6 +97,7 @@ export interface CreateStoryInput {
   story_type: string;
   status?: ItemStatus;
   priority?: number | null;
+  current_assignee_agent_id?: string | null;
   metadata_json?: string | null;
   created_by?: string | null;
 }
@@ -112,6 +113,7 @@ export interface UpdateStoryInput {
   is_blocked?: number;
   blocked_reason?: string | null;
   priority?: number | null;
+  current_assignee_agent_id?: string | null;
   metadata_json?: string | null;
   completed_at?: string | null;
   updated_by?: string | null;
@@ -466,8 +468,8 @@ export class PlanningRepository {
 
     this.db
       .prepare(
-        `INSERT INTO stories (id, project_id, epic_id, key, title, intent, description, story_type, status, is_blocked, blocked_reason, priority, metadata_json, created_by, updated_by, created_at, updated_at, completed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO stories (id, project_id, epic_id, key, title, intent, description, story_type, status, is_blocked, blocked_reason, priority, current_assignee_agent_id, metadata_json, created_by, updated_by, created_at, updated_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -482,6 +484,7 @@ export class PlanningRepository {
         0,
         null,
         input.priority ?? null,
+        input.current_assignee_agent_id ?? null,
         input.metadata_json ?? null,
         input.created_by ?? null,
         input.created_by ?? null,
@@ -531,6 +534,7 @@ export class PlanningRepository {
     if (input.is_blocked !== undefined) { fields.push("is_blocked = ?"); values.push(input.is_blocked); }
     if (input.blocked_reason !== undefined) { fields.push("blocked_reason = ?"); values.push(input.blocked_reason); }
     if (input.priority !== undefined) { fields.push("priority = ?"); values.push(input.priority); }
+    if (input.current_assignee_agent_id !== undefined) { fields.push("current_assignee_agent_id = ?"); values.push(input.current_assignee_agent_id); }
     if (input.metadata_json !== undefined) { fields.push("metadata_json = ?"); values.push(input.metadata_json); }
     if (input.completed_at !== undefined) { fields.push("completed_at = ?"); values.push(input.completed_at); }
     if (input.updated_by !== undefined) { fields.push("updated_by = ?"); values.push(input.updated_by); }

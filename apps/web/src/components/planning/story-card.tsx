@@ -34,6 +34,7 @@ export interface StoryCardStory {
     initials?: string | null;
     avatar?: string | null;
   } | null;
+  assignee_agent_id?: string | null;
   assignee_name?: string | null;
   assignee_last_name?: string | null;
   assignee_initials?: string | null;
@@ -125,6 +126,7 @@ export function StoryCard({
   onDragEnd,
   disabled = false,
   actions,
+  assigneeControl,
 }: {
   story: StoryCardStory;
   onClick?: (storyId: string) => void;
@@ -132,6 +134,7 @@ export function StoryCard({
   onDragEnd?: () => void;
   disabled?: boolean;
   actions?: ReactNode;
+  assigneeControl?: ReactNode;
 }) {
   const typeConfig = resolveStoryTypeVisualConfig(story.story_type);
   const TypeIcon = typeConfig.icon;
@@ -200,23 +203,25 @@ export function StoryCard({
           <span className="text-[11px] text-muted-foreground" title="Story points">
             -
           </span>
-          {hasAssignee ? (
-            <Avatar
-              src={assignee?.avatar}
-              name={assignee?.name ?? null}
-              lastName={assignee?.last_name ?? null}
-              initials={assignee?.initials ?? null}
-              alt={`${assigneeName} assignee avatar`}
-              className="size-5"
-            />
-          ) : (
-            <span
-              className="inline-flex size-5 items-center justify-center rounded-full border border-border/70 bg-muted text-muted-foreground"
-              title="Unassigned"
-              aria-label="Unassigned"
-            >
-              <User className="size-3" aria-hidden="true" />
-            </span>
+          {assigneeControl ?? (
+            hasAssignee ? (
+              <Avatar
+                src={assignee?.avatar}
+                name={assignee?.name ?? null}
+                lastName={assignee?.last_name ?? null}
+                initials={assignee?.initials ?? null}
+                alt={`${assigneeName} assignee avatar`}
+                className="size-5"
+              />
+            ) : (
+              <span
+                className="inline-flex size-5 items-center justify-center rounded-full border border-border/70 bg-muted text-muted-foreground"
+                title="Unassigned"
+                aria-label="Unassigned"
+              >
+                <User className="size-3" aria-hidden="true" />
+              </span>
+            )
           )}
         </div>
       </div>

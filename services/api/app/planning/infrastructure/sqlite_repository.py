@@ -123,6 +123,9 @@ def _row_to_epic(row: aiosqlite.Row) -> Epic:
 
 
 def _row_to_story(row: aiosqlite.Row) -> Story:
+    current_assignee_agent_id = (
+        row["current_assignee_agent_id"] if "current_assignee_agent_id" in row.keys() else None
+    )
     return Story(
         id=row["id"],
         project_id=row["project_id"],
@@ -136,6 +139,7 @@ def _row_to_story(row: aiosqlite.Row) -> Story:
         is_blocked=bool(row["is_blocked"]),
         blocked_reason=row["blocked_reason"],
         priority=row["priority"],
+        current_assignee_agent_id=current_assignee_agent_id,
         metadata_json=row["metadata_json"],
         created_by=row["created_by"],
         updated_by=row["updated_by"],
@@ -599,10 +603,10 @@ class SqliteStoryRepository(StoryRepository):
         await self._db.execute(
             """INSERT INTO stories (id, project_id, epic_id, key, title, intent,
                description, story_type, status,
-               is_blocked, blocked_reason, priority, metadata_json,
+               is_blocked, blocked_reason, priority, current_assignee_agent_id, metadata_json,
                created_by, updated_by, created_at, updated_at,
                started_at, completed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 story.id,
                 story.project_id,
@@ -616,6 +620,7 @@ class SqliteStoryRepository(StoryRepository):
                 1 if story.is_blocked else 0,
                 story.blocked_reason,
                 story.priority,
+                story.current_assignee_agent_id,
                 story.metadata_json,
                 story.created_by,
                 story.updated_by,
@@ -639,6 +644,7 @@ class SqliteStoryRepository(StoryRepository):
             "is_blocked",
             "blocked_reason",
             "priority",
+            "current_assignee_agent_id",
             "metadata_json",
             "updated_by",
             "updated_at",
@@ -709,6 +715,9 @@ class SqliteStoryRepository(StoryRepository):
             "SELECT 1 FROM story_labels WHERE story_id = ? AND label_id = ?",
             [story_id, label_id],
         )
+
+    async def agent_exists(self, agent_id: str) -> bool:
+        return await _exists(self._db, "SELECT 1 FROM agents WHERE id = ?", [agent_id])
 
 
 # ---------------------------------------------------------------------------
@@ -1274,7 +1283,8 @@ class SqliteBacklogRepository(BacklogRepository):
     async def list_backlog_stories(self, backlog_id: str) -> list[dict[str, Any]]:
         story_rows = await _fetch_all(
             self._db,
-            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type, s.metadata_json,
+            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+                      s.current_assignee_agent_id, s.metadata_json,
                       e.key AS epic_key,
                       e.title AS epic_title,
                       bs.position,
@@ -1320,7 +1330,8 @@ class SqliteBacklogRepository(BacklogRepository):
             return None, []
         story_rows = await _fetch_all(
             self._db,
-            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type, s.metadata_json,
+            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+                      s.current_assignee_agent_id, s.metadata_json,
                       e.key AS epic_key,
                       e.title AS epic_title,
                       bs.position,
@@ -1379,6 +1390,15 @@ class SqliteBacklogRepository(BacklogRepository):
         assignee_by_story_id: dict[str, str] = {}
 
         for story in stories:
+            direct_assignee = story.get("current_assignee_agent_id")
+            if isinstance(direct_assignee, str) and direct_assignee.strip() != "":
+                assignee_id = direct_assignee.strip()
+                assignee_ids.add(assignee_id)
+                assignee_by_story_id[story["id"]] = assignee_id
+                continue
+
+            # Backward-compatible fallback for legacy records created before
+            # story-level assignee column existed.
             metadata_raw = story.get("metadata_json")
             if not isinstance(metadata_raw, str) or metadata_raw.strip() == "":
                 continue

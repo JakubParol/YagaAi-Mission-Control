@@ -43,6 +43,7 @@ test("buildStoryCreatePayload trims subject and includes assignee metadata", () 
     title: "Add sprint goal copy",
     story_type: "TASK",
     project_id: "p1",
+    current_assignee_agent_id: "agent-1",
     metadata_json: JSON.stringify({
       quick_create_assignee_agent_id: "agent-1",
       quick_create_source: "board_todo_column",
@@ -105,6 +106,7 @@ test("createTodoQuickItem performs create + product backlog + sprint attach flow
     assert.equal(created.id, "s-1")
     assert.equal(created.status, "TODO")
     assert.equal(created.story_type, "BUG")
+    assert.equal(created.assignee_agent_id, "agent-2")
     assert.equal(created.task_count, 0)
   } finally {
     globalThis.fetch = originalFetch
@@ -235,6 +237,7 @@ test("quick-add create flow order supports USER_STORY, TASK and BUG without spri
           title: `${workType} title`,
           story_type: workType,
           project_id: "p1",
+          current_assignee_agent_id: null,
           metadata_json: null,
         },
       )

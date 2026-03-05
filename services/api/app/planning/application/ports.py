@@ -190,6 +190,9 @@ class StoryRepository(ABC):
     async def epic_exists(self, epic_id: str) -> bool: ...
 
     @abstractmethod
+    async def agent_exists(self, agent_id: str) -> bool: ...
+
+    @abstractmethod
     async def label_exists(self, label_id: str) -> bool: ...
 
     @abstractmethod

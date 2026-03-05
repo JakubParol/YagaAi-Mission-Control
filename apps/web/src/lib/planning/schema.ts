@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS epics (
   is_blocked            INTEGER NOT NULL DEFAULT 0,
   blocked_reason        TEXT,
   priority              INTEGER,
+  current_assignee_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
   metadata_json         TEXT,
   created_by            TEXT,
   updated_by            TEXT,

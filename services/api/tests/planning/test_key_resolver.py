@@ -62,6 +62,7 @@ FAKE_STORY = Story(
     is_blocked=False,
     blocked_reason=None,
     priority=None,
+    current_assignee_agent_id=None,
     metadata_json=None,
     created_by=None,
     updated_by=None,
