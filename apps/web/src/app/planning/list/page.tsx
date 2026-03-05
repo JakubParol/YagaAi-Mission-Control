@@ -13,6 +13,7 @@ import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { STATUS_LABEL, STATUS_STYLE } from "@/components/planning/story-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemedSelect, type ThemedSelectOption } from "@/components/ui/themed-select";
 import {
   Dialog,
   DialogContent,
@@ -408,6 +409,36 @@ function PlanningListPageContent() {
       : [];
   const statusOptions = state.kind === "ok" ? buildStatusOptions(state.rows) : [];
   const typeOptions = state.kind === "ok" ? buildTypeOptions(state.rows) : [];
+  const statusSelectOptions: ThemedSelectOption[] = [
+    { value: "", label: "Status: All" },
+    ...statusOptions,
+  ];
+  const typeSelectOptions: ThemedSelectOption[] = [{ value: "", label: "Type: All" }, ...typeOptions];
+  const labelSelectOptions: ThemedSelectOption[] = [
+    { value: "", label: "Label: All" },
+    ...(state.kind === "ok"
+      ? state.labels.map((label) => ({ value: label.id, label: label.name }))
+      : []),
+  ];
+  const epicSelectOptions: ThemedSelectOption[] = [
+    { value: "", label: "Epic: All" },
+    ...(state.kind === "ok"
+      ? state.epics.map((epic) => ({
+          value: epic.id,
+          label: `${epic.key} ${epic.title}`,
+        }))
+      : []),
+  ];
+  const assigneeSelectOptions: ThemedSelectOption[] = [
+    { value: "", label: "Assignee: All" },
+    { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
+    ...(state.kind === "ok"
+      ? state.assignees.map((assignee) => ({
+          value: assignee.id,
+          label: assignee.label,
+        }))
+      : []),
+  ];
 
   const activeSelectedStoryId =
     state.kind === "ok" &&
@@ -460,87 +491,58 @@ function PlanningListPageContent() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5">
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5">
                 <Filter className="size-3.5 text-muted-foreground" />
-                <select
-                  aria-label="Filter by status"
-                  className="bg-transparent text-xs text-muted-foreground outline-none"
+                <ThemedSelect
                   value={statusFilter}
-                  onChange={(event) => {
-                    updateFilterParam(LIST_FILTER_KEYS.status, event.target.value);
+                  options={statusSelectOptions}
+                  placeholder="Status"
+                  onValueChange={(value) => {
+                    updateFilterParam(LIST_FILTER_KEYS.status, value);
                   }}
-                >
-                  <option value="">Status: All</option>
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Filter by type"
-                  className="bg-transparent text-xs text-muted-foreground outline-none"
+                  triggerClassName="h-8 min-w-[132px] bg-background/70 text-xs"
+                  contentClassName="w-[180px]"
+                />
+                <ThemedSelect
                   value={typeFilter}
-                  onChange={(event) => {
-                    updateFilterParam(LIST_FILTER_KEYS.type, event.target.value);
+                  options={typeSelectOptions}
+                  placeholder="Type"
+                  onValueChange={(value) => {
+                    updateFilterParam(LIST_FILTER_KEYS.type, value);
                   }}
-                >
-                  <option value="">Type: All</option>
-                  {typeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Filter by label"
-                  className="max-w-[180px] bg-transparent text-xs text-muted-foreground outline-none"
+                  triggerClassName="h-8 min-w-[132px] bg-background/70 text-xs"
+                  contentClassName="w-[180px]"
+                />
+                <ThemedSelect
                   value={labelFilter}
-                  onChange={(event) => {
-                    updateFilterParam(LIST_FILTER_KEYS.labelId, event.target.value);
+                  options={labelSelectOptions}
+                  placeholder="Label"
+                  onValueChange={(value) => {
+                    updateFilterParam(LIST_FILTER_KEYS.labelId, value);
                   }}
-                >
-                  <option value="">Label: All</option>
-                  {state.kind === "ok" &&
-                    state.labels.map((label) => (
-                      <option key={label.id} value={label.id}>
-                        {label.name}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  aria-label="Filter by epic"
-                  className="max-w-[180px] bg-transparent text-xs text-muted-foreground outline-none"
+                  triggerClassName="h-8 min-w-[144px] bg-background/70 text-xs"
+                  contentClassName="w-[220px]"
+                />
+                <ThemedSelect
                   value={epicFilter}
-                  onChange={(event) => {
-                    updateFilterParam(LIST_FILTER_KEYS.epicId, event.target.value);
+                  options={epicSelectOptions}
+                  placeholder="Epic"
+                  onValueChange={(value) => {
+                    updateFilterParam(LIST_FILTER_KEYS.epicId, value);
                   }}
-                >
-                  <option value="">Epic: All</option>
-                  {state.kind === "ok" &&
-                    state.epics.map((epic) => (
-                      <option key={epic.id} value={epic.id}>
-                        {epic.key} {epic.title}
-                      </option>
-                    ))}
-                </select>
-                <select
-                  aria-label="Filter by assignee"
-                  className="max-w-[180px] bg-transparent text-xs text-muted-foreground outline-none"
+                  triggerClassName="h-8 min-w-[160px] bg-background/70 text-xs"
+                  contentClassName="w-[240px]"
+                />
+                <ThemedSelect
                   value={assigneeFilter}
-                  onChange={(event) => {
-                    updateFilterParam(LIST_FILTER_KEYS.assignee, event.target.value);
+                  options={assigneeSelectOptions}
+                  placeholder="Assignee"
+                  onValueChange={(value) => {
+                    updateFilterParam(LIST_FILTER_KEYS.assignee, value);
                   }}
-                >
-                  <option value="">Assignee: All</option>
-                  <option value={UNASSIGNED_FILTER_VALUE}>Unassigned</option>
-                  {state.kind === "ok" &&
-                    state.assignees.map((assignee) => (
-                      <option key={assignee.id} value={assignee.id}>
-                        {assignee.label}
-                      </option>
-                    ))}
-                </select>
+                  triggerClassName="h-8 min-w-[164px] bg-background/70 text-xs"
+                  contentClassName="w-[240px]"
+                />
                 <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
                   Clear
                 </Button>
