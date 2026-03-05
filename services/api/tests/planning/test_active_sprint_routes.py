@@ -94,6 +94,11 @@ def test_active_sprint_story_fields(client):
     assert "key" in story
     assert "labels" in story
     assert "label_ids" in story
+    assert "assignee_agent_id" in story
+    assert "assignee_name" in story
+    assert "assignee_last_name" in story
+    assert "assignee_initials" in story
+    assert "assignee_avatar" in story
 
 
 def test_active_sprint_empty_stories(client):
@@ -170,3 +175,49 @@ def test_active_sprint_reflects_story_label_mutation(client, _setup_test_db):
     story_after = second.json()["data"]["stories"][0]
     assert story_after["labels"] == []
     assert story_after["label_ids"] == []
+
+
+def test_active_sprint_resolves_story_assignee_from_metadata(client, _setup_test_db):
+    conn = sqlite3.connect(_setup_test_db)
+    conn.execute(
+        """
+        UPDATE stories
+        SET metadata_json = ?
+        WHERE id = ?
+        """,
+        ('{"quick_create_assignee_agent_id":"a1","quick_create_source":"board_todo_column"}', "s1"),
+    )
+    conn.commit()
+    conn.close()
+
+    _add_story(client, "b2", "s1", 0)
+
+    resp = client.get(f"{ACTIVE_SPRINT_URL}?project_id=p1")
+    assert resp.status_code == 200
+    story = resp.json()["data"]["stories"][0]
+    assert story["assignee_agent_id"] == "a1"
+    assert story["assignee_name"] == "Agent"
+    assert story["assignee_last_name"] == "Alpha"
+    assert story["assignee_initials"] == "AA"
+    assert story["assignee_avatar"] == "https://cdn.example.com/agent-1.png"
+
+
+def test_active_sprint_keeps_assignee_id_when_agent_missing(client, _setup_test_db):
+    conn = sqlite3.connect(_setup_test_db)
+    conn.execute(
+        "UPDATE stories SET metadata_json = ? WHERE id = ?",
+        ('{"quick_create_assignee_agent_id":"missing-agent"}', "s1"),
+    )
+    conn.commit()
+    conn.close()
+
+    _add_story(client, "b2", "s1", 0)
+
+    resp = client.get(f"{ACTIVE_SPRINT_URL}?project_id=p1")
+    assert resp.status_code == 200
+    story = resp.json()["data"]["stories"][0]
+    assert story["assignee_agent_id"] == "missing-agent"
+    assert story["assignee_name"] is None
+    assert story["assignee_last_name"] is None
+    assert story["assignee_initials"] is None
+    assert story["assignee_avatar"] is None

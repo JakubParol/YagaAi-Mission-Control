@@ -36,6 +36,11 @@ def test_backlog_stories_happy_path_ordered_and_fields(client):
         "position",
         "task_count",
         "done_task_count",
+        "assignee_agent_id",
+        "assignee_name",
+        "assignee_last_name",
+        "assignee_initials",
+        "assignee_avatar",
     ]:
         assert field in first
 
@@ -71,3 +76,24 @@ def test_backlog_stories_includes_label_payload(client, _setup_test_db):
     assert story["id"] == "s1"
     assert story["labels"] == [{"id": "lbl-story", "name": "urgent", "color": "#ff0000"}]
     assert story["label_ids"] == ["lbl-story"]
+
+
+def test_backlog_stories_resolves_assignee_from_story_metadata(client, _setup_test_db):
+    conn = sqlite3.connect(_setup_test_db)
+    conn.execute(
+        "UPDATE stories SET metadata_json = ? WHERE id = ?",
+        ('{"quick_create_assignee_agent_id":"a1"}', "s1"),
+    )
+    conn.commit()
+    conn.close()
+
+    _add_story(client, "b1", "s1", 0)
+    resp = client.get(f"{PREFIX}/b1/stories")
+    assert resp.status_code == 200
+
+    story = resp.json()["data"][0]
+    assert story["assignee_agent_id"] == "a1"
+    assert story["assignee_name"] == "Agent"
+    assert story["assignee_last_name"] == "Alpha"
+    assert story["assignee_initials"] == "AA"
+    assert story["assignee_avatar"] == "https://cdn.example.com/agent-1.png"
