@@ -34,9 +34,35 @@ async def _ensure_agent_columns(db: aiosqlite.Connection) -> None:
         raise
 
 
+async def _ensure_story_columns(db: aiosqlite.Connection) -> None:
+    """Add new nullable columns for stories on legacy DB files."""
+    cursor = await db.execute("PRAGMA table_info(stories)")
+    columns = await cursor.fetchall()
+    await cursor.close()
+    existing = {str(row["name"]) for row in columns}
+    required = {
+        "current_assignee_agent_id": "TEXT",
+    }
+
+    missing = [name for name in required if name not in existing]
+    if not missing:
+        return
+
+    try:
+        for name in missing:
+            await db.execute(f"ALTER TABLE stories ADD COLUMN {name} {required[name]}")
+        await db.commit()
+    except sqlite3.OperationalError as exc:
+        lowered = str(exc).lower()
+        if "duplicate column name" in lowered or "no such table" in lowered:
+            return
+        raise
+
+
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = sqlite3.Row
         await db.execute("PRAGMA foreign_keys = ON")
         await _ensure_agent_columns(db)
+        await _ensure_story_columns(db)
         yield db

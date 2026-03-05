@@ -62,6 +62,7 @@ export function buildStoryCreatePayload(input: QuickCreateSubmitInput): Record<s
     title: input.subject.trim(),
     story_type: input.workType,
     project_id: input.projectId,
+    current_assignee_agent_id: input.assigneeAgentId,
     metadata_json: buildMetadataJson(input.assigneeAgentId),
   }
 }
@@ -260,6 +261,7 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
     position: 0,
     task_count: 0,
     done_task_count: 0,
+    assignee_agent_id: input.assigneeAgentId,
     labels: [],
     label_ids: [],
   }

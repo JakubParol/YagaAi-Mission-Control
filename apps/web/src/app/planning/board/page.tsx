@@ -248,6 +248,16 @@ export default function BoardPage() {
         ...input,
         projectId: singleProjectId,
       })
+      const selectedAssignee =
+        assigneeOptions.find((option) => option.id === input.assigneeAgentId) ?? null;
+      const createdWithAssignee = {
+        ...created,
+        assignee_agent_id: input.assigneeAgentId,
+        assignee_name: selectedAssignee?.name ?? null,
+        assignee_last_name: selectedAssignee?.last_name ?? null,
+        assignee_initials: selectedAssignee?.initials ?? null,
+        assignee_avatar: selectedAssignee?.avatar ?? null,
+      };
 
       setState((prevState) => {
         if (prevState.kind !== "ok" || prevState.projectId !== singleProjectId) {
@@ -262,12 +272,12 @@ export default function BoardPage() {
           ...prevState,
           data: {
             ...prevState.data,
-            stories: [created, ...shiftedStories],
+            stories: [createdWithAssignee, ...shiftedStories],
           },
         }
       })
     },
-    [singleProjectId],
+    [assigneeOptions, singleProjectId],
   )
 
   const handleStoryDelete = useCallback(
@@ -298,6 +308,33 @@ export default function BoardPage() {
       }
     },
     [fetchBoardState, pendingStoryIds, selectedStoryId, showErrorToast, state],
+  );
+
+  const handleStoryAssigneeChange = useCallback(
+    async (storyId: string, assigneeAgentId: string | null) => {
+      if (state.kind !== "ok") return;
+      if (pendingStoryIds[storyId]) return;
+
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+
+      try {
+        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_assignee_agent_id: assigneeAgentId }),
+        });
+        if (!response.ok) {
+          throw new Error(await response.text());
+        }
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingStoryIds, state.kind],
   );
 
   return (
@@ -366,6 +403,7 @@ export default function BoardPage() {
           data={visibleState.data}
           onStoryClick={handleStoryClick}
           onStoryStatusChange={handleStoryStatusChange}
+          onStoryAssigneeChange={handleStoryAssigneeChange}
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           onTodoQuickCreate={handleTodoQuickCreate}

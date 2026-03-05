@@ -395,6 +395,7 @@ class StoryCreate(BaseModel):
     intent: str | None = None
     description: str | None = None
     priority: int | None = None
+    current_assignee_agent_id: str | None = None
 
 
 class StoryUpdate(BaseModel):
@@ -405,6 +406,7 @@ class StoryUpdate(BaseModel):
     status: str | None = Field(None, pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$")
     epic_id: str | None = None
     priority: int | None = None
+    current_assignee_agent_id: str | None = None
 
 
 class StoryResponse(BaseModel):
@@ -420,6 +422,7 @@ class StoryResponse(BaseModel):
     is_blocked: bool
     blocked_reason: str | None
     priority: int | None
+    current_assignee_agent_id: str | None
     metadata_json: str | None
     created_by: str | None
     updated_by: str | None

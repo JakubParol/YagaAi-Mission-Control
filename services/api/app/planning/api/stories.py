@@ -27,6 +27,7 @@ async def create_story(
         intent=body.intent,
         description=body.description,
         priority=body.priority,
+        current_assignee_agent_id=body.current_assignee_agent_id,
     )
     return Envelope(data=StoryResponse(**story.__dict__))
 

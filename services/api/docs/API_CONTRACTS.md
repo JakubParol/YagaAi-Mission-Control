@@ -238,7 +238,8 @@ Request:
   "intent": "...",          // optional
   "description": "...",     // optional
   "story_type": "feature",  // required
-  "priority": 1             // optional
+  "priority": 1,            // optional
+  "current_assignee_agent_id": "..." // optional, null to unassign
 }
 ```
 
@@ -277,7 +278,7 @@ Includes computed fields: `task_count`.
 
 #### `PATCH /v1/planning/stories/{id}` — Update story
 
-Updatable: `project_id`, `epic_id`, `title`, `intent`, `description`, `story_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `metadata_json`.
+Updatable: `project_id`, `epic_id`, `title`, `intent`, `description`, `story_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `current_assignee_agent_id`, `metadata_json`.
 
 Side effects:
 - Setting `project_id` on a project-less story triggers key generation and removal from global backlog.

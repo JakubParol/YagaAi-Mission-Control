@@ -139,6 +139,7 @@ class Story:
     is_blocked: bool
     blocked_reason: str | None
     priority: int | None
+    current_assignee_agent_id: str | None
     metadata_json: str | None
     created_by: str | None
     updated_by: str | None

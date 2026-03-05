@@ -81,6 +81,151 @@ type AssigneePickerOption = ThemedSelectOption & {
   isUnassigned?: boolean;
 };
 
+type StoryAssigneeSelection = {
+  assignee_agent_id: string | null;
+  assignee_name: string | null;
+  assignee_last_name: string | null;
+  assignee_initials: string | null;
+  assignee_avatar: string | null;
+};
+
+function buildAssigneePickerOptions(
+  assigneeOptions: readonly QuickCreateAssigneeOption[],
+): AssigneePickerOption[] {
+  return [
+    {
+      value: UNASSIGNED_OPTION,
+      label: "Unassigned",
+      name: "Unassigned",
+      lastName: null,
+      initials: null,
+      role: null,
+      avatar: null,
+      isUnassigned: true,
+    },
+    ...assigneeOptions.map((option) => ({
+      value: option.id,
+      label: option.role ? `${option.name} · ${option.role}` : option.name,
+      name: option.name,
+      lastName: option.last_name,
+      initials: option.initials,
+      role: option.role,
+      avatar: option.avatar,
+    })),
+  ];
+}
+
+function StoryAssigneeControl({
+  storyId,
+  currentAssignee,
+  assigneeOptions,
+  onChange,
+  disabled = false,
+}: {
+  storyId: string;
+  currentAssignee: StoryAssigneeSelection;
+  assigneeOptions: readonly QuickCreateAssigneeOption[];
+  onChange: (storyId: string, assignee: StoryAssigneeSelection) => void;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const pickerOptions = useMemo(
+    () => buildAssigneePickerOptions(assigneeOptions),
+    [assigneeOptions],
+  );
+  const selectedValue = currentAssignee.assignee_agent_id ?? UNASSIGNED_OPTION;
+  const selectedName = currentAssignee.assignee_name ?? "Unassigned";
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-xs"
+          disabled={disabled}
+          aria-label={`Select assignee. Current assignee: ${selectedName}`}
+          className="group/assignee relative"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <AssigneeAvatarTooltip
+            name={selectedName}
+            lastName={currentAssignee.assignee_last_name}
+            initials={currentAssignee.assignee_initials}
+            avatar={currentAssignee.assignee_avatar}
+          />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        className="w-[280px] p-2"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <p className="mb-2 px-1 text-[11px] font-medium text-muted-foreground">
+          Assignee
+        </p>
+        <ThemedSelect
+          value={selectedValue}
+          options={pickerOptions}
+          placeholder="Select assignee"
+          disabled={disabled}
+          renderOption={(option) => {
+            const assignee = option as AssigneePickerOption;
+            if (assignee.isUnassigned) return "Unassigned";
+            return (
+              <AvatarOption
+                name={assignee.name}
+                lastName={assignee.lastName}
+                initials={assignee.initials}
+                role={assignee.role}
+                avatar={assignee.avatar}
+              />
+            );
+          }}
+          renderValue={(option) => {
+            const assignee = option as AssigneePickerOption;
+            if (assignee.isUnassigned) return "Unassigned";
+            return (
+              <AvatarOption
+                name={assignee.name}
+                lastName={assignee.lastName}
+                initials={assignee.initials}
+                avatar={assignee.avatar}
+                compact
+              />
+            );
+          }}
+          onValueChange={(value) => {
+            const assignee = pickerOptions.find((option) => option.value === value);
+            if (!assignee || assignee.isUnassigned) {
+              onChange(storyId, {
+                assignee_agent_id: null,
+                assignee_name: null,
+                assignee_last_name: null,
+                assignee_initials: null,
+                assignee_avatar: null,
+              });
+              setIsOpen(false);
+              return;
+            }
+            onChange(storyId, {
+              assignee_agent_id: String(assignee.value),
+              assignee_name: assignee.name,
+              assignee_last_name: assignee.lastName,
+              assignee_initials: assignee.initials,
+              assignee_avatar: assignee.avatar,
+            });
+            setIsOpen(false);
+          }}
+          triggerClassName="h-8 text-xs"
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ─── Sprint Header ──────────────────────────────────────────────────
 
 function SprintHeader({
@@ -184,27 +329,7 @@ function TodoQuickCreate({
     [],
   );
   const assigneePickerOptions = useMemo<AssigneePickerOption[]>(
-    () => [
-      {
-        value: UNASSIGNED_OPTION,
-        label: "Unassigned",
-        name: "Unassigned",
-        lastName: null,
-        initials: null,
-        role: null,
-        avatar: null,
-        isUnassigned: true,
-      },
-      ...assigneeOptions.map((option) => ({
-        value: option.id,
-        label: option.role ? `${option.name} · ${option.role}` : option.name,
-        name: option.name,
-        lastName: option.last_name,
-        initials: option.initials,
-        role: option.role,
-        avatar: option.avatar,
-      })),
-    ],
+    () => buildAssigneePickerOptions(assigneeOptions),
     [assigneeOptions],
   );
   const [isOpen, setIsOpen] = useState(false);
@@ -449,6 +574,8 @@ function BoardColumn({
   onStoryDelete,
   onTodoQuickCreate,
   assigneeOptions,
+  assigneeOverrides,
+  onStoryAssigneeChange,
 }: {
   status: ItemStatus;
   label: string;
@@ -464,6 +591,8 @@ function BoardColumn({
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions: readonly QuickCreateAssigneeOption[];
+  assigneeOverrides: Readonly<Record<string, StoryAssigneeSelection>>;
+  onStoryAssigneeChange: (storyId: string, assignee: StoryAssigneeSelection) => void;
 }) {
   return (
     <div
@@ -499,14 +628,37 @@ function BoardColumn({
         ) : (
           stories.map((story) => {
             const isPending = pendingStoryIds.has(story.id);
+            const assignee = assigneeOverrides[story.id] ?? {
+              assignee_agent_id: story.assignee_agent_id ?? null,
+              assignee_name: story.assignee_name ?? null,
+              assignee_last_name: story.assignee_last_name ?? null,
+              assignee_initials: story.assignee_initials ?? null,
+              assignee_avatar: story.assignee_avatar ?? null,
+            };
             return (
               <StoryCard
                 key={story.id}
-                story={story}
+                story={{
+                  ...story,
+                  assignee_agent_id: assignee.assignee_agent_id,
+                  assignee_name: assignee.assignee_name,
+                  assignee_last_name: assignee.assignee_last_name,
+                  assignee_initials: assignee.assignee_initials,
+                  assignee_avatar: assignee.assignee_avatar,
+                }}
                 onClick={onStoryClick}
                 onDragStart={onCardDragStart}
                 onDragEnd={onCardDragEnd}
                 disabled={isPending}
+                assigneeControl={(
+                  <StoryAssigneeControl
+                    storyId={story.id}
+                    currentAssignee={assignee}
+                    assigneeOptions={assigneeOptions}
+                    disabled={isPending}
+                    onChange={onStoryAssigneeChange}
+                  />
+                )}
                 actions={
                   onStoryDelete ? (
                     <StoryActionsMenu
@@ -535,6 +687,7 @@ export function SprintBoard({
   data,
   onStoryClick,
   onStoryStatusChange,
+  onStoryAssigneeChange,
   onStoryDelete,
   pendingStoryIds,
   onTodoQuickCreate,
@@ -543,6 +696,7 @@ export function SprintBoard({
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
   onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   pendingStoryIds?: ReadonlySet<string>;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
@@ -550,7 +704,26 @@ export function SprintBoard({
 }) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
   const [dropTargetStatus, setDropTargetStatus] = useState<ItemStatus | null>(null);
+  const [assigneeOverrides, setAssigneeOverrides] = useState<Record<string, StoryAssigneeSelection>>({});
   const pendingSet = useMemo(() => new Set(pendingStoryIds ?? []), [pendingStoryIds]);
+
+  const handleStoryAssigneeChange = (storyId: string, assignee: StoryAssigneeSelection) => {
+    const story = data.stories.find((item) => item.id === storyId);
+    const previousAssignee = assigneeOverrides[storyId] ?? {
+      assignee_agent_id: story?.assignee_agent_id ?? null,
+      assignee_name: story?.assignee_name ?? null,
+      assignee_last_name: story?.assignee_last_name ?? null,
+      assignee_initials: story?.assignee_initials ?? null,
+      assignee_avatar: story?.assignee_avatar ?? null,
+    };
+    setAssigneeOverrides((prev) => ({ ...prev, [storyId]: assignee }));
+    void onStoryAssigneeChange?.(storyId, assignee.assignee_agent_id ?? null).catch(() => {
+      setAssigneeOverrides((prev) => ({
+        ...prev,
+        [storyId]: previousAssignee,
+      }));
+    });
+  };
 
   const byStatus = useMemo(() => {
     const grouped = new Map<ItemStatus, StoryCardStory[]>();
@@ -624,6 +797,8 @@ export function SprintBoard({
             onStoryDelete={onStoryDelete}
             onTodoQuickCreate={col.status === "TODO" ? onTodoQuickCreate : undefined}
             assigneeOptions={assigneeOptions}
+            assigneeOverrides={assigneeOverrides}
+            onStoryAssigneeChange={handleStoryAssigneeChange}
           />
         ))}
       </div>

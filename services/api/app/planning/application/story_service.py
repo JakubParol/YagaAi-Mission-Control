@@ -55,6 +55,7 @@ class StoryService:
         intent: str | None = None,
         description: str | None = None,
         priority: int | None = None,
+        current_assignee_agent_id: str | None = None,
         actor: str | None = None,
     ) -> Story:
         key: str | None = None
@@ -67,6 +68,9 @@ class StoryService:
         if epic_id:
             if not await self._story_repo.epic_exists(epic_id):
                 raise ValidationError(f"Epic {epic_id} does not exist")
+        if current_assignee_agent_id is not None:
+            if not await self._story_repo.agent_exists(current_assignee_agent_id):
+                raise ValidationError(f"Agent {current_assignee_agent_id} does not exist")
 
         now = utc_now()
         story = Story(
@@ -82,6 +86,7 @@ class StoryService:
             is_blocked=False,
             blocked_reason=None,
             priority=priority,
+            current_assignee_agent_id=current_assignee_agent_id,
             metadata_json=None,
             created_by=actor,
             updated_by=actor,
@@ -119,6 +124,9 @@ class StoryService:
         if "epic_id" in data and data["epic_id"] is not None:
             if not await self._story_repo.epic_exists(data["epic_id"]):
                 raise ValidationError(f"Epic {data['epic_id']} does not exist")
+        if "current_assignee_agent_id" in data and data["current_assignee_agent_id"] is not None:
+            if not await self._story_repo.agent_exists(data["current_assignee_agent_id"]):
+                raise ValidationError(f"Agent {data['current_assignee_agent_id']} does not exist")
 
         data["updated_by"] = actor
         data["updated_at"] = utc_now()

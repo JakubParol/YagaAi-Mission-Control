@@ -92,6 +92,21 @@ def test_create_story_with_all_fields(client) -> None:
     assert data["priority"] == 3
 
 
+def test_create_story_with_current_assignee(client) -> None:
+    resp = client.post(
+        "/v1/planning/stories",
+        json={
+            "title": "Assigned Story",
+            "story_type": "USER_STORY",
+            "project_id": "p1",
+            "current_assignee_agent_id": "a1",
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    assert data["current_assignee_agent_id"] == "a1"
+
+
 def test_create_story_increments_counter(client) -> None:
     resp1 = client.post(
         "/v1/planning/stories",
@@ -333,6 +348,28 @@ def test_update_story_status(client) -> None:
     assert "status_override" not in data
 
 
+def test_update_story_current_assignee(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    )
+    story_id = create_resp.json()["data"]["id"]
+
+    assign_resp = client.patch(
+        f"/v1/planning/stories/{story_id}",
+        json={"current_assignee_agent_id": "a1"},
+    )
+    assert assign_resp.status_code == 200
+    assert assign_resp.json()["data"]["current_assignee_agent_id"] == "a1"
+
+    unassign_resp = client.patch(
+        f"/v1/planning/stories/{story_id}",
+        json={"current_assignee_agent_id": None},
+    )
+    assert unassign_resp.status_code == 200
+    assert unassign_resp.json()["data"]["current_assignee_agent_id"] is None
+
+
 def test_update_story_status_done_sets_completed_at(client) -> None:
     create_resp = client.post(
         "/v1/planning/stories",
@@ -398,6 +435,21 @@ def test_update_story_invalid_status(client) -> None:
 
     resp = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "INVALID"})
     assert resp.status_code == 422
+
+
+def test_update_story_invalid_assignee(client) -> None:
+    create_resp = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    )
+    story_id = create_resp.json()["data"]["id"]
+
+    resp = client.patch(
+        f"/v1/planning/stories/{story_id}",
+        json={"current_assignee_agent_id": "missing-agent"},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 # ── Delete ────────────────────────────────────────────────────────────────

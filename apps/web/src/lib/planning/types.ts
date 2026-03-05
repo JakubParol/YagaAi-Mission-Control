@@ -67,6 +67,7 @@ export interface Epic {
   is_blocked: number;
   blocked_reason: string | null;
   priority: number | null;
+  current_assignee_agent_id: string | null;
   metadata_json: string | null;
   created_by: string | null;
   updated_by: string | null;
