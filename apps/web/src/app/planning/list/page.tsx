@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Filter, ListTodo, Loader2, Search } from "lucide-react";
 
@@ -157,7 +157,7 @@ function ItemTypeBadge({ rowType }: { rowType: PlanningListRow["row_type"] }) {
   );
 }
 
-export default function PlanningListPage() {
+function PlanningListPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -800,5 +800,19 @@ export default function PlanningListPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+export default function PlanningListPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+    >
+      <PlanningListPageContent />
+    </Suspense>
   );
 }
