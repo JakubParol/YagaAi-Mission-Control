@@ -1174,6 +1174,42 @@ export function StoryDetailDialog({
     }
   };
 
+  const handleStoryStatusChange = async (targetStoryId: string, status: ItemStatus) => {
+    if (viewState.kind !== "ok" || targetStoryId !== viewState.story.id || isSavingStory) return;
+    if (viewState.story.status === status) return;
+
+    setStoryError(null);
+    setIsSavingStory(true);
+
+    try {
+      const response = await fetch(apiUrl(`/v1/planning/stories/${targetStoryId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) {
+        throw new Error(await parseApiMessage(response));
+      }
+      const json = await response.json();
+      const updatedStory = json.data as StoryDetail;
+      setState((prev) => {
+        if (prev.kind !== "ok") return prev;
+        return {
+          ...prev,
+          story: {
+            ...prev.story,
+            ...updatedStory,
+          },
+        };
+      });
+      onStoryUpdated?.();
+    } catch (error) {
+      setStoryError(error instanceof Error ? error.message : "Failed to update story status.");
+    } finally {
+      setIsSavingStory(false);
+    }
+  };
+
   const handleStoryDelete = async (targetStoryId: string) => {
     if (isDeletingStory) return;
     setStoryError(null);
@@ -1539,7 +1575,15 @@ export function StoryDetailDialog({
                             storyType={viewState.story.story_type}
                             storyKey={viewState.story.key ?? null}
                             storyTitle={viewState.story.title}
+                            storyStatus={viewState.story.status}
                             onDelete={handleStoryDelete}
+                            onStatusChange={handleStoryStatusChange}
+                            onAddLabel={(storyId) => {
+                              if (storyId === viewState.story.id) {
+                                const labelTab = document.getElementById("story-detail-labels");
+                                labelTab?.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }
+                            }}
                             disabled={isSavingStory}
                             isDeleting={isDeletingStory}
                           />
@@ -1588,7 +1632,15 @@ export function StoryDetailDialog({
                             storyType={viewState.story.story_type}
                             storyKey={viewState.story.key ?? null}
                             storyTitle={viewState.story.title}
+                            storyStatus={viewState.story.status}
                             onDelete={handleStoryDelete}
+                            onStatusChange={handleStoryStatusChange}
+                            onAddLabel={(storyId) => {
+                              if (storyId === viewState.story.id) {
+                                const labelTab = document.getElementById("story-detail-labels");
+                                labelTab?.scrollIntoView({ behavior: "smooth", block: "center" });
+                              }
+                            }}
                             disabled={isSavingStory}
                             isDeleting={isDeletingStory}
                           />
@@ -1717,7 +1769,7 @@ export function StoryDetailDialog({
                         </select>
                       </div>
 
-                      <div className="border-t border-border/20 pt-4">
+                      <div id="story-detail-labels" className="border-t border-border/20 pt-4">
                         <StoryLabelManager
                           labels={storyLabels}
                           availableLabels={availableLabels}

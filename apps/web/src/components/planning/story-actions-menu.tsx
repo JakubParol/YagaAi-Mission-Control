@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  Archive,
+  ChevronRight,
+  Flag,
+  Link2,
+  Loader2,
+  MoreHorizontal,
+  Tag,
+  Trash2,
+  Copy,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,9 +22,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { ItemStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
+import { STATUS_LABEL } from "./story-card";
 
 export const STORY_ACTIONS_SUPPORTED_TYPES = ["USER_STORY", "TASK", "BUG"] as const;
+export const STORY_STATUS_ORDER: readonly ItemStatus[] = [
+  "TODO",
+  "IN_PROGRESS",
+  "CODE_REVIEW",
+  "VERIFY",
+  "DONE",
+] as const;
 
 export function isStoryActionsSupportedType(storyType: string | null | undefined): boolean {
   if (!storyType) return false;
@@ -43,11 +62,66 @@ interface StoryActionsMenuProps {
   storyType: string | null | undefined;
   storyKey: string | null;
   storyTitle: string;
+  storyStatus?: ItemStatus;
   onDelete: (storyId: string) => void | Promise<void>;
+  onStatusChange?: (storyId: string, status: ItemStatus) => void | Promise<void>;
+  onAddLabel?: (storyId: string) => void;
   disabled?: boolean;
   isDeleting?: boolean;
   defaultOpen?: boolean;
   defaultConfirmOpen?: boolean;
+}
+
+type ActiveZone = "main" | "status";
+
+type MainAction =
+  | "copy-link"
+  | "copy-key"
+  | "add-label"
+  | "change-status"
+  | "add-flag"
+  | "link-work-item"
+  | "link-parent"
+  | "archive"
+  | "delete";
+
+interface MenuActionItem {
+  id: MainAction;
+  label: string;
+  tone?: "default" | "danger";
+  disabled: boolean;
+  submenu?: boolean;
+  icon: ComponentType<{ className?: string }>;
+}
+
+const SECTION_GROUPS: ReadonlyArray<ReadonlyArray<MainAction>> = [
+  ["copy-link", "copy-key", "add-label"],
+  ["change-status"],
+  ["add-flag", "link-work-item", "link-parent", "archive"],
+  ["delete"],
+] as const;
+
+function getStoryLinkUrl(storyId: string): string {
+  if (typeof window === "undefined") return `/planning/stories/${storyId}`;
+  return new URL(`/planning/stories/${storyId}`, window.location.origin).toString();
+}
+
+async function writeClipboard(text: string): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === "undefined") return;
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  document.body.append(textArea);
+  textArea.focus();
+  textArea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textArea);
 }
 
 export function StoryActionsMenu({
@@ -55,7 +129,10 @@ export function StoryActionsMenu({
   storyType,
   storyKey,
   storyTitle,
+  storyStatus,
   onDelete,
+  onStatusChange,
+  onAddLabel,
   disabled = false,
   isDeleting = false,
   defaultOpen = false,
@@ -63,14 +140,58 @@ export function StoryActionsMenu({
 }: StoryActionsMenuProps) {
   const isSupportedType = isStoryActionsSupportedType(storyType);
   const [open, setOpen] = useState(defaultOpen);
+  const [statusSubmenuOpen, setStatusSubmenuOpen] = useState(false);
+  const [activeZone, setActiveZone] = useState<ActiveZone>("main");
+  const [activeMainIndex, setActiveMainIndex] = useState(0);
+  const [activeStatusIndex, setActiveStatusIndex] = useState(0);
   const [confirmPhase, setConfirmPhase] = useState<DeleteConfirmPhase>(
     defaultConfirmOpen ? "open" : "closed",
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  const mainActionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const statusActionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const isDisabled = disabled || isDeleting;
   const isConfirmOpen = confirmPhase !== "closed";
   const isConfirming = confirmPhase === "submitting";
   const storyLabel = storyKey ? `${storyKey} ${storyTitle}` : storyTitle;
+
+  const mainActions = useMemo<MenuActionItem[]>(
+    () => [
+      { id: "copy-link", label: "Copy link", icon: Copy, disabled: isDisabled },
+      { id: "copy-key", label: "Copy key", icon: Copy, disabled: isDisabled || !storyKey },
+      { id: "add-label", label: "Add label", icon: Tag, disabled: isDisabled },
+      {
+        id: "change-status",
+        label: "Change status",
+        icon: ChevronRight,
+        disabled: isDisabled || !onStatusChange,
+        submenu: true,
+      },
+      { id: "add-flag", label: "Add flag", icon: Flag, disabled: true },
+      { id: "link-work-item", label: "Link work item", icon: Link2, disabled: true },
+      { id: "link-parent", label: "Link parent", icon: Link2, disabled: true },
+      { id: "archive", label: "Archive", icon: Archive, disabled: true },
+      { id: "delete", label: "Delete", icon: Trash2, disabled: isDisabled, tone: "danger" },
+    ],
+    [isDisabled, onStatusChange, storyKey],
+  );
+
+  const enabledMainIndexes = useMemo(
+    () => mainActions.flatMap((item, index) => (item.disabled ? [] : [index])),
+    [mainActions],
+  );
+  const statusOptions = useMemo(
+    () =>
+      STORY_STATUS_ORDER.map((status) => ({
+        status,
+        disabled: isDisabled || !onStatusChange || storyStatus === status,
+      })),
+    [isDisabled, onStatusChange, storyStatus],
+  );
+  const enabledStatusIndexes = useMemo(
+    () => statusOptions.flatMap((item, index) => (item.disabled ? [] : [index])),
+    [statusOptions],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -80,11 +201,18 @@ export function StoryActionsMenu({
       if (!(target instanceof Node)) return;
       if (!rootRef.current?.contains(target)) {
         setOpen(false);
+        setStatusSubmenuOpen(false);
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      if (statusSubmenuOpen) {
+        setStatusSubmenuOpen(false);
+        setActiveZone("main");
+        return;
+      }
+      setOpen(false);
     };
 
     window.addEventListener("pointerdown", handlePointerDown);
@@ -93,11 +221,46 @@ export function StoryActionsMenu({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [open, statusSubmenuOpen]);
+
+  useEffect(() => {
+    if (!open) return;
+    const nextMainIndex = enabledMainIndexes[0] ?? 0;
+    setActiveMainIndex(nextMainIndex);
+    setStatusSubmenuOpen(false);
+    setActiveZone("main");
+    queueMicrotask(() => {
+      mainActionRefs.current[nextMainIndex]?.focus();
+    });
+  }, [enabledMainIndexes, open]);
+
+  const focusMainAction = (index: number) => {
+    setActiveMainIndex(index);
+    setActiveZone("main");
+    queueMicrotask(() => {
+      mainActionRefs.current[index]?.focus();
+    });
+  };
+
+  const focusStatusAction = (index: number) => {
+    setActiveStatusIndex(index);
+    setActiveZone("status");
+    queueMicrotask(() => {
+      statusActionRefs.current[index]?.focus();
+    });
+  };
+
+  const openStatusSubmenu = () => {
+    if (!onStatusChange || enabledStatusIndexes.length === 0) return;
+    setStatusSubmenuOpen(true);
+    const nextIndex = enabledStatusIndexes[0] ?? 0;
+    focusStatusAction(nextIndex);
+  };
 
   const handleDeleteMenuItem = () => {
     if (isDisabled) return;
     setOpen(false);
+    setStatusSubmenuOpen(false);
     setConfirmPhase((prev) => reduceDeleteConfirmPhase(prev, "OPEN"));
   };
 
@@ -108,6 +271,143 @@ export function StoryActionsMenu({
       await onDelete(storyId);
     } finally {
       setConfirmPhase((prev) => reduceDeleteConfirmPhase(prev, "FINISH"));
+    }
+  };
+
+  const handleMainAction = async (actionId: MainAction) => {
+    if (actionId === "change-status") {
+      openStatusSubmenu();
+      return;
+    }
+
+    if (actionId === "delete") {
+      handleDeleteMenuItem();
+      return;
+    }
+
+    if (actionId === "copy-link") {
+      await writeClipboard(getStoryLinkUrl(storyId));
+      setOpen(false);
+      setStatusSubmenuOpen(false);
+      return;
+    }
+
+    if (actionId === "copy-key") {
+      if (storyKey) {
+        await writeClipboard(storyKey);
+      }
+      setOpen(false);
+      setStatusSubmenuOpen(false);
+      return;
+    }
+
+    if (actionId === "add-label") {
+      onAddLabel?.(storyId);
+      setOpen(false);
+      setStatusSubmenuOpen(false);
+    }
+  };
+
+  const handleStatusAction = async (status: ItemStatus) => {
+    if (!onStatusChange || status === storyStatus || isDisabled) return;
+    await onStatusChange(storyId, status);
+    setOpen(false);
+    setStatusSubmenuOpen(false);
+  };
+
+  const moveFocusInMain = (direction: 1 | -1) => {
+    if (enabledMainIndexes.length === 0) return;
+    const currentEnabledIndex = enabledMainIndexes.indexOf(activeMainIndex);
+    const startIndex = currentEnabledIndex === -1 ? 0 : currentEnabledIndex;
+    const nextEnabledIndex =
+      (startIndex + direction + enabledMainIndexes.length) % enabledMainIndexes.length;
+    focusMainAction(enabledMainIndexes[nextEnabledIndex]!);
+  };
+
+  const moveFocusInStatus = (direction: 1 | -1) => {
+    if (enabledStatusIndexes.length === 0) return;
+    const currentEnabledIndex = enabledStatusIndexes.indexOf(activeStatusIndex);
+    const startIndex = currentEnabledIndex === -1 ? 0 : currentEnabledIndex;
+    const nextEnabledIndex =
+      (startIndex + direction + enabledStatusIndexes.length) % enabledStatusIndexes.length;
+    focusStatusAction(enabledStatusIndexes[nextEnabledIndex]!);
+  };
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!open) return;
+
+    if (event.key === "Tab") {
+      setOpen(false);
+      setStatusSubmenuOpen(false);
+      return;
+    }
+
+    if (activeZone === "main") {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        moveFocusInMain(1);
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        moveFocusInMain(-1);
+        return;
+      }
+      if (event.key === "ArrowRight") {
+        const action = mainActions[activeMainIndex];
+        if (action?.id === "change-status") {
+          event.preventDefault();
+          openStatusSubmenu();
+        }
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        const action = mainActions[activeMainIndex];
+        if (!action || action.disabled) return;
+        event.preventDefault();
+        void handleMainAction(action.id);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+      }
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      moveFocusInStatus(1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      moveFocusInStatus(-1);
+      return;
+    }
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setStatusSubmenuOpen(false);
+      setActiveZone("main");
+      queueMicrotask(() => {
+        mainActionRefs.current[activeMainIndex]?.focus();
+      });
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      const option = statusOptions[activeStatusIndex];
+      if (!option || option.disabled) return;
+      event.preventDefault();
+      void handleStatusAction(option.status);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setStatusSubmenuOpen(false);
+      setActiveZone("main");
+      queueMicrotask(() => {
+        mainActionRefs.current[activeMainIndex]?.focus();
+      });
     }
   };
 
@@ -136,24 +436,92 @@ export function StoryActionsMenu({
         <div
           role="menu"
           aria-label={`Story actions for ${storyLabel}`}
+          onKeyDown={handleMenuKeyDown}
           className={cn(
-            "absolute right-0 top-full z-30 mt-1 min-w-36 rounded-md border border-border/70 bg-card p-1 shadow-xl",
+            "absolute right-0 top-full z-30 mt-1 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl",
             "animate-in fade-in-0 zoom-in-95 duration-100",
           )}
         >
-          <button
-            type="button"
-            role="menuitem"
-            disabled={isDisabled}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-              "text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50",
-            )}
-            onClick={handleDeleteMenuItem}
-          >
-            <Trash2 className="size-3.5" />
-            Delete
-          </button>
+          {SECTION_GROUPS.map((group, groupIndex) => (
+            <div key={`group-${groupIndex}`} className={cn(groupIndex > 0 && "mt-1 border-t border-border/40 pt-1") }>
+              {group.map((actionId) => {
+                const actionIndex = mainActions.findIndex((item) => item.id === actionId);
+                const action = mainActions[actionIndex];
+                if (!action) return null;
+                const Icon = action.icon;
+
+                return (
+                  <button
+                    key={action.id}
+                    ref={(element) => {
+                      mainActionRefs.current[actionIndex] = element;
+                    }}
+                    type="button"
+                    role="menuitem"
+                    disabled={action.disabled}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                      action.tone === "danger"
+                        ? "text-red-300 hover:bg-red-500/10"
+                        : "text-foreground hover:bg-muted/60",
+                      action.submenu && "justify-between",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
+                    )}
+                    onMouseEnter={() => {
+                      setActiveMainIndex(actionIndex);
+                      setActiveZone("main");
+                    }}
+                    onClick={() => {
+                      if (action.disabled) return;
+                      void handleMainAction(action.id);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="size-3.5" />
+                      {action.label}
+                    </span>
+                    {action.submenu && <ChevronRight className="size-3" />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+
+          {statusSubmenuOpen && (
+            <div
+              role="menu"
+              aria-label="Story status options"
+              className="absolute left-full top-[34%] z-40 ml-1 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+            >
+              {statusOptions.map((option, index) => (
+                <button
+                  key={option.status}
+                  ref={(element) => {
+                    statusActionRefs.current[index] = element;
+                  }}
+                  type="button"
+                  role="menuitem"
+                  disabled={option.disabled}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                    "text-foreground hover:bg-muted/60",
+                    "disabled:cursor-not-allowed disabled:opacity-50",
+                  )}
+                  onMouseEnter={() => {
+                    setActiveStatusIndex(index);
+                    setActiveZone("status");
+                  }}
+                  onClick={() => {
+                    if (option.disabled) return;
+                    void handleStatusAction(option.status);
+                  }}
+                >
+                  <span>{STATUS_LABEL[option.status]}</span>
+                  {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

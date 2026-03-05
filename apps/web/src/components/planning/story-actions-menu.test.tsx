@@ -37,6 +37,14 @@ test("StoryActionsMenu renders Delete option when opened", () => {
   );
 
   assert.match(markup, /Story actions for Untitled story/);
+  assert.match(markup, />Copy link</);
+  assert.match(markup, />Copy key</);
+  assert.match(markup, />Add label</);
+  assert.match(markup, />Change status</);
+  assert.match(markup, />Add flag</);
+  assert.match(markup, />Link work item</);
+  assert.match(markup, />Link parent</);
+  assert.match(markup, />Archive</);
   assert.match(markup, />Delete</);
 });
 
