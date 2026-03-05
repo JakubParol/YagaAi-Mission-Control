@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/empty-state";
 import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { deleteStory } from "../story-actions";
 import {
   createTodoQuickItem,
   type QuickCreateAssigneeOption,
@@ -269,6 +270,36 @@ export default function BoardPage() {
     [singleProjectId],
   )
 
+  const handleStoryDelete = useCallback(
+    async (storyId: string) => {
+      if (state.kind !== "ok") return;
+      if (pendingStoryIds[storyId]) return;
+      const projectId = state.projectId;
+
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+
+      try {
+        await deleteStory(storyId);
+        if (selectedStoryId === storyId) {
+          setSelectedStoryId(null);
+        }
+        const nextState = await fetchBoardState(projectId);
+        setState(nextState);
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to delete story.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [fetchBoardState, pendingStoryIds, selectedStoryId, showErrorToast, state],
+  );
+
   return (
     <>
       {errorToast && (
@@ -335,6 +366,7 @@ export default function BoardPage() {
           data={visibleState.data}
           onStoryClick={handleStoryClick}
           onStoryStatusChange={handleStoryStatusChange}
+          onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           onTodoQuickCreate={handleTodoQuickCreate}
           assigneeOptions={assigneeOptions}
