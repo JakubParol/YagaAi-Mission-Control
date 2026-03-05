@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Target } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { EmptyState } from "@/components/empty-state";
 import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
@@ -349,24 +350,23 @@ export default function BoardPage() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-1">Board</h1>
-          <p className="text-muted-foreground text-sm">
-            Active sprint board for the selected project.
-          </p>
-          {selectedLabelIds.length > 0 && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Filtered by {selectedLabelIds.length} label
-              {selectedLabelIds.length === 1 ? "" : "s"}.
-            </p>
-          )}
-        </div>
-        <PlanningRefreshControl
-          onRefresh={refreshCurrentView}
-          disabled={!singleProjectId}
-        />
-      </div>
+      <PlanningTopShell
+        icon={Target}
+        title="Board"
+        subtitle="Active sprint board for the selected project."
+        context={
+          selectedLabelIds.length > 0
+            ? `Filtered by ${selectedLabelIds.length} label${selectedLabelIds.length === 1 ? "" : "s"}.`
+            : undefined
+        }
+        actions={(
+          <PlanningRefreshControl
+            onRefresh={refreshCurrentView}
+            disabled={!singleProjectId}
+            className="items-stretch sm:items-end"
+          />
+        )}
+      />
 
       {visibleState.kind === "no-project" && (
         <EmptyState

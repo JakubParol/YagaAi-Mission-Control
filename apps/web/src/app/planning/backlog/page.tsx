@@ -22,6 +22,7 @@ import { apiUrl } from "@/lib/api-client";
 import type { BacklogKind, BacklogStatus, ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
+import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow } from "@/components/planning/backlog-row";
@@ -944,56 +945,56 @@ export default function BacklogPage() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <Layers className="size-6 text-muted-foreground" />
-            <h1 className="text-3xl font-bold text-foreground">Backlog</h1>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            All backlogs and their stories for the selected project.
-          </p>
-        </div>
-        <PlanningRefreshControl
-          onRefresh={refreshCurrentView}
-          disabled={!singleProjectId}
-        />
-      </div>
-
-      {singleProjectId && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          {state.kind === "ok" && (
-            <div className="relative min-w-[220px] flex-1">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search backlog"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className={cn(
-                  "h-8 w-full rounded-md border border-border/60 bg-background pl-8 pr-3 text-sm text-foreground",
-                  "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                )}
-              />
+      <PlanningTopShell
+        icon={Layers}
+        title="Backlog"
+        subtitle="All backlogs and their stories for the selected project."
+        controls={
+          singleProjectId ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {state.kind === "ok" ? (
+                <div className="relative min-w-[220px] flex-1">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search backlog"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className={cn(
+                      "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground",
+                      "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    )}
+                  />
+                </div>
+              ) : (
+                <div className="min-w-[220px] flex-1" />
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleCreateBoardDialogChange(true)}
+                className="gap-1.5"
+              >
+                <Plus className="size-3.5" />
+                Create board
+              </Button>
+              {state.kind === "ok" && selectedLabelIds.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  Label filter: {selectedLabelIds.length} selected
+                </p>
+              ) : null}
             </div>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => handleCreateBoardDialogChange(true)}
-            className={cn("gap-1.5", state.kind === "ok" && "ml-auto")}
-          >
-            <Plus className="size-3.5" />
-            Create board
-          </Button>
-          {state.kind === "ok" && selectedLabelIds.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Label filter: {selectedLabelIds.length} selected
-            </p>
-          )}
-        </div>
-      )}
+          ) : null
+        }
+        actions={(
+          <PlanningRefreshControl
+            onRefresh={refreshCurrentView}
+            disabled={!singleProjectId}
+            className="items-stretch sm:items-end"
+          />
+        )}
+      />
 
       {state.kind === "no-project" && (
         <EmptyState

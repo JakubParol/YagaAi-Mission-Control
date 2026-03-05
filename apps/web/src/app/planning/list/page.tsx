@@ -5,6 +5,7 @@ import { BookOpen, Filter, Group, ListTodo, Loader2, Search } from "lucide-react
 
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
@@ -315,71 +316,69 @@ export default function PlanningListPage() {
         </div>
       )}
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <ListTodo className="size-6 text-muted-foreground" />
-            <h1 className="text-3xl font-bold text-foreground">List</h1>
-          </div>
-          <p className="text-muted-foreground text-sm">
-            Unified project view of stories and standalone tasks.
-          </p>
-        </div>
-        <PlanningRefreshControl
-          onRefresh={refreshCurrentView}
-          disabled={!singleProjectId}
-        />
-      </div>
-
-      {singleProjectId && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              value=""
-              readOnly
-              placeholder="Search (Coming soon)"
-              aria-label="Search work items"
-              className={cn(
-                "h-8 w-full rounded-md border border-border/60 bg-background pl-8 pr-3 text-sm text-muted-foreground",
-                "cursor-not-allowed",
-              )}
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled
-            className="gap-1.5"
-            title="Coming soon"
-          >
-            <Filter className="size-3.5" />
-            Filters
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-              {COMING_SOON_LABEL}
-            </span>
-          </Button>
-          <div className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1.5">
-            <Group className="size-3.5 text-muted-foreground" />
-            <select
-              aria-label="Group work items"
-              disabled
-              className="bg-transparent text-xs text-muted-foreground outline-none"
-              value={LIST_GROUP_OPTIONS[0]}
-              onChange={() => undefined}
-            >
-              {LIST_GROUP_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <span className="text-[10px] text-muted-foreground/80">{COMING_SOON_LABEL}</span>
-          </div>
-        </div>
-      )}
+      <PlanningTopShell
+        icon={ListTodo}
+        title="List"
+        subtitle="Unified project view of stories and standalone tasks."
+        controls={
+          singleProjectId ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value=""
+                  readOnly
+                  placeholder="Search (Coming soon)"
+                  aria-label="Search work items"
+                  className={cn(
+                    "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-muted-foreground",
+                    "cursor-not-allowed",
+                  )}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled
+                className="gap-1.5"
+                title="Coming soon"
+              >
+                <Filter className="size-3.5" />
+                Filters
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                  {COMING_SOON_LABEL}
+                </span>
+              </Button>
+              <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/60 px-2 py-1.5">
+                <Group className="size-3.5 text-muted-foreground" />
+                <select
+                  aria-label="Group work items"
+                  disabled
+                  className="bg-transparent text-xs text-muted-foreground outline-none"
+                  value={LIST_GROUP_OPTIONS[0]}
+                  onChange={() => undefined}
+                >
+                  {LIST_GROUP_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[10px] text-muted-foreground/80">{COMING_SOON_LABEL}</span>
+              </div>
+            </div>
+          ) : null
+        }
+        actions={(
+          <PlanningRefreshControl
+            onRefresh={refreshCurrentView}
+            disabled={!singleProjectId}
+            className="items-stretch sm:items-end"
+          />
+        )}
+      />
 
       {state.kind === "no-project" && (
         <EmptyState
