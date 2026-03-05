@@ -453,6 +453,7 @@ export default function PlanningListPage() {
                       {isStoryRow && (
                         <StoryActionsMenu
                           storyId={row.id}
+                          storyType={row.story_type}
                           storyKey={row.key}
                           storyTitle={row.title}
                           onDelete={handleStoryDelete}
@@ -513,6 +514,7 @@ export default function PlanningListPage() {
                       {isStoryRow && (
                         <StoryActionsMenu
                           storyId={row.id}
+                          storyType={row.story_type}
                           storyKey={row.key}
                           storyTitle={row.title}
                           onDelete={handleStoryDelete}

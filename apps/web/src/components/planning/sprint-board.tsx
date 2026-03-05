@@ -511,6 +511,7 @@ function BoardColumn({
                   onStoryDelete ? (
                     <StoryActionsMenu
                       storyId={story.id}
+                      storyType={story.story_type}
                       storyKey={story.key}
                       storyTitle={story.title}
                       onDelete={onStoryDelete}
