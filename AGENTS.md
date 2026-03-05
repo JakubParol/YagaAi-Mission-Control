@@ -74,6 +74,11 @@ When the user asks you to work with planning entities (projects, epics, stories,
    - Create: `mc story create --json '{"title":"...","story_type":"USER_STORY","project_id":"..."}'`
    - Update: `mc task update --id <uuid> --set status=IN_PROGRESS`
    - Filter: `--key`, `--project-id`, `--story-id`, `--status`, `--sort`
+6. **Default User Story placement policy (mandatory unless user says otherwise):**
+   - A newly created User Story must have an epic assigned.
+   - A newly created User Story must have labels assigned.
+   - A newly created User Story must be attached to the project product backlog.
+   - If the user explicitly asks to add the story to a sprint, attach it to the project's active sprint instead of product backlog.
 
 ## Task Workflow
 
