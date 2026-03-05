@@ -90,8 +90,12 @@ interface ListEnvelope<T> {
   data?: T[];
 }
 
-const HEADER_GRID_TEMPLATE =
-  "grid-cols-[116px_84px_minmax(0,1fr)_112px_72px_172px_220px_136px_44px]";
+const LIST_ONE_ROW_GRID_TEMPLATE =
+  "grid-cols-[108px_84px_minmax(280px,2.5fr)_112px_72px_168px_148px_132px_44px]";
+const LIST_FALLBACK_PRIMARY_GRID_TEMPLATE =
+  "grid-cols-[108px_84px_minmax(0,1fr)_112px_44px]";
+const LIST_FALLBACK_SECONDARY_GRID_TEMPLATE =
+  "grid-cols-[72px_minmax(0,1fr)_minmax(0,0.8fr)_132px]";
 
 async function fetchList<T>(path: string): Promise<T[]> {
   const response = await fetch(apiUrl(path));
@@ -599,8 +603,8 @@ function PlanningListPageContent() {
             <>
               <header
                 className={cn(
-                  "hidden border-b border-border/40 bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:grid",
-                  HEADER_GRID_TEMPLATE,
+                  "hidden border-b border-border/40 bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground 2xl:grid",
+                  LIST_ONE_ROW_GRID_TEMPLATE,
                 )}
               >
                 <span>Type</span>
@@ -699,58 +703,132 @@ function PlanningListPageContent() {
                     </p>
                   </div>
 
-                  <div className={cn("hidden items-center gap-3 md:grid", HEADER_GRID_TEMPLATE)}>
-                    <ItemTypeBadge rowType={row.row_type} />
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {row.key ?? "—"}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-foreground">{row.title}</p>
-                      <p className="truncate text-[10px] text-muted-foreground">
-                        {row.row_type === "story"
-                          ? (row.story_type ?? "Story")
-                          : (row.task_type ?? "Task")}
-                      </p>
-                    </div>
-                    <span
+                  <div className="hidden md:block">
+                    <div
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        statusStyle.bg,
-                        statusStyle.text,
+                        "hidden items-center gap-3 2xl:grid",
+                        LIST_ONE_ROW_GRID_TEMPLATE,
                       )}
                     >
-                      <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-                      {STATUS_LABEL[row.status]}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {getPriorityLabel(row.priority)}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground" title={epicText}>
-                      {epicText}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground" title={labelsText}>
-                      {labelsText}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatUpdatedAt(row.updated_at)}
-                    </span>
-                    <div className="justify-self-end">
-                      {isStoryRow && (
-                        <StoryActionsMenu
-                          storyId={row.id}
-                          storyType={row.story_type}
-                          storyKey={row.key}
-                          storyTitle={row.title}
-                          storyStatus={row.status}
-                          onDelete={handleStoryDelete}
-                          onStatusChange={handleStoryStatusChange}
-                          onAddLabel={(storyId) => {
-                            setSelectedStoryId(storyId);
-                          }}
-                          disabled={isStoryDeletePending}
-                          isDeleting={isStoryDeletePending}
-                        />
-                      )}
+                      <ItemTypeBadge rowType={row.row_type} />
+                      <span className="font-mono text-[11px] text-muted-foreground">
+                        {row.key ?? "—"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-foreground">{row.title}</p>
+                        <p className="truncate text-[10px] text-muted-foreground">
+                          {row.row_type === "story"
+                            ? (row.story_type ?? "Story")
+                            : (row.task_type ?? "Task")}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          statusStyle.bg,
+                          statusStyle.text,
+                        )}
+                      >
+                        <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+                        {STATUS_LABEL[row.status]}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {getPriorityLabel(row.priority)}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground" title={epicText}>
+                        {epicText}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground" title={labelsText}>
+                        {labelsText}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatUpdatedAt(row.updated_at)}
+                      </span>
+                      <div className="justify-self-end">
+                        {isStoryRow && (
+                          <StoryActionsMenu
+                            storyId={row.id}
+                            storyType={row.story_type}
+                            storyKey={row.key}
+                            storyTitle={row.title}
+                            storyStatus={row.status}
+                            onDelete={handleStoryDelete}
+                            onStatusChange={handleStoryStatusChange}
+                            onAddLabel={(storyId) => {
+                              setSelectedStoryId(storyId);
+                            }}
+                            disabled={isStoryDeletePending}
+                            isDeleting={isStoryDeletePending}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="hidden space-y-1.5 md:block 2xl:hidden">
+                      <div
+                        className={cn(
+                          "grid items-center gap-3",
+                          LIST_FALLBACK_PRIMARY_GRID_TEMPLATE,
+                        )}
+                      >
+                        <ItemTypeBadge rowType={row.row_type} />
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          {row.key ?? "—"}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-foreground">{row.title}</p>
+                          <p className="truncate text-[10px] text-muted-foreground">
+                            {row.row_type === "story"
+                              ? (row.story_type ?? "Story")
+                              : (row.task_type ?? "Task")}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                            statusStyle.bg,
+                            statusStyle.text,
+                          )}
+                        >
+                          <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+                          {STATUS_LABEL[row.status]}
+                        </span>
+                        <div className="justify-self-end">
+                          {isStoryRow && (
+                            <StoryActionsMenu
+                              storyId={row.id}
+                              storyType={row.story_type}
+                              storyKey={row.key}
+                              storyTitle={row.title}
+                              storyStatus={row.status}
+                              onDelete={handleStoryDelete}
+                              onStatusChange={handleStoryStatusChange}
+                              onAddLabel={(storyId) => {
+                                setSelectedStoryId(storyId);
+                              }}
+                              disabled={isStoryDeletePending}
+                              isDeleting={isStoryDeletePending}
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <div
+                        className={cn(
+                          "grid items-center gap-3 text-xs text-muted-foreground",
+                          LIST_FALLBACK_SECONDARY_GRID_TEMPLATE,
+                        )}
+                      >
+                        <span title={`Priority ${getPriorityLabel(row.priority)}`}>
+                          Prio: {getPriorityLabel(row.priority)}
+                        </span>
+                        <span className="truncate" title={epicText}>
+                          Epic: {epicText}
+                        </span>
+                        <span className="truncate" title={labelsText}>
+                          Labels: {labelsText}
+                        </span>
+                        <span className="text-right">{formatUpdatedAt(row.updated_at)}</span>
+                      </div>
                     </div>
                   </div>
                     </div>
