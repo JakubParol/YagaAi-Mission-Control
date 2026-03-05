@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
-import { Calendar, Target, Hash, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
@@ -14,7 +14,6 @@ import {
   ThemedSelect,
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
-import { FloatingCard } from "@/components/ui/floating-card";
 import { AvatarOption } from "@/components/planning/avatar-option";
 import { StoryTypeBadge } from "@/components/planning/story-type-badge";
 import { AssigneeAvatarTooltip } from "@/components/planning/assignee-avatar-tooltip";
@@ -224,97 +223,6 @@ function StoryAssigneeControl({
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ─── Sprint Header ──────────────────────────────────────────────────
-
-function SprintHeader({
-  backlog,
-  stories,
-}: {
-  backlog: SprintBacklog;
-  stories: StoryCardStory[];
-}) {
-  const { total, done, inProgress, pctDone } = useMemo(() => {
-    const totalStories = stories.length;
-    const doneStories = stories.filter((s) => s.status === "DONE").length;
-    const inProgressStories = stories.filter(
-      (s) => s.status === "IN_PROGRESS" || s.status === "CODE_REVIEW" || s.status === "VERIFY"
-    ).length;
-    const donePercent = totalStories > 0 ? Math.round((doneStories / totalStories) * 100) : 0;
-    return {
-      total: totalStories,
-      done: doneStories,
-      inProgress: inProgressStories,
-      pctDone: donePercent,
-    };
-  }, [stories]);
-
-  const formatDate = (d: string | null) => {
-    if (!d) return null;
-    try {
-      return new Date(d).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-      });
-    } catch {
-      return d;
-    }
-  };
-
-  const start = formatDate(backlog.start_date);
-  const end = formatDate(backlog.end_date);
-
-  return (
-    <FloatingCard className="mb-6 px-5 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {/* Left: name + meta */}
-        <div className="space-y-1.5">
-          <h2 className="text-lg font-semibold text-foreground">{backlog.name}</h2>
-          {backlog.goal && (
-            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Target className="size-3.5 shrink-0" />
-              {backlog.goal}
-            </p>
-          )}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            {(start || end) && (
-              <span className="flex items-center gap-1">
-                <Calendar className="size-3" />
-                {start && end ? `${start} – ${end}` : start ?? end}
-              </span>
-            )}
-            <span className="flex items-center gap-1">
-              <Hash className="size-3" />
-              {total} {total === 1 ? "story" : "stories"}
-            </span>
-          </div>
-        </div>
-
-        {/* Right: progress */}
-        <div className="flex flex-col items-end gap-1.5 min-w-[140px]">
-          <span className="text-xs font-medium text-muted-foreground">
-            {done}/{total} done ({pctDone}%)
-          </span>
-          {/* Segmented progress bar */}
-          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted/50">
-            {done > 0 && (
-              <div
-                className="bg-emerald-500 transition-all duration-300"
-                style={{ width: `${(done / total) * 100}%` }}
-              />
-            )}
-            {inProgress > 0 && (
-              <div
-                className="bg-blue-500/70 transition-all duration-300"
-                style={{ width: `${(inProgress / total) * 100}%` }}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    </FloatingCard>
   );
 }
 
@@ -783,8 +691,6 @@ export function SprintBoard({
 
   return (
     <div>
-      <SprintHeader backlog={data.backlog} stories={data.stories} />
-
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 overflow-x-auto">
         {COLUMNS.map((col) => (
           <BoardColumn
