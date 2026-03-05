@@ -93,6 +93,19 @@ export default function BoardPage() {
     state.kind === "ok" && selectedStoryId
       ? state.data.stories.find((story) => story.id === selectedStoryId)?.labels
       : undefined;
+  const boardSummary = visibleState.kind === "ok"
+    ? (() => {
+        const total = visibleState.data.stories.length;
+        const done = visibleState.data.stories.filter((story) => story.status === "DONE").length;
+        const pctDone = total > 0 ? Math.round((done / total) * 100) : 0;
+        return {
+          sprintName: visibleState.data.backlog.name,
+          total,
+          done,
+          pctDone,
+        };
+      })()
+    : null;
 
   const fetchBoardState = useCallback(async (projectId: string): Promise<BoardState> => {
     setPendingStoryIds({});
@@ -358,6 +371,21 @@ export default function BoardPage() {
           selectedLabelIds.length > 0
             ? `Filtered by ${selectedLabelIds.length} label${selectedLabelIds.length === 1 ? "" : "s"}.`
             : undefined
+        }
+        controls={
+          boardSummary ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5 font-medium text-foreground">
+                {boardSummary.sprintName}
+              </span>
+              <span className="rounded-full border border-border/50 bg-muted/40 px-2 py-0.5">
+                {boardSummary.total} {boardSummary.total === 1 ? "story" : "stories"}
+              </span>
+              <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+                {boardSummary.done}/{boardSummary.total} done ({boardSummary.pctDone}%)
+              </span>
+            </div>
+          ) : null
         }
         actions={(
           <PlanningRefreshControl
