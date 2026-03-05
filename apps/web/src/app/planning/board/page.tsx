@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Target } from "lucide-react";
+import { Loader2, Search, Target } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/empty-state";
 import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
   createTodoQuickItem,
@@ -47,6 +48,7 @@ export default function BoardPage() {
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [assigneeOptions, setAssigneeOptions] = useState<QuickCreateAssigneeOption[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -78,6 +80,7 @@ export default function BoardPage() {
     : state.kind !== "no-project" && state.projectId === singleProjectId
       ? state
       : { kind: "loading", projectId: singleProjectId };
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
   const visibleState: BoardState =
     viewState.kind === "ok"
@@ -85,7 +88,12 @@ export default function BoardPage() {
           ...viewState,
           data: {
             ...viewState.data,
-            stories: filterStoriesBySelectedLabels(viewState.data.stories, selectedLabelIds),
+            stories: filterStoriesBySelectedLabels(viewState.data.stories, selectedLabelIds).filter((story) => {
+              if (normalizedSearchQuery.length === 0) return true;
+              const key = (story.key ?? "").toLowerCase();
+              const title = story.title.toLowerCase();
+              return key.includes(normalizedSearchQuery) || title.includes(normalizedSearchQuery);
+            }),
           },
         }
       : viewState;
@@ -365,7 +373,7 @@ export default function BoardPage() {
 
       <PlanningTopShell
         icon={Target}
-        title="Board"
+        title={boardSummary?.sprintName ?? "Board"}
         subtitle="Active sprint board for the selected project."
         context={
           selectedLabelIds.length > 0
@@ -373,26 +381,45 @@ export default function BoardPage() {
             : undefined
         }
         controls={
-          boardSummary ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5 font-medium text-foreground">
-                {boardSummary.sprintName}
-              </span>
-              <span className="rounded-full border border-border/50 bg-muted/40 px-2 py-0.5">
-                {boardSummary.total} {boardSummary.total === 1 ? "story" : "stories"}
-              </span>
-              <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
-                {boardSummary.done}/{boardSummary.total} done ({boardSummary.pctDone}%)
-              </span>
+          singleProjectId ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  disabled={visibleState.kind !== "ok"}
+                  placeholder="Filter by name or key"
+                  aria-label="Filter board stories by name"
+                  className={cn(
+                    "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground",
+                    "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                    visibleState.kind !== "ok" && "cursor-not-allowed text-muted-foreground",
+                  )}
+                />
+              </div>
             </div>
           ) : null
         }
         actions={(
-          <PlanningRefreshControl
-            onRefresh={refreshCurrentView}
-            disabled={!singleProjectId}
-            className="items-stretch sm:items-end"
-          />
+          <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
+            <PlanningRefreshControl
+              onRefresh={refreshCurrentView}
+              disabled={!singleProjectId}
+              className="items-stretch sm:items-end"
+            />
+            {boardSummary ? (
+              <div className="flex flex-wrap justify-end gap-1.5 text-xs text-muted-foreground">
+                <span className="rounded-full border border-border/50 bg-muted/40 px-2 py-0.5">
+                  {boardSummary.total} {boardSummary.total === 1 ? "story" : "stories"}
+                </span>
+                <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+                  {boardSummary.done}/{boardSummary.total} done ({boardSummary.pctDone}%)
+                </span>
+              </div>
+            ) : null}
+          </div>
         )}
       />
 
