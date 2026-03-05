@@ -6,9 +6,13 @@ import { STORY_CARD_LAYOUT } from "./story-card.js";
 import { STORY_DETAIL_HEADER_LAYOUT } from "./story-detail-dialog.js";
 
 test("story card keeps a single metadata row layout", () => {
-  assert.equal(STORY_CARD_LAYOUT.metadataRow, "flex items-center justify-between gap-2 mb-0.5");
+  assert.equal(STORY_CARD_LAYOUT.metadataRow, "flex items-center justify-between gap-2");
   assert.equal(STORY_CARD_LAYOUT.metadataLeft, "flex min-w-0 items-center gap-1.5");
-  assert.equal(STORY_CARD_LAYOUT.taskProgress, "min-h-4 min-w-[44px] text-right");
+  assert.equal(STORY_CARD_LAYOUT.metadataRight, "flex items-center gap-2.5");
+  assert.equal(
+    STORY_CARD_LAYOUT.actions,
+    "absolute right-2 top-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+  );
 });
 
 test("backlog row uses fixed-width grid columns for alignment", () => {

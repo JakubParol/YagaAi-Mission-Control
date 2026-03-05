@@ -1,16 +1,17 @@
 import type { DragEvent, ReactNode } from "react";
 import {
-  CheckCircle2,
-  ChevronUp,
   ChevronDown,
+  ChevronUp,
   Minus,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryLabelChips, type StoryLabel } from "./story-label-chips";
 import {
   STORY_TYPE_CONFIG,
-  StoryTypeBadge,
+  resolveStoryTypeVisualConfig,
 } from "./story-type-badge";
 
 export interface StoryCardStory {
@@ -27,7 +28,19 @@ export interface StoryCardStory {
   done_task_count: number;
   labels?: StoryLabel[];
   label_ids?: string[];
+  assignee?: {
+    name?: string | null;
+    last_name?: string | null;
+    initials?: string | null;
+    avatar?: string | null;
+  } | null;
+  assignee_name?: string | null;
+  assignee_last_name?: string | null;
+  assignee_initials?: string | null;
+  assignee_avatar?: string | null;
 }
+
+export const TYPE_CONFIG = STORY_TYPE_CONFIG;
 
 export const STATUS_STYLE: Record<
   ItemStatus,
@@ -48,12 +61,11 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   DONE: "Done",
 };
 
-export const TYPE_CONFIG = STORY_TYPE_CONFIG;
-
 export const STORY_CARD_LAYOUT = {
-  metadataRow: "flex items-center justify-between gap-2 mb-0.5",
+  metadataRow: "flex items-center justify-between gap-2",
   metadataLeft: "flex min-w-0 items-center gap-1.5",
-  taskProgress: "min-h-4 min-w-[44px] text-right",
+  metadataRight: "flex items-center gap-2.5",
+  actions: "absolute right-2 top-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
 } as const;
 
 function PriorityIndicator({ priority }: { priority: number | null }) {
@@ -88,6 +100,24 @@ function PriorityIndicator({ priority }: { priority: number | null }) {
   );
 }
 
+function resolveStoryAssignee(story: StoryCardStory): StoryCardStory["assignee"] | null {
+  if (story.assignee) return story.assignee;
+  if (
+    story.assignee_name
+    || story.assignee_last_name
+    || story.assignee_initials
+    || story.assignee_avatar
+  ) {
+    return {
+      name: story.assignee_name ?? null,
+      last_name: story.assignee_last_name ?? null,
+      initials: story.assignee_initials ?? null,
+      avatar: story.assignee_avatar ?? null,
+    };
+  }
+  return null;
+}
+
 export function StoryCard({
   story,
   onClick,
@@ -103,7 +133,13 @@ export function StoryCard({
   disabled?: boolean;
   actions?: ReactNode;
 }) {
-  const statusStyle = STATUS_STYLE[story.status];
+  const typeConfig = resolveStoryTypeVisualConfig(story.story_type);
+  const TypeIcon = typeConfig.icon;
+  const assignee = resolveStoryAssignee(story);
+  const assigneeName = assignee?.name?.trim() ?? "Unassigned";
+  const hasAssignee = Boolean(
+    assignee && (assignee.name || assignee.initials || assignee.avatar),
+  );
 
   return (
     <div
@@ -126,58 +162,63 @@ export function StoryCard({
       }}
       onDragEnd={() => onDragEnd?.()}
       className={cn(
-        "group w-full text-left rounded-lg border border-border/60 bg-card px-3 py-2.5",
+        "group relative w-full text-left rounded-lg border border-border/60 bg-card px-3 py-2.5",
         "hover:border-border hover:bg-card/80 transition-colors duration-150",
         "focus-ring",
         disabled && "cursor-not-allowed opacity-70",
       )}
     >
-      {/* Top row: key + priority */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <span className="font-mono text-[11px] tracking-wide text-muted-foreground">
-          {story.key ?? "—"}
-        </span>
-        <div className="flex items-center gap-0.5">
-          <PriorityIndicator priority={story.priority} />
+      {actions ? (
+        <div className={STORY_CARD_LAYOUT.actions} aria-hidden={disabled ? true : undefined}>
           {actions}
         </div>
-      </div>
+      ) : null}
 
       {/* Title */}
-      <p className="text-sm font-medium leading-snug text-foreground line-clamp-2 mb-2">
+      <p className="pr-8 text-sm font-medium leading-snug text-foreground line-clamp-2 mb-1">
         {story.title}
       </p>
 
-      {/* Metadata row: type + status + task progress */}
+      {/* Epic */}
+      <p className="mb-1.5 min-h-4 text-[11px] text-muted-foreground line-clamp-1">
+        {story.epic_key && story.epic_title
+          ? `${story.epic_key} ${story.epic_title}`
+          : "No epic"}
+      </p>
+
+      {/* Metadata row: type + key + story points + assignee */}
       <div className={STORY_CARD_LAYOUT.metadataRow} data-testid="story-card-metadata-row">
         <div className={STORY_CARD_LAYOUT.metadataLeft}>
-          <StoryTypeBadge storyType={story.story_type} variant="plain" />
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-              statusStyle.bg,
-              "text-muted-foreground",
-            )}
-          >
-            <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-            {STATUS_LABEL[story.status]}
+          <TypeIcon className={cn("size-3.5 shrink-0", typeConfig.color)} aria-hidden="true" />
+          <span className="truncate font-mono text-[11px] tracking-wide text-muted-foreground">
+            {story.key ?? "—"}
           </span>
+          <PriorityIndicator priority={story.priority} />
         </div>
 
-        <span className={STORY_CARD_LAYOUT.taskProgress}>
-          {story.task_count > 0 ? (
+        <div className={STORY_CARD_LAYOUT.metadataRight}>
+          <span className="text-[11px] text-muted-foreground" title="Story points">
+            -
+          </span>
+          {hasAssignee ? (
+            <Avatar
+              src={assignee?.avatar}
+              name={assignee?.name ?? null}
+              lastName={assignee?.last_name ?? null}
+              initials={assignee?.initials ?? null}
+              alt={`${assigneeName} assignee avatar`}
+              className="size-5"
+            />
+          ) : (
             <span
-              className={cn(
-                "inline-flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground",
-                story.done_task_count === story.task_count && "text-emerald-400",
-              )}
-              title={`${story.done_task_count} of ${story.task_count} tasks done`}
+              className="inline-flex size-5 items-center justify-center rounded-full border border-border/70 bg-muted text-muted-foreground"
+              title="Unassigned"
+              aria-label="Unassigned"
             >
-              <CheckCircle2 className="size-3" />
-              {story.done_task_count}/{story.task_count}
+              <User className="size-3" aria-hidden="true" />
             </span>
-          ) : null}
-        </span>
+          )}
+        </div>
       </div>
 
       <StoryLabelChips labels={story.labels} className="mt-1" />
