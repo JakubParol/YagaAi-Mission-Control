@@ -523,7 +523,7 @@ Returns `200`.
 #### `GET /v1/planning/backlogs/{id}/stories` — List stories in a backlog
 
 Returns stories belonging to the given backlog, ordered by `position ASC`.
-Story objects match the active sprint story shape (`id`, `key`, `title`, `status`, `priority`, `story_type`, `position`, `task_count`, `done_task_count`, `labels`, `label_ids`).
+Story objects match the active sprint story shape (`id`, `key`, `title`, `status`, `priority`, `story_type`, `position`, `task_count`, `done_task_count`, `assignee_agent_id`, `assignee_name`, `assignee_last_name`, `assignee_initials`, `assignee_avatar`, `labels`, `label_ids`).
 
 Response `200`:
 ```jsonc
@@ -539,6 +539,11 @@ Response `200`:
       "position": 0,
       "task_count": 3,
       "done_task_count": 1,
+      "assignee_agent_id": "a1",
+      "assignee_name": "Agent",
+      "assignee_last_name": "Alpha",
+      "assignee_initials": "AA",
+      "assignee_avatar": "https://cdn.example.com/agent-1.png",
       "labels": [
         { "id": "...", "name": "bug", "color": "#ff0000" }
       ],
@@ -582,6 +587,13 @@ Response `200`:
         "priority": 1,
         "story_type": "feature",
         "position": 0,
+        "task_count": 3,
+        "done_task_count": 1,
+        "assignee_agent_id": "a1",
+        "assignee_name": "Agent",
+        "assignee_last_name": "Alpha",
+        "assignee_initials": "AA",
+        "assignee_avatar": "https://cdn.example.com/agent-1.png",
         "labels": [
           { "id": "...", "name": "bug", "color": "#ff0000" }
         ],

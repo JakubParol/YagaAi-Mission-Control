@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import aiosqlite
@@ -1273,7 +1274,7 @@ class SqliteBacklogRepository(BacklogRepository):
     async def list_backlog_stories(self, backlog_id: str) -> list[dict[str, Any]]:
         story_rows = await _fetch_all(
             self._db,
-            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type, s.metadata_json,
                       e.key AS epic_key,
                       e.title AS epic_title,
                       bs.position,
@@ -1288,6 +1289,7 @@ class SqliteBacklogRepository(BacklogRepository):
         )
         stories = [dict(r) for r in story_rows]
         await self._attach_story_labels(stories)
+        await self._attach_story_assignees(stories)
         return stories
 
     async def list_task_items(self, backlog_id: str) -> list[BacklogTaskItem]:
@@ -1318,7 +1320,7 @@ class SqliteBacklogRepository(BacklogRepository):
             return None, []
         story_rows = await _fetch_all(
             self._db,
-            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type,
+            """SELECT s.id, s.key, s.title, s.status, s.priority, s.story_type, s.metadata_json,
                       e.key AS epic_key,
                       e.title AS epic_title,
                       bs.position,
@@ -1333,6 +1335,7 @@ class SqliteBacklogRepository(BacklogRepository):
         )
         stories = [dict(r) for r in story_rows]
         await self._attach_story_labels(stories)
+        await self._attach_story_assignees(stories)
         return backlog, stories
 
     async def _attach_story_labels(self, stories: list[dict[str, Any]]) -> None:
@@ -1367,6 +1370,71 @@ class SqliteBacklogRepository(BacklogRepository):
             story_labels = labels_by_story.get(story["id"], [])
             story["labels"] = story_labels
             story["label_ids"] = [label["id"] for label in story_labels]
+
+    async def _attach_story_assignees(self, stories: list[dict[str, Any]]) -> None:
+        if not stories:
+            return
+
+        assignee_ids: set[str] = set()
+        assignee_by_story_id: dict[str, str] = {}
+
+        for story in stories:
+            metadata_raw = story.get("metadata_json")
+            if not isinstance(metadata_raw, str) or metadata_raw.strip() == "":
+                continue
+            try:
+                metadata = json.loads(metadata_raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(metadata, dict):
+                continue
+            quick_create_assignee = metadata.get("quick_create_assignee_agent_id")
+            if not isinstance(quick_create_assignee, str):
+                continue
+            assignee_id = quick_create_assignee.strip()
+            if assignee_id == "":
+                continue
+            assignee_ids.add(assignee_id)
+            assignee_by_story_id[story["id"]] = assignee_id
+
+        agents_by_id: dict[str, dict[str, Any]] = {}
+        if assignee_ids:
+            placeholders = ", ".join(["?"] * len(assignee_ids))
+            rows = await _fetch_all(
+                self._db,
+                (
+                    "SELECT id, name, last_name, initials, avatar "
+                    "FROM agents "
+                    f"WHERE id IN ({placeholders}) AND is_active = 1"
+                ),
+                list(assignee_ids),
+            )
+            agents_by_id = {
+                row["id"]: {
+                    "name": row["name"],
+                    "last_name": row["last_name"],
+                    "initials": row["initials"],
+                    "avatar": row["avatar"],
+                }
+                for row in rows
+            }
+
+        for story in stories:
+            assignee_id = assignee_by_story_id.get(story["id"])
+            if not assignee_id:
+                story["assignee_agent_id"] = None
+                story["assignee_name"] = None
+                story["assignee_last_name"] = None
+                story["assignee_initials"] = None
+                story["assignee_avatar"] = None
+                continue
+
+            agent = agents_by_id.get(assignee_id)
+            story["assignee_agent_id"] = assignee_id
+            story["assignee_name"] = agent["name"] if agent else None
+            story["assignee_last_name"] = agent["last_name"] if agent else None
+            story["assignee_initials"] = agent["initials"] if agent else None
+            story["assignee_avatar"] = agent["avatar"] if agent else None
 
     async def get_active_sprint_backlog(self, project_id: str) -> Backlog | None:
         row = await _fetch_one(

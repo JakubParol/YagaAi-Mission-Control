@@ -353,6 +353,11 @@ class SprintStoryResponse(BaseModel):
     position: int
     task_count: int
     done_task_count: int
+    assignee_agent_id: str | None = None
+    assignee_name: str | None = None
+    assignee_last_name: str | None = None
+    assignee_initials: str | None = None
+    assignee_avatar: str | None = None
     labels: list[SprintStoryLabelResponse] = Field(default_factory=list)
     label_ids: list[str] = Field(default_factory=list)
 
