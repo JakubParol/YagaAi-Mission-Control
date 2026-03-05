@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Filter, Group, ListTodo, Loader2, Search } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BookOpen, Filter, ListTodo, Loader2, Search } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
@@ -25,22 +26,46 @@ import { deleteStory } from "../story-actions";
 import {
   buildPlanningListRows,
   COMING_SOON_LABEL,
-  LIST_GROUP_OPTIONS,
   type PlanningBacklogStoryApiItem,
   type PlanningEpicApiItem,
+  type PlanningListLabel,
   type PlanningListRow,
   type PlanningStoryApiItem,
   type PlanningTaskApiItem,
 } from "./list-view-model";
+import {
+  applyPlanningListFilters,
+  buildStatusOptions,
+  buildTypeOptions,
+  LIST_FILTER_KEYS,
+  UNASSIGNED_FILTER_VALUE,
+} from "./list-filters";
 
 interface PlanningBacklogApiItem {
   id: string;
 }
 
+interface PlanningAgentApiItem {
+  id?: string;
+  name?: string;
+  last_name?: string | null;
+}
+
+interface PlanningListAssigneeOption {
+  id: string;
+  label: string;
+}
+
 type FetchResult =
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; rows: PlanningListRow[] };
+  | {
+      kind: "ok";
+      rows: PlanningListRow[];
+      epics: PlanningEpicApiItem[];
+      labels: PlanningListLabel[];
+      assignees: PlanningListAssigneeOption[];
+    };
 
 interface ScopedFetchResult {
   projectId: string;
@@ -52,7 +77,13 @@ type PageState =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; rows: PlanningListRow[] };
+  | {
+      kind: "ok";
+      rows: PlanningListRow[];
+      epics: PlanningEpicApiItem[];
+      labels: PlanningListLabel[];
+      assignees: PlanningListAssigneeOption[];
+    };
 
 interface ListEnvelope<T> {
   data?: T[];
@@ -85,6 +116,26 @@ function getPriorityLabel(priority: number | null): string {
   return priority === null ? "—" : String(priority);
 }
 
+function resolveAgentLabel(agent: PlanningAgentApiItem): string | null {
+  if (!agent.id || !agent.name) return null;
+  const fullName = [agent.name, agent.last_name ?? ""].join(" ").trim();
+  return fullName.length > 0 ? fullName : agent.name;
+}
+
+function buildLabelOptions(rows: PlanningListRow[]): PlanningListLabel[] {
+  const labelsById = new Map<string, PlanningListLabel>();
+
+  for (const row of rows) {
+    for (const label of row.labels) {
+      if (!labelsById.has(label.id)) {
+        labelsById.set(label.id, label);
+      }
+    }
+  }
+
+  return [...labelsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function ItemTypeBadge({ rowType }: { rowType: PlanningListRow["row_type"] }) {
   const Icon = rowType === "story" ? BookOpen : ListTodo;
   const label = rowType === "story" ? "Story" : "Task";
@@ -108,6 +159,9 @@ function ItemTypeBadge({ rowType }: { rowType: PlanningListRow["row_type"] }) {
 
 export default function PlanningListPage() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [selectedTaskRow, setSelectedTaskRow] = useState<PlanningListRow | null>(null);
@@ -130,8 +184,41 @@ export default function PlanningListPage() {
       ? { kind: "loading" }
       : fetchResult;
 
+  const searchQuery = searchParams.get(LIST_FILTER_KEYS.search) ?? "";
+  const statusFilter = (searchParams.get(LIST_FILTER_KEYS.status) ?? "") as ItemStatus | "";
+  const typeFilter = searchParams.get(LIST_FILTER_KEYS.type) ?? "";
+  const labelFilter = searchParams.get(LIST_FILTER_KEYS.labelId) ?? "";
+  const epicFilter = searchParams.get(LIST_FILTER_KEYS.epicId) ?? "";
+  const assigneeFilter = searchParams.get(LIST_FILTER_KEYS.assignee) ?? "";
+
+  const updateFilterParam = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value.trim().length === 0) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+      const queryString = params.toString();
+      router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(LIST_FILTER_KEYS.search);
+    params.delete(LIST_FILTER_KEYS.status);
+    params.delete(LIST_FILTER_KEYS.type);
+    params.delete(LIST_FILTER_KEYS.labelId);
+    params.delete(LIST_FILTER_KEYS.epicId);
+    params.delete(LIST_FILTER_KEYS.assignee);
+    const queryString = params.toString();
+    router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
+  }, [pathname, router, searchParams]);
+
   const fetchListResult = useCallback(async (projectId: string): Promise<FetchResult> => {
-    const [stories, tasks, epics, backlogs] = await Promise.all([
+    const [stories, tasks, epics, backlogs, agents] = await Promise.all([
       fetchList<PlanningStoryApiItem>(
         `/v1/planning/stories?project_id=${projectId}&limit=100&sort=-updated_at`,
       ),
@@ -144,6 +231,9 @@ export default function PlanningListPage() {
       fetchList<PlanningBacklogApiItem>(
         `/v1/planning/backlogs?project_id=${projectId}&limit=100`,
       ),
+      fetchList<PlanningAgentApiItem>(
+        "/v1/planning/agents?is_active=true&limit=100&sort=name",
+      ).catch(() => []),
     ]);
 
     const backlogStoryGroups = await Promise.all(
@@ -170,7 +260,26 @@ export default function PlanningListPage() {
       epics,
     });
 
-    return rows.length === 0 ? { kind: "empty" } : { kind: "ok", rows };
+    if (rows.length === 0) {
+      return { kind: "empty" };
+    }
+
+    const labels = buildLabelOptions(rows);
+    const assignees = agents
+      .map((agent) => {
+        const label = resolveAgentLabel(agent);
+        return label && agent.id ? { id: agent.id, label } : null;
+      })
+      .filter((value): value is PlanningListAssigneeOption => value !== null)
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    return {
+      kind: "ok",
+      rows,
+      epics,
+      labels,
+      assignees,
+    };
   }, []);
 
   const refreshCurrentView = useCallback(async () => {
@@ -286,21 +395,35 @@ export default function PlanningListPage() {
     [pendingStoryIds, refreshCurrentView],
   );
 
+  const visibleRows =
+    state.kind === "ok"
+      ? applyPlanningListFilters(state.rows, {
+          search: searchQuery,
+          status: statusFilter,
+          type: typeFilter,
+          labelId: labelFilter,
+          epicId: epicFilter,
+          assignee: assigneeFilter,
+        })
+      : [];
+  const statusOptions = state.kind === "ok" ? buildStatusOptions(state.rows) : [];
+  const typeOptions = state.kind === "ok" ? buildTypeOptions(state.rows) : [];
+
   const activeSelectedStoryId =
     state.kind === "ok" &&
     selectedStoryId &&
-    state.rows.some((row) => row.row_type === "story" && row.id === selectedStoryId)
+    visibleRows.some((row) => row.row_type === "story" && row.id === selectedStoryId)
       ? selectedStoryId
       : null;
   const activeSelectedTaskRow =
     state.kind === "ok" &&
     selectedTaskRow &&
-    state.rows.some((row) => row.row_type === "task" && row.id === selectedTaskRow.id)
+    visibleRows.some((row) => row.row_type === "task" && row.id === selectedTaskRow.id)
       ? selectedTaskRow
       : null;
   const selectedStoryLabels =
     state.kind === "ok" && activeSelectedStoryId
-      ? state.rows.find((row) => row.row_type === "story" && row.id === activeSelectedStoryId)
+      ? visibleRows.find((row) => row.row_type === "story" && row.id === activeSelectedStoryId)
           ?.labels
       : undefined;
 
@@ -327,46 +450,100 @@ export default function PlanningListPage() {
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
-                  value=""
-                  readOnly
-                  placeholder="Search (Coming soon)"
+                  value={searchQuery}
+                  onChange={(event) => {
+                    updateFilterParam(LIST_FILTER_KEYS.search, event.target.value);
+                  }}
+                  placeholder="Search by key or title"
                   aria-label="Search work items"
-                  className={cn(
-                    "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-muted-foreground",
-                    "cursor-not-allowed",
-                  )}
+                  className="h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground"
                 />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled
-                className="gap-1.5"
-                title="Coming soon"
-              >
-                <Filter className="size-3.5" />
-                Filters
-                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
-                  {COMING_SOON_LABEL}
-                </span>
-              </Button>
-              <div className="flex items-center gap-1.5 rounded-md border border-border/60 bg-background/60 px-2 py-1.5">
-                <Group className="size-3.5 text-muted-foreground" />
+
+              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5">
+                <Filter className="size-3.5 text-muted-foreground" />
                 <select
-                  aria-label="Group work items"
-                  disabled
+                  aria-label="Filter by status"
                   className="bg-transparent text-xs text-muted-foreground outline-none"
-                  value={LIST_GROUP_OPTIONS[0]}
-                  onChange={() => undefined}
+                  value={statusFilter}
+                  onChange={(event) => {
+                    updateFilterParam(LIST_FILTER_KEYS.status, event.target.value);
+                  }}
                 >
-                  {LIST_GROUP_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                  <option value="">Status: All</option>
+                  {statusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
-                <span className="text-[10px] text-muted-foreground/80">{COMING_SOON_LABEL}</span>
+                <select
+                  aria-label="Filter by type"
+                  className="bg-transparent text-xs text-muted-foreground outline-none"
+                  value={typeFilter}
+                  onChange={(event) => {
+                    updateFilterParam(LIST_FILTER_KEYS.type, event.target.value);
+                  }}
+                >
+                  <option value="">Type: All</option>
+                  {typeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Filter by label"
+                  className="max-w-[180px] bg-transparent text-xs text-muted-foreground outline-none"
+                  value={labelFilter}
+                  onChange={(event) => {
+                    updateFilterParam(LIST_FILTER_KEYS.labelId, event.target.value);
+                  }}
+                >
+                  <option value="">Label: All</option>
+                  {state.kind === "ok" &&
+                    state.labels.map((label) => (
+                      <option key={label.id} value={label.id}>
+                        {label.name}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  aria-label="Filter by epic"
+                  className="max-w-[180px] bg-transparent text-xs text-muted-foreground outline-none"
+                  value={epicFilter}
+                  onChange={(event) => {
+                    updateFilterParam(LIST_FILTER_KEYS.epicId, event.target.value);
+                  }}
+                >
+                  <option value="">Epic: All</option>
+                  {state.kind === "ok" &&
+                    state.epics.map((epic) => (
+                      <option key={epic.id} value={epic.id}>
+                        {epic.key} {epic.title}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  aria-label="Filter by assignee"
+                  className="max-w-[180px] bg-transparent text-xs text-muted-foreground outline-none"
+                  value={assigneeFilter}
+                  onChange={(event) => {
+                    updateFilterParam(LIST_FILTER_KEYS.assignee, event.target.value);
+                  }}
+                >
+                  <option value="">Assignee: All</option>
+                  <option value={UNASSIGNED_FILTER_VALUE}>Unassigned</option>
+                  {state.kind === "ok" &&
+                    state.assignees.map((assignee) => (
+                      <option key={assignee.id} value={assignee.id}>
+                        {assignee.label}
+                      </option>
+                    ))}
+                </select>
+                <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
+                  Clear
+                </Button>
               </div>
             </div>
           ) : null
@@ -408,28 +585,38 @@ export default function PlanningListPage() {
 
       {state.kind === "ok" && (
         <section className="overflow-hidden rounded-lg border border-border/60 bg-card/20">
-          <header
-            className={cn(
-              "hidden border-b border-border/40 bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:grid",
-              HEADER_GRID_TEMPLATE,
-            )}
-          >
-            <span>Type</span>
-            <span>Key</span>
-            <span>Title</span>
-            <span>Status</span>
-            <span>Priority</span>
-            <span>Epic</span>
-            <span>Labels</span>
-            <span>Updated</span>
-            <span className="text-right">Actions</span>
-          </header>
+          {visibleRows.length === 0 ? (
+            <div className="px-4 py-12">
+              <EmptyState
+                icon="default"
+                title="No matching work items"
+                description="No items match the active list filters. Adjust filters or clear them to see all rows."
+              />
+            </div>
+          ) : (
+            <>
+              <header
+                className={cn(
+                  "hidden border-b border-border/40 bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:grid",
+                  HEADER_GRID_TEMPLATE,
+                )}
+              >
+                <span>Type</span>
+                <span>Key</span>
+                <span>Title</span>
+                <span>Status</span>
+                <span>Priority</span>
+                <span>Epic</span>
+                <span>Labels</span>
+                <span>Updated</span>
+                <span className="text-right">Actions</span>
+              </header>
 
-          <div className="divide-y divide-border/20">
-            {state.rows.map((row) => {
-              const statusStyle = STATUS_STYLE[row.status];
-              const labelsText =
-                row.labels.length > 0
+              <div className="divide-y divide-border/20">
+                {visibleRows.map((row) => {
+                  const statusStyle = STATUS_STYLE[row.status];
+                  const labelsText =
+                    row.labels.length > 0
                   ? row.labels.map((label) => label.name).join(", ")
                   : "—";
               const epicText =
@@ -444,60 +631,60 @@ export default function PlanningListPage() {
                 }
               };
 
-              return (
-                <div
-                  key={`${row.row_type}:${row.id}`}
-                  role="button"
-                  tabIndex={isStoryDeletePending ? -1 : 0}
-                  aria-disabled={isStoryDeletePending}
-                  onClick={() => {
-                    if (isStoryDeletePending) return;
-                    openRowDetails();
-                  }}
-                  onKeyDown={(event) => {
-                    if (isStoryDeletePending) return;
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openRowDetails();
-                    }
-                  }}
-                  className={cn(
-                    "w-full text-left transition-colors duration-100 hover:bg-muted/25 focus-ring",
-                    "px-3 py-2.5",
-                    isStoryDeletePending && "cursor-progress opacity-70",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-2 md:hidden">
-                    <ItemTypeBadge rowType={row.row_type} />
-                    <div className="flex items-center gap-1">
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          statusStyle.bg,
-                          statusStyle.text,
-                        )}
-                      >
-                        <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-                        {STATUS_LABEL[row.status]}
-                      </span>
-                      {isStoryRow && (
-                        <StoryActionsMenu
-                          storyId={row.id}
-                          storyType={row.story_type}
-                          storyKey={row.key}
-                          storyTitle={row.title}
-                          storyStatus={row.status}
-                          onDelete={handleStoryDelete}
-                          onStatusChange={handleStoryStatusChange}
-                          onAddLabel={(storyId) => {
-                            setSelectedStoryId(storyId);
-                          }}
-                          disabled={isStoryDeletePending}
-                          isDeleting={isStoryDeletePending}
-                        />
+                  return (
+                    <div
+                      key={`${row.row_type}:${row.id}`}
+                      role="button"
+                      tabIndex={isStoryDeletePending ? -1 : 0}
+                      aria-disabled={isStoryDeletePending}
+                      onClick={() => {
+                        if (isStoryDeletePending) return;
+                        openRowDetails();
+                      }}
+                      onKeyDown={(event) => {
+                        if (isStoryDeletePending) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openRowDetails();
+                        }
+                      }}
+                      className={cn(
+                        "w-full text-left transition-colors duration-100 hover:bg-muted/25 focus-ring",
+                        "px-3 py-2.5",
+                        isStoryDeletePending && "cursor-progress opacity-70",
                       )}
-                    </div>
-                  </div>
+                    >
+                      <div className="flex items-center justify-between gap-2 md:hidden">
+                        <ItemTypeBadge rowType={row.row_type} />
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                              statusStyle.bg,
+                              statusStyle.text,
+                            )}
+                          >
+                            <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
+                            {STATUS_LABEL[row.status]}
+                          </span>
+                          {isStoryRow && (
+                            <StoryActionsMenu
+                              storyId={row.id}
+                              storyType={row.story_type}
+                              storyKey={row.key}
+                              storyTitle={row.title}
+                              storyStatus={row.status}
+                              onDelete={handleStoryDelete}
+                              onStatusChange={handleStoryStatusChange}
+                              onAddLabel={(storyId) => {
+                                setSelectedStoryId(storyId);
+                              }}
+                              disabled={isStoryDeletePending}
+                              isDeleting={isStoryDeletePending}
+                            />
+                          )}
+                        </div>
+                      </div>
 
                   <div className="mt-2 space-y-1 md:hidden">
                     <p className="text-sm text-foreground">
@@ -564,10 +751,12 @@ export default function PlanningListPage() {
                       )}
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </section>
       )}
 

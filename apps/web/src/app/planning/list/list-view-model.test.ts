@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   buildPlanningListRows,
   COMING_SOON_LABEL,
-  LIST_GROUP_OPTIONS,
 } from "./list-view-model.js";
 
 test("buildPlanningListRows composes stories and standalone tasks sorted by updated_at desc", () => {
@@ -13,6 +12,7 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
       {
         id: "story-1",
         epic_id: "epic-1",
+        current_assignee_agent_id: "agent-1",
         key: "MC-10",
         title: "Story one",
         story_type: "USER_STORY",
@@ -23,6 +23,7 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
       {
         id: "story-2",
         epic_id: null,
+        current_assignee_agent_id: null,
         key: "MC-11",
         title: "Story two",
         story_type: "BUG",
@@ -48,6 +49,7 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
       {
         id: "task-standalone",
         story_id: null,
+        current_assignee_agent_id: "agent-2",
         key: "MC-12",
         title: "Standalone task",
         objective: "Do standalone work",
@@ -59,6 +61,7 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
       {
         id: "task-linked",
         story_id: "story-1",
+        current_assignee_agent_id: "agent-1",
         key: "MC-13",
         title: "Linked task",
         objective: null,
@@ -79,11 +82,13 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
   assert.deepEqual(rows[1].labels.map((label) => label.name), ["frontend"]);
   assert.equal(rows[1].epic_key, "MC-1");
   assert.equal(rows[1].epic_title, "Platform");
+  assert.equal(rows[1].epic_id, "epic-1");
+  assert.equal(rows[1].current_assignee_agent_id, "agent-1");
   assert.equal(rows[0].task_type, "CHORE");
   assert.equal(rows[0].objective, "Do standalone work");
+  assert.equal(rows[0].current_assignee_agent_id, "agent-2");
 });
 
 test("list-view mocked controls contract stays explicit", () => {
   assert.equal(COMING_SOON_LABEL, "Coming soon");
-  assert.deepEqual([...LIST_GROUP_OPTIONS], ["None", "Status", "Assignee", "Epic"]);
 });
