@@ -26,7 +26,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | `epic` | `list`, `get`, `create`, `update`, `delete` |
 | `story` | `list`, `get`, `create`, `update`, `delete` |
 | `task` | `list`, `get`, `create`, `update`, `delete`, `assign`, `unassign`, `assignments` |
-| `backlog` | `list`, `get`, `create`, `update`, `delete`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder`, `active-sprint` |
+| `backlog` | `list`, `get`, `create`, `update`, `delete`, `start`, `complete`, `transition-kind`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder`, `active-sprint` |
 | `agent` | `list`, `get`, `create`, `update`, `delete`, `sync` |
 | `label` | `list`, `get`, `create`, `update`, `delete`, `attach-story`, `detach-story`, `attach-task`, `detach-task` |
 
@@ -66,6 +66,10 @@ mc story list --project-key MC --epic-key MC-1
 mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"
 mc task assignments --id <uuid>
 mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
+mc backlog start --id <uuid> --project-key MC
+mc backlog complete --id <uuid> --project-key MC
+mc backlog transition-kind --id <uuid> --kind SPRINT --project-key MC
+mc backlog update --id <uuid> --set kind=IDEAS --project-key MC
 mc backlog active-sprint --project-key MC
 mc agent list --output json
 mc agent create --set openclaw_key=codex --set name=Codex --set last_name=Coder --set initials=CC --set avatar=https://cdn.example.com/codex.png

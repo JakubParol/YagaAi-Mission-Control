@@ -73,6 +73,11 @@ type TaskUnassignOptions = SelectorOptions;
 
 type TaskAssignmentsOptions = SelectorOptions;
 
+interface BacklogProjectScopeOptions {
+  projectId?: string;
+  projectKey?: string;
+}
+
 function addSelectConvenienceOptions(command: Command): Command {
   return command
     .option("--project-id <id>", "filter by project UUID")
@@ -169,6 +174,27 @@ function buildConvenienceQuery(opts: CommonFilterOptions): Record<string, string
   assign("openclaw_key", opts.openclawKey);
 
   return query;
+}
+
+function buildBacklogProjectScopeQuery(
+  opts: BacklogProjectScopeOptions,
+): Record<string, string> {
+  validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
+  const query: Record<string, string> = {};
+  if (opts.projectId) {
+    query.project_id = opts.projectId;
+  }
+  if (opts.projectKey) {
+    query.project_key = opts.projectKey;
+  }
+  return query;
+}
+
+function normalizeBacklogTransitionKind(value: unknown): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new CliUsageError("Backlog kind transition requires a non-empty string 'kind' value.");
+  }
+  return value;
 }
 
 function resolvePathContext(
@@ -404,6 +430,15 @@ function registerStandardResourceCommands(
     );
   }
 
+  if (spec.name === "backlog") {
+    updateCommand.addHelpText(
+      "after",
+      "\nKind transitions are routed to the lifecycle endpoint:\n" +
+        "  mc backlog update --id <uuid> --set kind=SPRINT --project-key MC\n" +
+        "  mc backlog transition-kind --id <uuid> --kind BACKLOG --project-key MC",
+    );
+  }
+
   updateCommand.action(async (opts: MutationOptions, command: Command) => {
     const ctx = getContext(command);
     const target = await resolveTargetId(spec, opts, ctx.client);
@@ -413,9 +448,23 @@ function registerStandardResourceCommands(
       sets: opts.set,
     });
 
-    const payload = await ctx.client.patch(spec.itemPath(target.id, target.ctx), {
-      body: payloadBody,
-    });
+    let payload: unknown;
+    if (spec.name === "backlog" && Object.hasOwn(payloadBody, "kind")) {
+      const payloadKeys = Object.keys(payloadBody);
+      if (payloadKeys.length > 1) {
+        throw new CliUsageError(
+          "Backlog kind transition must be the only field in payload. Use 'mc backlog transition-kind' or run separate updates.",
+        );
+      }
+      payload = await ctx.client.post(`/v1/planning/backlogs/${target.id}/transition-kind`, {
+        query: buildBacklogProjectScopeQuery(opts),
+        body: { kind: normalizeBacklogTransitionKind(payloadBody.kind) },
+      });
+    } else {
+      payload = await ctx.client.patch(spec.itemPath(target.id, target.ctx), {
+        body: payloadBody,
+      });
+    }
 
     printPayload(payload, ctx.config.output);
   });
@@ -440,6 +489,68 @@ function registerStandardResourceCommands(
 }
 
 function registerBacklogCommands(resource: Command, getContext: ContextFactory): void {
+  resource
+    .command("start")
+    .description("Start sprint lifecycle for a backlog")
+    .requiredOption("--id <id>", "backlog id")
+    .option("--project-id <id>", "project UUID for scope validation")
+    .option("--project-key <key>", "project key (e.g. MC) for scope validation")
+    .action(
+      async (
+        opts: { id: string; projectId?: string; projectKey?: string },
+        command: Command,
+      ) => {
+        const ctx = getContext(command);
+        const payload = await ctx.client.post(`/v1/planning/backlogs/${opts.id}/start`, {
+          query: buildBacklogProjectScopeQuery(opts),
+        });
+        printPayload(payload, ctx.config.output);
+      },
+    );
+
+  resource
+    .command("complete")
+    .description("Complete sprint lifecycle for a backlog")
+    .requiredOption("--id <id>", "backlog id")
+    .option("--project-id <id>", "project UUID for scope validation")
+    .option("--project-key <key>", "project key (e.g. MC) for scope validation")
+    .action(
+      async (
+        opts: { id: string; projectId?: string; projectKey?: string },
+        command: Command,
+      ) => {
+        const ctx = getContext(command);
+        const payload = await ctx.client.post(`/v1/planning/backlogs/${opts.id}/complete`, {
+          query: buildBacklogProjectScopeQuery(opts),
+        });
+        printPayload(payload, ctx.config.output);
+      },
+    );
+
+  resource
+    .command("transition-kind")
+    .description("Transition backlog kind with API lifecycle guardrails")
+    .requiredOption("--id <id>", "backlog id")
+    .requiredOption("--kind <kind>", "target kind: BACKLOG | SPRINT | IDEAS")
+    .option("--project-id <id>", "project UUID for scope validation")
+    .option("--project-key <key>", "project key (e.g. MC) for scope validation")
+    .action(
+      async (
+        opts: { id: string; kind: string; projectId?: string; projectKey?: string },
+        command: Command,
+      ) => {
+        const ctx = getContext(command);
+        const payload = await ctx.client.post(
+          `/v1/planning/backlogs/${opts.id}/transition-kind`,
+          {
+            query: buildBacklogProjectScopeQuery(opts),
+            body: { kind: opts.kind },
+          },
+        );
+        printPayload(payload, ctx.config.output);
+      },
+    );
+
   resource
     .command("add-story")
     .description("Add story to backlog")
