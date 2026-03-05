@@ -29,6 +29,7 @@ This document defines how the app should behave on top of the v1 entity model.
 
 - For tasks/stories: `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE`
 - For epics: `TODO`, `IN_PROGRESS`, `DONE`
+- For backlogs: `ACTIVE`, `CLOSED`
 
 ### Task behavior
 
@@ -48,6 +49,15 @@ This document defines how the app should behave on top of the v1 entity model.
 
 - Manual override on epics is temporary.
 - Epic override expires on next child story status change.
+
+### Backlog behavior
+
+- Backlog status is lifecycle-managed, not generic-patch managed.
+- Sprint lifecycle transitions are explicit:
+  - `POST /backlogs/{id}/start` (non-active sprint -> `ACTIVE`)
+  - `POST /backlogs/{id}/complete` (`ACTIVE` sprint -> `CLOSED`)
+- Backlog kind transition uses dedicated path (`/backlogs/{id}/transition-kind`) with guardrails.
+- Transitioning to `SPRINT` forces backlog status to `CLOSED`; activation must happen explicitly via `start`.
 
 ---
 

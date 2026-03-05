@@ -969,6 +969,7 @@ class SqliteBacklogRepository(BacklogRepository):
     async def update(self, backlog_id: str, data: dict[str, Any]) -> Backlog | None:
         allowed = {
             "name",
+            "kind",
             "status",
             "goal",
             "start_date",

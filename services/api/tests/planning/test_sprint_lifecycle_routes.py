@@ -11,8 +11,8 @@ def _create_sprint(client, project_id: str, name: str = "Sprint X", status: str 
     assert create_resp.status_code == 201
     sprint_id = create_resp.json()["data"]["id"]
     if status != "ACTIVE":
-        patch_resp = client.patch(f"{PREFIX}/{sprint_id}", json={"status": status})
-        assert patch_resp.status_code == 200
+        complete_resp = client.post(f"{PREFIX}/{sprint_id}/complete?project_id={project_id}")
+        assert complete_resp.status_code == 200
     return sprint_id
 
 

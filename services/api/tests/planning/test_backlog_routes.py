@@ -166,10 +166,10 @@ def test_update_backlog_name(client):
     assert resp.json()["data"]["name"] == "Renamed"
 
 
-def test_update_backlog_status_to_closed(client):
+def test_update_backlog_status_rejected(client):
     resp = client.patch(f"{PREFIX}/b1", json={"status": "CLOSED"})
-    assert resp.status_code == 200
-    assert resp.json()["data"]["status"] == "CLOSED"
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
 
 
 def test_update_backlog_goal(client):

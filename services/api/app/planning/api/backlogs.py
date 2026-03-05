@@ -5,6 +5,7 @@ from app.planning.api.schemas import (
     BacklogAddStory,
     BacklogAddTask,
     BacklogCreate,
+    BacklogKindTransitionRequest,
     BacklogReorderRequest,
     BacklogReorderResponse,
     BacklogResponse,
@@ -162,6 +163,22 @@ async def complete_sprint(
     backlog = await service.get_backlog(backlog_id)
     _validate_backlog_project_scope(backlog.project_id, project_id)
     updated, meta = await service.complete_sprint(backlog_id)
+    return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
+
+
+@router.post("/{backlog_id}/transition-kind")
+async def transition_backlog_kind(
+    backlog_id: str,
+    body: BacklogKindTransitionRequest,
+    project_id: str | None = Depends(resolve_project_key),
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogResponse]:
+    backlog = await service.get_backlog(backlog_id)
+    _validate_backlog_project_scope(backlog.project_id, project_id)
+    updated, meta = await service.transition_backlog_kind(
+        backlog_id,
+        target_kind=BacklogKind(body.kind),
+    )
     return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
 
 

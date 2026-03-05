@@ -331,6 +331,10 @@ class BacklogReorderResponse(BaseModel):
     updated_task_count: int
 
 
+class BacklogKindTransitionRequest(BaseModel):
+    kind: str = Field(..., pattern=r"^(BACKLOG|SPRINT|IDEAS)$")
+
+
 class SprintStoryLabelResponse(BaseModel):
     id: str
     name: str
