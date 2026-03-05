@@ -16,6 +16,11 @@
 | Backlog | `ACTIVE`, `CLOSED` |
 | Project | `ACTIVE`, `ARCHIVED` |
 
+Backlog `status` is lifecycle-managed:
+- Generic `PATCH /backlogs/{id}` cannot change `status`.
+- Sprint activation path is explicit: `POST /backlogs/{id}/start` and `POST /backlogs/{id}/complete`.
+- If backlog `kind` transitions to `SPRINT`, status is forced to `CLOSED` and must be explicitly started.
+
 ---
 
 ## 2) Task Status

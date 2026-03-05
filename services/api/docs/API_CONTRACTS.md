@@ -437,9 +437,48 @@ Guardrails:
 - `400 BUSINESS_RULE_VIOLATION` when sprint is not active
 - `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
 
+#### `POST /v1/planning/backlogs/{id}/transition-kind` — Transition backlog kind
+
+Transitions backlog `kind` using explicit guardrails.
+
+Query: optional `project_id` or `project_key` for project-scope validation.
+
+Request:
+```jsonc
+{ "kind": "BACKLOG" } // BACKLOG | SPRINT | IDEAS
+```
+
+Response `200`:
+```jsonc
+{
+  "data": { "...backlog fields..." },
+  "meta": {
+    "transition": "TRANSITION_BACKLOG_KIND",
+    "from_kind": "IDEAS",
+    "to_kind": "SPRINT",
+    "from_status": "ACTIVE",
+    "to_status": "CLOSED",
+    "changed": true
+  }
+}
+```
+
+Guardrails:
+- `400 BUSINESS_RULE_VIOLATION` when changing kind of default backlog
+- `400 BUSINESS_RULE_VIOLATION` when transitioning global backlog to `SPRINT`
+- `400 BUSINESS_RULE_VIOLATION` when transitioning an active sprint to a different kind
+- Transitioning to `SPRINT` forces status to `CLOSED` (activation must happen via `POST /start`)
+- `409 CONFLICT` when transitioning to `BACKLOG` would create a second active product backlog
+- `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
+
 #### `PATCH /v1/planning/backlogs/{id}` — Update backlog
 
-Updatable: `name`, `status`, `goal`, `start_date`, `end_date`, `metadata_json`.
+Updatable: `name`, `goal`, `start_date`, `end_date`, `metadata_json`.
+
+`status` is lifecycle-managed and cannot be changed via generic `PATCH`.
+Use:
+- `POST /v1/planning/backlogs/{id}/start`
+- `POST /v1/planning/backlogs/{id}/complete`
 
 #### `DELETE /v1/planning/backlogs/{id}` — Delete backlog
 
