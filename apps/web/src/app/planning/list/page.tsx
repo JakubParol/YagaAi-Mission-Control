@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { apiUrl } from "@/lib/api-client";
+import type { ItemStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
@@ -254,6 +255,36 @@ export default function PlanningListPage() {
     [pendingStoryIds, refreshCurrentView, selectedStoryId],
   );
 
+  const handleStoryStatusChange = useCallback(
+    async (storyId: string, status: ItemStatus) => {
+      if (pendingStoryIds[storyId]) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+
+      try {
+        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update story status. HTTP ${response.status}.`);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        setErrorToast(
+          error instanceof Error ? error.message : "Failed to update story status.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingStoryIds, refreshCurrentView],
+  );
+
   const activeSelectedStoryId =
     state.kind === "ok" &&
     selectedStoryId &&
@@ -456,7 +487,12 @@ export default function PlanningListPage() {
                           storyType={row.story_type}
                           storyKey={row.key}
                           storyTitle={row.title}
+                          storyStatus={row.status}
                           onDelete={handleStoryDelete}
+                          onStatusChange={handleStoryStatusChange}
+                          onAddLabel={(storyId) => {
+                            setSelectedStoryId(storyId);
+                          }}
                           disabled={isStoryDeletePending}
                           isDeleting={isStoryDeletePending}
                         />
@@ -517,7 +553,12 @@ export default function PlanningListPage() {
                           storyType={row.story_type}
                           storyKey={row.key}
                           storyTitle={row.title}
+                          storyStatus={row.status}
                           onDelete={handleStoryDelete}
+                          onStatusChange={handleStoryStatusChange}
+                          onAddLabel={(storyId) => {
+                            setSelectedStoryId(storyId);
+                          }}
                           disabled={isStoryDeletePending}
                           isDeleting={isStoryDeletePending}
                         />

@@ -573,6 +573,7 @@ function BoardColumn({
   onCardDragEnd,
   pendingStoryIds,
   onStoryDelete,
+  onStoryStatusChange,
   onTodoQuickCreate,
   assigneeOptions,
   assigneeOverrides,
@@ -590,6 +591,7 @@ function BoardColumn({
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
+  onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions: readonly QuickCreateAssigneeOption[];
   assigneeOverrides: Readonly<Record<string, StoryAssigneeSelection>>;
@@ -667,7 +669,10 @@ function BoardColumn({
                       storyType={story.story_type}
                       storyKey={story.key}
                       storyTitle={story.title}
+                      storyStatus={story.status}
                       onDelete={onStoryDelete}
+                      onStatusChange={onStoryStatusChange}
+                      onAddLabel={onStoryClick}
                       disabled={isPending}
                       isDeleting={isPending}
                     />
@@ -796,6 +801,7 @@ export function SprintBoard({
             onCardDragEnd={handleCardDragEnd}
             pendingStoryIds={pendingSet}
             onStoryDelete={onStoryDelete}
+            onStoryStatusChange={onStoryStatusChange}
             onTodoQuickCreate={col.status === "TODO" ? onTodoQuickCreate : undefined}
             assigneeOptions={assigneeOptions}
             assigneeOverrides={assigneeOverrides}

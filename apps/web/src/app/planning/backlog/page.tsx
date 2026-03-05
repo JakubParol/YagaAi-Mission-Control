@@ -137,6 +137,7 @@ function BacklogSection({
   onCompleteSprint,
   onCreateStory,
   onStoryDelete,
+  onStoryStatusChange,
   onDeleteBoard,
   pendingStoryIds,
   pendingDeleteStoryIds,
@@ -157,6 +158,7 @@ function BacklogSection({
   ) => void;
   onCreateStory: (backlogId: string) => void;
   onStoryDelete: (storyId: string) => void;
+  onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
   pendingStoryIds: ReadonlySet<string>;
   pendingDeleteStoryIds: ReadonlySet<string>;
@@ -359,7 +361,10 @@ function BacklogSection({
                         storyType={story.story_type}
                         storyKey={story.key}
                         storyTitle={story.title}
+                        storyStatus={story.status}
                         onDelete={onStoryDelete}
+                        onStatusChange={onStoryStatusChange}
+                        onAddLabel={onStoryClick}
                         disabled={pendingStoryIds.has(story.id)}
                         isDeleting={pendingDeleteStoryIds.has(story.id)}
                       />
@@ -705,6 +710,35 @@ export default function BacklogPage() {
     [pendingDeleteStoryIds, refreshCurrentView, selectedStoryId, showErrorToast],
   );
 
+  const handleStoryStatusChange = useCallback(
+    async (storyId: string, status: ItemStatus) => {
+      if (pendingStoryIds[storyId] || pendingDeleteStoryIds[storyId]) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+      try {
+        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update story status. HTTP ${response.status}.`);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to update story status.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, showErrorToast],
+  );
+
   const handleStartSprint = useCallback(
     (backlogId: string, backlogName: string) => {
       const confirmed = window.confirm(
@@ -1009,6 +1043,7 @@ export default function BacklogPage() {
               onCompleteSprint={handleCompleteSprint}
               onCreateStory={handleCreateStory}
               onStoryDelete={handleStoryDelete}
+              onStoryStatusChange={handleStoryStatusChange}
               onDeleteBoard={handleDeleteBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
               pendingDeleteStoryIds={new Set(Object.keys(pendingDeleteStoryIds))}
