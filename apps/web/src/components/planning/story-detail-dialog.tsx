@@ -28,6 +28,10 @@ import {
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
 import { STATUS_LABEL, STATUS_STYLE } from "./story-card";
+import {
+  isStoryActionsSupportedType,
+  StoryActionsMenu,
+} from "./story-actions-menu";
 import { toLabelChipStyle, type StoryLabel } from "./story-label-chips";
 import {
   addOptimisticTask,
@@ -40,6 +44,7 @@ import {
   type TaskPatch,
 } from "./task-optimistic";
 import type { StoryDetail, TaskItem } from "./story-types";
+import { deleteStory } from "@/app/planning/story-actions";
 
 type DialogState =
   | { kind: "loading"; forStoryId: string }
@@ -96,6 +101,14 @@ const STORY_TYPE_OPTIONS = [
   { value: "SPIKE", label: "Spike" },
   { value: "CHORE", label: "Chore" },
 ] as const;
+
+export const STORY_DETAIL_HEADER_LAYOUT = {
+  actionsGroup: "ml-auto flex items-center gap-1.5",
+} as const;
+
+export function shouldShowStoryDetailActions(storyType: string | null | undefined): boolean {
+  return isStoryActionsSupportedType(storyType);
+}
 
 function initialTaskDraft(): TaskDraft {
   return {
@@ -878,6 +891,7 @@ export function StoryDetailDialog({
   const [storyDraft, setStoryDraft] = useState<StoryDraft | null>(null);
   const [storyDraftForId, setStoryDraftForId] = useState<string | null>(null);
   const [isSavingStory, setIsSavingStory] = useState(false);
+  const [isDeletingStory, setIsDeletingStory] = useState(false);
   const [storyError, setStoryError] = useState<string | null>(null);
   const [epics, setEpics] = useState<EpicOption[]>([]);
   const [isLoadingEpics, setIsLoadingEpics] = useState(false);
@@ -1157,6 +1171,32 @@ export function StoryDetailDialog({
       setStoryError(error instanceof Error ? error.message : "Failed to save story.");
     } finally {
       setIsSavingStory(false);
+    }
+  };
+
+  const handleStoryDelete = async (targetStoryId: string) => {
+    if (isDeletingStory) return;
+    setStoryError(null);
+    setIsDeletingStory(true);
+
+    try {
+      await deleteStory(targetStoryId);
+      onStoryUpdated?.();
+
+      if (embedded) {
+        window.location.assign("/planning/stories");
+        return;
+      }
+
+      if (viewState.kind === "ok") {
+        setStoryDraft(toStoryDraft(viewState.story));
+        setStoryDraftForId(viewState.story.id);
+      }
+      handleDialogOpenChange(false);
+    } catch (error) {
+      setStoryError(error instanceof Error ? error.message : "Failed to delete story.");
+    } finally {
+      setIsDeletingStory(false);
     }
   };
 
@@ -1492,18 +1532,30 @@ export function StoryDetailDialog({
                       >
                         {STATUS_LABEL[viewState.story.status]}
                       </span>
-                      {hasUnsavedStoryChanges && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={saveStory}
-                          disabled={isSavingStory}
-                          className="ml-auto"
-                        >
-                          {isSavingStory && <Loader2 className="size-3 animate-spin" />}
-                          Save
-                        </Button>
-                      )}
+                      <div className={STORY_DETAIL_HEADER_LAYOUT.actionsGroup}>
+                        {shouldShowStoryDetailActions(viewState.story.story_type) && (
+                          <StoryActionsMenu
+                            storyId={viewState.story.id}
+                            storyType={viewState.story.story_type}
+                            storyKey={viewState.story.key ?? null}
+                            storyTitle={viewState.story.title}
+                            onDelete={handleStoryDelete}
+                            disabled={isSavingStory}
+                            isDeleting={isDeletingStory}
+                          />
+                        )}
+                        {hasUnsavedStoryChanges && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={saveStory}
+                            disabled={isSavingStory || isDeletingStory}
+                          >
+                            {isSavingStory && <Loader2 className="size-3 animate-spin" />}
+                            Save
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <h2 className="sr-only">{viewState.story.title}</h2>
                     <input
@@ -1529,15 +1581,28 @@ export function StoryDetailDialog({
                       >
                         {STATUS_LABEL[viewState.story.status]}
                       </span>
-                      <a
-                        href={`/planning/stories/${viewState.story.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        <ExternalLink className="size-3.5" />
-                        Open in new tab
-                      </a>
+                      <div className={STORY_DETAIL_HEADER_LAYOUT.actionsGroup}>
+                        {shouldShowStoryDetailActions(viewState.story.story_type) && (
+                          <StoryActionsMenu
+                            storyId={viewState.story.id}
+                            storyType={viewState.story.story_type}
+                            storyKey={viewState.story.key ?? null}
+                            storyTitle={viewState.story.title}
+                            onDelete={handleStoryDelete}
+                            disabled={isSavingStory}
+                            isDeleting={isDeletingStory}
+                          />
+                        )}
+                        <a
+                          href={`/planning/stories/${viewState.story.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <ExternalLink className="size-3.5" />
+                          Open in new tab
+                        </a>
+                      </div>
                     </div>
                     <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
                     <input
