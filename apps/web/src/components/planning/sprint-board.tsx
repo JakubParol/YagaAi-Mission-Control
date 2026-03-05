@@ -14,6 +14,7 @@ import {
   ThemedSelect,
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
+import { FloatingCard } from "@/components/ui/floating-card";
 import { AvatarOption } from "@/components/planning/avatar-option";
 import { StoryTypeBadge } from "@/components/planning/story-type-badge";
 import { AssigneeAvatarTooltip } from "@/components/planning/assignee-avatar-tooltip";
@@ -266,7 +267,7 @@ function SprintHeader({
   const end = formatDate(backlog.end_date);
 
   return (
-    <div className="rounded-lg border border-border bg-card/50 px-5 py-4 mb-6">
+    <FloatingCard className="mb-6 px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         {/* Left: name + meta */}
         <div className="space-y-1.5">
@@ -313,7 +314,7 @@ function SprintHeader({
           </div>
         </div>
       </div>
-    </div>
+    </FloatingCard>
   );
 }
 
