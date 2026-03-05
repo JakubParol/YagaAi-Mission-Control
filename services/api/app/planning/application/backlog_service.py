@@ -83,11 +83,27 @@ class BacklogService:
         return await self._repo.create(backlog)
 
     async def update_backlog(
-        self, backlog_id: str, data: dict[str, Any], *, actor: str | None = None
+        self,
+        backlog_id: str,
+        data: dict[str, Any],
+        *,
+        actor: str | None = None,
+        allow_status_update: bool = False,
+        allow_kind_update: bool = False,
     ) -> Backlog:
         existing = await self._repo.get_by_id(backlog_id)
         if not existing:
             raise NotFoundError(f"Backlog {backlog_id} not found")
+
+        if "status" in data and not allow_status_update:
+            raise BusinessRuleError(
+                "Backlog status is lifecycle-managed. Use /backlogs/{id}/start or /backlogs/{id}/complete."
+            )
+
+        if "kind" in data and not allow_kind_update:
+            raise BusinessRuleError(
+                "Backlog kind changes are lifecycle-managed. Use /backlogs/{id}/transition-kind."
+            )
 
         if "is_default" in data and data["is_default"] and not existing.is_default:
             raise BusinessRuleError("Cannot manually set a backlog as default")
@@ -99,6 +115,71 @@ class BacklogService:
         if not updated:
             raise NotFoundError(f"Backlog {backlog_id} not found")
         return updated
+
+    async def transition_backlog_kind(
+        self,
+        backlog_id: str,
+        *,
+        target_kind: BacklogKind,
+        actor: str | None = None,
+    ) -> tuple[Backlog, dict[str, Any]]:
+        backlog = await self.get_backlog(backlog_id)
+        if backlog.kind == target_kind:
+            return backlog, {
+                "transition": "TRANSITION_BACKLOG_KIND",
+                "from_kind": backlog.kind.value,
+                "to_kind": target_kind.value,
+                "from_status": backlog.status.value,
+                "to_status": backlog.status.value,
+                "changed": False,
+            }
+
+        if backlog.is_default:
+            raise BusinessRuleError("Cannot change kind of default backlog")
+
+        if target_kind == BacklogKind.SPRINT and backlog.project_id is None:
+            raise BusinessRuleError("Only project-scoped backlogs can transition to SPRINT")
+
+        if backlog.kind == BacklogKind.SPRINT and backlog.status == BacklogStatus.ACTIVE:
+            raise BusinessRuleError(
+                "Cannot transition kind of an ACTIVE sprint. Complete sprint first."
+            )
+
+        target_status = backlog.status
+        if target_kind == BacklogKind.SPRINT:
+            # Require explicit sprint activation via start endpoint after conversion.
+            target_status = BacklogStatus.CLOSED
+
+        if (
+            target_kind == BacklogKind.BACKLOG
+            and target_status == BacklogStatus.ACTIVE
+            and backlog.project_id is not None
+        ):
+            active_product_backlog = await self._repo.get_product_backlog(backlog.project_id)
+            if active_product_backlog and active_product_backlog.id != backlog_id:
+                raise ConflictError(
+                    f"Project {backlog.project_id} already has active product backlog "
+                    f"{active_product_backlog.id}"
+                )
+
+        data: dict[str, Any] = {"kind": target_kind.value}
+        if target_status != backlog.status:
+            data["status"] = target_status.value
+        updated = await self.update_backlog(
+            backlog_id,
+            data,
+            actor=actor,
+            allow_status_update=True,
+            allow_kind_update=True,
+        )
+        return updated, {
+            "transition": "TRANSITION_BACKLOG_KIND",
+            "from_kind": backlog.kind.value,
+            "to_kind": target_kind.value,
+            "from_status": backlog.status.value,
+            "to_status": updated.status.value,
+            "changed": True,
+        }
 
     async def delete_backlog(self, backlog_id: str) -> None:
         existing = await self._repo.get_by_id(backlog_id)
@@ -234,6 +315,7 @@ class BacklogService:
             backlog_id,
             {"status": BacklogStatus.ACTIVE.value},
             actor=actor,
+            allow_status_update=True,
         )
         meta = await self._build_sprint_transition_meta(
             backlog_id=backlog_id,
@@ -269,6 +351,7 @@ class BacklogService:
             backlog_id,
             {"status": BacklogStatus.CLOSED.value},
             actor=actor,
+            allow_status_update=True,
         )
         meta = await self._build_sprint_transition_meta(
             backlog_id=backlog_id,
