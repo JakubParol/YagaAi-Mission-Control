@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test src/**/*.test.ts",
     "lint": "./scripts/lint.sh",
     "lint:fix": "./scripts/lint.sh --fix",
     "dev": "tsx src/index.ts",
