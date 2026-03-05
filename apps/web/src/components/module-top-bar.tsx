@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { SubPage } from "@/lib/navigation";
+import { FloatingCard } from "@/components/ui/floating-card";
 
 interface ModuleTopBarProps {
   subPages: SubPage[];
@@ -19,45 +20,42 @@ export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
   const pathname = usePathname();
 
   return (
-    <nav
-      aria-label="Module navigation"
-      className={cn(
-        "border-b border-white/[0.08]",
-        "bg-slate-900/60 backdrop-blur-md",
-      )}
-    >
-      <div className="mx-auto flex h-11 max-w-7xl items-center gap-1 px-4 sm:px-6">
-        {leftSlot && (
-          <>
-            {leftSlot}
-            <div className="mx-1.5 h-4 w-px bg-white/[0.12]" />
-          </>
-        )}
-        {subPages.map((page) => {
-          const active = isSubPageActive(pathname, page);
+    <div className="px-4 pb-3 pt-4 sm:px-6">
+      <FloatingCard
+        as="nav"
+        aria-label="Module navigation"
+        className="mx-auto max-w-7xl px-3 py-2 sm:px-4"
+      >
+        <div className="flex min-h-11 flex-wrap items-center gap-1">
+          {leftSlot && (
+            <>
+              {leftSlot}
+              <div className="mx-1.5 hidden h-4 w-px bg-border/80 sm:block" />
+            </>
+          )}
+          {subPages.map((page) => {
+            const active = isSubPageActive(pathname, page);
 
-          return (
-            <Link
-              key={page.href}
-              href={page.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "focus-ring relative rounded-md px-3 py-1.5",
-                "text-sm font-medium",
-                "transition-colors duration-150",
-                active
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {page.label}
-              {active && (
-                <span className="absolute inset-x-1 -bottom-[7px] h-0.5 rounded-full bg-primary" />
-              )}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+            return (
+              <Link
+                key={page.href}
+                href={page.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "focus-ring rounded-md px-3 py-1.5",
+                  "text-sm font-medium",
+                  "transition-colors duration-150",
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                )}
+              >
+                {page.label}
+              </Link>
+            );
+          })}
+        </div>
+      </FloatingCard>
+    </div>
   );
 }
