@@ -476,8 +476,8 @@ function PlanningListPageContent() {
         subtitle="Unified project view of stories and standalone tasks."
         controls={
           singleProjectId ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[220px] flex-1">
+            <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
+              <div className="relative min-w-[280px] flex-1">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
@@ -491,7 +491,7 @@ function PlanningListPageContent() {
                 />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5">
+              <div className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5 sm:w-auto sm:flex-nowrap">
                 <Filter className="size-3.5 text-muted-foreground" />
                 <ThemedSelect
                   value={statusFilter}
@@ -500,7 +500,7 @@ function PlanningListPageContent() {
                   onValueChange={(value) => {
                     updateFilterParam(LIST_FILTER_KEYS.status, value);
                   }}
-                  triggerClassName="h-8 min-w-[132px] bg-background/70 text-xs"
+                  triggerClassName="h-8 min-w-[120px] bg-background/70 text-xs"
                   contentClassName="w-[180px]"
                 />
                 <ThemedSelect
@@ -510,7 +510,7 @@ function PlanningListPageContent() {
                   onValueChange={(value) => {
                     updateFilterParam(LIST_FILTER_KEYS.type, value);
                   }}
-                  triggerClassName="h-8 min-w-[132px] bg-background/70 text-xs"
+                  triggerClassName="h-8 min-w-[120px] bg-background/70 text-xs"
                   contentClassName="w-[180px]"
                 />
                 <ThemedSelect
@@ -520,7 +520,7 @@ function PlanningListPageContent() {
                   onValueChange={(value) => {
                     updateFilterParam(LIST_FILTER_KEYS.labelId, value);
                   }}
-                  triggerClassName="h-8 min-w-[144px] bg-background/70 text-xs"
+                  triggerClassName="h-8 min-w-[128px] bg-background/70 text-xs"
                   contentClassName="w-[220px]"
                 />
                 <ThemedSelect
@@ -530,7 +530,7 @@ function PlanningListPageContent() {
                   onValueChange={(value) => {
                     updateFilterParam(LIST_FILTER_KEYS.epicId, value);
                   }}
-                  triggerClassName="h-8 min-w-[160px] bg-background/70 text-xs"
+                  triggerClassName="h-8 min-w-[136px] bg-background/70 text-xs"
                   contentClassName="w-[240px]"
                 />
                 <ThemedSelect
@@ -540,7 +540,7 @@ function PlanningListPageContent() {
                   onValueChange={(value) => {
                     updateFilterParam(LIST_FILTER_KEYS.assignee, value);
                   }}
-                  triggerClassName="h-8 min-w-[164px] bg-background/70 text-xs"
+                  triggerClassName="h-8 min-w-[136px] bg-background/70 text-xs"
                   contentClassName="w-[240px]"
                 />
                 <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
