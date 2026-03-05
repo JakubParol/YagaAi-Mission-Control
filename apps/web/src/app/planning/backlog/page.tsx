@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/empty-state";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow } from "@/components/planning/backlog-row";
+import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { StoryForm } from "@/components/planning/story-form";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { matchesSelectedStoryLabels } from "@/components/planning/story-label-filter";
+import { deleteStory } from "../story-actions";
 import {
   addStoryToActiveSprint,
   removeStoryFromActiveSprint,
@@ -134,8 +136,10 @@ function BacklogSection({
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
+  onStoryDelete,
   onDeleteBoard,
   pendingStoryIds,
+  pendingDeleteStoryIds,
   pendingSprintIds,
   pendingBoardIds,
 }: {
@@ -152,8 +156,10 @@ function BacklogSection({
     unfinishedStoryCount: number,
   ) => void;
   onCreateStory: (backlogId: string) => void;
+  onStoryDelete: (storyId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
   pendingStoryIds: ReadonlySet<string>;
+  pendingDeleteStoryIds: ReadonlySet<string>;
   pendingSprintIds: ReadonlySet<string>;
   pendingBoardIds: ReadonlySet<string>;
 }) {
@@ -346,12 +352,22 @@ function BacklogSection({
                   key={story.id}
                   item={story}
                   onClick={onStoryClick}
-                  actions={
-                    canAddToActiveSprint || canRemoveFromActiveSprint ? (
+                  actions={(
+                    <div className="flex items-center justify-end gap-1">
+                      <StoryActionsMenu
+                        storyId={story.id}
+                        storyType={story.story_type}
+                        storyKey={story.key}
+                        storyTitle={story.title}
+                        onDelete={onStoryDelete}
+                        disabled={pendingStoryIds.has(story.id)}
+                        isDeleting={pendingDeleteStoryIds.has(story.id)}
+                      />
+                      {(canAddToActiveSprint || canRemoveFromActiveSprint) ? (
                       <Button
                         variant="outline"
                         size="xs"
-                        disabled={pendingStoryIds.has(story.id)}
+                        disabled={pendingStoryIds.has(story.id) || pendingDeleteStoryIds.has(story.id)}
                         onClick={(event) => {
                           event.stopPropagation();
                           if (canAddToActiveSprint) {
@@ -367,7 +383,7 @@ function BacklogSection({
                             : "Remove from active sprint"
                         }
                       >
-                        {pendingStoryIds.has(story.id) ? (
+                        {pendingStoryIds.has(story.id) || pendingDeleteStoryIds.has(story.id) ? (
                           <Loader2 className="size-3 animate-spin" />
                         ) : canAddToActiveSprint ? (
                           <ListPlus className="size-3" />
@@ -376,8 +392,9 @@ function BacklogSection({
                         )}
                         {canAddToActiveSprint ? "Add" : "Remove"}
                       </Button>
-                    ) : null
-                  }
+                      ) : null}
+                    </div>
+                  )}
                 />
               ))}
             </div>
@@ -411,6 +428,7 @@ export default function BacklogPage() {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
+  const [pendingDeleteStoryIds, setPendingDeleteStoryIds] = useState<Record<string, true>>({});
   const [pendingSprintIds, setPendingSprintIds] = useState<Record<string, true>>({});
   const [pendingBoardIds, setPendingBoardIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
@@ -661,6 +679,31 @@ export default function BacklogPage() {
   const handleCreateStory = useCallback((backlogId: string) => {
     setCreateBacklogId(backlogId);
   }, []);
+
+  const handleStoryDelete = useCallback(
+    async (storyId: string) => {
+      if (pendingDeleteStoryIds[storyId]) return;
+      setPendingDeleteStoryIds((prev) => ({ ...prev, [storyId]: true }));
+      try {
+        await deleteStory(storyId);
+        if (selectedStoryId === storyId) {
+          setSelectedStoryId(null);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to delete story.",
+        );
+      } finally {
+        setPendingDeleteStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingDeleteStoryIds, refreshCurrentView, selectedStoryId, showErrorToast],
+  );
 
   const handleStartSprint = useCallback(
     (backlogId: string, backlogName: string) => {
@@ -965,8 +1008,10 @@ export default function BacklogPage() {
               onStartSprint={handleStartSprint}
               onCompleteSprint={handleCompleteSprint}
               onCreateStory={handleCreateStory}
+              onStoryDelete={handleStoryDelete}
               onDeleteBoard={handleDeleteBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
+              pendingDeleteStoryIds={new Set(Object.keys(pendingDeleteStoryIds))}
               pendingSprintIds={new Set(Object.keys(pendingSprintIds))}
               pendingBoardIds={new Set(Object.keys(pendingBoardIds))}
             />
