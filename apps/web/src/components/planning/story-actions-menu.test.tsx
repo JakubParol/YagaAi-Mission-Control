@@ -50,6 +50,22 @@ test("StoryActionsMenu renders Delete option when opened", () => {
   assert.match(markup, />Delete</);
 });
 
+test("StoryActionsMenu keeps floating menu hidden until coordinates are measured", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(StoryActionsMenu, {
+      storyId: "s-5",
+      storyType: "USER_STORY",
+      storyKey: "MC-334",
+      storyTitle: "Story action menu flicker",
+      onDelete: () => undefined,
+      defaultOpen: true,
+    }),
+  );
+
+  assert.match(markup, /visibility:hidden/);
+  assert.match(markup, /Story actions for MC-334 Story action menu flicker/);
+});
+
 test("StoryActionsMenu accepts confirm-open state without breaking markup", () => {
   const markup = renderToStaticMarkup(
     React.createElement(StoryActionsMenu, {
