@@ -65,7 +65,9 @@ export function BacklogRow({
 
       {/* Summary */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-foreground">{item.title}</p>
+        <p className="truncate text-sm text-foreground" title={item.title}>
+          {item.title}
+        </p>
         <StoryLabelChips
           labels={item.labels}
           className="mt-1"
