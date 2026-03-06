@@ -81,6 +81,25 @@ test("StoryActionsMenu does not use zoom enter animation on the floating menu", 
   assert.doesNotMatch(markup, /zoom-in-95/);
 });
 
+test("StoryActionsMenu keeps status submenu hidden until coordinates are measured", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(StoryActionsMenu, {
+      storyId: "s-7",
+      storyType: "USER_STORY",
+      storyKey: "MC-343",
+      storyTitle: "Submenu shift",
+      storyStatus: "TODO",
+      onDelete: () => undefined,
+      onStatusChange: () => undefined,
+      defaultOpen: true,
+      defaultStatusSubmenuOpen: true,
+    }),
+  );
+
+  assert.match(markup, /Story status options/);
+  assert.match(markup, /visibility:hidden/);
+});
+
 test("StoryActionsMenu accepts confirm-open state without breaking markup", () => {
   const markup = renderToStaticMarkup(
     React.createElement(StoryActionsMenu, {
