@@ -3,10 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ListPlus,
   Layers,
   Loader2,
-  ListMinus,
   Plus,
 } from "lucide-react";
 
@@ -255,7 +253,7 @@ function BacklogSection({
               No stories in this backlog
             </p>
           ) : (
-            <div className="divide-y divide-border/10">
+            <div className="divide-y divide-border/25">
               {stories.map((story) => (
                 <BacklogRow
                   key={story.id}
@@ -272,39 +270,22 @@ function BacklogSection({
                         onDelete={onStoryDelete}
                         onStatusChange={onStoryStatusChange}
                         onAddLabel={onStoryClick}
+                        sprintMembershipAction={
+                          canAddToActiveSprint
+                            ? {
+                                mode: "add",
+                                onSelect: onAddToActiveSprint,
+                              }
+                            : canRemoveFromActiveSprint
+                              ? {
+                                  mode: "remove",
+                                  onSelect: onRemoveFromActiveSprint,
+                                }
+                              : undefined
+                        }
                         disabled={pendingStoryIds.has(story.id)}
                         isDeleting={pendingDeleteStoryIds.has(story.id)}
                       />
-                      {(canAddToActiveSprint || canRemoveFromActiveSprint) ? (
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        disabled={pendingStoryIds.has(story.id) || pendingDeleteStoryIds.has(story.id)}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (canAddToActiveSprint) {
-                            onAddToActiveSprint(story.id);
-                            return;
-                          }
-                          onRemoveFromActiveSprint(story.id);
-                        }}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        title={
-                          canAddToActiveSprint
-                            ? "Add to active sprint"
-                            : "Remove from active sprint"
-                        }
-                      >
-                        {pendingStoryIds.has(story.id) || pendingDeleteStoryIds.has(story.id) ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : canAddToActiveSprint ? (
-                          <ListPlus className="size-3" />
-                        ) : (
-                          <ListMinus className="size-3" />
-                        )}
-                        {canAddToActiveSprint ? "Add" : "Remove"}
-                      </Button>
-                      ) : null}
                     </div>
                   )}
                 />

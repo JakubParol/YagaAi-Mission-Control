@@ -1,24 +1,27 @@
 import type { ReactNode } from "react";
+import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryCardStory } from "./story-card";
 import { STATUS_STYLE, STATUS_LABEL } from "./story-card";
+import { AssigneeAvatarTooltip } from "./assignee-avatar-tooltip";
 import { StoryEpicDisplay } from "./story-epic-display";
 import { StoryLabelChips } from "./story-label-chips";
 import { StoryTaskProgress } from "./story-task-progress";
 import { resolveStoryTypeVisualConfig } from "./story-type-badge";
 
 export const BACKLOG_ROW_LAYOUT = {
-  gridTemplate: "grid-cols-[auto_72px_minmax(0,1fr)_112px_240px_112px_36px_56px]",
-  actions: "w-[112px]",
+  gridTemplate: "grid-cols-[auto_72px_minmax(0,1fr)_240px_112px_36px_56px_72px_56px]",
+  actions: "w-[56px]",
   epic: "w-[240px]",
   status: "w-[112px]",
   storyPoints: "w-[36px]",
   taskProgress: "w-[56px]",
+  assignee: "w-[72px]",
 } as const;
 
 /**
  * A single compact row in the Jira-like backlog list.
- * Columns: type icon | key | summary | epic | status pill | SP | task progress
+ * Columns: type icon | key | summary | epic | status pill | SP | task progress | assignee | actions
  */
 export function BacklogRow({
   item,
@@ -32,6 +35,20 @@ export function BacklogRow({
   const statusStyle = STATUS_STYLE[item.status];
   const typeConf = resolveStoryTypeVisualConfig(item.story_type);
   const TypeIcon = typeConf.icon;
+  const assignee = item.assignee ?? (
+    item.assignee_name || item.assignee_last_name || item.assignee_initials || item.assignee_avatar
+      ? {
+          name: item.assignee_name ?? null,
+          last_name: item.assignee_last_name ?? null,
+          initials: item.assignee_initials ?? null,
+          avatar: item.assignee_avatar ?? null,
+        }
+      : null
+  );
+  const assigneeName = assignee?.name?.trim() ?? "Unassigned";
+  const hasAssignee = Boolean(
+    assignee && (assignee.name || assignee.initials || assignee.avatar),
+  );
 
   return (
     <div
@@ -75,11 +92,6 @@ export function BacklogRow({
         />
       </div>
 
-      {/* Actions */}
-      <span className={cn("shrink-0 flex justify-end", BACKLOG_ROW_LAYOUT.actions)}>
-        {actions}
-      </span>
-
       {/* Epic */}
       <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.epic)}>
         <StoryEpicDisplay
@@ -114,6 +126,29 @@ export function BacklogRow({
           doneCount={item.done_task_count}
           totalCount={item.task_count}
         />
+      </span>
+
+      {/* Assignee */}
+      <span className={cn("shrink-0 flex justify-center", BACKLOG_ROW_LAYOUT.assignee)}>
+        {hasAssignee ? (
+          <span className="group/assignee relative inline-flex items-center">
+            <AssigneeAvatarTooltip
+              name={assigneeName}
+              lastName={assignee?.last_name ?? null}
+              initials={assignee?.initials ?? null}
+              avatar={assignee?.avatar ?? null}
+            />
+          </span>
+        ) : (
+          <span className="inline-flex size-5 items-center justify-center rounded-full border border-border/70 bg-muted text-muted-foreground" title="Unassigned" aria-label="Unassigned">
+            <User className="size-3" aria-hidden="true" />
+          </span>
+        )}
+      </span>
+
+      {/* Actions */}
+      <span className={cn("shrink-0 flex justify-end", BACKLOG_ROW_LAYOUT.actions)}>
+        {actions}
       </span>
     </div>
   );

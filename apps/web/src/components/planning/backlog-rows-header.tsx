@@ -13,11 +13,12 @@ export function BacklogRowsHeader() {
       <span>Type</span>
       <span>Key</span>
       <span>Title</span>
-      <span className="text-right">Actions</span>
       <span>Epic</span>
       <span>Status</span>
       <span className="text-center">SP</span>
       <span className="text-right">Tasks</span>
+      <span className="text-center">Assignee</span>
+      <span className="text-right">Actions</span>
     </header>
   );
 }

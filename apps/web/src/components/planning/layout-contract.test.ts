@@ -18,13 +18,14 @@ test("story card keeps a single metadata row layout", () => {
 test("backlog row uses fixed-width grid columns for alignment", () => {
   assert.equal(
     BACKLOG_ROW_LAYOUT.gridTemplate,
-    "grid-cols-[auto_72px_minmax(0,1fr)_112px_240px_112px_36px_56px]",
+    "grid-cols-[auto_72px_minmax(0,1fr)_240px_112px_36px_56px_72px_56px]",
   );
-  assert.equal(BACKLOG_ROW_LAYOUT.actions, "w-[112px]");
+  assert.equal(BACKLOG_ROW_LAYOUT.actions, "w-[56px]");
   assert.equal(BACKLOG_ROW_LAYOUT.epic, "w-[240px]");
   assert.equal(BACKLOG_ROW_LAYOUT.status, "w-[112px]");
   assert.equal(BACKLOG_ROW_LAYOUT.storyPoints, "w-[36px]");
   assert.equal(BACKLOG_ROW_LAYOUT.taskProgress, "w-[56px]");
+  assert.equal(BACKLOG_ROW_LAYOUT.assignee, "w-[72px]");
 });
 
 test("story detail header keeps a dedicated top-right actions group", () => {
