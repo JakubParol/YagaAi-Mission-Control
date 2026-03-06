@@ -1,5 +1,6 @@
 import type { ItemStatus } from "@/lib/planning/types";
 import {
+  applyPlanningFilters,
   PLANNING_FILTER_KEYS,
   UNASSIGNED_FILTER_VALUE,
 } from "@/components/planning/planning-filters";
@@ -31,45 +32,15 @@ export function applyPlanningListFilters(
   rows: PlanningListRow[],
   filters: PlanningListFilters,
 ): PlanningListRow[] {
-  const normalizedSearch = filters.search.trim().toLowerCase();
-
-  return rows.filter((row) => {
-    if (normalizedSearch.length > 0) {
-      const key = row.key?.toLowerCase() ?? "";
-      const title = row.title.toLowerCase();
-      if (!key.includes(normalizedSearch) && !title.includes(normalizedSearch)) {
-        return false;
-      }
-    }
-
-    if (filters.status !== "" && row.status !== filters.status) {
-      return false;
-    }
-
-    if (filters.type !== "" && normalizeType(row) !== filters.type) {
-      return false;
-    }
-
-    if (filters.labelId !== "" && !row.labels.some((label) => label.id === filters.labelId)) {
-      return false;
-    }
-
-    if (filters.epicId !== "" && row.epic_id !== filters.epicId) {
-      return false;
-    }
-
-    if (filters.assignee !== "") {
-      if (filters.assignee === UNASSIGNED_FILTER_VALUE) {
-        if (row.current_assignee_agent_id !== null) {
-          return false;
-        }
-      } else if (row.current_assignee_agent_id !== filters.assignee) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  return applyPlanningFilters(rows, filters, (row) => ({
+    key: row.key,
+    title: row.title,
+    status: row.status,
+    type: normalizeType(row),
+    labelIds: row.labels.map((label) => label.id),
+    epicId: row.epic_id,
+    assigneeId: row.current_assignee_agent_id,
+  }));
 }
 
 export function buildTypeOptions(rows: PlanningListRow[]): OptionItem[] {
