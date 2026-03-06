@@ -6,10 +6,6 @@ interface PlanningFilterState {
   selectedProjectIds: string[];
   setSelectedProjectIds: (ids: string[]) => void;
   toggleProject: (id: string) => void;
-  selectedLabelIds: string[];
-  setSelectedLabelIds: (ids: string[]) => void;
-  toggleLabel: (id: string) => void;
-  clearLabels: () => void;
   allSelected: boolean;
   singleProjectId: string | null;
 }
@@ -20,28 +16,14 @@ export function PlanningFilterProvider({ children }: { children: React.ReactNode
   // Empty array = "all projects selected". Toggling off the last project
   // resets to [] which means "all" — this is intentional to avoid an empty view.
   const [selectedProjectIds, setSelectedProjectIdsState] = useState<string[]>([]);
-  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
-
   const setSelectedProjectIds = useCallback((ids: string[]) => {
     setSelectedProjectIdsState(ids);
-    setSelectedLabelIds((prev) => (prev.length === 0 ? prev : []));
   }, []);
 
   const toggleProject = useCallback((id: string) => {
     setSelectedProjectIdsState((prev) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
     );
-    setSelectedLabelIds((prev) => (prev.length === 0 ? prev : []));
-  }, []);
-
-  const toggleLabel = useCallback((id: string) => {
-    setSelectedLabelIds((prev) =>
-      prev.includes(id) ? prev.filter((labelId) => labelId !== id) : [...prev, id],
-    );
-  }, []);
-
-  const clearLabels = useCallback(() => {
-    setSelectedLabelIds([]);
   }, []);
 
   const singleProjectId = selectedProjectIds.length === 1 ? selectedProjectIds[0] : null;
@@ -51,22 +33,10 @@ export function PlanningFilterProvider({ children }: { children: React.ReactNode
       selectedProjectIds,
       setSelectedProjectIds,
       toggleProject,
-      selectedLabelIds,
-      setSelectedLabelIds,
-      toggleLabel,
-      clearLabels,
       allSelected: selectedProjectIds.length === 0,
       singleProjectId,
     }),
-    [
-      clearLabels,
-      selectedLabelIds,
-      selectedProjectIds,
-      setSelectedProjectIds,
-      singleProjectId,
-      toggleLabel,
-      toggleProject,
-    ],
+    [selectedProjectIds, setSelectedProjectIds, singleProjectId, toggleProject],
   );
 
   return (

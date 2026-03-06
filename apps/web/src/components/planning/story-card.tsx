@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryLabelChips, type StoryLabel } from "./story-label-chips";
+import { StoryEpicDisplay } from "./story-epic-display";
+import { StoryTaskProgress } from "./story-task-progress";
 import {
   STORY_TYPE_CONFIG,
   resolveStoryTypeVisualConfig,
@@ -185,23 +187,30 @@ export function StoryCard({
       </p>
 
       {/* Epic */}
-      <p className="mb-1.5 min-h-4 text-[11px] text-muted-foreground line-clamp-1">
-        {story.epic_key && story.epic_title
-          ? `${story.epic_key} ${story.epic_title}`
-          : "No epic"}
-      </p>
+      <div className="mb-1.5 min-h-4">
+        <StoryEpicDisplay
+          epicKey={story.epic_key}
+          epicTitle={story.epic_title}
+          emptyLabel="No epic"
+          className="w-full"
+        />
+      </div>
 
-      {/* Metadata row: type + key + story points + assignee */}
+      {/* Metadata row: type + key | tasks + priority + story points + assignee */}
       <div className={STORY_CARD_LAYOUT.metadataRow} data-testid="story-card-metadata-row">
         <div className={STORY_CARD_LAYOUT.metadataLeft}>
           <TypeIcon className={cn("size-3.5 shrink-0", typeConfig.color)} aria-hidden="true" />
           <span className="truncate font-mono text-[11px] tracking-wide text-muted-foreground">
             {story.key ?? "—"}
           </span>
-          <PriorityIndicator priority={story.priority} />
         </div>
 
         <div className={STORY_CARD_LAYOUT.metadataRight}>
+          <StoryTaskProgress
+            doneCount={story.done_task_count}
+            totalCount={story.task_count}
+          />
+          <PriorityIndicator priority={story.priority} />
           <span className="text-[11px] text-muted-foreground" title="Story points">
             -
           </span>

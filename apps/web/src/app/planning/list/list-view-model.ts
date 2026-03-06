@@ -29,6 +29,8 @@ export interface PlanningBacklogStoryApiItem {
   priority: number | null;
   epic_key: string | null;
   epic_title: string | null;
+  task_count?: number;
+  done_task_count?: number;
   labels: PlanningListLabel[];
 }
 
@@ -67,6 +69,8 @@ export interface PlanningListRow {
   story_type: string | null;
   task_type: string | null;
   objective: string | null;
+  task_count: number;
+  done_task_count: number;
 }
 
 function asTimestamp(value: string): number {
@@ -77,14 +81,29 @@ function asTimestamp(value: string): number {
 function toStoryRows(
   stories: PlanningStoryApiItem[],
   backlogStories: PlanningBacklogStoryApiItem[],
+  allTasks: PlanningTaskApiItem[],
   epics: PlanningEpicApiItem[],
 ): PlanningListRow[] {
   const backlogById = new Map(backlogStories.map((story) => [story.id, story]));
   const epicById = new Map(epics.map((epic) => [epic.id, epic]));
+  const progressByStoryId = new Map<string, { total: number; done: number }>();
+
+  for (const task of allTasks) {
+    if (!task.story_id) continue;
+    const current = progressByStoryId.get(task.story_id) ?? { total: 0, done: 0 };
+    current.total += 1;
+    if (task.status === "DONE") {
+      current.done += 1;
+    }
+    progressByStoryId.set(task.story_id, current);
+  }
 
   return stories.map((story) => {
     const backlogStory = backlogById.get(story.id);
     const epic = story.epic_id ? epicById.get(story.epic_id) : undefined;
+    const progress = progressByStoryId.get(story.id);
+    const taskCount = backlogStory?.task_count ?? progress?.total ?? 0;
+    const doneTaskCount = backlogStory?.done_task_count ?? progress?.done ?? 0;
 
     return {
       row_type: "story",
@@ -102,6 +121,8 @@ function toStoryRows(
       story_type: story.story_type,
       task_type: null,
       objective: null,
+      task_count: taskCount,
+      done_task_count: doneTaskCount,
     };
   });
 }
@@ -125,6 +146,8 @@ function toStandaloneTaskRows(tasks: PlanningTaskApiItem[]): PlanningListRow[] {
       story_type: null,
       task_type: task.task_type,
       objective: task.objective,
+      task_count: 0,
+      done_task_count: 0,
     }));
 }
 
@@ -134,7 +157,12 @@ export function buildPlanningListRows(input: {
   standaloneTaskCandidates: PlanningTaskApiItem[];
   epics: PlanningEpicApiItem[];
 }): PlanningListRow[] {
-  const storyRows = toStoryRows(input.stories, input.backlogStories, input.epics);
+  const storyRows = toStoryRows(
+    input.stories,
+    input.backlogStories,
+    input.standaloneTaskCandidates,
+    input.epics,
+  );
   const standaloneTaskRows = toStandaloneTaskRows(input.standaloneTaskCandidates);
 
   return [...storyRows, ...standaloneTaskRows].sort((a, b) => {

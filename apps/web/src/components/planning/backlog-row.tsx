@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
 import type { StoryCardStory } from "./story-card";
 import { STATUS_STYLE, STATUS_LABEL } from "./story-card";
+import { StoryEpicDisplay } from "./story-epic-display";
 import { StoryLabelChips } from "./story-label-chips";
+import { StoryTaskProgress } from "./story-task-progress";
 import { resolveStoryTypeVisualConfig } from "./story-type-badge";
 
 export const BACKLOG_ROW_LAYOUT = {
@@ -80,19 +80,11 @@ export function BacklogRow({
 
       {/* Epic */}
       <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.epic)}>
-        {item.epic_key && item.epic_title ? (
-          <Badge
-            variant="outline"
-            className={cn(
-              "w-full justify-start gap-1.5 px-2 py-0.5 text-[10px] font-medium",
-              "bg-violet-500/10 text-violet-300 border-violet-500/30",
-            )}
-            title={`${item.epic_key} ${item.epic_title}`}
-          >
-            <span className="font-mono">{item.epic_key}</span>
-            <span className="truncate min-w-0">{item.epic_title}</span>
-          </Badge>
-        ) : null}
+        <StoryEpicDisplay
+          epicKey={item.epic_key}
+          epicTitle={item.epic_title}
+          className="w-full"
+        />
       </span>
 
       {/* Status pill */}
@@ -116,17 +108,10 @@ export function BacklogRow({
 
       {/* Task progress */}
       <span className={cn("shrink-0 text-right", BACKLOG_ROW_LAYOUT.taskProgress)}>
-        {item.task_count > 0 ? (
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 text-[10px] tabular-nums text-muted-foreground",
-              item.done_task_count === item.task_count && "text-emerald-400",
-            )}
-          >
-            <CheckCircle2 className="size-3" />
-            {item.done_task_count}/{item.task_count}
-          </span>
-        ) : null}
+        <StoryTaskProgress
+          doneCount={item.done_task_count}
+          totalCount={item.task_count}
+        />
       </span>
     </div>
   );

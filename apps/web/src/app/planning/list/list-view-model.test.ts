@@ -84,6 +84,10 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
   assert.equal(rows[1].epic_title, "Platform");
   assert.equal(rows[1].epic_id, "epic-1");
   assert.equal(rows[1].current_assignee_agent_id, "agent-1");
+  assert.equal(rows[1].task_count, 1);
+  assert.equal(rows[1].done_task_count, 0);
+  assert.equal(rows[2].task_count, 0);
+  assert.equal(rows[2].done_task_count, 0);
   assert.equal(rows[0].task_type, "CHORE");
   assert.equal(rows[0].objective, "Do standalone work");
   assert.equal(rows[0].current_assignee_agent_id, "agent-2");

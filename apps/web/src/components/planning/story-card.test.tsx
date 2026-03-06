@@ -33,8 +33,8 @@ test("StoryCard keeps hover-only actions and required line clamps", () => {
 
   assert.match(markup, /absolute right-2 top-2 opacity-0 pointer-events-none/);
   assert.match(markup, /line-clamp-2/);
-  assert.match(markup, /line-clamp-1/);
-  assert.match(markup, /MC-44 Web Early Access/);
+  assert.match(markup, /MC-44/);
+  assert.match(markup, /Web Early Access/);
 });
 
 test("StoryCard metadata row follows type+key then story points and unassigned slot", () => {
@@ -48,6 +48,30 @@ test("StoryCard metadata row follows type+key then story points and unassigned s
   assert.match(markup, /MC-303/);
   assert.match(markup, /title="Story points"/);
   assert.match(markup, /title="Unassigned"/);
+});
+
+test("StoryCard renders task progress when story has tasks", () => {
+  const markup = renderToStaticMarkup(
+    React.createElement(StoryCard, {
+      story: {
+        ...baseStory(),
+        task_count: 4,
+        done_task_count: 2,
+        priority: 2,
+      },
+    }),
+  );
+
+  assert.match(markup, />2\/4</);
+  const tasksIndex = markup.indexOf(">2/4<");
+  const priorityIndex = markup.indexOf("title=\"Priority 2\"");
+  const storyPointsIndex = markup.indexOf("title=\"Story points\"");
+  const assigneeIndex = markup.indexOf("title=\"Unassigned\"");
+
+  assert.ok(tasksIndex >= 0);
+  assert.ok(priorityIndex > tasksIndex);
+  assert.ok(storyPointsIndex > priorityIndex);
+  assert.ok(assigneeIndex > storyPointsIndex);
 });
 
 test("StoryCard renders assignee avatar with initials fallback when assignee has no image", () => {
