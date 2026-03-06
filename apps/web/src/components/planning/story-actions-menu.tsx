@@ -81,6 +81,7 @@ interface StoryActionsMenuProps {
   isDeleting?: boolean;
   defaultOpen?: boolean;
   defaultConfirmOpen?: boolean;
+  defaultStatusSubmenuOpen?: boolean;
 }
 
 type ActiveZone = "main" | "status";
@@ -132,7 +133,6 @@ interface RectLike {
 const FLOATING_OFFSET_PX = 4;
 const VIEWPORT_MARGIN_PX = 8;
 const DEFAULT_MAIN_MENU_SIZE: Size2D = { width: 192, height: 320 };
-const DEFAULT_SUBMENU_SIZE: Size2D = { width: 176, height: 220 };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -230,11 +230,12 @@ export function StoryActionsMenu({
   isDeleting = false,
   defaultOpen = false,
   defaultConfirmOpen = false,
+  defaultStatusSubmenuOpen = false,
 }: StoryActionsMenuProps) {
   const isSupportedType = isStoryActionsSupportedType(storyType);
   const [isClient, setIsClient] = useState(false);
   const [open, setOpen] = useState(defaultOpen);
-  const [statusSubmenuOpen, setStatusSubmenuOpen] = useState(false);
+  const [statusSubmenuOpen, setStatusSubmenuOpen] = useState(defaultStatusSubmenuOpen);
   const [activeZone, setActiveZone] = useState<ActiveZone>("main");
   const [activeMainIndex, setActiveMainIndex] = useState(0);
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
@@ -317,6 +318,12 @@ export function StoryActionsMenu({
         return;
       }
 
+      if (!submenuRef.current) {
+        // Keep submenu hidden until real dimensions are measurable.
+        setSubmenuCoordinates(null);
+        return;
+      }
+
       const changeStatusIndex = mainActions.findIndex((item) => item.id === "change-status");
       const anchorRect =
         mainActionRefs.current[changeStatusIndex]?.getBoundingClientRect() ??
@@ -326,8 +333,8 @@ export function StoryActionsMenu({
         anchorRect,
         parentMenuRect,
         {
-          width: submenuRef.current?.offsetWidth ?? DEFAULT_SUBMENU_SIZE.width,
-          height: submenuRef.current?.offsetHeight ?? DEFAULT_SUBMENU_SIZE.height,
+          width: submenuRef.current.offsetWidth,
+          height: submenuRef.current.offsetHeight,
         },
         viewportSize,
       );
