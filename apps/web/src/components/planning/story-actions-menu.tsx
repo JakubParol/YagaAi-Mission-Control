@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentType, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   Archive,
   ChevronRight,
@@ -101,6 +111,88 @@ const SECTION_GROUPS: ReadonlyArray<ReadonlyArray<MainAction>> = [
   ["delete"],
 ] as const;
 
+interface FloatingCoordinates {
+  top: number;
+  left: number;
+}
+
+interface Size2D {
+  width: number;
+  height: number;
+}
+
+interface RectLike {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+const FLOATING_OFFSET_PX = 4;
+const VIEWPORT_MARGIN_PX = 8;
+const DEFAULT_MAIN_MENU_SIZE: Size2D = { width: 192, height: 320 };
+const DEFAULT_SUBMENU_SIZE: Size2D = { width: 176, height: 220 };
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function hasSameCoordinates(
+  current: FloatingCoordinates | null,
+  next: FloatingCoordinates,
+): boolean {
+  if (!current) return false;
+  return current.left === next.left && current.top === next.top;
+}
+
+export function calculateMainMenuCoordinates(
+  triggerRect: RectLike,
+  menuSize: Size2D,
+  viewportSize: Size2D,
+): FloatingCoordinates {
+  const minLeft = VIEWPORT_MARGIN_PX;
+  const maxLeft = Math.max(VIEWPORT_MARGIN_PX, viewportSize.width - menuSize.width - VIEWPORT_MARGIN_PX);
+  const preferredLeft = triggerRect.right - menuSize.width;
+  const left = clamp(preferredLeft, minLeft, maxLeft);
+
+  const preferredTop = triggerRect.bottom + FLOATING_OFFSET_PX;
+  const needsFlipUp = preferredTop + menuSize.height > viewportSize.height - VIEWPORT_MARGIN_PX;
+  const flippedTop = triggerRect.top - menuSize.height - FLOATING_OFFSET_PX;
+  const top = clamp(
+    needsFlipUp ? flippedTop : preferredTop,
+    VIEWPORT_MARGIN_PX,
+    Math.max(VIEWPORT_MARGIN_PX, viewportSize.height - menuSize.height - VIEWPORT_MARGIN_PX),
+  );
+
+  return { top, left };
+}
+
+export function calculateSubmenuCoordinates(
+  anchorRect: RectLike,
+  parentMenuRect: RectLike,
+  submenuSize: Size2D,
+  viewportSize: Size2D,
+): FloatingCoordinates {
+  const rightPlacement = parentMenuRect.right + FLOATING_OFFSET_PX;
+  const rightFits = rightPlacement + submenuSize.width <= viewportSize.width - VIEWPORT_MARGIN_PX;
+  const leftPlacement = parentMenuRect.left - submenuSize.width - FLOATING_OFFSET_PX;
+  const left = rightFits
+    ? rightPlacement
+    : clamp(
+        leftPlacement,
+        VIEWPORT_MARGIN_PX,
+        Math.max(VIEWPORT_MARGIN_PX, viewportSize.width - submenuSize.width - VIEWPORT_MARGIN_PX),
+      );
+
+  const top = clamp(
+    anchorRect.top,
+    VIEWPORT_MARGIN_PX,
+    Math.max(VIEWPORT_MARGIN_PX, viewportSize.height - submenuSize.height - VIEWPORT_MARGIN_PX),
+  );
+
+  return { top, left };
+}
+
 function getStoryLinkUrl(storyId: string): string {
   if (typeof window === "undefined") return `/planning/stories/${storyId}`;
   return new URL(`/planning/stories/${storyId}`, window.location.origin).toString();
@@ -139,15 +231,20 @@ export function StoryActionsMenu({
   defaultConfirmOpen = false,
 }: StoryActionsMenuProps) {
   const isSupportedType = isStoryActionsSupportedType(storyType);
+  const [isClient, setIsClient] = useState(false);
   const [open, setOpen] = useState(defaultOpen);
   const [statusSubmenuOpen, setStatusSubmenuOpen] = useState(false);
   const [activeZone, setActiveZone] = useState<ActiveZone>("main");
   const [activeMainIndex, setActiveMainIndex] = useState(0);
   const [activeStatusIndex, setActiveStatusIndex] = useState(0);
+  const [menuCoordinates, setMenuCoordinates] = useState<FloatingCoordinates | null>(null);
+  const [submenuCoordinates, setSubmenuCoordinates] = useState<FloatingCoordinates | null>(null);
   const [confirmPhase, setConfirmPhase] = useState<DeleteConfirmPhase>(
     defaultConfirmOpen ? "open" : "closed",
   );
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const mainActionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const statusActionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const isDisabled = disabled || isDeleting;
@@ -194,12 +291,62 @@ export function StoryActionsMenu({
   );
 
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const updateFloatingPositions = useCallback(() => {
+      if (typeof window === "undefined" || !open || !rootRef.current) return;
+
+      const viewportSize = { width: window.innerWidth, height: window.innerHeight };
+      const triggerRect = rootRef.current.getBoundingClientRect();
+      const nextMenuCoordinates = calculateMainMenuCoordinates(
+        triggerRect,
+        {
+          width: menuRef.current?.offsetWidth ?? DEFAULT_MAIN_MENU_SIZE.width,
+          height: menuRef.current?.offsetHeight ?? DEFAULT_MAIN_MENU_SIZE.height,
+        },
+        viewportSize,
+      );
+      setMenuCoordinates((current) =>
+        hasSameCoordinates(current, nextMenuCoordinates) ? current : nextMenuCoordinates,
+      );
+
+      if (!statusSubmenuOpen || !menuRef.current) {
+        setSubmenuCoordinates(null);
+        return;
+      }
+
+      const changeStatusIndex = mainActions.findIndex((item) => item.id === "change-status");
+      const anchorRect =
+        mainActionRefs.current[changeStatusIndex]?.getBoundingClientRect() ??
+        menuRef.current.getBoundingClientRect();
+      const parentMenuRect = menuRef.current.getBoundingClientRect();
+      const nextSubmenuCoordinates = calculateSubmenuCoordinates(
+        anchorRect,
+        parentMenuRect,
+        {
+          width: submenuRef.current?.offsetWidth ?? DEFAULT_SUBMENU_SIZE.width,
+          height: submenuRef.current?.offsetHeight ?? DEFAULT_SUBMENU_SIZE.height,
+        },
+        viewportSize,
+      );
+      setSubmenuCoordinates((current) =>
+        hasSameCoordinates(current, nextSubmenuCoordinates) ? current : nextSubmenuCoordinates,
+      );
+    },
+    [mainActions, open, statusSubmenuOpen],
+  );
+
+  useEffect(() => {
     if (!open) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (!(target instanceof Node)) return;
-      if (!rootRef.current?.contains(target)) {
+      const clickInsideTrigger = rootRef.current?.contains(target) ?? false;
+      const clickInsideMenu = menuRef.current?.contains(target) ?? false;
+      const clickInsideSubmenu = submenuRef.current?.contains(target) ?? false;
+      if (!clickInsideTrigger && !clickInsideMenu && !clickInsideSubmenu) {
         setOpen(false);
         setStatusSubmenuOpen(false);
       }
@@ -233,6 +380,31 @@ export function StoryActionsMenu({
       mainActionRefs.current[nextMainIndex]?.focus();
     });
   }, [enabledMainIndexes, open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    updateFloatingPositions();
+    const handleViewportChange = () => {
+      updateFloatingPositions();
+    };
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [open, updateFloatingPositions]);
+
+  useEffect(() => {
+    if (!open) {
+      setMenuCoordinates(null);
+      setSubmenuCoordinates(null);
+      return;
+    }
+    updateFloatingPositions();
+  }, [open, statusSubmenuOpen, activeMainIndex, activeStatusIndex, updateFloatingPositions]);
 
   const focusMainAction = (index: number) => {
     setActiveMainIndex(index);
@@ -413,6 +585,115 @@ export function StoryActionsMenu({
 
   if (!isSupportedType) return null;
 
+  const menuStyle: CSSProperties = {
+    position: "fixed",
+    top: menuCoordinates?.top ?? VIEWPORT_MARGIN_PX,
+    left: menuCoordinates?.left ?? VIEWPORT_MARGIN_PX,
+  };
+
+  const submenuStyle: CSSProperties = {
+    position: "fixed",
+    top: submenuCoordinates?.top ?? VIEWPORT_MARGIN_PX,
+    left: submenuCoordinates?.left ?? VIEWPORT_MARGIN_PX,
+  };
+
+  const menuContent = open ? (
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label={`Story actions for ${storyLabel}`}
+      onKeyDown={handleMenuKeyDown}
+      style={menuStyle}
+      className={cn(
+        "z-30 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl",
+        "animate-in fade-in-0 zoom-in-95 duration-100",
+      )}
+    >
+      {SECTION_GROUPS.map((group, groupIndex) => (
+        <div key={`group-${groupIndex}`} className={cn(groupIndex > 0 && "mt-1 border-t border-border/40 pt-1") }>
+          {group.map((actionId) => {
+            const actionIndex = mainActions.findIndex((item) => item.id === actionId);
+            const action = mainActions[actionIndex];
+            if (!action) return null;
+            const Icon = action.icon;
+
+            return (
+              <button
+                key={action.id}
+                ref={(element) => {
+                  mainActionRefs.current[actionIndex] = element;
+                }}
+                type="button"
+                role="menuitem"
+                disabled={action.disabled}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                  action.tone === "danger"
+                    ? "text-red-300 hover:bg-red-500/10"
+                    : "text-foreground hover:bg-muted/60",
+                  action.submenu && "justify-between",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                )}
+                onMouseEnter={() => {
+                  setActiveMainIndex(actionIndex);
+                  setActiveZone("main");
+                }}
+                onClick={() => {
+                  if (action.disabled) return;
+                  void handleMainAction(action.id);
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <Icon className="size-3.5" />
+                  {action.label}
+                </span>
+                {action.submenu && <ChevronRight className="size-3" />}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+
+      {statusSubmenuOpen && (
+        <div
+          ref={submenuRef}
+          role="menu"
+          aria-label="Story status options"
+          style={submenuStyle}
+          className="z-40 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+        >
+          {statusOptions.map((option, index) => (
+            <button
+              key={option.status}
+              ref={(element) => {
+                statusActionRefs.current[index] = element;
+              }}
+              type="button"
+              role="menuitem"
+              disabled={option.disabled}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                "text-foreground hover:bg-muted/60",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+              onMouseEnter={() => {
+                setActiveStatusIndex(index);
+                setActiveZone("status");
+              }}
+              onClick={() => {
+                if (option.disabled) return;
+                void handleStatusAction(option.status);
+              }}
+            >
+              <span>{STATUS_LABEL[option.status]}</span>
+              {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div
       ref={rootRef}
@@ -432,98 +713,8 @@ export function StoryActionsMenu({
         {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <MoreHorizontal className="size-3.5" />}
       </Button>
 
-      {open && (
-        <div
-          role="menu"
-          aria-label={`Story actions for ${storyLabel}`}
-          onKeyDown={handleMenuKeyDown}
-          className={cn(
-            "absolute right-0 top-full z-30 mt-1 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl",
-            "animate-in fade-in-0 zoom-in-95 duration-100",
-          )}
-        >
-          {SECTION_GROUPS.map((group, groupIndex) => (
-            <div key={`group-${groupIndex}`} className={cn(groupIndex > 0 && "mt-1 border-t border-border/40 pt-1") }>
-              {group.map((actionId) => {
-                const actionIndex = mainActions.findIndex((item) => item.id === actionId);
-                const action = mainActions[actionIndex];
-                if (!action) return null;
-                const Icon = action.icon;
-
-                return (
-                  <button
-                    key={action.id}
-                    ref={(element) => {
-                      mainActionRefs.current[actionIndex] = element;
-                    }}
-                    type="button"
-                    role="menuitem"
-                    disabled={action.disabled}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-                      action.tone === "danger"
-                        ? "text-red-300 hover:bg-red-500/10"
-                        : "text-foreground hover:bg-muted/60",
-                      action.submenu && "justify-between",
-                      "disabled:cursor-not-allowed disabled:opacity-50",
-                    )}
-                    onMouseEnter={() => {
-                      setActiveMainIndex(actionIndex);
-                      setActiveZone("main");
-                    }}
-                    onClick={() => {
-                      if (action.disabled) return;
-                      void handleMainAction(action.id);
-                    }}
-                  >
-                    <span className="flex items-center gap-2">
-                      <Icon className="size-3.5" />
-                      {action.label}
-                    </span>
-                    {action.submenu && <ChevronRight className="size-3" />}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-
-          {statusSubmenuOpen && (
-            <div
-              role="menu"
-              aria-label="Story status options"
-              className="absolute left-full top-[34%] z-40 ml-1 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
-            >
-              {statusOptions.map((option, index) => (
-                <button
-                  key={option.status}
-                  ref={(element) => {
-                    statusActionRefs.current[index] = element;
-                  }}
-                  type="button"
-                  role="menuitem"
-                  disabled={option.disabled}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-                    "text-foreground hover:bg-muted/60",
-                    "disabled:cursor-not-allowed disabled:opacity-50",
-                  )}
-                  onMouseEnter={() => {
-                    setActiveStatusIndex(index);
-                    setActiveZone("status");
-                  }}
-                  onClick={() => {
-                    if (option.disabled) return;
-                    void handleStatusAction(option.status);
-                  }}
-                >
-                  <span>{STATUS_LABEL[option.status]}</span>
-                  {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {menuContent &&
+        (isClient ? createPortal(menuContent, document.body) : menuContent)}
 
       <Dialog
         open={isConfirmOpen}

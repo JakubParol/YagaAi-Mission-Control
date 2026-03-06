@@ -4,6 +4,8 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  calculateMainMenuCoordinates,
+  calculateSubmenuCoordinates,
   isStoryActionsSupportedType,
   reduceDeleteConfirmPhase,
   StoryActionsMenu,
@@ -103,4 +105,50 @@ test("StoryActionsMenu hides trigger for unsupported story type", () => {
   );
 
   assert.equal(markup, "");
+});
+
+test("calculateMainMenuCoordinates flips upward when there is no room below", () => {
+  const coordinates = calculateMainMenuCoordinates(
+    { top: 680, left: 740, right: 772, bottom: 712 },
+    { width: 192, height: 320 },
+    { width: 1280, height: 720 },
+  );
+
+  assert.equal(coordinates.left, 580);
+  assert.equal(coordinates.top, 356);
+});
+
+test("calculateMainMenuCoordinates clamps inside viewport on narrow screens", () => {
+  const coordinates = calculateMainMenuCoordinates(
+    { top: 32, left: 340, right: 372, bottom: 64 },
+    { width: 192, height: 320 },
+    { width: 360, height: 640 },
+  );
+
+  assert.equal(coordinates.left, 160);
+  assert.equal(coordinates.top, 68);
+});
+
+test("calculateSubmenuCoordinates opens left when right side would overflow", () => {
+  const coordinates = calculateSubmenuCoordinates(
+    { top: 440, left: 1060, right: 1210, bottom: 470 },
+    { top: 360, left: 1020, right: 1212, bottom: 700 },
+    { width: 176, height: 220 },
+    { width: 1280, height: 720 },
+  );
+
+  assert.equal(coordinates.left, 840);
+  assert.equal(coordinates.top, 440);
+});
+
+test("calculateSubmenuCoordinates clamps top inside viewport", () => {
+  const coordinates = calculateSubmenuCoordinates(
+    { top: 620, left: 200, right: 360, bottom: 650 },
+    { top: 560, left: 180, right: 372, bottom: 700 },
+    { width: 176, height: 220 },
+    { width: 1280, height: 720 },
+  );
+
+  assert.equal(coordinates.left, 376);
+  assert.equal(coordinates.top, 492);
 });
