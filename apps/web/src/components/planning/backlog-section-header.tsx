@@ -33,7 +33,7 @@ const KIND_LABEL: Record<BacklogKind, string> = {
   IDEAS: "Ideas",
 };
 
-const STATUS_TONE: Record<BacklogStatus, string> = {
+const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-blue-500/10 text-blue-300",
   OPEN: "bg-cyan-500/10 text-cyan-300",
   CLOSED: "bg-muted/40 text-muted-foreground/70",
@@ -131,7 +131,7 @@ export function BacklogSectionHeader({
           <span
             className={cn(
               "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider",
-              STATUS_TONE[backlog.status],
+              STATUS_TONE[String(backlog.status)] ?? "bg-muted/40 text-muted-foreground/70",
             )}
           >
             {backlog.status}

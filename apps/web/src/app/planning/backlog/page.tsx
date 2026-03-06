@@ -130,7 +130,8 @@ const KIND_CONFIG: Record<BacklogKind, { label: string }> = {
 function isCompleteSprintTarget(backlog: BacklogItem, sourceBacklogId: string): boolean {
   if (backlog.id === sourceBacklogId) return false;
   if (backlog.kind !== "SPRINT" && backlog.kind !== "BACKLOG") return false;
-  return backlog.status === "OPEN" || backlog.status === "ACTIVE";
+  const status = String(backlog.status);
+  return status === "OPEN" || status === "ACTIVE";
 }
 
 const BOARD_KIND_OPTIONS: readonly { value: BacklogKind; label: string }[] = [
