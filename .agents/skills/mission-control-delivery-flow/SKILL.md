@@ -44,6 +44,7 @@ Prefer `--output json` for deterministic parsing.
    - implement code + commit,
    - run quality gates (see `mission-control-test-gate`),
    - set task `DONE` via `mc task update`.
+   - Di it for each singke task - Status must be updated before you proceed to another task in the loop.
 
 ## Phase 2 — Pull Request
 
@@ -52,7 +53,7 @@ Prefer `--output json` for deterministic parsing.
 
 ## Phase 3 — Review and fixes
 
-7. Run `/review-pr` (self-review) or perform CodeReview by yourself if /review-pr is not avaiable.
+7. Run `/review` (self-review) or perform CodeReview by yourself if /review-pr is not avaiable.
 8. Each finding must be injected into the PR as a comment with gh cli
 9. Fix all findings (including small issues), resolve comments in PR, commit and push.
 
