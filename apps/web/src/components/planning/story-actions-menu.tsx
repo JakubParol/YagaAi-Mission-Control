@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -381,7 +382,7 @@ export function StoryActionsMenu({
     });
   }, [enabledMainIndexes, open]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
 
     updateFloatingPositions();
@@ -397,7 +398,7 @@ export function StoryActionsMenu({
     };
   }, [open, updateFloatingPositions]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) {
       setMenuCoordinates(null);
       setSubmenuCoordinates(null);
@@ -587,14 +588,16 @@ export function StoryActionsMenu({
 
   const menuStyle: CSSProperties = {
     position: "fixed",
-    top: menuCoordinates?.top ?? VIEWPORT_MARGIN_PX,
-    left: menuCoordinates?.left ?? VIEWPORT_MARGIN_PX,
+    top: menuCoordinates?.top ?? 0,
+    left: menuCoordinates?.left ?? 0,
+    visibility: menuCoordinates ? "visible" : "hidden",
   };
 
   const submenuStyle: CSSProperties = {
     position: "fixed",
-    top: submenuCoordinates?.top ?? VIEWPORT_MARGIN_PX,
-    left: submenuCoordinates?.left ?? VIEWPORT_MARGIN_PX,
+    top: submenuCoordinates?.top ?? 0,
+    left: submenuCoordinates?.left ?? 0,
+    visibility: submenuCoordinates ? "visible" : "hidden",
   };
 
   const menuContent = open ? (
