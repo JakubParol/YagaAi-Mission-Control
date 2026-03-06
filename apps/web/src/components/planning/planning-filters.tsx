@@ -46,12 +46,73 @@ export interface PlanningStoryFilterItem {
   assignee_agent_id?: string | null;
 }
 
+export interface PlanningFilterCandidate {
+  key: string | null;
+  title: string;
+  status: ItemStatus;
+  type: string;
+  labelIds: readonly string[];
+  epicId: string | null;
+  assigneeId: string | null;
+}
+
 function normalizeLabel(value: string): string {
   return value.replaceAll("_", " ");
 }
 
 function normalizeAssigneeId(item: PlanningStoryFilterItem): string | null {
   return item.current_assignee_agent_id ?? item.assignee_agent_id ?? null;
+}
+
+function matchesPlanningFilterCandidate(
+  item: PlanningFilterCandidate,
+  filters: PlanningFiltersValue,
+): boolean {
+  const normalizedSearch = filters.search.trim().toLowerCase();
+
+  if (normalizedSearch.length > 0) {
+    const key = (item.key ?? "").toLowerCase();
+    const title = item.title.toLowerCase();
+    if (!key.includes(normalizedSearch) && !title.includes(normalizedSearch)) {
+      return false;
+    }
+  }
+
+  if (filters.status.length > 0 && item.status !== filters.status) {
+    return false;
+  }
+
+  if (filters.type.length > 0 && item.type !== filters.type) {
+    return false;
+  }
+
+  if (filters.labelId.length > 0 && !item.labelIds.includes(filters.labelId)) {
+    return false;
+  }
+
+  if (filters.epicId.length > 0 && item.epicId !== filters.epicId) {
+    return false;
+  }
+
+  if (filters.assignee.length > 0) {
+    if (filters.assignee === UNASSIGNED_FILTER_VALUE) {
+      if (item.assigneeId !== null) {
+        return false;
+      }
+    } else if (item.assigneeId !== filters.assignee) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function applyPlanningFilters<T>(
+  items: readonly T[],
+  filters: PlanningFiltersValue,
+  selectCandidate: (item: T) => PlanningFilterCandidate,
+): T[] {
+  return items.filter((item) => matchesPlanningFilterCandidate(selectCandidate(item), filters));
 }
 
 export function hasActivePlanningFilters(value: PlanningFiltersValue): boolean {
@@ -69,49 +130,15 @@ export function applyPlanningStoryFilters<T extends PlanningStoryFilterItem>(
   stories: readonly T[],
   filters: PlanningFiltersValue,
 ): T[] {
-  const normalizedSearch = filters.search.trim().toLowerCase();
-
-  return stories.filter((story) => {
-    if (normalizedSearch.length > 0) {
-      const key = (story.key ?? "").toLowerCase();
-      const title = story.title.toLowerCase();
-      if (!key.includes(normalizedSearch) && !title.includes(normalizedSearch)) {
-        return false;
-      }
-    }
-
-    if (filters.status.length > 0 && story.status !== filters.status) {
-      return false;
-    }
-
-    if (filters.type.length > 0 && story.story_type !== filters.type) {
-      return false;
-    }
-
-    if (filters.labelId.length > 0) {
-      const hasLabel = (story.labels ?? []).some((label) => label.id === filters.labelId);
-      if (!hasLabel) {
-        return false;
-      }
-    }
-
-    if (filters.epicId.length > 0 && story.epic_id !== filters.epicId) {
-      return false;
-    }
-
-    if (filters.assignee.length > 0) {
-      const assigneeId = normalizeAssigneeId(story);
-      if (filters.assignee === UNASSIGNED_FILTER_VALUE) {
-        if (assigneeId !== null) {
-          return false;
-        }
-      } else if (assigneeId !== filters.assignee) {
-        return false;
-      }
-    }
-
-    return true;
-  });
+  return applyPlanningFilters(stories, filters, (story) => ({
+    key: story.key,
+    title: story.title,
+    status: story.status,
+    type: story.story_type,
+    labelIds: (story.labels ?? []).map((label) => label.id),
+    epicId: story.epic_id ?? null,
+    assigneeId: normalizeAssigneeId(story),
+  }));
 }
 
 export function buildStoryStatusOptions(

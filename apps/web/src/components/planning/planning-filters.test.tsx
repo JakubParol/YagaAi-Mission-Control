@@ -4,6 +4,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  applyPlanningFilters,
   applyPlanningStoryFilters,
   buildStoryEpicOptions,
   buildStoryLabelOptions,
@@ -82,6 +83,39 @@ test("applyPlanningStoryFilters supports unassigned assignee", () => {
   );
 
   assert.deepEqual(filtered.map((story) => story.id), ["s2"]);
+});
+
+test("applyPlanningFilters supports shared engine via custom adapter", () => {
+  const items = [
+    {
+      id: "x-1",
+      key: "MC-10",
+      title: "Filter list rows",
+      status: "TODO",
+      type: "USER_STORY",
+      labelIds: ["l-web"],
+      epicId: "e-1",
+      assigneeId: "a-1",
+    },
+    {
+      id: "x-2",
+      key: "MC-11",
+      title: "Refactor board filters",
+      status: "DONE",
+      type: "TASK",
+      labelIds: [],
+      epicId: null,
+      assigneeId: null,
+    },
+  ] as const;
+
+  const filtered = applyPlanningFilters(
+    items,
+    emptyFilters({ status: "TODO", type: "USER_STORY", labelId: "l-web" }),
+    (item) => item,
+  );
+
+  assert.deepEqual(filtered.map((item) => item.id), ["x-1"]);
 });
 
 test("story option builders emit unique sorted values", () => {
