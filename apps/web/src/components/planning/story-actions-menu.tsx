@@ -609,7 +609,9 @@ export function StoryActionsMenu({
       style={menuStyle}
       className={cn(
         "z-30 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl",
-        "animate-in fade-in-0 zoom-in-95 duration-100",
+        // Avoid transform-based enter animation here; scaling the menu while
+        // the status submenu is measured can cause visible submenu drift.
+        "animate-in fade-in-0 duration-100",
       )}
     >
       {SECTION_GROUPS.map((group, groupIndex) => (
