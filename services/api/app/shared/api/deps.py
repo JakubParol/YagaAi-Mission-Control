@@ -100,6 +100,23 @@ async def _ensure_backlog_indexes(db: aiosqlite.Connection) -> None:
     """Ensure backlog uniqueness and ordering indexes exist."""
     try:
         await db.execute("""
+            WITH ranked AS (
+              SELECT
+                id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY project_id
+                  ORDER BY display_order ASC, created_at ASC, id ASC
+                ) AS rn
+              FROM backlogs
+              WHERE project_id IS NOT NULL
+                AND kind = 'SPRINT'
+                AND UPPER(status) = 'ACTIVE'
+            )
+            UPDATE backlogs
+            SET status = 'OPEN'
+            WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+            """)
+        await db.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_default_per_project
               ON backlogs(project_id)
               WHERE project_id IS NOT NULL AND is_default = 1

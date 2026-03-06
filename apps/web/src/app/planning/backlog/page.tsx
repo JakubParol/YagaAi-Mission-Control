@@ -52,7 +52,7 @@ import {
   type SprintLifecycleOperation,
 } from "../sprint-lifecycle-actions";
 import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
-import { excludeClosedSprintBacklogs } from "./backlog-filters";
+import { excludeClosedSprintBacklogs, sortBacklogsForPlanning } from "./backlog-filters";
 import { createBoard, deleteBoard } from "./board-actions";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -522,13 +522,16 @@ function BacklogPageContent() {
     }
 
     const json = await response.json();
-    const backlogs: BacklogItem[] = excludeClosedSprintBacklogs(json.data ?? []);
+    const backlogs: BacklogItem[] = sortBacklogsForPlanning(
+      excludeClosedSprintBacklogs(json.data ?? []),
+    );
 
     if (backlogs.length === 0) {
       return { kind: "empty" };
     }
 
-    // Keep backlog order exactly as returned by API (including display_order semantics).
+    // Enforce backlog ordering contract in UI:
+    // active sprint first, default backlog last, the rest by display_order.
     const sections: BacklogWithStories[] = await Promise.all(
       backlogs.map(async (backlog) => {
         const storiesResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`));

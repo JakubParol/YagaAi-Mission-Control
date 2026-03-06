@@ -331,3 +331,35 @@ def test_list_backlogs_default_backlog_is_pinned_to_bottom(client):
     assert items[1]["name"] == "Backlog A"
     assert items[2]["name"] == "Sprint A"
     assert items[-1]["is_default"] is True
+
+
+def test_list_backlogs_repairs_multiple_active_sprints_and_creates_index(client, _setup_test_db):
+    import sqlite3
+
+    db_path = _setup_test_db
+    conn = sqlite3.connect(db_path)
+    conn.execute("DROP INDEX IF EXISTS idx_backlogs_one_active_sprint_per_project")
+    conn.execute(
+        "INSERT INTO backlogs (id, project_id, name, kind, status, display_order, is_default, "
+        "created_at, updated_at) VALUES "
+        "('b3', 'p1', 'P1 Sprint 2', 'SPRINT', 'ACTIVE', 300, 0, "
+        "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"{PREFIX}?project_id=p1")
+    assert resp.status_code == 200
+
+    check = sqlite3.connect(db_path)
+    active_count = check.execute(
+        "SELECT COUNT(*) FROM backlogs WHERE project_id = 'p1' AND kind = 'SPRINT' AND status = 'ACTIVE'"
+    ).fetchone()[0]
+    idx_row = check.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'index' "
+        "AND name = 'idx_backlogs_one_active_sprint_per_project'"
+    ).fetchone()
+    check.close()
+
+    assert active_count == 1
+    assert idx_row is not None
