@@ -132,7 +132,6 @@ interface RectLike {
 
 const FLOATING_OFFSET_PX = 4;
 const VIEWPORT_MARGIN_PX = 8;
-const DEFAULT_MAIN_MENU_SIZE: Size2D = { width: 192, height: 320 };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -297,51 +296,57 @@ export function StoryActionsMenu({
   }, []);
 
   const updateFloatingPositions = useCallback(() => {
-      if (typeof window === "undefined" || !open || !rootRef.current) return;
+    if (typeof window === "undefined" || !open || !rootRef.current) return;
 
-      const viewportSize = { width: window.innerWidth, height: window.innerHeight };
-      const triggerRect = rootRef.current.getBoundingClientRect();
-      const nextMenuCoordinates = calculateMainMenuCoordinates(
-        triggerRect,
-        {
-          width: menuRef.current?.offsetWidth ?? DEFAULT_MAIN_MENU_SIZE.width,
-          height: menuRef.current?.offsetHeight ?? DEFAULT_MAIN_MENU_SIZE.height,
-        },
-        viewportSize,
-      );
-      setMenuCoordinates((current) =>
-        hasSameCoordinates(current, nextMenuCoordinates) ? current : nextMenuCoordinates,
-      );
+    if (!menuRef.current) {
+      setMenuCoordinates(null);
+      setSubmenuCoordinates(null);
+      return;
+    }
 
-      if (!statusSubmenuOpen || !menuRef.current) {
-        setSubmenuCoordinates(null);
-        return;
-      }
+    const viewportSize = { width: window.innerWidth, height: window.innerHeight };
+    const triggerRect = rootRef.current.getBoundingClientRect();
+    const nextMenuCoordinates = calculateMainMenuCoordinates(
+      triggerRect,
+      {
+        width: menuRef.current.offsetWidth,
+        height: menuRef.current.offsetHeight,
+      },
+      viewportSize,
+    );
+    setMenuCoordinates((current) =>
+      hasSameCoordinates(current, nextMenuCoordinates) ? current : nextMenuCoordinates,
+    );
 
-      if (!submenuRef.current) {
-        // Keep submenu hidden until real dimensions are measurable.
-        setSubmenuCoordinates(null);
-        return;
-      }
+    if (!statusSubmenuOpen || !menuRef.current) {
+      setSubmenuCoordinates(null);
+      return;
+    }
 
-      const changeStatusIndex = mainActions.findIndex((item) => item.id === "change-status");
-      const anchorRect =
-        mainActionRefs.current[changeStatusIndex]?.getBoundingClientRect() ??
-        menuRef.current.getBoundingClientRect();
-      const parentMenuRect = menuRef.current.getBoundingClientRect();
-      const nextSubmenuCoordinates = calculateSubmenuCoordinates(
-        anchorRect,
-        parentMenuRect,
-        {
-          width: submenuRef.current.offsetWidth,
-          height: submenuRef.current.offsetHeight,
-        },
-        viewportSize,
-      );
-      setSubmenuCoordinates((current) =>
-        hasSameCoordinates(current, nextSubmenuCoordinates) ? current : nextSubmenuCoordinates,
-      );
-    },
+    if (!submenuRef.current) {
+      // Keep submenu hidden until real dimensions are measurable.
+      setSubmenuCoordinates(null);
+      return;
+    }
+
+    const changeStatusIndex = mainActions.findIndex((item) => item.id === "change-status");
+    const anchorRect =
+      mainActionRefs.current[changeStatusIndex]?.getBoundingClientRect() ??
+      menuRef.current.getBoundingClientRect();
+    const parentMenuRect = menuRef.current.getBoundingClientRect();
+    const nextSubmenuCoordinates = calculateSubmenuCoordinates(
+      anchorRect,
+      parentMenuRect,
+      {
+        width: submenuRef.current.offsetWidth,
+        height: submenuRef.current.offsetHeight,
+      },
+      viewportSize,
+    );
+    setSubmenuCoordinates((current) =>
+      hasSameCoordinates(current, nextSubmenuCoordinates) ? current : nextSubmenuCoordinates,
+    );
+  },
     [mainActions, open, statusSubmenuOpen],
   );
 
@@ -614,12 +619,7 @@ export function StoryActionsMenu({
       aria-label={`Story actions for ${storyLabel}`}
       onKeyDown={handleMenuKeyDown}
       style={menuStyle}
-      className={cn(
-        "z-30 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl",
-        // Avoid transform-based enter animation here; scaling the menu while
-        // the status submenu is measured can cause visible submenu drift.
-        "animate-in fade-in-0 duration-100",
-      )}
+      className="z-30 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl"
     >
       {SECTION_GROUPS.map((group, groupIndex) => (
         <div key={`group-${groupIndex}`} className={cn(groupIndex > 0 && "mt-1 border-t border-border/40 pt-1") }>
@@ -666,43 +666,45 @@ export function StoryActionsMenu({
         </div>
       ))}
 
-      {statusSubmenuOpen && (
-        <div
-          ref={submenuRef}
-          role="menu"
-          aria-label="Story status options"
-          style={submenuStyle}
-          className="z-40 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+    </div>
+  ) : null;
+
+  const submenuContent = open && statusSubmenuOpen ? (
+    <div
+      ref={submenuRef}
+      role="menu"
+      aria-label="Story status options"
+      onKeyDown={handleMenuKeyDown}
+      style={submenuStyle}
+      className="z-40 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+    >
+      {statusOptions.map((option, index) => (
+        <button
+          key={option.status}
+          ref={(element) => {
+            statusActionRefs.current[index] = element;
+          }}
+          type="button"
+          role="menuitem"
+          disabled={option.disabled}
+          className={cn(
+            "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/60",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+          )}
+          onMouseEnter={() => {
+            setActiveStatusIndex(index);
+            setActiveZone("status");
+          }}
+          onClick={() => {
+            if (option.disabled) return;
+            void handleStatusAction(option.status);
+          }}
         >
-          {statusOptions.map((option, index) => (
-            <button
-              key={option.status}
-              ref={(element) => {
-                statusActionRefs.current[index] = element;
-              }}
-              type="button"
-              role="menuitem"
-              disabled={option.disabled}
-              className={cn(
-                "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-                "text-foreground hover:bg-muted/60",
-                "disabled:cursor-not-allowed disabled:opacity-50",
-              )}
-              onMouseEnter={() => {
-                setActiveStatusIndex(index);
-                setActiveZone("status");
-              }}
-              onClick={() => {
-                if (option.disabled) return;
-                void handleStatusAction(option.status);
-              }}
-            >
-              <span>{STATUS_LABEL[option.status]}</span>
-              {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
-            </button>
-          ))}
-        </div>
-      )}
+          <span>{STATUS_LABEL[option.status]}</span>
+          {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
+        </button>
+      ))}
     </div>
   ) : null;
 
@@ -727,6 +729,8 @@ export function StoryActionsMenu({
 
       {menuContent &&
         (isClient ? createPortal(menuContent, document.body) : menuContent)}
+      {submenuContent &&
+        (isClient ? createPortal(submenuContent, document.body) : submenuContent)}
 
       <Dialog
         open={isConfirmOpen}

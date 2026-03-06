@@ -66,7 +66,7 @@ test("StoryActionsMenu keeps floating menu hidden until coordinates are measured
   assert.match(markup, /Story actions for MC-334 Story action menu flicker/);
 });
 
-test("StoryActionsMenu does not use zoom enter animation on the floating menu", () => {
+test("StoryActionsMenu does not use transform-based enter animation on the floating menu", () => {
   const markup = renderToStaticMarkup(
     React.createElement(StoryActionsMenu, {
       storyId: "s-6",
@@ -78,6 +78,7 @@ test("StoryActionsMenu does not use zoom enter animation on the floating menu", 
     }),
   );
 
+  assert.doesNotMatch(markup, /animate-in/);
   assert.doesNotMatch(markup, /zoom-in-95/);
 });
 
