@@ -42,8 +42,18 @@ _SORT_ALLOWED_PROJECT = {"created_at", "updated_at", "name", "key"}
 _SORT_ALLOWED_EPIC = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_STORY = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_AGENT = {"created_at", "updated_at", "name", "openclaw_key"}
-_SORT_ALLOWED_BACKLOG = {"created_at", "updated_at", "name"}
+_SORT_ALLOWED_BACKLOG = {"created_at", "updated_at", "name", "display_order"}
 _SORT_ALLOWED_TASK = {"created_at", "updated_at", "title", "priority", "status"}
+_BACKLOG_PRIORITY_SQL = (
+    "CASE "
+    "WHEN kind = 'SPRINT' AND status = 'ACTIVE' THEN 0 "
+    "WHEN is_default = 1 THEN 2 "
+    "ELSE 1 "
+    "END"
+)
+_DEFAULT_BACKLOG_ORDER_SQL = (
+    _BACKLOG_PRIORITY_SQL + " ASC, display_order ASC, created_at ASC, id ASC"
+)
 
 
 def _parse_sort(raw: str, allowed: set[str]) -> str:
@@ -189,6 +199,7 @@ def _row_to_backlog(row: aiosqlite.Row) -> Backlog:
         name=row["name"],
         kind=BacklogKind(row["kind"]),
         status=BacklogStatus(row["status"]),
+        display_order=row["display_order"],
         is_default=bool(row["is_default"]),
         goal=row["goal"],
         start_date=row["start_date"],
@@ -922,7 +933,7 @@ class SqliteBacklogRepository(BacklogRepository):
         kind: str | None = None,
         limit: int = 20,
         offset: int = 0,
-        sort: str = "-created_at",
+        sort: str | None = None,
     ) -> tuple[list[Backlog], int]:
         where_parts: list[str] = []
         params: list[Any] = []
@@ -939,7 +950,15 @@ class SqliteBacklogRepository(BacklogRepository):
             where_parts.append("kind = ?")
             params.append(kind)
 
-        order_sql = _parse_sort(sort, _SORT_ALLOWED_BACKLOG)
+        if sort and sort.strip():
+            order_sql = (
+                _BACKLOG_PRIORITY_SQL
+                + " ASC, "
+                + _parse_sort(sort, _SORT_ALLOWED_BACKLOG)
+                + ", id ASC"
+            )
+        else:
+            order_sql = _DEFAULT_BACKLOG_ORDER_SQL
         count_q, select_q = _build_list_queries("backlogs", where_parts, order_sql)
 
         total = await _fetch_count(self._db, count_q, params)
@@ -952,16 +971,17 @@ class SqliteBacklogRepository(BacklogRepository):
 
     async def create(self, backlog: Backlog) -> Backlog:
         await self._db.execute(
-            """INSERT INTO backlogs (id, project_id, name, kind, status, is_default,
+            """INSERT INTO backlogs (id, project_id, name, kind, status, display_order, is_default,
                goal, start_date, end_date, metadata_json,
                created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 backlog.id,
                 backlog.project_id,
                 backlog.name,
                 backlog.kind,
                 backlog.status,
+                backlog.display_order,
                 1 if backlog.is_default else 0,
                 backlog.goal,
                 backlog.start_date,
@@ -976,6 +996,24 @@ class SqliteBacklogRepository(BacklogRepository):
         await self._db.commit()
         return backlog
 
+    async def next_display_order(self, project_id: str | None) -> int:
+        if project_id is None:
+            row = await _fetch_one(
+                self._db,
+                "SELECT COALESCE(MAX(display_order), 0) AS max_display_order "
+                "FROM backlogs WHERE project_id IS NULL",
+                [],
+            )
+        else:
+            row = await _fetch_one(
+                self._db,
+                "SELECT COALESCE(MAX(display_order), 0) AS max_display_order "
+                "FROM backlogs WHERE project_id = ?",
+                [project_id],
+            )
+        max_display_order = int(row["max_display_order"]) if row else 0
+        return max_display_order + 100
+
     async def update(self, backlog_id: str, data: dict[str, Any]) -> Backlog | None:
         allowed = {
             "name",
@@ -984,6 +1022,7 @@ class SqliteBacklogRepository(BacklogRepository):
             "goal",
             "start_date",
             "end_date",
+            "display_order",
             "metadata_json",
             "updated_by",
             "updated_at",
@@ -1460,7 +1499,8 @@ class SqliteBacklogRepository(BacklogRepository):
         row = await _fetch_one(
             self._db,
             "SELECT * FROM backlogs WHERE project_id = ? "
-            "AND kind = 'SPRINT' AND status = 'ACTIVE' ORDER BY created_at ASC, id ASC LIMIT 1",
+            "AND kind = 'SPRINT' AND status = 'ACTIVE' "
+            "ORDER BY display_order ASC, created_at ASC, id ASC LIMIT 1",
             [project_id],
         )
         return _row_to_backlog(row) if row else None
@@ -1470,7 +1510,7 @@ class SqliteBacklogRepository(BacklogRepository):
             self._db,
             "SELECT * FROM backlogs WHERE project_id = ? "
             "AND kind = 'BACKLOG' AND status = 'ACTIVE' "
-            "ORDER BY is_default DESC, created_at ASC, id ASC LIMIT 1",
+            "ORDER BY is_default DESC, display_order ASC, created_at ASC, id ASC LIMIT 1",
             [project_id],
         )
         return _row_to_backlog(row) if row else None

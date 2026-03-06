@@ -28,7 +28,7 @@ class BacklogService:
         kind: str | None = None,
         limit: int = 20,
         offset: int = 0,
-        sort: str = "-created_at",
+        sort: str | None = None,
     ) -> tuple[list[Backlog], int]:
         return await self._repo.list_all(
             project_id=project_id,
@@ -58,18 +58,26 @@ class BacklogService:
         project_id: str | None = None,
         name: str,
         kind: BacklogKind,
+        display_order: int | None = None,
         goal: str | None = None,
         start_date: str | None = None,
         end_date: str | None = None,
         actor: str | None = None,
     ) -> Backlog:
         now = utc_now()
+        resolved_display_order = (
+            display_order
+            if display_order is not None
+            else await self._repo.next_display_order(project_id)
+        )
+        initial_status = BacklogStatus.OPEN if kind == BacklogKind.SPRINT else BacklogStatus.ACTIVE
         backlog = Backlog(
             id=new_uuid(),
             project_id=project_id,
             name=name,
             kind=kind,
-            status=BacklogStatus.ACTIVE,
+            status=initial_status,
+            display_order=resolved_display_order,
             is_default=False,
             goal=goal,
             start_date=start_date,
@@ -148,7 +156,7 @@ class BacklogService:
         target_status = backlog.status
         if target_kind == BacklogKind.SPRINT:
             # Require explicit sprint activation via start endpoint after conversion.
-            target_status = BacklogStatus.CLOSED
+            target_status = BacklogStatus.OPEN
 
         if (
             target_kind == BacklogKind.BACKLOG

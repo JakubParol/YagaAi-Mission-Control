@@ -116,6 +116,7 @@ Date range filters use `_after` / `_before` suffixes:
 | `sort` | `-created_at` | `sort=priority,-updated_at` |
 
 Prefix `-` means descending. Multiple fields separated by comma.
+Default sorting can be specialized by a specific endpoint (documented in that endpoint section).
 
 Sortable fields are documented per resource. Invalid sort fields return 400.
 
@@ -367,18 +368,29 @@ Request:
   "project_id": "...",     // optional (null = global)
   "name": "Sprint 1",     // required
   "kind": "SPRINT",       // required: BACKLOG | SPRINT | IDEAS
+  "display_order": 200,    // optional, integer >= 0
   "goal": "...",           // optional
   "start_date": "...",     // optional
   "end_date": "..."        // optional
 }
 ```
 
-`status` defaults to `ACTIVE`.
+`status` defaults to:
+- `ACTIVE` for `BACKLOG` and `IDEAS`,
+- `OPEN` for `SPRINT` (activate explicitly via `POST /backlogs/{id}/start`).
+`display_order` defaults to next free order bucket for the same scope (`project_id` or global).
 
 #### `GET /v1/planning/backlogs` — List backlogs
 
 Query: `project_id`, `project_key`, `status`, `kind`, `sort`, `limit`, `offset`.
 Use `project_id=null` to list global backlogs. `project_key` — same behavior as stories (see above).
+
+Default order when `sort` is omitted:
+- active sprint first (`kind=SPRINT` and `status=ACTIVE`)
+- default backlog last (`is_default=true`)
+- remaining backlogs by `display_order ASC` (then `created_at ASC`)
+
+Pinned ordering rules are always applied (active sprint first, default backlog last), even when `sort` is provided.
 
 #### `GET /v1/planning/backlogs/{id}` — Get backlog
 
@@ -396,7 +408,7 @@ Response `200`:
   "data": { "...backlog fields...", "status": "ACTIVE" },
   "meta": {
     "transition": "START_SPRINT",
-    "from_status": "CLOSED",
+    "from_status": "OPEN",
     "to_status": "ACTIVE",
     "story_count": 3,
     "done_story_count": 1,
@@ -410,6 +422,10 @@ Validation/business rules:
 - `400 BUSINESS_RULE_VIOLATION` if backlog is not a sprint or is already active
 - `409 CONFLICT` if another sprint is already active for the same project
 - `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
+
+Uniqueness constraints (project scope):
+- at most one active sprint (`kind=SPRINT`, `status=ACTIVE`) per project
+- at most one default backlog (`is_default=true`) per project
 
 #### `POST /v1/planning/backlogs/{id}/complete` — Complete sprint
 
@@ -458,7 +474,7 @@ Response `200`:
     "from_kind": "IDEAS",
     "to_kind": "SPRINT",
     "from_status": "ACTIVE",
-    "to_status": "CLOSED",
+    "to_status": "OPEN",
     "changed": true
   }
 }
@@ -468,13 +484,13 @@ Guardrails:
 - `400 BUSINESS_RULE_VIOLATION` when changing kind of default backlog
 - `400 BUSINESS_RULE_VIOLATION` when transitioning global backlog to `SPRINT`
 - `400 BUSINESS_RULE_VIOLATION` when transitioning an active sprint to a different kind
-- Transitioning to `SPRINT` forces status to `CLOSED` (activation must happen via `POST /start`)
+- Transitioning to `SPRINT` forces status to `OPEN` (activation must happen via `POST /start`)
 - `409 CONFLICT` when transitioning to `BACKLOG` would create a second active product backlog
 - `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
 
 #### `PATCH /v1/planning/backlogs/{id}` — Update backlog
 
-Updatable: `name`, `goal`, `start_date`, `end_date`, `metadata_json`.
+Updatable: `name`, `display_order`, `goal`, `start_date`, `end_date`, `metadata_json`.
 
 `status` is lifecycle-managed and cannot be changed via generic `PATCH`.
 Use:
@@ -573,6 +589,7 @@ Response `200`:
       "name": "Sprint 1",
       "kind": "SPRINT",
       "status": "ACTIVE",
+      "display_order": 100,
       "is_default": false,
       "goal": "Ship MVP",
       "start_date": "2026-03-01",

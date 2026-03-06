@@ -14,6 +14,7 @@ class BacklogKind(StrEnum):
 
 
 class BacklogStatus(StrEnum):
+    OPEN = "OPEN"
     ACTIVE = "ACTIVE"
     CLOSED = "CLOSED"
 
@@ -91,6 +92,7 @@ class Backlog:
     name: str
     kind: BacklogKind
     status: BacklogStatus
+    display_order: int
     is_default: bool
     goal: str | None
     start_date: str | None

@@ -47,6 +47,7 @@ It supports:
 - `DONE`
 
 ### Backlogs
+- `OPEN`
 - `ACTIVE`
 - `CLOSED`
 
@@ -189,7 +190,8 @@ Constraints:
 - `project_id` TEXT NULL (`NULL` => global backlog)
 - `name` TEXT NOT NULL
 - `kind` TEXT NOT NULL (`BACKLOG`/`SPRINT`/`IDEAS`)
-- `status` TEXT NOT NULL (`ACTIVE`/`CLOSED`)
+- `status` TEXT NOT NULL (`OPEN`/`ACTIVE`/`CLOSED`)
+- `display_order` INTEGER NOT NULL DEFAULT 1000 (ordering within project/global scope)
 - `is_default` INTEGER NOT NULL DEFAULT 0
 - `goal` TEXT NULL
 - `start_date` TEXT NULL
@@ -201,7 +203,8 @@ Constraints:
 - `updated_at` TEXT NOT NULL
 
 Constraint:
-- one default backlog per project: partial unique on `project_id` where `is_default = 1`
+- one default backlog per project: partial unique on `project_id` where `project_id IS NOT NULL AND is_default = 1`
+- one active sprint per project: partial unique on `project_id` where `project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'`
 
 ## 7) `backlog_stories`
 

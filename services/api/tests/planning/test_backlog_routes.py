@@ -7,6 +7,7 @@ filter), GET single (with counts), PATCH update, DELETE, plus business rules
 """
 
 PREFIX = "/v1/planning/backlogs"
+PROJECTS_PREFIX = "/v1/planning/projects"
 
 
 # ── Create ───────────────────────────────────────────────────────────────
@@ -15,14 +16,15 @@ PREFIX = "/v1/planning/backlogs"
 def test_create_backlog_for_project(client):
     resp = client.post(
         PREFIX,
-        json={"project_id": "p1", "name": "Sprint 1", "kind": "SPRINT"},
+        json={"project_id": "p2", "name": "Sprint 1", "kind": "SPRINT"},
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
-    assert data["project_id"] == "p1"
+    assert data["project_id"] == "p2"
     assert data["name"] == "Sprint 1"
     assert data["kind"] == "SPRINT"
-    assert data["status"] == "ACTIVE"
+    assert data["status"] == "OPEN"
+    assert data["display_order"] == 100
     assert data["is_default"] is False
 
 
@@ -38,9 +40,10 @@ def test_create_backlog_with_all_fields(client):
     resp = client.post(
         PREFIX,
         json={
-            "project_id": "p1",
+            "project_id": "p2",
             "name": "Full Sprint",
             "kind": "SPRINT",
+            "display_order": 15,
             "goal": "Ship v1",
             "start_date": "2026-03-01",
             "end_date": "2026-03-15",
@@ -48,9 +51,19 @@ def test_create_backlog_with_all_fields(client):
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
+    assert data["display_order"] == 15
     assert data["goal"] == "Ship v1"
     assert data["start_date"] == "2026-03-01"
     assert data["end_date"] == "2026-03-15"
+
+
+def test_create_sprint_allows_second_open_sprint_when_active_exists(client):
+    resp = client.post(
+        PREFIX,
+        json={"project_id": "p1", "name": "Second planned sprint", "kind": "SPRINT"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["data"]["status"] == "OPEN"
 
 
 def test_create_backlog_empty_name_validation(client):
@@ -79,6 +92,15 @@ def test_list_backlogs_filter_by_project(client):
     assert body["meta"]["total"] == 2
     for bl in body["data"]:
         assert bl["project_id"] == "p1"
+
+
+def test_list_backlogs_default_order_keeps_active_sprint_first(client):
+    resp = client.get(f"{PREFIX}?project_id=p1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["data"][0]["id"] == "b2"
+    assert body["data"][0]["kind"] == "SPRINT"
+    assert body["data"][0]["status"] == "ACTIVE"
 
 
 def test_list_backlogs_filter_global(client):
@@ -112,10 +134,12 @@ def test_list_backlogs_pagination(client):
 
 
 def test_list_backlogs_sort_by_name(client):
-    resp = client.get(f"{PREFIX}?sort=name")
+    resp = client.get(f"{PREFIX}?project_id=p1&sort=name")
     assert resp.status_code == 200
-    names = [b["name"] for b in resp.json()["data"]]
-    assert names == sorted(names)
+    data = resp.json()["data"]
+    assert data[0]["id"] == "b2"
+    remaining_names = [backlog["name"] for backlog in data[1:]]
+    assert remaining_names == sorted(remaining_names)
 
 
 def test_list_backlogs_sort_invalid_column(client):
@@ -178,6 +202,12 @@ def test_update_backlog_goal(client):
     assert resp.json()["data"]["goal"] == "New goal"
 
 
+def test_update_backlog_display_order(client):
+    resp = client.patch(f"{PREFIX}/b1", json={"display_order": 7})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["display_order"] == 7
+
+
 def test_update_backlog_not_found(client):
     resp = client.patch(f"{PREFIX}/nonexistent", json={"name": "X"})
     assert resp.status_code == 404
@@ -219,9 +249,9 @@ def test_delete_default_backlog_rejected(client, _setup_test_db):
     db_path = _setup_test_db
     conn = sqlite3.connect(db_path)
     conn.execute(
-        "INSERT INTO backlogs (id, project_id, name, kind, status, is_default, "
+        "INSERT INTO backlogs (id, project_id, name, kind, status, display_order, is_default, "
         "created_at, updated_at) VALUES "
-        "('bdef2', 'p2', 'Default', 'BACKLOG', 'ACTIVE', 1, "
+        "('bdef2', 'p2', 'Default', 'BACKLOG', 'ACTIVE', 999, 1, "
         "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
     )
     conn.commit()
@@ -253,3 +283,51 @@ def test_list_backlogs_null_project_id_still_works(client):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert any(b["project_id"] is None for b in data)
+
+
+def test_list_backlogs_default_backlog_is_pinned_to_bottom(client):
+    project_resp = client.post(PROJECTS_PREFIX, json={"key": "ORD", "name": "Order"})
+    assert project_resp.status_code == 201
+    project_id = project_resp.json()["data"]["id"]
+
+    sprint_resp = client.post(
+        PREFIX,
+        json={
+            "project_id": project_id,
+            "name": "Sprint A",
+            "kind": "SPRINT",
+            "display_order": 50,
+        },
+    )
+    assert sprint_resp.status_code == 201
+
+    ideas_resp = client.post(
+        PREFIX,
+        json={
+            "project_id": project_id,
+            "name": "Ideas A",
+            "kind": "IDEAS",
+            "display_order": 10,
+        },
+    )
+    assert ideas_resp.status_code == 201
+
+    backlog_resp = client.post(
+        PREFIX,
+        json={
+            "project_id": project_id,
+            "name": "Backlog A",
+            "kind": "BACKLOG",
+            "display_order": 20,
+        },
+    )
+    assert backlog_resp.status_code == 201
+
+    list_resp = client.get(f"{PREFIX}?project_id={project_id}")
+    assert list_resp.status_code == 200
+    items = list_resp.json()["data"]
+
+    assert items[0]["name"] == "Ideas A"
+    assert items[1]["name"] == "Backlog A"
+    assert items[2]["name"] == "Sprint A"
+    assert items[-1]["is_default"] is True

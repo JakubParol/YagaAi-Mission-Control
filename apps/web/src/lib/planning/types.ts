@@ -16,7 +16,7 @@ export type EpicStatus = "TODO" | "IN_PROGRESS" | "DONE";
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
 
 /** Status values for backlogs. */
-export type BacklogStatus = "ACTIVE" | "CLOSED";
+export type BacklogStatus = "OPEN" | "ACTIVE" | "CLOSED";
 
 /** Backlog kind values. */
 export type BacklogKind = "BACKLOG" | "SPRINT" | "IDEAS";
@@ -126,6 +126,7 @@ export interface Backlog {
   name: string;
   kind: BacklogKind;
   status: BacklogStatus;
+  display_order: number;
   is_default: number;
   goal: string | null;
   start_date: string | null;

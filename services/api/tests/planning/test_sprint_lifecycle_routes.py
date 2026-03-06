@@ -9,11 +9,20 @@ def _create_sprint(client, project_id: str, name: str = "Sprint X", status: str 
         json={"project_id": project_id, "name": name, "kind": "SPRINT"},
     )
     assert create_resp.status_code == 201
-    sprint_id = create_resp.json()["data"]["id"]
-    if status != "ACTIVE":
-        complete_resp = client.post(f"{PREFIX}/{sprint_id}/complete?project_id={project_id}")
+    backlog_id = create_resp.json()["data"]["id"]
+
+    if status == "ACTIVE":
+        start_resp = client.post(f"{PREFIX}/{backlog_id}/start?project_id={project_id}")
+        assert start_resp.status_code == 200
+        return backlog_id
+
+    if status == "CLOSED":
+        start_resp = client.post(f"{PREFIX}/{backlog_id}/start?project_id={project_id}")
+        assert start_resp.status_code == 200
+        complete_resp = client.post(f"{PREFIX}/{backlog_id}/complete?project_id={project_id}")
         assert complete_resp.status_code == 200
-    return sprint_id
+
+    return backlog_id
 
 
 def _add_story_to_backlog(client, backlog_id: str, story_id: str, position: int = 0) -> None:
@@ -25,14 +34,14 @@ def _add_story_to_backlog(client, backlog_id: str, story_id: str, position: int 
 
 
 def test_start_sprint_happy_path(client) -> None:
-    sprint_id = _create_sprint(client, project_id="p2", status="CLOSED")
+    sprint_id = _create_sprint(client, project_id="p2", status="OPEN")
 
     resp = client.post(f"{PREFIX}/{sprint_id}/start?project_id=p2")
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["status"] == "ACTIVE"
     assert body["meta"]["transition"] == "START_SPRINT"
-    assert body["meta"]["from_status"] == "CLOSED"
+    assert body["meta"]["from_status"] == "OPEN"
     assert body["meta"]["to_status"] == "ACTIVE"
     assert body["meta"]["active_sprint_id"] == sprint_id
 
@@ -44,7 +53,7 @@ def test_start_sprint_rejects_non_sprint_backlog(client) -> None:
 
 
 def test_start_sprint_rejects_when_another_active_sprint_exists(client) -> None:
-    sprint_id = _create_sprint(client, project_id="p1", name="Future sprint", status="CLOSED")
+    sprint_id = _create_sprint(client, project_id="p1", name="Future sprint", status="OPEN")
 
     resp = client.post(f"{PREFIX}/{sprint_id}/start?project_id=p1")
     assert resp.status_code == 409
@@ -58,7 +67,7 @@ def test_start_sprint_project_scope_validation(client) -> None:
 
 
 def test_start_sprint_by_project_key(client) -> None:
-    sprint_id = _create_sprint(client, project_id="p2", status="CLOSED")
+    sprint_id = _create_sprint(client, project_id="p2", status="OPEN")
 
     resp = client.post(f"{PREFIX}/{sprint_id}/start?project_key=P2")
     assert resp.status_code == 200
@@ -93,7 +102,7 @@ def test_complete_sprint_rejects_unfinished_stories(client) -> None:
 
 
 def test_complete_sprint_rejects_not_active(client) -> None:
-    sprint_id = _create_sprint(client, project_id="p2", status="CLOSED")
+    sprint_id = _create_sprint(client, project_id="p2", status="OPEN")
 
     resp = client.post(f"{PREFIX}/{sprint_id}/complete?project_id=p2")
     assert resp.status_code == 400

@@ -45,6 +45,7 @@ async def create_backlog(
         project_id=body.project_id,
         name=body.name,
         kind=BacklogKind(body.kind),
+        display_order=body.display_order,
         goal=body.goal,
         start_date=body.start_date,
         end_date=body.end_date,
@@ -58,7 +59,7 @@ async def list_backlogs(
     project_id: str | None = Depends(resolve_project_key),
     status: str | None = Query(None),
     kind: str | None = Query(None),
-    sort: str = Query("-created_at"),
+    sort: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> ListEnvelope[BacklogResponse]:

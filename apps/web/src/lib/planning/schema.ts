@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS backlogs (
   name          TEXT NOT NULL,
   kind          TEXT NOT NULL DEFAULT 'BACKLOG',
   status        TEXT NOT NULL DEFAULT 'ACTIVE',
+  display_order INTEGER NOT NULL DEFAULT 1000,
   is_default    INTEGER NOT NULL DEFAULT 0,
   goal          TEXT,
   start_date    TEXT,
@@ -332,7 +333,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_project_key
 /** One default backlog per project */
 export const IDX_BACKLOGS_DEFAULT = `
 CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_default
-  ON backlogs(project_id) WHERE is_default = 1;
+  ON backlogs(project_id)
+  WHERE project_id IS NOT NULL AND is_default = 1;
+`;
+
+/** One active sprint per project */
+export const IDX_BACKLOGS_ACTIVE_SPRINT = `
+CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_active_sprint
+  ON backlogs(project_id)
+  WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE';
 `;
 
 /** At most one default project across all projects */
@@ -399,6 +408,11 @@ CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(current_assignee_agent_id
 
 export const IDX_BACKLOGS_PROJECT = `
 CREATE INDEX IF NOT EXISTS idx_backlogs_project_id ON backlogs(project_id);
+`;
+
+export const IDX_BACKLOGS_PROJECT_DISPLAY_ORDER = `
+CREATE INDEX IF NOT EXISTS idx_backlogs_project_display_order
+  ON backlogs(project_id, display_order);
 `;
 
 export const IDX_TASK_ASSIGNMENTS_TASK = `
@@ -481,6 +495,7 @@ export const PLANNING_SCHEMA_STATEMENTS: string[] = [
   IDX_TASKS_PROJECT_KEY,
   IDX_PROJECTS_DEFAULT,
   IDX_BACKLOGS_DEFAULT,
+  IDX_BACKLOGS_ACTIVE_SPRINT,
   IDX_TASK_ASSIGNMENTS_ACTIVE,
   IDX_LABELS_PROJECT_NAME,
   IDX_LABELS_GLOBAL_NAME,
@@ -496,6 +511,7 @@ export const PLANNING_SCHEMA_STATEMENTS: string[] = [
   IDX_TASKS_STATUS,
   IDX_TASKS_ASSIGNEE,
   IDX_BACKLOGS_PROJECT,
+  IDX_BACKLOGS_PROJECT_DISPLAY_ORDER,
   IDX_TASK_ASSIGNMENTS_TASK,
   IDX_TASK_ASSIGNMENTS_AGENT,
   IDX_COMMENTS_ENTITY,

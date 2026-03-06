@@ -76,6 +76,7 @@ class ProjectService:
             name=f"{created.key} Backlog",
             kind=BacklogKind.BACKLOG,
             status=BacklogStatus.ACTIVE,
+            display_order=1000,
             is_default=True,
             goal=None,
             start_date=None,

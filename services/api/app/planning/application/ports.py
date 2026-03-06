@@ -216,8 +216,11 @@ class BacklogRepository(ABC):
         kind: str | None = None,
         limit: int = 20,
         offset: int = 0,
-        sort: str = "-created_at",
+        sort: str | None = None,
     ) -> tuple[list[Backlog], int]: ...
+
+    @abstractmethod
+    async def next_display_order(self, project_id: str | None) -> int: ...
 
     @abstractmethod
     async def get_by_id(self, backlog_id: str) -> Backlog | None: ...

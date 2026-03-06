@@ -29,7 +29,7 @@ This document defines how the app should behave on top of the v1 entity model.
 
 - For tasks/stories: `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE`
 - For epics: `TODO`, `IN_PROGRESS`, `DONE`
-- For backlogs: `ACTIVE`, `CLOSED`
+- For backlogs: `OPEN`, `ACTIVE`, `CLOSED`
 
 ### Task behavior
 
@@ -53,11 +53,17 @@ This document defines how the app should behave on top of the v1 entity model.
 ### Backlog behavior
 
 - Backlog status is lifecycle-managed, not generic-patch managed.
+- Newly created sprint backlogs start as `OPEN` and must be started explicitly.
+- Backlog list ordering is deterministic:
+  - active sprint is always first,
+  - default backlog is always last,
+  - remaining backlogs are ordered by `display_order` (ascending).
 - Sprint lifecycle transitions are explicit:
   - `POST /backlogs/{id}/start` (non-active sprint -> `ACTIVE`)
   - `POST /backlogs/{id}/complete` (`ACTIVE` sprint -> `CLOSED`)
 - Backlog kind transition uses dedicated path (`/backlogs/{id}/transition-kind`) with guardrails.
-- Transitioning to `SPRINT` forces backlog status to `CLOSED`; activation must happen explicitly via `start`.
+- Transitioning to `SPRINT` forces backlog status to `OPEN`; activation must happen explicitly via `start`.
+- A project can have at most one active sprint and at most one default backlog.
 
 ---
 

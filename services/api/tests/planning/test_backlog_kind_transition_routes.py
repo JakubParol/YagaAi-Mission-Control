@@ -15,7 +15,7 @@ def test_transition_backlog_kind_backlog_to_ideas(client) -> None:
     assert body["meta"]["changed"] is True
 
 
-def test_transition_backlog_kind_to_sprint_forces_closed_status(client) -> None:
+def test_transition_backlog_kind_to_sprint_forces_open_status(client) -> None:
     create_resp = client.post(
         PREFIX,
         json={"project_id": "p2", "name": "Roadmap", "kind": "IDEAS"},
@@ -30,9 +30,9 @@ def test_transition_backlog_kind_to_sprint_forces_closed_status(client) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["kind"] == "SPRINT"
-    assert body["data"]["status"] == "CLOSED"
+    assert body["data"]["status"] == "OPEN"
     assert body["meta"]["from_status"] == "ACTIVE"
-    assert body["meta"]["to_status"] == "CLOSED"
+    assert body["meta"]["to_status"] == "OPEN"
 
 
 def test_transition_backlog_kind_rejects_active_sprint(client) -> None:

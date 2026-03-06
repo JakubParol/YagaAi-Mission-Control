@@ -256,6 +256,7 @@ class BacklogCreate(BaseModel):
     project_id: str | None = None
     name: str = Field(..., min_length=1, max_length=200)
     kind: str = Field(..., pattern=r"^(BACKLOG|SPRINT|IDEAS)$")
+    display_order: int | None = Field(None, ge=0)
     goal: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -263,7 +264,8 @@ class BacklogCreate(BaseModel):
 
 class BacklogUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
-    status: str | None = Field(None, pattern=r"^(ACTIVE|CLOSED)$")
+    status: str | None = Field(None, pattern=r"^(OPEN|ACTIVE|CLOSED)$")
+    display_order: int | None = Field(None, ge=0)
     goal: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -276,6 +278,7 @@ class BacklogResponse(BaseModel):
     name: str
     kind: str
     status: str
+    display_order: int
     is_default: bool
     goal: str | None
     start_date: str | None

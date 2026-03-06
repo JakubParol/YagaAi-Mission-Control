@@ -128,6 +128,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           name TEXT NOT NULL,
           kind TEXT NOT NULL,
           status TEXT NOT NULL,
+          display_order INTEGER NOT NULL DEFAULT 1000,
           is_default INTEGER NOT NULL DEFAULT 0,
           goal TEXT,
           start_date TEXT,
@@ -211,6 +212,14 @@ def _setup_test_db(tmp_path, monkeypatch):
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
           ON projects(is_default) WHERE is_default = 1;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_default_per_project
+          ON backlogs(project_id)
+          WHERE project_id IS NOT NULL AND is_default = 1;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_active_sprint_per_project
+          ON backlogs(project_id)
+          WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE';
         """)
 
     conn.executescript(f"""
@@ -224,11 +233,13 @@ def _setup_test_db(tmp_path, monkeypatch):
           ('p1', 1, '{TS}'),
           ('p2', 1, '{TS}');
 
-        INSERT INTO backlogs (id, project_id, name, kind, status, is_default, created_at, updated_at)
+        INSERT INTO backlogs (
+          id, project_id, name, kind, status, display_order, is_default, created_at, updated_at
+        )
         VALUES
-          ('b1', 'p1', 'P1 Backlog', 'BACKLOG', 'ACTIVE', 0, '{TS}', '{TS}'),
-          ('b2', 'p1', 'P1 Sprint', 'SPRINT', 'ACTIVE', 0, '{TS}', '{TS}'),
-          ('bg', NULL, 'Global Backlog', 'BACKLOG', 'ACTIVE', 0, '{TS}', '{TS}');
+          ('b1', 'p1', 'P1 Backlog', 'BACKLOG', 'ACTIVE', 200, 0, '{TS}', '{TS}'),
+          ('b2', 'p1', 'P1 Sprint', 'SPRINT', 'ACTIVE', 100, 0, '{TS}', '{TS}'),
+          ('bg', NULL, 'Global Backlog', 'BACKLOG', 'ACTIVE', 100, 0, '{TS}', '{TS}');
 
         INSERT INTO stories (id, project_id, title, story_type, status, created_at, updated_at)
         VALUES
