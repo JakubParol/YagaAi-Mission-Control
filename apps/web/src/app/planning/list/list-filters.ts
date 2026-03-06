@@ -1,17 +1,13 @@
 import type { ItemStatus } from "@/lib/planning/types";
+import {
+  PLANNING_FILTER_KEYS,
+  UNASSIGNED_FILTER_VALUE,
+} from "@/components/planning/planning-filters";
 
 import type { PlanningListRow } from "./list-view-model";
 
-export const LIST_FILTER_KEYS = {
-  search: "q",
-  status: "status",
-  type: "type",
-  labelId: "label",
-  epicId: "epic",
-  assignee: "assignee",
-} as const;
-
-export const UNASSIGNED_FILTER_VALUE = "unassigned";
+export const LIST_FILTER_KEYS = PLANNING_FILTER_KEYS;
+export { UNASSIGNED_FILTER_VALUE };
 
 export interface PlanningListFilters {
   search: string;
@@ -97,4 +93,3 @@ export function buildStatusOptions(rows: PlanningListRow[]): OptionItem[] {
     .sort((a, b) => a.localeCompare(b))
     .map((value) => ({ value, label: value.replaceAll("_", " ") }));
 }
-

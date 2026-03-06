@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Calendar,
   ChevronDown,
@@ -13,7 +14,6 @@ import {
   ListMinus,
   Plus,
   Play,
-  Search,
   Trash2,
   Zap,
 } from "lucide-react";
@@ -22,6 +22,18 @@ import { apiUrl } from "@/lib/api-client";
 import type { BacklogKind, BacklogStatus, ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
+import {
+  applyPlanningStoryFilters,
+  buildStoryEpicOptions,
+  buildStoryLabelOptions,
+  buildStoryStatusOptions,
+  buildStoryTypeOptions,
+  PlanningFilters,
+  PLANNING_FILTER_KEYS,
+  UNASSIGNED_FILTER_VALUE,
+  type PlanningFilterOption,
+  type PlanningFiltersValue,
+} from "@/components/planning/planning-filters";
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
@@ -37,7 +49,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { matchesSelectedStoryLabels } from "@/components/planning/story-label-filter";
 import { deleteStory } from "../story-actions";
 import {
   addStoryToActiveSprint,
@@ -75,16 +86,22 @@ type PageState =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; sections: BacklogWithStories[] };
+  | { kind: "ok"; sections: BacklogWithStories[]; assignees: PlanningFilterOption[] };
 
 type FetchResult =
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; sections: BacklogWithStories[] };
+  | { kind: "ok"; sections: BacklogWithStories[]; assignees: PlanningFilterOption[] };
 
 interface ScopedFetchResult {
   projectId: string;
   result: FetchResult;
+}
+
+interface PlanningAgentApiItem {
+  id?: string;
+  name?: string;
+  last_name?: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -111,6 +128,12 @@ function formatDate(d: string | null): string | null {
   } catch {
     return d;
   }
+}
+
+function resolveAgentLabel(agent: PlanningAgentApiItem): string | null {
+  if (!agent.id || !agent.name) return null;
+  const fullName = [agent.name, agent.last_name ?? ""].join(" ").trim();
+  return fullName.length > 0 ? fullName : agent.name;
 }
 
 function getSprintStatusCount(stories: StoryCardStory[], status: ItemStatus): number {
@@ -428,11 +451,13 @@ function BacklogSection({
 
 // ─── Page ────────────────────────────────────────────────────────────
 
-export default function BacklogPage() {
-  const { selectedProjectIds, allSelected, selectedLabelIds } = usePlanningFilter();
+function BacklogPageContent() {
+  const { selectedProjectIds, allSelected } = usePlanningFilter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [pendingDeleteStoryIds, setPendingDeleteStoryIds] = useState<Record<string, true>>({});
   const [pendingSprintIds, setPendingSprintIds] = useState<Record<string, true>>({});
@@ -485,29 +510,58 @@ export default function BacklogPage() {
       ? { kind: "loading" }
       : fetchResult;
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filters: PlanningFiltersValue = {
+    search: searchParams.get(PLANNING_FILTER_KEYS.search) ?? "",
+    status: (searchParams.get(PLANNING_FILTER_KEYS.status) ?? "") as ItemStatus | "",
+    type: searchParams.get(PLANNING_FILTER_KEYS.type) ?? "",
+    labelId: searchParams.get(PLANNING_FILTER_KEYS.labelId) ?? "",
+    epicId: searchParams.get(PLANNING_FILTER_KEYS.epicId) ?? "",
+    assignee: searchParams.get(PLANNING_FILTER_KEYS.assignee) ?? "",
+  };
+
+  const updateFilterParam = useCallback(
+    (key: keyof PlanningFiltersValue, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const paramKey = PLANNING_FILTER_KEYS[key];
+      if (value.trim().length === 0) {
+        params.delete(paramKey);
+      } else {
+        params.set(paramKey, value);
+      }
+      const queryString = params.toString();
+      router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(PLANNING_FILTER_KEYS.search);
+    params.delete(PLANNING_FILTER_KEYS.status);
+    params.delete(PLANNING_FILTER_KEYS.type);
+    params.delete(PLANNING_FILTER_KEYS.labelId);
+    params.delete(PLANNING_FILTER_KEYS.epicId);
+    params.delete(PLANNING_FILTER_KEYS.assignee);
+    const queryString = params.toString();
+    router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
+  }, [pathname, router, searchParams]);
+
   const filteredSections =
     state.kind === "ok"
       ? state.sections.map((section) => ({
           ...section,
-          stories:
-            normalizedSearchQuery.length === 0 && selectedLabelIds.length === 0
-              ? section.stories
-              : section.stories.filter((story) => {
-                  const key = (story.key ?? "").toLowerCase();
-                  const title = story.title.toLowerCase();
-                  const matchesSearch =
-                    normalizedSearchQuery.length === 0 ||
-                    key.includes(normalizedSearchQuery) ||
-                    title.includes(normalizedSearchQuery);
-                  const matchesLabels = matchesSelectedStoryLabels(
-                    story,
-                    selectedLabelIds,
-                  );
-                  return matchesSearch && matchesLabels;
-                }),
+          stories: applyPlanningStoryFilters(section.stories, filters),
         }))
       : [];
+  const allStories = state.kind === "ok" ? state.sections.flatMap((section) => section.stories) : [];
+  const statusOptions = buildStoryStatusOptions(allStories);
+  const typeOptions = buildStoryTypeOptions(allStories);
+  const labelOptions = buildStoryLabelOptions(allStories);
+  const epicOptions = buildStoryEpicOptions(allStories);
+  const assigneeOptions = [
+    { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
+    ...(state.kind === "ok" ? state.assignees : []),
+  ];
 
   const totalStoryCount =
     state.kind === "ok"
@@ -598,7 +652,23 @@ export default function BacklogPage() {
       return aKind - bKind;
     });
 
-    return { kind: "ok", sections };
+    const agents = await fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name"))
+      .then(async (res) => {
+        if (!res.ok) return [] as PlanningAgentApiItem[];
+        const body = (await res.json()) as { data?: PlanningAgentApiItem[] };
+        return body.data ?? [];
+      })
+      .catch(() => [] as PlanningAgentApiItem[]);
+
+    const assignees = agents
+      .map((agent) => {
+        const label = resolveAgentLabel(agent);
+        return label && agent.id ? { value: agent.id, label } : null;
+      })
+      .filter((item): item is PlanningFilterOption => item !== null)
+      .sort((a, b) => a.label.localeCompare(b.label));
+
+    return { kind: "ok", sections, assignees };
   }, []);
 
   const refreshCurrentView = useCallback(async () => {
@@ -951,24 +1021,19 @@ export default function BacklogPage() {
         subtitle="All backlogs and their stories for the selected project."
         controls={
           singleProjectId ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {state.kind === "ok" ? (
-                <div className="relative min-w-[220px] flex-1">
-                  <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search backlog"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className={cn(
-                      "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground",
-                      "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                    )}
-                  />
-                </div>
-              ) : (
-                <div className="min-w-[220px] flex-1" />
-              )}
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <PlanningFilters
+                value={filters}
+                onChange={updateFilterParam}
+                onClear={clearAllFilters}
+                disabled={state.kind !== "ok"}
+                statusOptions={statusOptions}
+                typeOptions={typeOptions}
+                labelOptions={labelOptions}
+                epicOptions={epicOptions}
+                assigneeOptions={assigneeOptions}
+                className="flex-1"
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -979,11 +1044,6 @@ export default function BacklogPage() {
                 <Plus className="size-3.5" />
                 Create board
               </Button>
-              {state.kind === "ok" && selectedLabelIds.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Label filter: {selectedLabelIds.length} selected
-                </p>
-              ) : null}
             </div>
           ) : null
         }
@@ -1230,5 +1290,19 @@ export default function BacklogPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+export default function BacklogPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+    >
+      <BacklogPageContent />
+    </Suspense>
   );
 }
