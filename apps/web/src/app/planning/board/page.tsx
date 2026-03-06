@@ -454,9 +454,6 @@ function BoardPageContent() {
             />
             {boardSummary ? (
               <div className="flex flex-wrap justify-end gap-1.5 text-xs text-muted-foreground">
-                <span className="rounded-full border border-border/50 bg-muted/40 px-2 py-0.5">
-                  {boardSummary.total} {boardSummary.total === 1 ? "story" : "stories"}
-                </span>
                 <span className="rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
                   {boardSummary.done}/{boardSummary.total} done ({boardSummary.pctDone}%)
                 </span>

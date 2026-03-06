@@ -16,7 +16,9 @@ import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { StoryEpicDisplay } from "@/components/planning/story-epic-display";
 import { STATUS_LABEL, STATUS_STYLE } from "@/components/planning/story-card";
+import { StoryTaskProgress } from "@/components/planning/story-task-progress";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -561,6 +563,8 @@ function PlanningListPageContent() {
                   : "—";
               const epicText =
                 row.epic_key && row.epic_title ? `${row.epic_key} ${row.epic_title}` : "—";
+              const taskProgressText =
+                row.task_count > 0 ? `${row.done_task_count}/${row.task_count}` : "—";
               const isStoryRow = row.row_type === "story";
               const isStoryDeletePending = isStoryRow && Boolean(pendingStoryIds[row.id]);
               const openRowDetails = () => {
@@ -632,8 +636,8 @@ function PlanningListPageContent() {
                       {row.title}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      Priority: {getPriorityLabel(row.priority)} | Epic: {epicText} | Updated:{" "}
-                      {formatUpdatedAt(row.updated_at)}
+                      Priority: {getPriorityLabel(row.priority)} | Epic: {epicText} | Tasks:{" "}
+                      {taskProgressText} | Updated: {formatUpdatedAt(row.updated_at)}
                     </p>
                   </div>
 
@@ -669,12 +673,23 @@ function PlanningListPageContent() {
                       <span className="text-sm text-muted-foreground">
                         {getPriorityLabel(row.priority)}
                       </span>
-                      <span className="truncate text-xs text-muted-foreground" title={epicText}>
-                        {epicText}
+                      <span className="min-w-0">
+                        <StoryEpicDisplay
+                          epicKey={row.epic_key}
+                          epicTitle={row.epic_title}
+                          emptyLabel="—"
+                          className="w-full"
+                        />
                       </span>
-                      <span className="truncate text-xs text-muted-foreground" title={labelsText}>
-                        {labelsText}
-                      </span>
+                      <div className="min-w-0 space-y-0.5">
+                        <span className="block truncate text-xs text-muted-foreground" title={labelsText}>
+                          {labelsText}
+                        </span>
+                        <StoryTaskProgress
+                          doneCount={row.done_task_count}
+                          totalCount={row.task_count}
+                        />
+                      </div>
                       <span className="text-xs text-muted-foreground">
                         {formatUpdatedAt(row.updated_at)}
                       </span>
@@ -755,11 +770,22 @@ function PlanningListPageContent() {
                         <span title={`Priority ${getPriorityLabel(row.priority)}`}>
                           Prio: {getPriorityLabel(row.priority)}
                         </span>
-                        <span className="truncate" title={epicText}>
-                          Epic: {epicText}
+                        <span className="min-w-0">
+                          <StoryEpicDisplay
+                            epicKey={row.epic_key}
+                            epicTitle={row.epic_title}
+                            emptyLabel="—"
+                            className="w-full"
+                          />
                         </span>
-                        <span className="truncate" title={labelsText}>
-                          Labels: {labelsText}
+                        <span className="min-w-0 space-y-0.5">
+                          <span className="block truncate" title={labelsText}>
+                            Labels: {labelsText}
+                          </span>
+                          <StoryTaskProgress
+                            doneCount={row.done_task_count}
+                            totalCount={row.task_count}
+                          />
                         </span>
                         <span className="text-right">{formatUpdatedAt(row.updated_at)}</span>
                       </div>

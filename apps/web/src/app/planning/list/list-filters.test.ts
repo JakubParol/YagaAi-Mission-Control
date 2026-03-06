@@ -27,6 +27,8 @@ const ROWS: PlanningListRow[] = [
     story_type: "USER_STORY",
     task_type: null,
     objective: null,
+    task_count: 2,
+    done_task_count: 1,
   },
   {
     row_type: "story",
@@ -44,6 +46,8 @@ const ROWS: PlanningListRow[] = [
     story_type: "BUG",
     task_type: null,
     objective: null,
+    task_count: 0,
+    done_task_count: 0,
   },
   {
     row_type: "task",
@@ -61,6 +65,8 @@ const ROWS: PlanningListRow[] = [
     story_type: null,
     task_type: "CHORE",
     objective: "Cleanup",
+    task_count: 0,
+    done_task_count: 0,
   },
 ];
 
@@ -114,4 +120,3 @@ test("buildTypeOptions and buildStatusOptions expose unique normalized values", 
     { value: "TODO", label: "TODO" },
   ]);
 });
-
