@@ -2,18 +2,22 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Filter, ListTodo, Loader2, Search } from "lucide-react";
+import { BookOpen, ListTodo, Loader2 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import {
+  PlanningFilters,
+  PLANNING_FILTER_KEYS,
+  UNASSIGNED_FILTER_VALUE,
+  type PlanningFiltersValue,
+} from "@/components/planning/planning-filters";
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { STATUS_LABEL, STATUS_STYLE } from "@/components/planning/story-card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ThemedSelect, type ThemedSelectOption } from "@/components/ui/themed-select";
 import {
   Dialog,
   DialogContent,
@@ -38,8 +42,6 @@ import {
   applyPlanningListFilters,
   buildStatusOptions,
   buildTypeOptions,
-  LIST_FILTER_KEYS,
-  UNASSIGNED_FILTER_VALUE,
 } from "./list-filters";
 
 interface PlanningBacklogApiItem {
@@ -189,20 +191,23 @@ function PlanningListPageContent() {
       ? { kind: "loading" }
       : fetchResult;
 
-  const searchQuery = searchParams.get(LIST_FILTER_KEYS.search) ?? "";
-  const statusFilter = (searchParams.get(LIST_FILTER_KEYS.status) ?? "") as ItemStatus | "";
-  const typeFilter = searchParams.get(LIST_FILTER_KEYS.type) ?? "";
-  const labelFilter = searchParams.get(LIST_FILTER_KEYS.labelId) ?? "";
-  const epicFilter = searchParams.get(LIST_FILTER_KEYS.epicId) ?? "";
-  const assigneeFilter = searchParams.get(LIST_FILTER_KEYS.assignee) ?? "";
+  const filters: PlanningFiltersValue = {
+    search: searchParams.get(PLANNING_FILTER_KEYS.search) ?? "",
+    status: (searchParams.get(PLANNING_FILTER_KEYS.status) ?? "") as ItemStatus | "",
+    type: searchParams.get(PLANNING_FILTER_KEYS.type) ?? "",
+    labelId: searchParams.get(PLANNING_FILTER_KEYS.labelId) ?? "",
+    epicId: searchParams.get(PLANNING_FILTER_KEYS.epicId) ?? "",
+    assignee: searchParams.get(PLANNING_FILTER_KEYS.assignee) ?? "",
+  };
 
   const updateFilterParam = useCallback(
-    (key: string, value: string) => {
+    (key: keyof PlanningFiltersValue, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
+      const paramKey = PLANNING_FILTER_KEYS[key];
       if (value.trim().length === 0) {
-        params.delete(key);
+        params.delete(paramKey);
       } else {
-        params.set(key, value);
+        params.set(paramKey, value);
       }
       const queryString = params.toString();
       router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
@@ -212,12 +217,12 @@ function PlanningListPageContent() {
 
   const clearAllFilters = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
-    params.delete(LIST_FILTER_KEYS.search);
-    params.delete(LIST_FILTER_KEYS.status);
-    params.delete(LIST_FILTER_KEYS.type);
-    params.delete(LIST_FILTER_KEYS.labelId);
-    params.delete(LIST_FILTER_KEYS.epicId);
-    params.delete(LIST_FILTER_KEYS.assignee);
+    params.delete(PLANNING_FILTER_KEYS.search);
+    params.delete(PLANNING_FILTER_KEYS.status);
+    params.delete(PLANNING_FILTER_KEYS.type);
+    params.delete(PLANNING_FILTER_KEYS.labelId);
+    params.delete(PLANNING_FILTER_KEYS.epicId);
+    params.delete(PLANNING_FILTER_KEYS.assignee);
     const queryString = params.toString();
     router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
   }, [pathname, router, searchParams]);
@@ -403,38 +408,28 @@ function PlanningListPageContent() {
   const visibleRows =
     state.kind === "ok"
       ? applyPlanningListFilters(state.rows, {
-          search: searchQuery,
-          status: statusFilter,
-          type: typeFilter,
-          labelId: labelFilter,
-          epicId: epicFilter,
-          assignee: assigneeFilter,
+          search: filters.search,
+          status: filters.status,
+          type: filters.type,
+          labelId: filters.labelId,
+          epicId: filters.epicId,
+          assignee: filters.assignee,
         })
       : [];
   const statusOptions = state.kind === "ok" ? buildStatusOptions(state.rows) : [];
   const typeOptions = state.kind === "ok" ? buildTypeOptions(state.rows) : [];
-  const statusSelectOptions: ThemedSelectOption[] = [
-    { value: "", label: "Status: All" },
-    ...statusOptions,
-  ];
-  const typeSelectOptions: ThemedSelectOption[] = [{ value: "", label: "Type: All" }, ...typeOptions];
-  const labelSelectOptions: ThemedSelectOption[] = [
-    { value: "", label: "Label: All" },
-    ...(state.kind === "ok"
+  const labelOptions =
+    state.kind === "ok"
       ? state.labels.map((label) => ({ value: label.id, label: label.name }))
-      : []),
-  ];
-  const epicSelectOptions: ThemedSelectOption[] = [
-    { value: "", label: "Epic: All" },
-    ...(state.kind === "ok"
+      : [];
+  const epicOptions =
+    state.kind === "ok"
       ? state.epics.map((epic) => ({
           value: epic.id,
           label: `${epic.key} ${epic.title}`,
         }))
-      : []),
-  ];
-  const assigneeSelectOptions: ThemedSelectOption[] = [
-    { value: "", label: "Assignee: All" },
+      : [];
+  const assigneeOptions = [
     { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
     ...(state.kind === "ok"
       ? state.assignees.map((assignee) => ({
@@ -480,78 +475,17 @@ function PlanningListPageContent() {
         subtitle="Unified project view of stories and standalone tasks."
         controls={
           singleProjectId ? (
-            <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
-              <div className="relative min-w-[280px] flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => {
-                    updateFilterParam(LIST_FILTER_KEYS.search, event.target.value);
-                  }}
-                  placeholder="Search by key or title"
-                  aria-label="Search work items"
-                  className="h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground"
-                />
-              </div>
-
-              <div className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5 sm:w-auto sm:flex-nowrap">
-                <Filter className="size-3.5 text-muted-foreground" />
-                <ThemedSelect
-                  value={statusFilter}
-                  options={statusSelectOptions}
-                  placeholder="Status"
-                  onValueChange={(value) => {
-                    updateFilterParam(LIST_FILTER_KEYS.status, value);
-                  }}
-                  triggerClassName="h-8 min-w-[120px] bg-background/70 text-xs"
-                  contentClassName="w-[180px]"
-                />
-                <ThemedSelect
-                  value={typeFilter}
-                  options={typeSelectOptions}
-                  placeholder="Type"
-                  onValueChange={(value) => {
-                    updateFilterParam(LIST_FILTER_KEYS.type, value);
-                  }}
-                  triggerClassName="h-8 min-w-[120px] bg-background/70 text-xs"
-                  contentClassName="w-[180px]"
-                />
-                <ThemedSelect
-                  value={labelFilter}
-                  options={labelSelectOptions}
-                  placeholder="Label"
-                  onValueChange={(value) => {
-                    updateFilterParam(LIST_FILTER_KEYS.labelId, value);
-                  }}
-                  triggerClassName="h-8 min-w-[128px] bg-background/70 text-xs"
-                  contentClassName="w-[220px]"
-                />
-                <ThemedSelect
-                  value={epicFilter}
-                  options={epicSelectOptions}
-                  placeholder="Epic"
-                  onValueChange={(value) => {
-                    updateFilterParam(LIST_FILTER_KEYS.epicId, value);
-                  }}
-                  triggerClassName="h-8 min-w-[136px] bg-background/70 text-xs"
-                  contentClassName="w-[240px]"
-                />
-                <ThemedSelect
-                  value={assigneeFilter}
-                  options={assigneeSelectOptions}
-                  placeholder="Assignee"
-                  onValueChange={(value) => {
-                    updateFilterParam(LIST_FILTER_KEYS.assignee, value);
-                  }}
-                  triggerClassName="h-8 min-w-[136px] bg-background/70 text-xs"
-                  contentClassName="w-[240px]"
-                />
-                <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters}>
-                  Clear
-                </Button>
-              </div>
-            </div>
+            <PlanningFilters
+              value={filters}
+              onChange={updateFilterParam}
+              onClear={clearAllFilters}
+              disabled={state.kind !== "ok"}
+              statusOptions={statusOptions}
+              typeOptions={typeOptions}
+              labelOptions={labelOptions}
+              epicOptions={epicOptions}
+              assigneeOptions={assigneeOptions}
+            />
           ) : null
         }
         actions={(

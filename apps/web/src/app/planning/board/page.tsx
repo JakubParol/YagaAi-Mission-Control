@@ -1,18 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Search, Target } from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Target } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import {
+  applyPlanningStoryFilters,
+  buildStoryEpicOptions,
+  buildStoryLabelOptions,
+  buildStoryStatusOptions,
+  buildStoryTypeOptions,
+  PlanningFilters,
+  PLANNING_FILTER_KEYS,
+  UNASSIGNED_FILTER_VALUE,
+  type PlanningFiltersValue,
+} from "@/components/planning/planning-filters";
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { EmptyState } from "@/components/empty-state";
-import { filterStoriesBySelectedLabels } from "@/components/planning/story-label-filter";
 import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
-import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
   createTodoQuickItem,
@@ -41,14 +51,16 @@ interface AgentListEnvelope {
   }>;
 }
 
-export default function BoardPage() {
-  const { selectedProjectIds, allSelected, selectedLabelIds } = usePlanningFilter();
+function BoardPageContent() {
+  const { selectedProjectIds, allSelected } = usePlanningFilter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
   const [state, setState] = useState<BoardState>({ kind: "no-project" });
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [assigneeOptions, setAssigneeOptions] = useState<QuickCreateAssigneeOption[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -80,7 +92,42 @@ export default function BoardPage() {
     : state.kind !== "no-project" && state.projectId === singleProjectId
       ? state
       : { kind: "loading", projectId: singleProjectId };
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const filters: PlanningFiltersValue = {
+    search: searchParams.get(PLANNING_FILTER_KEYS.search) ?? "",
+    status: (searchParams.get(PLANNING_FILTER_KEYS.status) ?? "") as ItemStatus | "",
+    type: searchParams.get(PLANNING_FILTER_KEYS.type) ?? "",
+    labelId: searchParams.get(PLANNING_FILTER_KEYS.labelId) ?? "",
+    epicId: searchParams.get(PLANNING_FILTER_KEYS.epicId) ?? "",
+    assignee: searchParams.get(PLANNING_FILTER_KEYS.assignee) ?? "",
+  };
+
+  const updateFilterParam = useCallback(
+    (key: keyof PlanningFiltersValue, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      const paramKey = PLANNING_FILTER_KEYS[key];
+      if (value.trim().length === 0) {
+        params.delete(paramKey);
+      } else {
+        params.set(paramKey, value);
+      }
+      const queryString = params.toString();
+      router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(PLANNING_FILTER_KEYS.search);
+    params.delete(PLANNING_FILTER_KEYS.status);
+    params.delete(PLANNING_FILTER_KEYS.type);
+    params.delete(PLANNING_FILTER_KEYS.labelId);
+    params.delete(PLANNING_FILTER_KEYS.epicId);
+    params.delete(PLANNING_FILTER_KEYS.assignee);
+    const queryString = params.toString();
+    router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname);
+  }, [pathname, router, searchParams]);
 
   const visibleState: BoardState =
     viewState.kind === "ok"
@@ -88,15 +135,23 @@ export default function BoardPage() {
           ...viewState,
           data: {
             ...viewState.data,
-            stories: filterStoriesBySelectedLabels(viewState.data.stories, selectedLabelIds).filter((story) => {
-              if (normalizedSearchQuery.length === 0) return true;
-              const key = (story.key ?? "").toLowerCase();
-              const title = story.title.toLowerCase();
-              return key.includes(normalizedSearchQuery) || title.includes(normalizedSearchQuery);
-            }),
+            stories: applyPlanningStoryFilters(viewState.data.stories, filters),
           },
         }
       : viewState;
+  const allStories = viewState.kind === "ok" ? viewState.data.stories : [];
+  const statusOptions = buildStoryStatusOptions(allStories);
+  const typeOptions = buildStoryTypeOptions(allStories);
+  const labelOptions = buildStoryLabelOptions(allStories);
+  const epicOptions = buildStoryEpicOptions(allStories);
+  const assigneeFilterOptions = [
+    { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
+    ...assigneeOptions.map((option) => ({
+      value: option.id,
+      label: option.role ? `${option.name} · ${option.role}` : option.name,
+    })),
+  ];
+
   const selectedStoryLabels =
     state.kind === "ok" && selectedStoryId
       ? state.data.stories.find((story) => story.id === selectedStoryId)?.labels
@@ -375,31 +430,19 @@ export default function BoardPage() {
         icon={Target}
         title={boardSummary?.sprintName ?? "Board"}
         subtitle="Active sprint board for the selected project."
-        context={
-          selectedLabelIds.length > 0
-            ? `Filtered by ${selectedLabelIds.length} label${selectedLabelIds.length === 1 ? "" : "s"}.`
-            : undefined
-        }
         controls={
           singleProjectId ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative min-w-[220px] flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  disabled={visibleState.kind !== "ok"}
-                  placeholder="Filter by name or key"
-                  aria-label="Filter board stories by name"
-                  className={cn(
-                    "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground",
-                    "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                    visibleState.kind !== "ok" && "cursor-not-allowed text-muted-foreground",
-                  )}
-                />
-              </div>
-            </div>
+            <PlanningFilters
+              value={filters}
+              onChange={updateFilterParam}
+              onClear={clearAllFilters}
+              disabled={visibleState.kind !== "ok"}
+              statusOptions={statusOptions}
+              typeOptions={typeOptions}
+              labelOptions={labelOptions}
+              epicOptions={epicOptions}
+              assigneeOptions={assigneeFilterOptions}
+            />
           ) : null
         }
         actions={(
@@ -476,5 +519,19 @@ export default function BoardPage() {
         }}
       />
     </>
+  );
+}
+
+export default function BoardPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+    >
+      <BoardPageContent />
+    </Suspense>
   );
 }

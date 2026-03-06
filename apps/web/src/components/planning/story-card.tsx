@@ -21,6 +21,7 @@ export interface StoryCardStory {
   status: ItemStatus;
   priority: number | null;
   story_type: string;
+  epic_id?: string | null;
   epic_key?: string | null;
   epic_title?: string | null;
   position: number;
@@ -35,6 +36,7 @@ export interface StoryCardStory {
     avatar?: string | null;
   } | null;
   assignee_agent_id?: string | null;
+  current_assignee_agent_id?: string | null;
   assignee_name?: string | null;
   assignee_last_name?: string | null;
   assignee_initials?: string | null;
