@@ -1,21 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  Calendar,
-  ChevronDown,
-  ChevronRight,
-  CircleCheckBig,
-  ListPlus,
-  Hash,
   Layers,
   Loader2,
-  ListMinus,
   Plus,
-  Play,
-  Trash2,
-  Zap,
 } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
@@ -38,6 +28,8 @@ import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow } from "@/components/planning/backlog-row";
+import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
+import { BacklogSectionHeader } from "@/components/planning/backlog-section-header";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { StoryForm } from "@/components/planning/story-form";
@@ -70,6 +62,7 @@ interface BacklogItem {
   name: string;
   kind: BacklogKind;
   status: BacklogStatus;
+  display_order?: number;
   is_default: boolean;
   goal: string | null;
   start_date: string | null;
@@ -98,6 +91,28 @@ interface ScopedFetchResult {
   result: FetchResult;
 }
 
+interface SprintCompleteDialogState {
+  backlogId: string;
+  backlogName: string;
+  completedCount: number;
+  openStories: StoryCardStory[];
+}
+
+interface SprintStartDialogState {
+  backlogId: string;
+  backlogName: string;
+}
+
+interface SprintCompleteConfirmDialogState {
+  backlogId: string;
+  backlogName: string;
+}
+
+interface DeleteBoardDialogState {
+  backlogId: string;
+  backlogName: string;
+}
+
 interface PlanningAgentApiItem {
   id?: string;
   name?: string;
@@ -106,11 +121,17 @@ interface PlanningAgentApiItem {
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
-const KIND_CONFIG: Record<BacklogKind, { label: string; accent: string }> = {
-  SPRINT: { label: "Sprint", accent: "border-l-blue-500" },
-  BACKLOG: { label: "Backlog", accent: "border-l-slate-500" },
-  IDEAS: { label: "Ideas", accent: "border-l-violet-500" },
+const KIND_CONFIG: Record<BacklogKind, { label: string }> = {
+  SPRINT: { label: "Sprint" },
+  BACKLOG: { label: "Backlog" },
+  IDEAS: { label: "Ideas" },
 };
+
+function isCompleteSprintTarget(backlog: BacklogItem, sourceBacklogId: string): boolean {
+  if (backlog.id === sourceBacklogId) return false;
+  if (backlog.kind !== "SPRINT" && backlog.kind !== "BACKLOG") return false;
+  return backlog.status === "OPEN" || backlog.status === "ACTIVE";
+}
 
 const BOARD_KIND_OPTIONS: readonly { value: BacklogKind; label: string }[] = [
   { value: "BACKLOG", label: "Backlog" },
@@ -118,34 +139,43 @@ const BOARD_KIND_OPTIONS: readonly { value: BacklogKind; label: string }[] = [
   { value: "IDEAS", label: "Ideas" },
 ];
 
-function formatDate(d: string | null): string | null {
-  if (!d) return null;
-  try {
-    return new Date(d).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "short",
-    });
-  } catch {
-    return d;
-  }
-}
-
 function resolveAgentLabel(agent: PlanningAgentApiItem): string | null {
   if (!agent.id || !agent.name) return null;
   const fullName = [agent.name, agent.last_name ?? ""].join(" ").trim();
   return fullName.length > 0 ? fullName : agent.name;
 }
 
-function getSprintStatusCount(stories: StoryCardStory[], status: ItemStatus): number {
-  if (status === "IN_PROGRESS") {
-    return stories.filter(
-      (story) =>
-        story.status === "IN_PROGRESS" ||
-        story.status === "CODE_REVIEW" ||
-        story.status === "VERIFY",
-    ).length;
+function getPluralizedWorkItems(count: number): string {
+  return count === 1 ? "work item" : "work items";
+}
+
+async function parseApiMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: { message?: string } };
+    const message = body.error?.message;
+    if (message && message.trim().length > 0) return message;
+  } catch {
+    // Ignore parse failures and use fallback text.
   }
-  return stories.filter((story) => story.status === status).length;
+  return `${fallback} HTTP ${response.status}.`;
+}
+
+async function addStoryToBacklog(backlogId: string, storyId: string): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ story_id: storyId }),
+  });
+  if (response.ok) return;
+  throw new Error(await parseApiMessage(response, "Failed to move work item to selected board."));
+}
+
+async function removeStoryFromBacklog(backlogId: string, storyId: string): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories/${storyId}`), {
+    method: "DELETE",
+  });
+  if (response.ok) return;
+  throw new Error(await parseApiMessage(response, "Failed to remove work item from source board."));
 }
 
 // ─── Backlog Section ─────────────────────────────────────────────────
@@ -175,11 +205,7 @@ function BacklogSection({
   onAddToActiveSprint: (storyId: string) => void;
   onRemoveFromActiveSprint: (storyId: string) => void;
   onStartSprint: (backlogId: string, backlogName: string) => void;
-  onCompleteSprint: (
-    backlogId: string,
-    backlogName: string,
-    unfinishedStoryCount: number,
-  ) => void;
+  onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
   onStoryDelete: (storyId: string) => void;
   onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
@@ -191,188 +217,43 @@ function BacklogSection({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const { backlog, stories } = section;
-  const kindConf = KIND_CONFIG[backlog.kind] ?? KIND_CONFIG.BACKLOG;
 
-  const total = stories.length;
-  const start = formatDate(backlog.start_date);
-  const end = formatDate(backlog.end_date);
-  const Chevron = collapsed ? ChevronRight : ChevronDown;
-  const isSprint = backlog.kind === "SPRINT";
-  const todoCount = isSprint ? getSprintStatusCount(stories, "TODO") : 0;
-  const inProgressCount = isSprint ? getSprintStatusCount(stories, "IN_PROGRESS") : 0;
-  const doneCount = isSprint ? getSprintStatusCount(stories, "DONE") : 0;
-  const canCompleteSprint = isSprint && backlog.status === "ACTIVE";
-  const canStartSprint = isSprint && backlog.status !== "ACTIVE";
   const canAddToActiveSprint = backlog.kind === "BACKLOG";
   const canRemoveFromActiveSprint = isActiveSprint;
   const isSprintPending = pendingSprintIds.has(backlog.id);
   const isBoardDeletePending = pendingBoardIds.has(backlog.id);
-  const isStartBlockedByActive = canStartSprint && hasAnyActiveSprint;
-  const canDeleteBoard = !backlog.is_default;
-  const unfinishedStoryCount = isSprint
-    ? stories.filter((story) => story.status !== "DONE").length
-    : 0;
 
   return (
     <section
       className={cn(
         "rounded-lg border border-border/60 bg-card/30 overflow-hidden",
-        "border-l-2",
-        kindConf.accent,
-        isActiveSprint && "ring-1 ring-blue-500/20 bg-blue-500/[0.02]",
       )}
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-2.5">
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(
-            "inline-flex items-center justify-center rounded-sm p-0.5",
-            "hover:bg-muted/40 transition-colors duration-150",
-            "focus-ring",
-          )}
-          aria-label={collapsed ? "Expand backlog section" : "Collapse backlog section"}
-        >
-          <Chevron className="size-4 shrink-0 text-muted-foreground" />
-        </button>
-
-        <h3 className="text-sm font-semibold text-foreground">
-          {backlog.name}
-        </h3>
-
-        {isActiveSprint && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-400">
-            <Zap className="size-2.5" />
-            Active
-          </span>
-        )}
-
-        <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-          {kindConf.label}
-        </span>
-
-        {backlog.status === "CLOSED" && (
-          <span className="rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
-            Closed
-          </span>
-        )}
-        {backlog.is_default && (
-          <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-300 uppercase tracking-wider">
-            Default
-          </span>
-        )}
-
-        {(start || end) && (
-          <span className="flex items-center gap-1 text-[11px] text-muted-foreground ml-auto">
-            <Calendar className="size-3" />
-            {start && end ? `${start} – ${end}` : (start ?? end)}
-          </span>
-        )}
-
-        <span className="flex items-center gap-1 text-[11px] text-muted-foreground tabular-nums">
-          <Hash className="size-3" />
-          {total}
-        </span>
-
-        {isSprint && (
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">
-              TODO
-              <span className="tabular-nums">{todoCount}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-medium text-blue-300">
-              IN_PROGRESS
-              <span className="tabular-nums">{inProgressCount}</span>
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
-              DONE
-              <span className="tabular-nums">{doneCount}</span>
-            </span>
-          </div>
-        )}
-
-        <div className="ml-1 flex items-center gap-1">
-          {canCompleteSprint && (
-            <Button
-              variant="outline"
-              size="xs"
-              disabled={isSprintPending}
-              title={
-                unfinishedStoryCount > 0
-                  ? `${unfinishedStoryCount} stories must be DONE before completing sprint`
-                  : "Complete sprint"
-              }
-              onClick={() =>
-                onCompleteSprint(backlog.id, backlog.name, unfinishedStoryCount)
-              }
-            >
-              {isSprintPending ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <CircleCheckBig className="size-3" />
-              )}
-              Complete sprint
-            </Button>
-          )}
-          {canStartSprint && (
-            <Button
-              variant="outline"
-              size="xs"
-              disabled={isSprintPending || isStartBlockedByActive}
-              title={
-                isStartBlockedByActive
-                  ? "Complete the current active sprint before starting another."
-                  : "Start sprint"
-              }
-              onClick={() => onStartSprint(backlog.id, backlog.name)}
-            >
-              {isSprintPending ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Play className="size-3" />
-              )}
-              Start sprint
-            </Button>
-          )}
-
-          {backlog.kind === "BACKLOG" && (
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => onCreateStory(backlog.id)}
-              title="Create story"
-            >
-              + Create
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            disabled={isBoardDeletePending || !canDeleteBoard}
-            title={canDeleteBoard ? "Delete board" : "Default board cannot be deleted"}
-            aria-label="Delete board"
-            onClick={() => onDeleteBoard(backlog.id, backlog.name, backlog.is_default)}
-          >
-            {isBoardDeletePending ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <Trash2 className="size-3" />
-            )}
-          </Button>
-        </div>
-      </div>
+      <BacklogSectionHeader
+        backlog={backlog}
+        collapsed={collapsed}
+        stories={stories}
+        hasAnyActiveSprint={hasAnyActiveSprint}
+        isSprintPending={isSprintPending}
+        isBoardDeletePending={isBoardDeletePending}
+        onToggleCollapsed={() => setCollapsed(!collapsed)}
+        onStartSprint={onStartSprint}
+        onCompleteSprint={onCompleteSprint}
+        onCreateStory={onCreateStory}
+        onDeleteBoard={onDeleteBoard}
+      />
 
       {/* Row list */}
       {!collapsed && (
         <div className="border-t border-border/30">
+          <BacklogRowsHeader />
+
           {stories.length === 0 ? (
             <p className="px-4 py-6 text-center text-[11px] text-muted-foreground/50">
               No stories in this backlog
             </p>
           ) : (
-            <div className="divide-y divide-border/10">
+            <div className="divide-y divide-border/25">
               {stories.map((story) => (
                 <BacklogRow
                   key={story.id}
@@ -389,39 +270,22 @@ function BacklogSection({
                         onDelete={onStoryDelete}
                         onStatusChange={onStoryStatusChange}
                         onAddLabel={onStoryClick}
+                        sprintMembershipAction={
+                          canAddToActiveSprint
+                            ? {
+                                mode: "add",
+                                onSelect: onAddToActiveSprint,
+                              }
+                            : canRemoveFromActiveSprint
+                              ? {
+                                  mode: "remove",
+                                  onSelect: onRemoveFromActiveSprint,
+                                }
+                              : undefined
+                        }
                         disabled={pendingStoryIds.has(story.id)}
                         isDeleting={pendingDeleteStoryIds.has(story.id)}
                       />
-                      {(canAddToActiveSprint || canRemoveFromActiveSprint) ? (
-                      <Button
-                        variant="outline"
-                        size="xs"
-                        disabled={pendingStoryIds.has(story.id) || pendingDeleteStoryIds.has(story.id)}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (canAddToActiveSprint) {
-                            onAddToActiveSprint(story.id);
-                            return;
-                          }
-                          onRemoveFromActiveSprint(story.id);
-                        }}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        title={
-                          canAddToActiveSprint
-                            ? "Add to active sprint"
-                            : "Remove from active sprint"
-                        }
-                      >
-                        {pendingStoryIds.has(story.id) || pendingDeleteStoryIds.has(story.id) ? (
-                          <Loader2 className="size-3 animate-spin" />
-                        ) : canAddToActiveSprint ? (
-                          <ListPlus className="size-3" />
-                        ) : (
-                          <ListMinus className="size-3" />
-                        )}
-                        {canAddToActiveSprint ? "Add" : "Remove"}
-                      </Button>
-                      ) : null}
                     </div>
                   )}
                 />
@@ -466,12 +330,19 @@ function BacklogPageContent() {
   const [createBacklogId, setCreateBacklogId] = useState<string | null>(null);
   const [createBoardOpen, setCreateBoardOpen] = useState(false);
   const [createBoardName, setCreateBoardName] = useState("");
-  const [createBoardKind, setCreateBoardKind] = useState<BacklogKind>("BACKLOG");
+  const [createBoardKind, setCreateBoardKind] = useState<BacklogKind>("SPRINT");
   const [createBoardGoal, setCreateBoardGoal] = useState("");
   const [createBoardStartDate, setCreateBoardStartDate] = useState("");
   const [createBoardEndDate, setCreateBoardEndDate] = useState("");
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [createBoardError, setCreateBoardError] = useState<string | null>(null);
+  const [startDialog, setStartDialog] = useState<SprintStartDialogState | null>(null);
+  const [completeConfirmDialog, setCompleteConfirmDialog] =
+    useState<SprintCompleteConfirmDialogState | null>(null);
+  const [completeDialog, setCompleteDialog] = useState<SprintCompleteDialogState | null>(null);
+  const [completeTargetBacklogId, setCompleteTargetBacklogId] = useState<string>("");
+  const [completeDialogError, setCompleteDialogError] = useState<string | null>(null);
+  const [deleteBoardDialog, setDeleteBoardDialog] = useState<DeleteBoardDialogState | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -504,11 +375,16 @@ function BacklogPageContent() {
       : null;
 
   // Derive state
-  const state: PageState = !singleProjectId
-    ? { kind: "no-project" }
-    : fetchResult === null
-      ? { kind: "loading" }
-      : fetchResult;
+  const state: PageState = useMemo(
+    () => (
+      !singleProjectId
+        ? { kind: "no-project" }
+        : fetchResult === null
+          ? { kind: "loading" }
+          : fetchResult
+    ),
+    [fetchResult, singleProjectId],
+  );
 
   const filters: PlanningFiltersValue = {
     search: searchParams.get(PLANNING_FILTER_KEYS.search) ?? "",
@@ -596,6 +472,20 @@ function BacklogPageContent() {
             section.backlog.kind === "SPRINT" && section.backlog.status === "ACTIVE",
         )
       : false;
+  const defaultBacklogId =
+    state.kind === "ok"
+      ? state.sections.find((section) => section.backlog.is_default)?.backlog.id ?? null
+      : null;
+  const completeDialogTargetOptions = useMemo(
+    () => (
+      state.kind === "ok" && completeDialog
+        ? state.sections
+            .map((section) => section.backlog)
+            .filter((backlog) => isCompleteSprintTarget(backlog, completeDialog.backlogId))
+        : []
+    ),
+    [completeDialog, state],
+  );
   const activeSelectedStoryId =
     state.kind === "ok" &&
     selectedStoryId &&
@@ -610,6 +500,16 @@ function BacklogPageContent() {
           .flatMap((section) => section.stories)
           .find((story) => story.id === activeSelectedStoryId)?.labels
       : undefined;
+  const isStartDialogSubmitting =
+    startDialog !== null ? Boolean(pendingSprintIds[startDialog.backlogId]) : false;
+  const isCompleteConfirmDialogSubmitting =
+    completeConfirmDialog !== null
+      ? Boolean(pendingSprintIds[completeConfirmDialog.backlogId])
+      : false;
+  const isCompleteDialogSubmitting =
+    completeDialog !== null ? Boolean(pendingSprintIds[completeDialog.backlogId]) : false;
+  const isDeleteBoardDialogSubmitting =
+    deleteBoardDialog !== null ? Boolean(pendingBoardIds[deleteBoardDialog.backlogId]) : false;
 
   const fetchBacklogResult = useCallback(async (projectId: string): Promise<FetchResult> => {
     const response = await fetch(
@@ -627,6 +527,7 @@ function BacklogPageContent() {
       return { kind: "empty" };
     }
 
+    // Keep backlog order exactly as returned by API (including display_order semantics).
     const sections: BacklogWithStories[] = await Promise.all(
       backlogs.map(async (backlog) => {
         const storiesResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`));
@@ -635,22 +536,6 @@ function BacklogPageContent() {
         return { backlog, stories: body.data ?? [] };
       }),
     );
-
-    sections.sort((a, b) => {
-      const aActive = a.backlog.kind === "SPRINT" && a.backlog.status === "ACTIVE" ? 1 : 0;
-      const bActive = b.backlog.kind === "SPRINT" && b.backlog.status === "ACTIVE" ? 1 : 0;
-      if (aActive !== bActive) return bActive - aActive;
-
-      const statusOrder = { ACTIVE: 0, CLOSED: 1 };
-      const aStatus = statusOrder[a.backlog.status] ?? 0;
-      const bStatus = statusOrder[b.backlog.status] ?? 0;
-      if (aStatus !== bStatus) return aStatus - bStatus;
-
-      const kindOrder = { SPRINT: 0, BACKLOG: 1, IDEAS: 2 };
-      const aKind = kindOrder[a.backlog.kind] ?? 1;
-      const bKind = kindOrder[b.backlog.kind] ?? 1;
-      return aKind - bKind;
-    });
 
     const agents = await fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name"))
       .then(async (res) => {
@@ -812,33 +697,160 @@ function BacklogPageContent() {
 
   const handleStartSprint = useCallback(
     (backlogId: string, backlogName: string) => {
-      const confirmed = window.confirm(
-        `Start sprint "${backlogName}"?\n\nThis sprint will become the active sprint board.`,
-      );
-      if (!confirmed) return;
-      void updateSprintLifecycle(backlogId, "start");
+      setStartDialog({ backlogId, backlogName });
     },
-    [updateSprintLifecycle],
+    [],
   );
 
+  const handleStartDialogOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    setStartDialog(null);
+  }, []);
+
+  const handleStartDialogConfirm = useCallback(() => {
+    if (!startDialog) return;
+    void updateSprintLifecycle(startDialog.backlogId, "start");
+    setStartDialog(null);
+  }, [startDialog, updateSprintLifecycle]);
+
   const handleCompleteSprint = useCallback(
-    (backlogId: string, backlogName: string, unfinishedStoryCount: number) => {
-      if (unfinishedStoryCount > 0) {
-        const noun = unfinishedStoryCount === 1 ? "story is" : "stories are";
-        showErrorToast(
-          `Cannot complete sprint "${backlogName}". ${unfinishedStoryCount} ${noun} not DONE.`,
-        );
+    (backlogId: string, backlogName: string) => {
+      if (state.kind !== "ok") {
+        showErrorToast("Sprint data is not available. Refresh and try again.");
         return;
       }
 
-      const confirmed = window.confirm(
-        `Complete sprint "${backlogName}"?\n\nThis will close the sprint and remove it from the active board.`,
-      );
-      if (!confirmed) return;
-      void updateSprintLifecycle(backlogId, "complete");
+      const sprintSection = state.sections.find((section) => section.backlog.id === backlogId);
+      if (!sprintSection) {
+        showErrorToast("Sprint was not found in current view. Refresh and try again.");
+        return;
+      }
+
+      const completedCount = sprintSection.stories.filter((story) => story.status === "DONE").length;
+      const openStories = sprintSection.stories.filter((story) => story.status !== "DONE");
+
+      if (openStories.length > 0) {
+        const targetOptions = state.sections
+          .map((section) => section.backlog)
+          .filter((backlog) => isCompleteSprintTarget(backlog, backlogId));
+
+        if (targetOptions.length === 0) {
+          showErrorToast(
+            "No target sprint/backlog is available for open work items. Create one first.",
+          );
+          return;
+        }
+
+        const defaultTargetId =
+          targetOptions.find((backlog) => backlog.is_default)?.id ?? targetOptions[0].id;
+        setCompleteDialog({
+          backlogId,
+          backlogName,
+          completedCount,
+          openStories,
+        });
+        setCompleteTargetBacklogId(defaultTargetId);
+        setCompleteDialogError(null);
+        return;
+      }
+
+      setCompleteConfirmDialog({ backlogId, backlogName });
     },
-    [showErrorToast, updateSprintLifecycle],
+    [showErrorToast, state],
   );
+
+  const handleCompleteConfirmDialogOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    setCompleteConfirmDialog(null);
+  }, []);
+
+  const handleCompleteConfirmDialogConfirm = useCallback(() => {
+    if (!completeConfirmDialog) return;
+    void updateSprintLifecycle(completeConfirmDialog.backlogId, "complete");
+    setCompleteConfirmDialog(null);
+  }, [completeConfirmDialog, updateSprintLifecycle]);
+
+  const handleCompleteDialogOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    setCompleteDialog(null);
+    setCompleteTargetBacklogId("");
+    setCompleteDialogError(null);
+  }, []);
+
+  const handleCompleteDialogConfirm = useCallback(async () => {
+    if (!completeDialog || !singleProjectId) return;
+
+    if (!completeTargetBacklogId) {
+      setCompleteDialogError("Select where open work items should be moved.");
+      return;
+    }
+
+    const targetExists = completeDialogTargetOptions.some(
+      (backlog) => backlog.id === completeTargetBacklogId,
+    );
+    if (!targetExists) {
+      setCompleteDialogError("Selected target board is no longer available. Refresh and try again.");
+      return;
+    }
+
+    if (!defaultBacklogId) {
+      setCompleteDialogError("Default backlog was not found for this project.");
+      return;
+    }
+
+    setCompleteDialogError(null);
+    setPendingSprintIds((prev) => ({ ...prev, [completeDialog.backlogId]: true }));
+
+    try {
+      for (const story of completeDialog.openStories) {
+        if (completeTargetBacklogId === defaultBacklogId) {
+          await removeStoryFromActiveSprint(singleProjectId, story.id);
+          continue;
+        }
+
+        await removeStoryFromBacklog(completeDialog.backlogId, story.id);
+        try {
+          await addStoryToBacklog(completeTargetBacklogId, story.id);
+        } catch (error) {
+          // Best-effort rollback keeps story in source sprint if target insert fails.
+          try {
+            await addStoryToBacklog(completeDialog.backlogId, story.id);
+          } catch {
+            // Ignore rollback failure; original error is more actionable.
+          }
+          throw error;
+        }
+      }
+
+      await completeSprint(singleProjectId, completeDialog.backlogId);
+      emitSprintLifecycleChanged({
+        projectId: singleProjectId,
+        backlogId: completeDialog.backlogId,
+        operation: "complete",
+      });
+
+      setCompleteDialog(null);
+      setCompleteTargetBacklogId("");
+      await refreshCurrentView();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to complete sprint.";
+      setCompleteDialogError(message);
+    } finally {
+      setPendingSprintIds((prev) => {
+        const next = { ...prev };
+        delete next[completeDialog.backlogId];
+        return next;
+      });
+    }
+  }, [
+    completeDialog,
+    completeTargetBacklogId,
+    defaultBacklogId,
+    completeDialogTargetOptions,
+    refreshCurrentView,
+    singleProjectId,
+  ]);
 
   const handleCreateDialogChange = useCallback((open: boolean) => {
     if (!open) setCreateBacklogId(null);
@@ -846,7 +858,7 @@ function BacklogPageContent() {
 
   const resetCreateBoardForm = useCallback(() => {
     setCreateBoardName("");
-    setCreateBoardKind("BACKLOG");
+    setCreateBoardKind("SPRINT");
     setCreateBoardGoal("");
     setCreateBoardStartDate("");
     setCreateBoardEndDate("");
@@ -947,35 +959,42 @@ function BacklogPageContent() {
   );
 
   const handleDeleteBoard = useCallback(
-    async (backlogId: string, backlogName: string, isDefault: boolean) => {
+    (backlogId: string, backlogName: string, isDefault: boolean) => {
       if (isDefault) {
         showErrorToast("Default board cannot be deleted.");
         return;
       }
-
-      const confirmed = window.confirm(
-        `Delete board "${backlogName}"?\n\nThis action cannot be undone.`,
-      );
-      if (!confirmed) return;
-
-      setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
-      try {
-        await deleteBoard(backlogId);
-        await refreshCurrentView();
-      } catch (error) {
-        showErrorToast(
-          error instanceof Error ? error.message : "Failed to delete board.",
-        );
-      } finally {
-        setPendingBoardIds((prev) => {
-          const next = { ...prev };
-          delete next[backlogId];
-          return next;
-        });
-      }
+      setDeleteBoardDialog({ backlogId, backlogName });
     },
-    [refreshCurrentView, showErrorToast],
+    [showErrorToast],
   );
+
+  const handleDeleteBoardDialogOpenChange = useCallback((open: boolean) => {
+    if (open) return;
+    setDeleteBoardDialog(null);
+  }, []);
+
+  const handleDeleteBoardDialogConfirm = useCallback(async () => {
+    if (!deleteBoardDialog) return;
+    const { backlogId } = deleteBoardDialog;
+
+    setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
+    try {
+      await deleteBoard(backlogId);
+      setDeleteBoardDialog(null);
+      await refreshCurrentView();
+    } catch (error) {
+      showErrorToast(
+        error instanceof Error ? error.message : "Failed to delete board.",
+      );
+    } finally {
+      setPendingBoardIds((prev) => {
+        const next = { ...prev };
+        delete next[backlogId];
+        return next;
+      });
+    }
+  }, [deleteBoardDialog, refreshCurrentView, showErrorToast]);
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -1118,6 +1137,240 @@ function BacklogPageContent() {
           </div>
         </div>
       )}
+
+      <Dialog open={startDialog !== null} onOpenChange={handleStartDialogOpenChange}>
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Start sprint</DialogTitle>
+          </DialogHeader>
+          {startDialog && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to start{" "}
+                <span className="font-semibold text-foreground">
+                  {startDialog.backlogName}
+                </span>
+                ? This sprint will become the active sprint board.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleStartDialogOpenChange(false)}
+                  disabled={isStartDialogSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleStartDialogConfirm}
+                  disabled={isStartDialogSubmitting}
+                >
+                  {isStartDialogSubmitting ? (
+                    <>
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      Starting sprint...
+                    </>
+                  ) : (
+                    "Start sprint"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={completeConfirmDialog !== null}
+        onOpenChange={handleCompleteConfirmDialogOpenChange}
+      >
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Complete sprint</DialogTitle>
+          </DialogHeader>
+          {completeConfirmDialog && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to complete{" "}
+                <span className="font-semibold text-foreground">
+                  {completeConfirmDialog.backlogName}
+                </span>
+                ? This will close the sprint and remove it from the active board.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleCompleteConfirmDialogOpenChange(false)}
+                  disabled={isCompleteConfirmDialogSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCompleteConfirmDialogConfirm}
+                  disabled={isCompleteConfirmDialogSubmitting}
+                >
+                  {isCompleteConfirmDialogSubmitting ? (
+                    <>
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      Completing sprint...
+                    </>
+                  ) : (
+                    "Complete sprint"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={completeDialog !== null} onOpenChange={handleCompleteDialogOpenChange}>
+        <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Complete sprint</DialogTitle>
+          </DialogHeader>
+          {completeDialog && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This sprint has{" "}
+                <span className="font-semibold text-foreground">
+                  {completeDialog.completedCount} completed {getPluralizedWorkItems(completeDialog.completedCount)}
+                </span>{" "}
+                and{" "}
+                <span className="font-semibold text-foreground">
+                  {completeDialog.openStories.length} open {getPluralizedWorkItems(completeDialog.openStories.length)}
+                </span>
+                .
+              </p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>Completed work items include everything in the Done column.</p>
+                <p>
+                  Open work items include everything from any other board column.
+                  Choose where to move them before completing this sprint.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="complete-sprint-target"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Move open work items to
+                </label>
+                <select
+                  id="complete-sprint-target"
+                  value={completeTargetBacklogId}
+                  onChange={(event) => {
+                    setCompleteTargetBacklogId(event.target.value);
+                    if (completeDialogError) setCompleteDialogError(null);
+                  }}
+                  disabled={isCompleteDialogSubmitting}
+                  className={cn(
+                    "h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  )}
+                >
+                  <option value="" disabled>
+                    Select target board
+                  </option>
+                  {completeDialogTargetOptions.map((backlog) => (
+                    <option key={backlog.id} value={backlog.id}>
+                      {backlog.name} ({KIND_CONFIG[backlog.kind]?.label ?? backlog.kind}
+                      {backlog.is_default ? ", default" : ""})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {completeDialogError && (
+                <p role="alert" className="text-xs text-red-400">
+                  {completeDialogError}
+                </p>
+              )}
+
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleCompleteDialogOpenChange(false)}
+                  disabled={isCompleteDialogSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    void handleCompleteDialogConfirm();
+                  }}
+                  disabled={
+                    isCompleteDialogSubmitting ||
+                    completeDialog.openStories.length === 0 ||
+                    completeTargetBacklogId.length === 0
+                  }
+                >
+                  {isCompleteDialogSubmitting ? (
+                    <>
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      Completing sprint...
+                    </>
+                  ) : (
+                    "Complete sprint"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteBoardDialog !== null} onOpenChange={handleDeleteBoardDialogOpenChange}>
+        <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Delete board</DialogTitle>
+          </DialogHeader>
+          {deleteBoardDialog && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Are you sure you want to delete{" "}
+                <span className="font-semibold text-foreground">
+                  {deleteBoardDialog.backlogName}
+                </span>
+                ? This action cannot be undone.
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleDeleteBoardDialogOpenChange(false)}
+                  disabled={isDeleteBoardDialogSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    void handleDeleteBoardDialogConfirm();
+                  }}
+                  disabled={isDeleteBoardDialogSubmitting}
+                >
+                  {isDeleteBoardDialogSubmitting ? (
+                    <>
+                      <Loader2 className="mr-1 size-3.5 animate-spin" />
+                      Deleting board...
+                    </>
+                  ) : (
+                    "Delete board"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <StoryDetailDialog
         storyId={activeSelectedStoryId}

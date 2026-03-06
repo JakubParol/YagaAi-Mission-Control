@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Flag,
   Link2,
+  ListMinus,
+  ListPlus,
   Loader2,
   MoreHorizontal,
   Tag,
@@ -77,6 +79,11 @@ interface StoryActionsMenuProps {
   onDelete: (storyId: string) => void | Promise<void>;
   onStatusChange?: (storyId: string, status: ItemStatus) => void | Promise<void>;
   onAddLabel?: (storyId: string) => void;
+  sprintMembershipAction?: {
+    mode: "add" | "remove";
+    onSelect: (storyId: string) => void | Promise<void>;
+    disabled?: boolean;
+  };
   disabled?: boolean;
   isDeleting?: boolean;
   defaultOpen?: boolean;
@@ -90,6 +97,7 @@ type MainAction =
   | "copy-link"
   | "copy-key"
   | "add-label"
+  | "toggle-sprint-membership"
   | "change-status"
   | "add-flag"
   | "link-work-item"
@@ -107,7 +115,7 @@ interface MenuActionItem {
 }
 
 const SECTION_GROUPS: ReadonlyArray<ReadonlyArray<MainAction>> = [
-  ["copy-link", "copy-key", "add-label"],
+  ["copy-link", "copy-key", "add-label", "toggle-sprint-membership"],
   ["change-status"],
   ["add-flag", "link-work-item", "link-parent", "archive"],
   ["delete"],
@@ -225,6 +233,7 @@ export function StoryActionsMenu({
   onDelete,
   onStatusChange,
   onAddLabel,
+  sprintMembershipAction,
   disabled = false,
   isDeleting = false,
   defaultOpen = false,
@@ -258,6 +267,19 @@ export function StoryActionsMenu({
       { id: "copy-link", label: "Copy link", icon: Copy, disabled: isDisabled },
       { id: "copy-key", label: "Copy key", icon: Copy, disabled: isDisabled || !storyKey },
       { id: "add-label", label: "Add label", icon: Tag, disabled: isDisabled },
+      ...(sprintMembershipAction
+        ? [
+            {
+              id: "toggle-sprint-membership" as const,
+              label:
+                sprintMembershipAction.mode === "add"
+                  ? "Add to active sprint"
+                  : "Remove from active sprint",
+              icon: sprintMembershipAction.mode === "add" ? ListPlus : ListMinus,
+              disabled: isDisabled || Boolean(sprintMembershipAction.disabled),
+            },
+          ]
+        : []),
       {
         id: "change-status",
         label: "Change status",
@@ -271,7 +293,7 @@ export function StoryActionsMenu({
       { id: "archive", label: "Archive", icon: Archive, disabled: true },
       { id: "delete", label: "Delete", icon: Trash2, disabled: isDisabled, tone: "danger" },
     ],
-    [isDisabled, onStatusChange, storyKey],
+    [isDisabled, onStatusChange, sprintMembershipAction, storyKey],
   );
 
   const enabledMainIndexes = useMemo(
@@ -467,6 +489,14 @@ export function StoryActionsMenu({
 
     if (actionId === "delete") {
       handleDeleteMenuItem();
+      return;
+    }
+
+    if (actionId === "toggle-sprint-membership") {
+      if (!sprintMembershipAction || isDisabled) return;
+      await sprintMembershipAction.onSelect(storyId);
+      setOpen(false);
+      setStatusSubmenuOpen(false);
       return;
     }
 
