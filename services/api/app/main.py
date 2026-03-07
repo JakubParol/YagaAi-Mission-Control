@@ -6,6 +6,9 @@ from app.observability.api.router import router as observability_router
 from app.planning.api.router import router as planning_router
 from app.shared.api.errors import AppError, app_error_handler, generic_error_handler
 from app.shared.api.health import router as health_router
+from app.shared.db import migrate_sqlite_or_raise
+
+migrate_sqlite_or_raise(settings.db_path)
 
 app = FastAPI(title=settings.app_name)
 

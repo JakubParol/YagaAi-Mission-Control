@@ -1,0 +1,124 @@
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+from app.shared.db.migrations import migrate_sqlite_or_raise
+
+
+def _create_legacy_db(path: Path) -> None:
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        PRAGMA foreign_keys = ON;
+
+        CREATE TABLE agents (
+          id TEXT PRIMARY KEY,
+          openclaw_key TEXT NOT NULL UNIQUE,
+          name TEXT NOT NULL,
+          role TEXT,
+          worker_type TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          source TEXT NOT NULL DEFAULT 'manual',
+          metadata_json TEXT,
+          last_synced_at TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE stories (
+          id TEXT PRIMARY KEY,
+          project_id TEXT,
+          epic_id TEXT,
+          key TEXT,
+          title TEXT NOT NULL,
+          intent TEXT,
+          description TEXT,
+          story_type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          is_blocked INTEGER NOT NULL DEFAULT 0,
+          blocked_reason TEXT,
+          priority INTEGER,
+          metadata_json TEXT,
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          started_at TEXT,
+          completed_at TEXT
+        );
+
+        CREATE TABLE backlogs (
+          id TEXT PRIMARY KEY,
+          project_id TEXT,
+          name TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          status TEXT NOT NULL,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          goal TEXT,
+          start_date TEXT,
+          end_date TEXT,
+          metadata_json TEXT,
+          created_by TEXT,
+          updated_by TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+
+        INSERT INTO backlogs (id, project_id, name, kind, status, created_at, updated_at)
+        VALUES
+          ('b1', 'p1', 'Sprint A', 'SPRINT', 'ACTIVE', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+          ('b2', 'p1', 'Sprint B', 'SPRINT', 'ACTIVE', '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z');
+        """)
+    conn.commit()
+    conn.close()
+
+
+def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
+    db_path = tmp_path / "legacy.db"
+    _create_legacy_db(db_path)
+
+    migrate_sqlite_or_raise(str(db_path))
+    migrate_sqlite_or_raise(str(db_path))
+
+    conn = sqlite3.connect(db_path)
+
+    agent_columns = {row[1] for row in conn.execute("PRAGMA table_info(agents)").fetchall()}
+    assert {"avatar", "last_name", "initials"}.issubset(agent_columns)
+
+    story_columns = {row[1] for row in conn.execute("PRAGMA table_info(stories)").fetchall()}
+    assert "current_assignee_agent_id" in story_columns
+
+    backlog_columns = {row[1] for row in conn.execute("PRAGMA table_info(backlogs)").fetchall()}
+    assert "display_order" in backlog_columns
+
+    migration_versions = [
+        row[0]
+        for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version").fetchall()
+    ]
+    assert migration_versions == [
+        "20260307_001",
+        "20260307_002",
+        "20260307_003",
+        "20260307_004",
+    ]
+
+    active_sprints = conn.execute(
+        "SELECT COUNT(*) FROM backlogs WHERE project_id='p1' AND kind='SPRINT' AND status='ACTIVE'"
+    ).fetchone()[0]
+    assert active_sprints == 1
+
+    conn.close()
+
+
+def test_migration_fails_for_corrupt_db(tmp_path: Path) -> None:
+    db_path = tmp_path / "corrupt.db"
+    db_path.write_bytes(b"not-a-sqlite-db")
+
+    with pytest.raises(RuntimeError, match="not readable"):
+        migrate_sqlite_or_raise(str(db_path))
+
+
+def test_migration_fails_when_parent_directory_missing(tmp_path: Path) -> None:
+    db_path = tmp_path / "missing" / "nested" / "mission-control.db"
+    with pytest.raises(RuntimeError, match="directory does not exist"):
+        migrate_sqlite_or_raise(str(db_path))

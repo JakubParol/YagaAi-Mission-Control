@@ -42,6 +42,7 @@ exclude = '''
 /(
     \.git
     | \.venv
+    | \.venv\.broken
     | __pycache__
     | \.pytest_cache
 )/
@@ -50,11 +51,11 @@ exclude = '''
 [tool.isort]
 profile = "black"
 line_length = 100
-skip = [".venv", "__pycache__"]
+skip = [".venv", ".venv.broken", "__pycache__"]
 known_first_party = ["app"]
 
 [tool.pylint.master]
-ignore-paths = ["^.venv/.*$", "^__pycache__/.*$"]
+ignore-paths = ["^.venv/.*$", "^.venv.broken/.*$", "^__pycache__/.*$"]
 load-plugins = []
 
 [tool.pylint.messages_control]
@@ -79,7 +80,7 @@ max-line-length = 100
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 include = ["app", "tests"]
-exclude = [".venv", "__pycache__", ".pytest_cache"]
+exclude = [".venv", ".venv.broken", "__pycache__", ".pytest_cache"]
 reportMissingImports = true
 reportMissingTypeStubs = false
 
