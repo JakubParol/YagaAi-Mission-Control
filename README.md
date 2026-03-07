@@ -12,6 +12,7 @@ mission-control/
 ├── services/
 │   └── api/                    # FastAPI REST API (Python)
 ├── infra/                      # Deployment configs (systemd, scripts)
+│   └── local-runtime/          # Deterministic local Docker runtime + Dapr bootstrap
 ├── data/                       # SQLite database (gitignored)
 └── docs/                       # Shared documentation
 ```
