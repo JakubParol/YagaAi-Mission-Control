@@ -157,7 +157,7 @@ function isShortcutInputTarget(target: EventTarget | null): boolean {
   return target.isContentEditable;
 }
 
-function getAdjacentEpicKey(epicKeys: readonly string[], currentKey: string | null, step: number): string | null {
+export function getAdjacentEpicKey(epicKeys: readonly string[], currentKey: string | null, step: number): string | null {
   if (epicKeys.length === 0) return null;
   if (!currentKey) return epicKeys[0];
   const index = epicKeys.indexOf(currentKey);
