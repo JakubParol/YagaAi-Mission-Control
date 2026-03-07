@@ -77,6 +77,9 @@ The planning module's application layer emits `activity_log` entries for key eve
 | Status changed | `{entity}.status.changed` | `from_status`, `to_status`, actor |
 | Assignment changed | `task.assigned` / `task.unassigned` | Agent ID, actor |
 | Backlog item added/removed | `backlog.item.added` / `backlog.item.removed` | Item ID, backlog ID |
+| Epic quick status action | `epic.status.changed` | `from_status`, `to_status`, actor, epic/project scope |
+| Story bulk status action | `story.status.changed` | per-story status change, actor, epic-overview scope |
+| Story bulk sprint add/remove | `story.sprint_membership.added` / `story.sprint_membership.removed` | per-story movement, actor, backlog scope |
 
 Implementation:
 - Application service methods call a lightweight `log_activity()` helper after successful DB commits.

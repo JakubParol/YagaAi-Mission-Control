@@ -1,15 +1,27 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 
 from app.planning.api.schemas import (
+    BulkOperationItemResult,
+    BulkOperationResponse,
     EpicCreate,
     EpicDetailResponse,
     EpicOverviewResponse,
     EpicResponse,
+    EpicStatusChangeRequest,
+    EpicStatusChangeResponse,
     EpicUpdate,
+    SprintBulkMembershipRequest,
+    StoryBulkStatusUpdateRequest,
 )
+from app.planning.application.epic_overview_action_service import EpicOverviewActionService
 from app.planning.application.epic_service import EpicService
-from app.planning.dependencies import get_epic_service, resolve_project_key
+from app.planning.dependencies import (
+    get_epic_overview_action_service,
+    get_epic_service,
+    resolve_project_key,
+)
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
+from app.shared.api.errors import ValidationError
 
 router = APIRouter(prefix="/epics", tags=["planning/epics"])
 
@@ -112,3 +124,127 @@ async def delete_epic(
     service: EpicService = Depends(get_epic_service),
 ) -> None:
     await service.delete_epic(epic_id)
+
+
+@router.post("/{epic_id}/status")
+async def change_epic_status(
+    epic_id: str,
+    body: EpicStatusChangeRequest,
+    service: EpicOverviewActionService = Depends(get_epic_overview_action_service),
+    actor_id: str | None = Header(default=None, alias="X-Actor-Id"),
+    actor_type: str | None = Header(default=None, alias="X-Actor-Type"),
+) -> Envelope[EpicStatusChangeResponse]:
+    result = await service.change_epic_status(
+        epic_id=epic_id,
+        status=body.status,
+        actor_id=actor_id,
+        actor_type=actor_type,
+    )
+    return Envelope(data=EpicStatusChangeResponse(**result.__dict__))
+
+
+@router.post("/bulk/story-status")
+async def bulk_update_story_status(
+    body: StoryBulkStatusUpdateRequest,
+    service: EpicOverviewActionService = Depends(get_epic_overview_action_service),
+    actor_id: str | None = Header(default=None, alias="X-Actor-Id"),
+    actor_type: str | None = Header(default=None, alias="X-Actor-Type"),
+) -> Envelope[BulkOperationResponse]:
+    result = await service.bulk_update_story_status(
+        story_ids=body.story_ids,
+        status=body.status,
+        actor_id=actor_id,
+        actor_type=actor_type,
+    )
+    return Envelope(
+        data=BulkOperationResponse(
+            operation=result.operation,
+            total=result.total,
+            succeeded=result.succeeded,
+            failed=result.failed,
+            results=[
+                BulkOperationItemResult(
+                    entity_id=item.entity_id,
+                    success=item.success,
+                    timestamp=item.timestamp,
+                    error_code=item.error_code,
+                    error_message=item.error_message,
+                )
+                for item in result.results
+            ],
+        )
+    )
+
+
+@router.post("/bulk/active-sprint/add")
+async def bulk_add_to_active_sprint(
+    body: SprintBulkMembershipRequest,
+    project_id: str | None = Depends(resolve_project_key),
+    service: EpicOverviewActionService = Depends(get_epic_overview_action_service),
+    actor_id: str | None = Header(default=None, alias="X-Actor-Id"),
+    actor_type: str | None = Header(default=None, alias="X-Actor-Type"),
+) -> Envelope[BulkOperationResponse]:
+    if not project_id:
+        raise ValidationError("Either project_id or project_key is required")
+
+    result = await service.bulk_add_stories_to_active_sprint(
+        project_id=project_id,
+        story_ids=body.story_ids,
+        actor_id=actor_id,
+        actor_type=actor_type,
+    )
+    return Envelope(
+        data=BulkOperationResponse(
+            operation=result.operation,
+            total=result.total,
+            succeeded=result.succeeded,
+            failed=result.failed,
+            results=[
+                BulkOperationItemResult(
+                    entity_id=item.entity_id,
+                    success=item.success,
+                    timestamp=item.timestamp,
+                    error_code=item.error_code,
+                    error_message=item.error_message,
+                )
+                for item in result.results
+            ],
+        )
+    )
+
+
+@router.post("/bulk/active-sprint/remove")
+async def bulk_remove_from_active_sprint(
+    body: SprintBulkMembershipRequest,
+    project_id: str | None = Depends(resolve_project_key),
+    service: EpicOverviewActionService = Depends(get_epic_overview_action_service),
+    actor_id: str | None = Header(default=None, alias="X-Actor-Id"),
+    actor_type: str | None = Header(default=None, alias="X-Actor-Type"),
+) -> Envelope[BulkOperationResponse]:
+    if not project_id:
+        raise ValidationError("Either project_id or project_key is required")
+
+    result = await service.bulk_remove_stories_from_active_sprint(
+        project_id=project_id,
+        story_ids=body.story_ids,
+        actor_id=actor_id,
+        actor_type=actor_type,
+    )
+    return Envelope(
+        data=BulkOperationResponse(
+            operation=result.operation,
+            total=result.total,
+            succeeded=result.succeeded,
+            failed=result.failed,
+            results=[
+                BulkOperationItemResult(
+                    entity_id=item.entity_id,
+                    success=item.success,
+                    timestamp=item.timestamp,
+                    error_code=item.error_code,
+                    error_message=item.error_message,
+                )
+                for item in result.results
+            ],
+        )
+    )

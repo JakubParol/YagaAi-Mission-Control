@@ -4,6 +4,7 @@ from fastapi import Depends, Query
 from app.config import settings
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
+from app.planning.application.epic_overview_action_service import EpicOverviewActionService
 from app.planning.application.epic_service import EpicService
 from app.planning.application.label_service import LabelService
 from app.planning.application.project_service import ProjectService
@@ -11,6 +12,7 @@ from app.planning.application.story_service import StoryService
 from app.planning.application.task_service import TaskService
 from app.planning.infrastructure.openclaw_source import FileOpenClawAgentSource
 from app.planning.infrastructure.sqlite_repository import (
+    SqliteActivityLogRepository,
     SqliteAgentRepository,
     SqliteBacklogRepository,
     SqliteEpicRepository,
@@ -71,6 +73,17 @@ async def get_backlog_service(
     db: aiosqlite.Connection = Depends(get_db),
 ) -> BacklogService:
     return BacklogService(SqliteBacklogRepository(db))
+
+
+async def get_epic_overview_action_service(
+    db: aiosqlite.Connection = Depends(get_db),
+) -> EpicOverviewActionService:
+    return EpicOverviewActionService(
+        epic_service=EpicService(SqliteEpicRepository(db)),
+        story_service=StoryService(SqliteStoryRepository(db)),
+        backlog_service=BacklogService(SqliteBacklogRepository(db)),
+        activity_log_repo=SqliteActivityLogRepository(db),
+    )
 
 
 async def resolve_project_key(

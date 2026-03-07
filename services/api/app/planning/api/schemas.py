@@ -155,6 +155,19 @@ class EpicOverviewResponse(BaseModel):
     stale_days: int
 
 
+class EpicStatusChangeRequest(BaseModel):
+    status: str = Field(..., pattern=r"^(TODO|IN_PROGRESS|DONE)$")
+
+
+class EpicStatusChangeResponse(BaseModel):
+    epic_id: str
+    from_status: str
+    to_status: str
+    changed: bool
+    actor_id: str | None
+    timestamp: str
+
+
 # ---------------------------------------------------------------------------
 # Agents
 # ---------------------------------------------------------------------------
@@ -395,6 +408,48 @@ class SprintMembershipMoveResponse(BaseModel):
     source_position: int | None
     target_position: int | None
     moved: bool
+
+
+class StoryBulkStatusUpdateRequest(BaseModel):
+    story_ids: list[str] = Field(..., min_length=1)
+    status: str = Field(..., pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$")
+
+
+class SprintBulkMembershipRequest(BaseModel):
+    story_ids: list[str] = Field(..., min_length=1)
+
+
+class BulkOperationItemResult(BaseModel):
+    entity_id: str
+    success: bool
+    timestamp: str
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class BulkOperationResponse(BaseModel):
+    operation: str
+    total: int
+    succeeded: int
+    failed: int
+    results: list[BulkOperationItemResult]
+
+
+def to_bulk_operation_response(
+    *,
+    operation: str,
+    total: int,
+    succeeded: int,
+    failed: int,
+    results: list[BulkOperationItemResult],
+) -> BulkOperationResponse:
+    return BulkOperationResponse(
+        operation=operation,
+        total=total,
+        succeeded=succeeded,
+        failed=failed,
+        results=results,
+    )
 
 
 # ---------------------------------------------------------------------------

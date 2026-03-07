@@ -138,6 +138,38 @@ async def _ensure_backlog_indexes(db: aiosqlite.Connection) -> None:
         raise
 
 
+async def _ensure_activity_log_table(db: aiosqlite.Connection) -> None:
+    try:
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS activity_log (
+              id TEXT PRIMARY KEY,
+              event_name TEXT NOT NULL,
+              actor_id TEXT,
+              actor_type TEXT,
+              entity_type TEXT NOT NULL,
+              entity_id TEXT NOT NULL,
+              scope_json TEXT,
+              metadata_json TEXT,
+              occurred_at TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            )
+            """
+        )
+        await db.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_activity_log_entity
+              ON activity_log(entity_type, entity_id, occurred_at)
+            """
+        )
+        await db.commit()
+    except sqlite3.OperationalError as exc:
+        lowered = str(exc).lower()
+        if "no such table" in lowered:
+            return
+        raise
+
+
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = sqlite3.Row
@@ -146,4 +178,5 @@ async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
         await _ensure_story_columns(db)
         await _ensure_backlog_columns(db)
         await _ensure_backlog_indexes(db)
+        await _ensure_activity_log_table(db)
         yield db

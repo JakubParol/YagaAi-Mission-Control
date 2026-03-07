@@ -241,6 +241,102 @@ Updatable: `title`, `description`, `status`, `status_override`, `is_blocked`, `b
 
 Setting `status` when `status_mode=DERIVED` sets `status_override` (temporary, clears on next child change).
 
+#### `POST /v1/planning/epics/{id}/status` — Quick action: change epic status
+
+Request:
+```jsonc
+{ "status": "IN_PROGRESS" } // TODO | IN_PROGRESS | DONE
+```
+
+Response `200`:
+```jsonc
+{
+  "data": {
+    "epic_id": "...",
+    "from_status": "TODO",
+    "to_status": "IN_PROGRESS",
+    "changed": true,
+    "actor_id": "agent-1",
+    "timestamp": "2026-03-07T...Z"
+  }
+}
+```
+
+Audit/event trail:
+- emits `epic.status.changed` with `actor_id`, `actor_type`, `timestamp`, and scope (`flow=epic_overview`, `project_id`, `epic_id`).
+
+#### `POST /v1/planning/epics/bulk/story-status` — Bulk update story status
+
+Request:
+```jsonc
+{
+  "story_ids": ["s1", "s2"],
+  "status": "DONE" // TODO | IN_PROGRESS | CODE_REVIEW | VERIFY | DONE
+}
+```
+
+Response `200` (per-record outcome):
+```jsonc
+{
+  "data": {
+    "operation": "BULK_UPDATE_STORY_STATUS",
+    "total": 2,
+    "succeeded": 1,
+    "failed": 1,
+    "results": [
+      { "entity_id": "s1", "success": true, "timestamp": "..." },
+      {
+        "entity_id": "s2",
+        "success": false,
+        "timestamp": "...",
+        "error_code": "NOT_FOUND",
+        "error_message": "Story s2 not found"
+      }
+    ]
+  }
+}
+```
+
+Audit/event trail:
+- each successful record emits `story.status.changed` with actor/timestamp/scope.
+
+#### `POST /v1/planning/epics/bulk/active-sprint/add` — Bulk add stories to active sprint
+
+Moves stories from product backlog to active sprint for a project.
+
+Query: `project_id` or `project_key` (required).
+
+Request:
+```jsonc
+{ "story_ids": ["s1", "s2"] }
+```
+
+Response `200` (per-record outcome): same bulk envelope as above, with `operation="ADD_TO_ACTIVE_SPRINT"`.
+
+Validation/error semantics:
+- Missing project selector → `400 VALIDATION_ERROR`
+- No active sprint for project (per record) → `error_code = "NO_ACTIVE_SPRINT"`
+- Other business/state issues are returned per record with explicit error code/message.
+
+Audit/event trail:
+- each successful record emits `story.sprint_membership.added` with actor/timestamp/scope.
+
+#### `POST /v1/planning/epics/bulk/active-sprint/remove` — Bulk remove stories from active sprint
+
+Moves stories from active sprint back to product backlog.
+
+Query: `project_id` or `project_key` (required).
+
+Request:
+```jsonc
+{ "story_ids": ["s1", "s2"] }
+```
+
+Response `200` (per-record outcome): same bulk envelope, with `operation="REMOVE_FROM_ACTIVE_SPRINT"`.
+
+Audit/event trail:
+- each successful record emits `story.sprint_membership.removed` with actor/timestamp/scope.
+
 #### `DELETE .../epics/{id}` — Delete epic
 
 Hard delete. Returns `204`.

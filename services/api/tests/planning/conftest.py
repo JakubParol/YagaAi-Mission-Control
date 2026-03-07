@@ -207,8 +207,24 @@ def _setup_test_db(tmp_path, monkeypatch):
           reason        TEXT
         );
 
+        CREATE TABLE activity_log (
+          id TEXT PRIMARY KEY,
+          event_name TEXT NOT NULL,
+          actor_id TEXT,
+          actor_type TEXT,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          scope_json TEXT,
+          metadata_json TEXT,
+          occurred_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
         CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
           ON task_assignments(task_id) WHERE unassigned_at IS NULL;
+
+        CREATE INDEX IF NOT EXISTS idx_activity_log_entity
+          ON activity_log(entity_type, entity_id, occurred_at);
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
           ON projects(is_default) WHERE is_default = 1;

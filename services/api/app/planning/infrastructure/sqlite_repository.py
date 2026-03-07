@@ -1,9 +1,11 @@
 import json
 from typing import Any
+from uuid import uuid4
 
 import aiosqlite
 
 from app.planning.application.ports import (
+    ActivityLogRepository,
     AgentRepository,
     BacklogRepository,
     EpicRepository,
@@ -1654,6 +1656,50 @@ class SqliteBacklogRepository(BacklogRepository):
 # ---------------------------------------------------------------------------
 # Task Repository
 # ---------------------------------------------------------------------------
+
+
+class SqliteActivityLogRepository(ActivityLogRepository):
+    def __init__(self, db: aiosqlite.Connection) -> None:
+        self._db = db
+
+    async def log_event(
+        self,
+        *,
+        event_name: str,
+        actor_id: str | None,
+        actor_type: str | None,
+        entity_type: str,
+        entity_id: str,
+        scope: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        occurred_at: str,
+    ) -> None:
+        event_id = str(uuid4())
+        scope_json = json.dumps(scope) if scope is not None else None
+        metadata_json = json.dumps(metadata) if metadata is not None else None
+        await self._db.execute(
+            """
+            INSERT INTO activity_log (
+              id, event_name, actor_id, actor_type,
+              entity_type, entity_id, scope_json, metadata_json,
+              occurred_at, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                event_id,
+                event_name,
+                actor_id,
+                actor_type,
+                entity_type,
+                entity_id,
+                scope_json,
+                metadata_json,
+                occurred_at,
+                occurred_at,
+            ],
+        )
+        await self._db.commit()
 
 
 class SqliteTaskRepository(TaskRepository):
