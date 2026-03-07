@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 function isElementTruncated(element: HTMLElement): boolean {
@@ -8,7 +9,7 @@ function isElementTruncated(element: HTMLElement): boolean {
 
 function useOverflowTitle<T extends HTMLElement>(fullText: string): {
   ref: RefObject<T | null>;
-  title: string | undefined;
+  isTruncated: boolean;
 } {
   const ref = useRef<T>(null);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -31,7 +32,7 @@ function useOverflowTitle<T extends HTMLElement>(fullText: string): {
 
   return {
     ref,
-    title: isTruncated ? fullText : undefined,
+    isTruncated,
   };
 }
 
@@ -49,7 +50,7 @@ export function StoryEpicDisplay({
   const key = epicKey?.trim() ?? "";
   const title = epicTitle?.trim() ?? "";
   const fullText = key.length > 0 && title.length > 0 ? `${key} ${title}` : "";
-  const { ref, title: tooltipTitle } = useOverflowTitle<HTMLSpanElement>(fullText);
+  const { ref, isTruncated } = useOverflowTitle<HTMLSpanElement>(fullText);
 
   if (key.length === 0 || title.length === 0) {
     return emptyLabel === null ? null : (
@@ -67,9 +68,20 @@ export function StoryEpicDisplay({
       )}
     >
       <span className="shrink-0 font-mono">{key}</span>
-      <span ref={ref} className="min-w-0 truncate" title={tooltipTitle}>
-        {title}
-      </span>
+      {isTruncated ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span ref={ref} className="min-w-0 truncate">
+              {title}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{fullText}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <span ref={ref} className="min-w-0 truncate">
+          {title}
+        </span>
+      )}
     </Badge>
   );
 }

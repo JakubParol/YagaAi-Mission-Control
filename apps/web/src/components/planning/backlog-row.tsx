@@ -1,17 +1,22 @@
 import type { ReactNode } from "react";
-import { User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryCardStory } from "./story-card";
 import { STATUS_STYLE, STATUS_LABEL } from "./story-card";
-import { AssigneeAvatarTooltip } from "./assignee-avatar-tooltip";
 import { StoryEpicDisplay } from "./story-epic-display";
 import { StoryLabelChips } from "./story-label-chips";
 import { StoryTaskProgress } from "./story-task-progress";
 import { resolveStoryTypeVisualConfig } from "./story-type-badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  StoryAssigneeControl,
+  type StoryAssigneeOption,
+  type StoryAssigneeSelection,
+} from "./story-assignee-control";
 
 export const BACKLOG_ROW_LAYOUT = {
-  gridTemplate: "grid-cols-[auto_72px_minmax(0,1fr)_240px_112px_36px_56px_72px_56px]",
+  gridTemplate: "grid-cols-[20px_72px_minmax(0,1fr)_96px_240px_112px_36px_56px_72px_56px]",
   actions: "w-[56px]",
+  labels: "w-[96px]",
   epic: "w-[240px]",
   status: "w-[112px]",
   storyPoints: "w-[36px]",
@@ -19,18 +24,26 @@ export const BACKLOG_ROW_LAYOUT = {
   assignee: "w-[72px]",
 } as const;
 
+export type BacklogAssigneeOption = StoryAssigneeOption;
+
 /**
  * A single compact row in the Jira-like backlog list.
- * Columns: type icon | key | summary | epic | status pill | SP | task progress | assignee | actions
+ * Columns: type icon | key | summary | labels | epic | status pill | SP | task progress | assignee | actions
  */
 export function BacklogRow({
   item,
   onClick,
   actions,
+  assigneeOptions,
+  onAssigneeChange,
+  assigneePending = false,
 }: {
   item: StoryCardStory;
   onClick?: (id: string) => void;
   actions?: ReactNode;
+  assigneeOptions?: readonly StoryAssigneeOption[];
+  onAssigneeChange?: (storyId: string, nextAssigneeAgentId: string | null) => void;
+  assigneePending?: boolean;
 }) {
   const statusStyle = STATUS_STYLE[item.status];
   const typeConf = resolveStoryTypeVisualConfig(item.story_type);
@@ -45,10 +58,14 @@ export function BacklogRow({
         }
       : null
   );
-  const assigneeName = assignee?.name?.trim() ?? "Unassigned";
-  const hasAssignee = Boolean(
-    assignee && (assignee.name || assignee.initials || assignee.avatar),
-  );
+  const selectedAssigneeId = item.current_assignee_agent_id ?? item.assignee_agent_id ?? null;
+  const currentAssignee: StoryAssigneeSelection = {
+    assignee_agent_id: selectedAssigneeId,
+    assignee_name: assignee?.name ?? null,
+    assignee_last_name: assignee?.last_name ?? null,
+    assignee_initials: assignee?.initials ?? null,
+    assignee_avatar: assignee?.avatar ?? null,
+  };
 
   return (
     <div
@@ -81,16 +98,27 @@ export function BacklogRow({
       </span>
 
       {/* Summary */}
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-foreground" title={item.title}>
-          {item.title}
-        </p>
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <p className="min-w-0 flex-1 truncate text-sm text-foreground">
+              {item.title}
+            </p>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{item.title}</TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* Labels */}
+      <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.labels)}>
         <StoryLabelChips
           labels={item.labels}
-          className="mt-1"
-          chipClassName="max-w-[7rem]"
+          maxVisible={1}
+          allNamesTooltip
+          className="min-w-0 max-w-full"
+          chipClassName="max-w-[5.5rem]"
         />
-      </div>
+      </span>
 
       {/* Epic */}
       <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.epic)}>
@@ -130,20 +158,18 @@ export function BacklogRow({
 
       {/* Assignee */}
       <span className={cn("shrink-0 flex justify-center", BACKLOG_ROW_LAYOUT.assignee)}>
-        {hasAssignee ? (
-          <span className="group/assignee relative inline-flex items-center">
-            <AssigneeAvatarTooltip
-              name={assigneeName}
-              lastName={assignee?.last_name ?? null}
-              initials={assignee?.initials ?? null}
-              avatar={assignee?.avatar ?? null}
-            />
-          </span>
-        ) : (
-          <span className="inline-flex size-5 items-center justify-center rounded-full border border-border/70 bg-muted text-muted-foreground" title="Unassigned" aria-label="Unassigned">
-            <User className="size-3" aria-hidden="true" />
-          </span>
-        )}
+        <StoryAssigneeControl
+          storyId={item.id}
+          currentAssignee={currentAssignee}
+          assigneeOptions={assigneeOptions ?? []}
+          disabled={assigneePending}
+          onChange={(_, nextAssignee) => {
+            const nextAssigneeAgentId = nextAssignee.assignee_agent_id;
+            if (!onAssigneeChange) return;
+            if (nextAssigneeAgentId === selectedAssigneeId) return;
+            onAssigneeChange(item.id, nextAssigneeAgentId);
+          }}
+        />
       </span>
 
       {/* Actions */}

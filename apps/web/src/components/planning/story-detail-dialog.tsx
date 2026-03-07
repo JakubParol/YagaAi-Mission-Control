@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ThemedSelect,
   type ThemedSelectOption,
@@ -403,11 +404,17 @@ function TaskRow({
           size="xs"
           variant="destructive"
           aria-label="Delete task"
-          title="Delete task"
           disabled={pending}
           onClick={onDelete}
         >
-          <Trash2 className="size-3" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center justify-center">
+                <Trash2 className="size-3" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Delete task</TooltipContent>
+          </Tooltip>
         </Button>
       </div>
     </div>
@@ -824,14 +831,18 @@ function StoryLabelManager({
                 type="button"
                 disabled={pendingLabelIds.has(label.id)}
                 onClick={() => onDetachLabel(label.id)}
-                title={`Detach "${label.name}"`}
                 style={toLabelChipStyle(label.color)}
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
                   "disabled:cursor-wait disabled:opacity-70",
                 )}
               >
-                <span className="max-w-[12rem] truncate">{label.name}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="max-w-[12rem] truncate">{label.name}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">{`Detach "${label.name}"`}</TooltipContent>
+                </Tooltip>
                 {pendingLabelIds.has(label.id) ? (
                   <Loader2 className="size-2.5 animate-spin" />
                 ) : (

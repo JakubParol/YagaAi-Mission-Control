@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface BacklogBoardActionsMenuProps {
@@ -85,6 +86,7 @@ export function BacklogBoardActionsMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerDisabled = isDeleting || !canDelete;
+  const triggerTooltip = canDelete ? "Board actions" : "Default board cannot be deleted";
 
   const updateFloatingPosition = useCallback(() => {
     if (typeof window === "undefined" || !open || !rootRef.current || !menuRef.current) {
@@ -200,24 +202,28 @@ export function BacklogBoardActionsMenu({
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        disabled={triggerDisabled}
-        title={canDelete ? "Board actions" : "Default board cannot be deleted"}
-        aria-label={`Open board actions for ${backlogName}`}
-        className="text-muted-foreground hover:text-foreground"
-        onClick={() =>
-          setOpen((prev) => {
-            const next = !prev;
-            if (!next) setMenuCoordinates(null);
-            return next;
-          })
-        }
-      >
-        {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <MoreHorizontal className="size-3.5" />}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={triggerDisabled}
+            aria-label={`Open board actions for ${backlogName}`}
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() =>
+              setOpen((prev) => {
+                const next = !prev;
+                if (!next) setMenuCoordinates(null);
+                return next;
+              })
+            }
+          >
+            {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <MoreHorizontal className="size-3.5" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{triggerTooltip}</TooltipContent>
+      </Tooltip>
 
       {menu && (typeof document !== "undefined" ? createPortal(menu, document.body) : menu)}
     </div>

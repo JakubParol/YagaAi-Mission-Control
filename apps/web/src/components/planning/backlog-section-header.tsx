@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, CircleCheckBig, Loader2, Play } from "lucide
 
 import { BacklogBoardActionsMenu } from "@/components/planning/backlog-board-actions-menu";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BacklogKind, BacklogStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ function MetricChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-between gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+        "inline-flex h-5 items-center justify-between gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none",
         toneClassName,
       )}
     >
@@ -116,12 +117,16 @@ export function BacklogSectionHeader({
       </button>
 
       <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           <h3
             className="min-w-0 max-w-[24rem] shrink truncate text-sm font-semibold text-foreground"
-            title={backlog.name}
           >
-            {backlog.name}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block truncate">{backlog.name}</span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{backlog.name}</TooltipContent>
+            </Tooltip>
           </h3>
 
           <span className="shrink-0 rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -137,21 +142,17 @@ export function BacklogSectionHeader({
             {backlog.status}
           </span>
 
-          <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+          <span className="inline-flex h-5 shrink-0 items-center text-[11px] text-muted-foreground tabular-nums">
             #{workItemCount}
           </span>
 
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             <MetricChip label="TODO" value={todoCount} toneClassName="bg-slate-500/10 text-slate-300" />
-          </div>
-          <div className="shrink-0">
             <MetricChip
               label="IN_PROGRESS"
               value={inProgressCount}
               toneClassName="bg-blue-500/10 text-blue-300"
             />
-          </div>
-          <div className="shrink-0">
             <MetricChip label="DONE" value={doneCount} toneClassName="bg-emerald-500/10 text-emerald-300" />
           </div>
         </div>
@@ -159,44 +160,56 @@ export function BacklogSectionHeader({
 
       <div className="flex shrink-0 items-center justify-end gap-1">
         {canCompleteSprint && (
-          <Button
-            variant="outline"
-            size="xs"
-            disabled={isSprintPending}
-            title="Complete sprint"
-            onClick={() => onCompleteSprint(backlog.id, backlog.name)}
-          >
-            {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <CircleCheckBig className="size-3" />}
-            Complete
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={isSprintPending}
+                onClick={() => onCompleteSprint(backlog.id, backlog.name)}
+              >
+                {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <CircleCheckBig className="size-3" />}
+                Complete
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Complete sprint</TooltipContent>
+          </Tooltip>
         )}
 
         {canStartSprint && (
-          <Button
-            variant="outline"
-            size="xs"
-            disabled={isSprintPending || isStartBlockedByActive}
-            title={
-              isStartBlockedByActive
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={isSprintPending || isStartBlockedByActive}
+                onClick={() => onStartSprint(backlog.id, backlog.name)}
+              >
+                {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
+                Start
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {isStartBlockedByActive
                 ? "Complete the current active sprint before starting another."
-                : "Start sprint"
-            }
-            onClick={() => onStartSprint(backlog.id, backlog.name)}
-          >
-            {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
-            Start
-          </Button>
+                : "Start sprint"}
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {backlog.kind === "BACKLOG" && (
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => onCreateStory(backlog.id)}
-            title="Create work item"
-          >
-            Create
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => onCreateStory(backlog.id)}
+              >
+                Create
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Create work item</TooltipContent>
+          </Tooltip>
         )}
 
         <BacklogBoardActionsMenu

@@ -27,7 +27,7 @@ import {
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
-import { BacklogRow } from "@/components/planning/backlog-row";
+import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
 import { BacklogSectionHeader } from "@/components/planning/backlog-section-header";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
@@ -40,6 +40,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
@@ -79,12 +80,22 @@ type PageState =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; sections: BacklogWithStories[]; assignees: PlanningFilterOption[] };
+  | {
+      kind: "ok";
+      sections: BacklogWithStories[];
+      assignees: PlanningFilterOption[];
+      assignableAgents: BacklogAssigneeOption[];
+    };
 
 type FetchResult =
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; sections: BacklogWithStories[]; assignees: PlanningFilterOption[] };
+  | {
+      kind: "ok";
+      sections: BacklogWithStories[];
+      assignees: PlanningFilterOption[];
+      assignableAgents: BacklogAssigneeOption[];
+    };
 
 interface ScopedFetchResult {
   projectId: string;
@@ -117,6 +128,9 @@ interface PlanningAgentApiItem {
   id?: string;
   name?: string;
   last_name?: string | null;
+  initials?: string | null;
+  role?: string | null;
+  avatar?: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -185,7 +199,9 @@ function BacklogSection({
   section,
   isActiveSprint,
   hasAnyActiveSprint,
+  assigneeOptions,
   onStoryClick,
+  onStoryAssigneeChange,
   onAddToActiveSprint,
   onRemoveFromActiveSprint,
   onStartSprint,
@@ -202,7 +218,9 @@ function BacklogSection({
   section: BacklogWithStories;
   isActiveSprint: boolean;
   hasAnyActiveSprint: boolean;
+  assigneeOptions: readonly BacklogAssigneeOption[];
   onStoryClick: (storyId: string) => void;
+  onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
   onAddToActiveSprint: (storyId: string) => void;
   onRemoveFromActiveSprint: (storyId: string) => void;
   onStartSprint: (backlogId: string, backlogName: string) => void;
@@ -260,6 +278,9 @@ function BacklogSection({
                   key={story.id}
                   item={story}
                   onClick={onStoryClick}
+                  assigneeOptions={assigneeOptions}
+                  assigneePending={pendingStoryIds.has(story.id)}
+                  onAssigneeChange={onStoryAssigneeChange}
                   actions={(
                     <div className="flex items-center justify-end gap-1">
                       <StoryActionsMenu
@@ -295,18 +316,26 @@ function BacklogSection({
           )}
 
           <div className="border-t border-border/20 px-3 py-1.5">
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={backlog.kind !== "BACKLOG"}
-              title={backlog.kind === "BACKLOG" ? "Create story" : "Only product backlog supports story creation"}
-              className="text-muted-foreground"
-              onClick={() => {
-                if (backlog.kind === "BACKLOG") onCreateStory(backlog.id);
-              }}
-            >
-              + Create
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={backlog.kind !== "BACKLOG"}
+                  className="text-muted-foreground"
+                  onClick={() => {
+                    if (backlog.kind === "BACKLOG") onCreateStory(backlog.id);
+                  }}
+                >
+                  + Create
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {backlog.kind === "BACKLOG"
+                  ? "Create story"
+                  : "Only product backlog supports story creation"}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -439,6 +468,7 @@ function BacklogPageContent() {
     { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
     ...(state.kind === "ok" ? state.assignees : []),
   ];
+  const assignableAgents = state.kind === "ok" ? state.assignableAgents : [];
 
   const totalStoryCount =
     state.kind === "ok"
@@ -557,7 +587,24 @@ function BacklogPageContent() {
       .filter((item): item is PlanningFilterOption => item !== null)
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    return { kind: "ok", sections, assignees };
+    const assignableAgents = agents
+      .filter((agent): agent is PlanningAgentApiItem & { id: string; name: string } => (
+        typeof agent.id === "string"
+        && agent.id.trim().length > 0
+        && typeof agent.name === "string"
+        && agent.name.trim().length > 0
+      ))
+      .map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        last_name: agent.last_name ?? null,
+        initials: agent.initials ?? null,
+        role: agent.role ?? null,
+        avatar: agent.avatar ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { kind: "ok", sections, assignees, assignableAgents };
   }, []);
 
   const refreshCurrentView = useCallback(async () => {
@@ -687,6 +734,35 @@ function BacklogPageContent() {
       } catch (error) {
         showErrorToast(
           error instanceof Error ? error.message : "Failed to update story status.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, showErrorToast],
+  );
+
+  const handleStoryAssigneeChange = useCallback(
+    async (storyId: string, nextAssigneeAgentId: string | null) => {
+      if (pendingStoryIds[storyId] || pendingDeleteStoryIds[storyId]) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+      try {
+        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_assignee_agent_id: nextAssigneeAgentId }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update assignee. HTTP ${response.status}.`);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to update assignee.",
         );
       } finally {
         setPendingStoryIds((prev) => {
@@ -1120,7 +1196,9 @@ function BacklogPageContent() {
                 section.backlog.status === "ACTIVE"
               }
               hasAnyActiveSprint={hasAnyActiveSprint}
+              assigneeOptions={assignableAgents}
               onStoryClick={handleStoryClick}
+              onStoryAssigneeChange={handleStoryAssigneeChange}
               onAddToActiveSprint={handleAddToActiveSprint}
               onRemoveFromActiveSprint={handleRemoveFromActiveSprint}
               onStartSprint={handleStartSprint}

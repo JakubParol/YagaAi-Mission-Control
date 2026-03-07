@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 const SUCCESS_STATE_TTL_MS = 2000;
@@ -87,28 +88,35 @@ export function PlanningRefreshControl({
       : state.phase === "error"
         ? "Retry refresh"
         : label;
+  const tooltipText = disabled ? disabledReason : "Refetch current view data";
 
   return (
     <div className={cn("flex flex-col items-end gap-1.5", className)}>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => void triggerRefresh()}
-        disabled={disabled || state.phase === "loading"}
-        title={disabled ? disabledReason : "Refetch current view data"}
-        className={cn(
-          "gap-1.5 border-border/60 bg-card/30",
-          state.phase === "error" && "border-red-400/50 text-red-200 hover:text-red-100",
-        )}
-      >
-        {state.phase === "loading" && <Loader2 className="size-3.5 animate-spin" />}
-        {state.phase === "success" && <CheckCircle2 className="size-3.5 text-emerald-300" />}
-        {(state.phase === "idle" || state.phase === "error") && (
-          <RefreshCw className="size-3.5" />
-        )}
-        {buttonLabel}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void triggerRefresh()}
+              disabled={disabled || state.phase === "loading"}
+              className={cn(
+                "gap-1.5 border-border/60 bg-card/30",
+                state.phase === "error" && "border-red-400/50 text-red-200 hover:text-red-100",
+              )}
+            >
+              {state.phase === "loading" && <Loader2 className="size-3.5 animate-spin" />}
+              {state.phase === "success" && <CheckCircle2 className="size-3.5 text-emerald-300" />}
+              {(state.phase === "idle" || state.phase === "error") && (
+                <RefreshCw className="size-3.5" />
+              )}
+              {buttonLabel}
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{tooltipText}</TooltipContent>
+      </Tooltip>
 
       {state.phase === "success" && (
         <p className="text-[11px] text-emerald-300" role="status" aria-live="polite">

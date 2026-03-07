@@ -18,6 +18,10 @@ import { AvatarOption } from "@/components/planning/avatar-option";
 import { StoryTypeBadge } from "@/components/planning/story-type-badge";
 import { AssigneeAvatarTooltip } from "@/components/planning/assignee-avatar-tooltip";
 import {
+  StoryAssigneeControl,
+  type StoryAssigneeSelection,
+} from "@/components/planning/story-assignee-control";
+import {
   isQuickCreateCancelKey,
   isQuickCreateSubmitKey,
   validateQuickCreateSubject,
@@ -81,14 +85,6 @@ type AssigneePickerOption = ThemedSelectOption & {
   isUnassigned?: boolean;
 };
 
-type StoryAssigneeSelection = {
-  assignee_agent_id: string | null;
-  assignee_name: string | null;
-  assignee_last_name: string | null;
-  assignee_initials: string | null;
-  assignee_avatar: string | null;
-};
-
 function buildAssigneePickerOptions(
   assigneeOptions: readonly QuickCreateAssigneeOption[],
 ): AssigneePickerOption[] {
@@ -113,117 +109,6 @@ function buildAssigneePickerOptions(
       avatar: option.avatar,
     })),
   ];
-}
-
-function StoryAssigneeControl({
-  storyId,
-  currentAssignee,
-  assigneeOptions,
-  onChange,
-  disabled = false,
-}: {
-  storyId: string;
-  currentAssignee: StoryAssigneeSelection;
-  assigneeOptions: readonly QuickCreateAssigneeOption[];
-  onChange: (storyId: string, assignee: StoryAssigneeSelection) => void;
-  disabled?: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const pickerOptions = useMemo(
-    () => buildAssigneePickerOptions(assigneeOptions),
-    [assigneeOptions],
-  );
-  const selectedValue = currentAssignee.assignee_agent_id ?? UNASSIGNED_OPTION;
-  const selectedName = currentAssignee.assignee_name ?? "Unassigned";
-
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-xs"
-          disabled={disabled}
-          aria-label={`Select assignee. Current assignee: ${selectedName}`}
-          className="group/assignee relative"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          <AssigneeAvatarTooltip
-            name={selectedName}
-            lastName={currentAssignee.assignee_last_name}
-            initials={currentAssignee.assignee_initials}
-            avatar={currentAssignee.assignee_avatar}
-          />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-[280px] p-2"
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <p className="mb-2 px-1 text-[11px] font-medium text-muted-foreground">
-          Assignee
-        </p>
-        <ThemedSelect
-          value={selectedValue}
-          options={pickerOptions}
-          placeholder="Select assignee"
-          disabled={disabled}
-          renderOption={(option) => {
-            const assignee = option as AssigneePickerOption;
-            if (assignee.isUnassigned) return "Unassigned";
-            return (
-              <AvatarOption
-                name={assignee.name}
-                lastName={assignee.lastName}
-                initials={assignee.initials}
-                role={assignee.role}
-                avatar={assignee.avatar}
-              />
-            );
-          }}
-          renderValue={(option) => {
-            const assignee = option as AssigneePickerOption;
-            if (assignee.isUnassigned) return "Unassigned";
-            return (
-              <AvatarOption
-                name={assignee.name}
-                lastName={assignee.lastName}
-                initials={assignee.initials}
-                avatar={assignee.avatar}
-                compact
-              />
-            );
-          }}
-          onValueChange={(value) => {
-            const assignee = pickerOptions.find((option) => option.value === value);
-            if (!assignee || assignee.isUnassigned) {
-              onChange(storyId, {
-                assignee_agent_id: null,
-                assignee_name: null,
-                assignee_last_name: null,
-                assignee_initials: null,
-                assignee_avatar: null,
-              });
-              setIsOpen(false);
-              return;
-            }
-            onChange(storyId, {
-              assignee_agent_id: String(assignee.value),
-              assignee_name: assignee.name,
-              assignee_last_name: assignee.lastName,
-              assignee_initials: assignee.initials,
-              assignee_avatar: assignee.avatar,
-            });
-            setIsOpen(false);
-          }}
-          triggerClassName="h-8 text-xs"
-        />
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 function TodoQuickCreate({

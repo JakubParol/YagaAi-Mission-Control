@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConnectionStatus } from "./connection-status";
 import { navModules, isModuleActive } from "@/lib/navigation";
 
@@ -92,36 +93,30 @@ export function Sidebar({
           const Icon = mod.icon;
 
           return (
-            <div key={mod.href} className={cn("relative", collapsed ? "group/nav-item" : undefined)}>
-              <Link
-                href={mod.subPages?.[0]?.href ?? mod.href}
-                aria-current={active ? "page" : undefined}
-                aria-label={collapsed ? mod.label : undefined}
-                className={cn(
-                  "focus-ring flex items-center rounded-lg py-2.5",
-                  "text-sm font-medium",
-                  "transition-colors duration-150",
-                  collapsed ? "justify-center px-2" : "gap-3 px-3",
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
-                )}
-              >
-                <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
-                {!collapsed ? mod.label : <span className="sr-only">{mod.label}</span>}
-              </Link>
-              {collapsed ? (
-                <span
-                  role="tooltip"
+            <Tooltip key={mod.href}>
+              <TooltipTrigger asChild>
+                <Link
+                  href={mod.subPages?.[0]?.href ?? mod.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={collapsed ? mod.label : undefined}
                   className={cn(
-                    "pointer-events-none absolute left-[calc(100%+0.5rem)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-border/70 bg-popover px-2 py-1 text-xs font-medium text-popover-foreground opacity-0 shadow-md transition-opacity duration-150",
-                    "group-hover/nav-item:opacity-100 group-focus-within/nav-item:opacity-100"
+                    "focus-ring flex items-center rounded-lg py-2.5",
+                    "text-sm font-medium",
+                    "transition-colors duration-150",
+                    collapsed ? "justify-center px-2" : "gap-3 px-3",
+                    active
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
                   )}
                 >
-                  {mod.label}
-                </span>
+                  <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  {!collapsed ? mod.label : <span className="sr-only">{mod.label}</span>}
+                </Link>
+              </TooltipTrigger>
+              {collapsed ? (
+                <TooltipContent side="right">{mod.label}</TooltipContent>
               ) : null}
-            </div>
+            </Tooltip>
           );
         })}
       </nav>

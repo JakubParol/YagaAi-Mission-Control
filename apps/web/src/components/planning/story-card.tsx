@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ItemStatus } from "@/lib/planning/types";
 import { StoryLabelChips, type StoryLabel } from "./story-label-chips";
 import { StoryEpicDisplay } from "./story-epic-display";
@@ -75,33 +76,54 @@ export const STORY_CARD_LAYOUT = {
 
 function PriorityIndicator({ priority }: { priority: number | null }) {
   if (priority === null) return null;
+  const label = `Priority ${priority}`;
 
   if (priority <= 2) {
     return (
-      <span className="flex items-center text-red-400" title={`Priority ${priority}`}>
-        <ChevronUp className="size-3.5 -mb-0.5" />
-        <ChevronUp className="size-3.5 -mt-0.5" />
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex items-center text-red-400">
+            <ChevronUp className="size-3.5 -mb-0.5" />
+            <ChevronUp className="size-3.5 -mt-0.5" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{label}</TooltipContent>
+      </Tooltip>
     );
   }
   if (priority <= 4) {
     return (
-      <span className="flex items-center text-amber-400" title={`Priority ${priority}`}>
-        <ChevronUp className="size-3.5" />
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex items-center text-amber-400">
+            <ChevronUp className="size-3.5" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{label}</TooltipContent>
+      </Tooltip>
     );
   }
   if (priority <= 6) {
     return (
-      <span className="flex items-center text-slate-400" title={`Priority ${priority}`}>
-        <Minus className="size-3.5" />
-      </span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="flex items-center text-slate-400">
+            <Minus className="size-3.5" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{label}</TooltipContent>
+      </Tooltip>
     );
   }
   return (
-    <span className="flex items-center text-blue-400" title={`Priority ${priority}`}>
-      <ChevronDown className="size-3.5" />
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex items-center text-blue-400">
+          <ChevronDown className="size-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -211,9 +233,12 @@ export function StoryCard({
             totalCount={story.task_count}
           />
           <PriorityIndicator priority={story.priority} />
-          <span className="text-[11px] text-muted-foreground" title="Story points">
-            -
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="text-[11px] text-muted-foreground">-</span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Story points</TooltipContent>
+          </Tooltip>
           {assigneeControl ?? (
             hasAssignee ? (
               <Avatar
@@ -227,10 +252,16 @@ export function StoryCard({
             ) : (
               <span
                 className="inline-flex size-5 items-center justify-center rounded-full border border-border/70 bg-muted text-muted-foreground"
-                title="Unassigned"
                 aria-label="Unassigned"
               >
-                <User className="size-3" aria-hidden="true" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex size-5 items-center justify-center">
+                      <User className="size-3" aria-hidden="true" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Unassigned</TooltipContent>
+                </Tooltip>
               </span>
             )
           )}
