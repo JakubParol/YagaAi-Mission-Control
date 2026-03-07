@@ -8,6 +8,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { BacklogKind, BacklogStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 
+export type MoveDirection = "top" | "up" | "down" | "bottom";
+
+export interface BacklogSiblingItem {
+  id: string;
+  kind: BacklogKind;
+  status: BacklogStatus;
+  is_default: boolean;
+}
+
 interface BacklogSectionHeaderProps {
   backlog: {
     id: string;
@@ -21,12 +30,14 @@ interface BacklogSectionHeaderProps {
   hasAnyActiveSprint: boolean;
   isSprintPending: boolean;
   isBoardDeletePending: boolean;
+  siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
   onToggleCollapsed: () => void;
   onStartSprint: (backlogId: string, backlogName: string) => void;
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
   onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
+  onMoveBoard: (backlogId: string, direction: MoveDirection) => void;
 }
 
 const KIND_LABEL: Record<BacklogKind, string> = {
@@ -78,6 +89,14 @@ function MetricChip({
   );
 }
 
+function isPinnedTop(b: BacklogSiblingItem): boolean {
+  return b.kind === "SPRINT" && b.status === "ACTIVE";
+}
+
+function isPinnedBottom(b: BacklogSiblingItem): boolean {
+  return b.is_default;
+}
+
 export function BacklogSectionHeader({
   backlog,
   collapsed,
@@ -85,12 +104,14 @@ export function BacklogSectionHeader({
   hasAnyActiveSprint,
   isSprintPending,
   isBoardDeletePending,
+  siblingBacklogs,
   onToggleCollapsed,
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
   onEditBoard,
   onDeleteBoard,
+  onMoveBoard,
 }: BacklogSectionHeaderProps) {
   const Chevron = collapsed ? ChevronRight : ChevronDown;
   const isSprint = backlog.kind === "SPRINT";
@@ -102,6 +123,16 @@ export function BacklogSectionHeader({
   const canStartSprint = isSprint && backlog.status !== "ACTIVE";
   const isStartBlockedByActive = canStartSprint && hasAnyActiveSprint;
   const canDeleteBoard = !backlog.is_default;
+
+  const moveableBacklogs = siblingBacklogs.filter(
+    (b) => !isPinnedTop(b) && !isPinnedBottom(b),
+  );
+  const moveableIndex = moveableBacklogs.findIndex((b) => b.id === backlog.id);
+  const isMoveable = moveableIndex !== -1;
+  const canMoveTop = isMoveable && moveableIndex > 0;
+  const canMoveUp = isMoveable && moveableIndex > 0;
+  const canMoveDown = isMoveable && moveableIndex < moveableBacklogs.length - 1;
+  const canMoveBottom = isMoveable && moveableIndex < moveableBacklogs.length - 1;
 
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5">
@@ -218,8 +249,16 @@ export function BacklogSectionHeader({
           backlogName={backlog.name}
           canDelete={canDeleteBoard}
           isDeleting={isBoardDeletePending}
+          canMoveTop={canMoveTop}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          canMoveBottom={canMoveBottom}
           onEdit={() => onEditBoard(backlog.id)}
           onDelete={() => onDeleteBoard(backlog.id, backlog.name, backlog.is_default)}
+          onMoveTop={() => onMoveBoard(backlog.id, "top")}
+          onMoveUp={() => onMoveBoard(backlog.id, "up")}
+          onMoveDown={() => onMoveBoard(backlog.id, "down")}
+          onMoveBottom={() => onMoveBoard(backlog.id, "bottom")}
         />
       </div>
     </div>

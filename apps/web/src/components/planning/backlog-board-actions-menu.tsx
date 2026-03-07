@@ -9,7 +9,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,8 +19,16 @@ interface BacklogBoardActionsMenuProps {
   backlogName: string;
   canDelete: boolean;
   isDeleting: boolean;
+  canMoveTop: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  canMoveBottom: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  onMoveTop: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onMoveBottom: () => void;
 }
 
 interface FloatingCoordinates {
@@ -80,8 +88,16 @@ export function BacklogBoardActionsMenu({
   backlogName,
   canDelete,
   isDeleting,
+  canMoveTop,
+  canMoveUp,
+  canMoveDown,
+  canMoveBottom,
   onEdit,
   onDelete,
+  onMoveTop,
+  onMoveUp,
+  onMoveDown,
+  onMoveBottom,
 }: BacklogBoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [menuCoordinates, setMenuCoordinates] = useState<FloatingCoordinates | null>(null);
@@ -191,6 +207,70 @@ export function BacklogBoardActionsMenu({
         <Pencil className="size-3.5" />
         Edit
       </button>
+
+      {(canMoveTop || canMoveUp || canMoveDown || canMoveBottom) && (
+        <div className="my-1 border-t border-border/40" role="separator" />
+      )}
+
+      {canMoveTop && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveTop(); }}
+        >
+          <ChevronsUp className="size-3.5" />
+          Move to top
+        </button>
+      )}
+      {canMoveUp && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveUp(); }}
+        >
+          <ChevronUp className="size-3.5" />
+          Move up
+        </button>
+      )}
+      {canMoveDown && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveDown(); }}
+        >
+          <ChevronDown className="size-3.5" />
+          Move down
+        </button>
+      )}
+      {canMoveBottom && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveBottom(); }}
+        >
+          <ChevronsDown className="size-3.5" />
+          Move to bottom
+        </button>
+      )}
+
+      <div className="my-1 border-t border-border/40" role="separator" />
+
       <button
         type="button"
         role="menuitem"

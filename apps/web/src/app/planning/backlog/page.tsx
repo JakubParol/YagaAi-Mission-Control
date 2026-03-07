@@ -29,7 +29,7 @@ import { PlanningRefreshControl } from "@/components/planning/planning-refresh-c
 import type { StoryCardStory } from "@/components/planning/story-card";
 import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
-import { BacklogSectionHeader } from "@/components/planning/backlog-section-header";
+import { BacklogSectionHeader, type BacklogSiblingItem, type MoveDirection } from "@/components/planning/backlog-section-header";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import {
@@ -203,6 +203,7 @@ function BacklogSection({
   section,
   isActiveSprint,
   hasAnyActiveSprint,
+  siblingBacklogs,
   assigneeOptions,
   onStoryClick,
   onStoryAssigneeChange,
@@ -215,6 +216,7 @@ function BacklogSection({
   onStoryStatusChange,
   onEditBoard,
   onDeleteBoard,
+  onMoveBoard,
   pendingStoryIds,
   pendingDeleteStoryIds,
   pendingSprintIds,
@@ -223,6 +225,7 @@ function BacklogSection({
   section: BacklogWithStories;
   isActiveSprint: boolean;
   hasAnyActiveSprint: boolean;
+  siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
   assigneeOptions: readonly BacklogAssigneeOption[];
   onStoryClick: (storyId: string) => void;
   onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
@@ -235,6 +238,7 @@ function BacklogSection({
   onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
   onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
+  onMoveBoard: (backlogId: string, direction: MoveDirection) => void;
   pendingStoryIds: ReadonlySet<string>;
   pendingDeleteStoryIds: ReadonlySet<string>;
   pendingSprintIds: ReadonlySet<string>;
@@ -261,12 +265,14 @@ function BacklogSection({
         hasAnyActiveSprint={hasAnyActiveSprint}
         isSprintPending={isSprintPending}
         isBoardDeletePending={isBoardDeletePending}
+        siblingBacklogs={siblingBacklogs}
         onToggleCollapsed={() => setCollapsed(!collapsed)}
         onStartSprint={onStartSprint}
         onCompleteSprint={onCompleteSprint}
         onCreateStory={onCreateStory}
         onEditBoard={onEditBoard}
         onDeleteBoard={onDeleteBoard}
+        onMoveBoard={onMoveBoard}
       />
 
       {/* Row list */}
@@ -1082,6 +1088,64 @@ function BacklogPageContent() {
     [state],
   );
 
+  const handleMoveBoard = useCallback(
+    async (backlogId: string, direction: MoveDirection) => {
+      if (state.kind !== "ok") return;
+
+      const moveable = state.sections
+        .map((s) => s.backlog)
+        .filter(
+          (b) => !(b.kind === "SPRINT" && b.status === "ACTIVE") && !b.is_default,
+        );
+
+      const currentIndex = moveable.findIndex((b) => b.id === backlogId);
+      if (currentIndex === -1) return;
+
+      let swapIndex: number;
+      if (direction === "top") swapIndex = 0;
+      else if (direction === "up") swapIndex = currentIndex - 1;
+      else if (direction === "down") swapIndex = currentIndex + 1;
+      else swapIndex = moveable.length - 1;
+
+      if (swapIndex === currentIndex || swapIndex < 0 || swapIndex >= moveable.length) return;
+
+      const current = moveable[currentIndex];
+      const swapWith = moveable[swapIndex];
+      const currentOrder = current.display_order ?? (currentIndex + 1) * 100;
+      const swapOrder = swapWith.display_order ?? (swapIndex + 1) * 100;
+
+      setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
+      try {
+        await Promise.all([
+          fetch(apiUrl(`/v1/planning/backlogs/${current.id}`), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ display_order: swapOrder }),
+          }).then((res) => {
+            if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
+          }),
+          fetch(apiUrl(`/v1/planning/backlogs/${swapWith.id}`), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ display_order: currentOrder }),
+          }).then((res) => {
+            if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
+          }),
+        ]);
+        await refreshCurrentView();
+      } catch (error) {
+        showErrorToast(error instanceof Error ? error.message : "Failed to reorder board.");
+      } finally {
+        setPendingBoardIds((prev) => {
+          const next = { ...prev };
+          delete next[backlogId];
+          return next;
+        });
+      }
+    },
+    [refreshCurrentView, showErrorToast, state],
+  );
+
   const handleDeleteBoardDialogConfirm = useCallback(async () => {
     if (!deleteBoardDialog) return;
     const { backlogId } = deleteBoardDialog;
@@ -1224,6 +1288,7 @@ function BacklogPageContent() {
                 section.backlog.status === "ACTIVE"
               }
               hasAnyActiveSprint={hasAnyActiveSprint}
+              siblingBacklogs={state.sections.map((s) => s.backlog)}
               assigneeOptions={assignableAgents}
               onStoryClick={handleStoryClick}
               onStoryAssigneeChange={handleStoryAssigneeChange}
@@ -1236,6 +1301,7 @@ function BacklogPageContent() {
               onStoryStatusChange={handleStoryStatusChange}
               onEditBoard={handleEditBoard}
               onDeleteBoard={handleDeleteBoard}
+              onMoveBoard={handleMoveBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
               pendingDeleteStoryIds={new Set(Object.keys(pendingDeleteStoryIds))}
               pendingSprintIds={new Set(Object.keys(pendingSprintIds))}
