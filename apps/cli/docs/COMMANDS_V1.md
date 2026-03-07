@@ -23,7 +23,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | Group | Core Commands |
 |---|---|
 | `project` | `list`, `get`, `create`, `update`, `delete` |
-| `epic` | `list`, `get`, `create`, `update`, `delete` |
+| `epic` | `list`, `get`, `create`, `update`, `delete`, `overview`, `stories` |
 | `story` | `list`, `get`, `create`, `update`, `delete` |
 | `task` | `list`, `get`, `create`, `update`, `delete`, `assign`, `unassign`, `assignments` |
 | `backlog` | `list`, `get`, `create`, `update`, `delete`, `start`, `complete`, `transition-kind`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder`, `active-sprint` |
@@ -63,6 +63,10 @@ mc project update --by key=MC --set is_default=true
 mc project update --by key=MC --set is_default=false
 mc task list --project-key MC --status TODO,IN_PROGRESS --sort priority,-updated_at
 mc story list --project-key MC --epic-key MC-1
+mc epic overview --project-key MC --sort -progress --output table
+mc epic overview --project-key MC --label CLI --sort updated --output json
+mc epic stories --epic-key MC-380 --status TODO,IN_PROGRESS --sort -updated_at
+mc epic stories --epic-key MC-380 --output json
 mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"
 mc task assignments --id <uuid>
 mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
