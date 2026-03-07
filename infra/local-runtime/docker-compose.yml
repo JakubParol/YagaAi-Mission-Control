@@ -1,0 +1,195 @@
+name: mission-control-local
+
+services:
+  sqlite:
+    image: alpine:3.22
+    command: ["/bin/sh", "-c", "mkdir -p /data && touch /data/mission-control.db && tail -f /dev/null"]
+    volumes:
+      - sqlite-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /data/mission-control.db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 2s
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: python:3.12-slim
+    working_dir: /workspace/services/api
+    env_file:
+      - .env
+    environment:
+      MC_API_DB_PATH: /runtime/sqlite/mission-control.db
+      MC_DB_PATH: /runtime/sqlite/mission-control.db
+      MC_API_CORS_ORIGINS: '["http://localhost:3000","http://localhost:3100"]'
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        pip install --no-cache-dir poetry >/dev/null
+        poetry install --no-interaction --no-root
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 5001
+    volumes:
+      - ../../:/workspace
+      - sqlite-data:/runtime/sqlite
+    ports:
+      - "${MC_API_PORT:-5001}:5001"
+    depends_on:
+      sqlite:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/healthz', timeout=2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  web:
+    image: node:22-alpine
+    working_dir: /workspace/apps/web
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:5001
+      MC_DB_PATH: /runtime/sqlite/mission-control.db
+      PORT: 3000
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        npm ci
+        npm run dev -- --hostname 0.0.0.0 --port 3000
+    volumes:
+      - ../../:/workspace
+      - sqlite-data:/runtime/sqlite
+    ports:
+      - "${MC_WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  worker:
+    image: python:3.12-alpine
+    env_file:
+      - .env
+    environment:
+      MC_WORKER_API_HEALTH_URL: http://api:5001/healthz
+      MC_WORKER_REDIS_HOST: redis
+      MC_WORKER_REDIS_PORT: 6379
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        pip install --no-cache-dir redis >/dev/null
+        while true; do
+          python -c "import os,urllib.request,redis; urllib.request.urlopen(os.environ['MC_WORKER_API_HEALTH_URL'], timeout=2); redis.Redis(host=os.environ['MC_WORKER_REDIS_HOST'], port=int(os.environ['MC_WORKER_REDIS_PORT']), socket_connect_timeout=2).ping(); print('worker heartbeat: api+redis ok')"
+          sleep 10
+        done
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://api:5001/healthz', timeout=2)\" && python -c \"import socket; s=socket.create_connection(('redis',6379),2); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  dapr-placement:
+    image: daprio/dapr:1.14.4
+    command: ["./placement", "--port", "50006"]
+
+  dapr-api:
+    image: daprio/daprd:1.14.4
+    network_mode: service:api
+    depends_on:
+      api:
+        condition: service_healthy
+      dapr-placement:
+        condition: service_started
+    command:
+      - ./daprd
+      - --app-id
+      - mission-control-api
+      - --app-port
+      - "5001"
+      - --dapr-http-port
+      - "3500"
+      - --dapr-grpc-port
+      - "50001"
+      - --placement-host-address
+      - dapr-placement:50006
+      - --resources-path
+      - /components
+    volumes:
+      - ./dapr/components:/components
+
+  dapr-web:
+    image: daprio/daprd:1.14.4
+    network_mode: service:web
+    depends_on:
+      web:
+        condition: service_healthy
+      dapr-placement:
+        condition: service_started
+    command:
+      - ./daprd
+      - --app-id
+      - mission-control-web
+      - --app-port
+      - "3000"
+      - --dapr-http-port
+      - "3510"
+      - --dapr-grpc-port
+      - "50011"
+      - --placement-host-address
+      - dapr-placement:50006
+      - --resources-path
+      - /components
+    volumes:
+      - ./dapr/components:/components
+
+  dapr-worker:
+    image: daprio/daprd:1.14.4
+    network_mode: service:worker
+    depends_on:
+      worker:
+        condition: service_healthy
+      dapr-placement:
+        condition: service_started
+    command:
+      - ./daprd
+      - --app-id
+      - mission-control-worker
+      - --dapr-http-port
+      - "3520"
+      - --dapr-grpc-port
+      - "50021"
+      - --placement-host-address
+      - dapr-placement:50006
+      - --resources-path
+      - /components
+    volumes:
+      - ./dapr/components:/components
+
+volumes:
+  sqlite-data:

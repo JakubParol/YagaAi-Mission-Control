@@ -73,6 +73,7 @@ FastAPI REST service with two domain modules:
 | `docs/` | Shared documentation (entity model, workflow logic, this file) |
 | `data/` | SQLite database (gitignored) |
 | `infra/` | Deployment configs (`mission-control.service`, `deploy.sh`) |
+| `infra/local-runtime/` | Deterministic local Docker runtime (api/web/worker/redis/sqlite + Dapr sidecars) |
 
 ---
 
