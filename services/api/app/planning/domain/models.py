@@ -126,6 +126,21 @@ class Epic:
 
 
 @dataclass
+class EpicOverview:
+    epic_key: str
+    title: str
+    status: EpicStatus
+    progress_pct: float
+    stories_total: int
+    stories_done: int
+    stories_in_progress: int
+    blocked_count: int
+    stale_days: int
+    priority: int | None
+    updated_at: str
+
+
+@dataclass
 class Story:
     id: str
     project_id: str | None

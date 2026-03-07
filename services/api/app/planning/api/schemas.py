@@ -143,6 +143,18 @@ class EpicDetailResponse(EpicResponse):
     story_count: int
 
 
+class EpicOverviewResponse(BaseModel):
+    epic_key: str
+    title: str
+    status: str
+    progress_pct: float
+    stories_total: int
+    stories_done: int
+    stories_in_progress: int
+    blocked_count: int
+    stale_days: int
+
+
 # ---------------------------------------------------------------------------
 # Agents
 # ---------------------------------------------------------------------------

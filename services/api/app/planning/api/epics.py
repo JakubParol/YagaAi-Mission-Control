@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, Query
 
-from app.planning.api.schemas import EpicCreate, EpicDetailResponse, EpicResponse, EpicUpdate
+from app.planning.api.schemas import (
+    EpicCreate,
+    EpicDetailResponse,
+    EpicOverviewResponse,
+    EpicResponse,
+    EpicUpdate,
+)
 from app.planning.application.epic_service import EpicService
 from app.planning.dependencies import get_epic_service, resolve_project_key
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
@@ -37,6 +43,36 @@ async def list_epics(
     )
     return ListEnvelope(
         data=[EpicResponse(**e.__dict__) for e in items],
+        meta=ListMeta(total=total, limit=limit, offset=offset),
+    )
+
+
+@router.get("/overview")
+async def list_epic_overview(
+    service: EpicService = Depends(get_epic_service),
+    project_id: str | None = Depends(resolve_project_key),
+    status: str | None = Query(None),
+    owner: str | None = Query(None),
+    is_blocked: bool | None = Query(None),
+    label: str | None = Query(None),
+    text: str | None = Query(None),
+    sort: str = Query("-updated_at"),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> ListEnvelope[EpicOverviewResponse]:
+    items, total = await service.list_epic_overview(
+        project_id=project_id,
+        status=status,
+        owner=owner,
+        is_blocked=is_blocked,
+        label=label,
+        text=text,
+        sort=sort,
+        limit=limit,
+        offset=offset,
+    )
+    return ListEnvelope(
+        data=[EpicOverviewResponse(**item.__dict__) for item in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 

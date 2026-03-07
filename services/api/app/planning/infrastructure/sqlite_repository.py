@@ -21,6 +21,7 @@ from app.planning.domain.models import (
     BacklogStoryItem,
     BacklogTaskItem,
     Epic,
+    EpicOverview,
     EpicStatus,
     ItemStatus,
     Label,
@@ -40,6 +41,12 @@ from app.shared.utils import utc_now
 
 _SORT_ALLOWED_PROJECT = {"created_at", "updated_at", "name", "key"}
 _SORT_ALLOWED_EPIC = {"created_at", "updated_at", "title", "priority", "status"}
+_SORT_ALLOWED_EPIC_OVERVIEW = {
+    "priority": "priority",
+    "progress_pct": "progress_pct",
+    "updated_at": "updated_at",
+    "blocked_count": "blocked_count",
+}
 _SORT_ALLOWED_STORY = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_AGENT = {"created_at", "updated_at", "name", "openclaw_key"}
 _SORT_ALLOWED_BACKLOG = {"created_at", "updated_at", "name", "display_order"}
@@ -94,6 +101,27 @@ def _build_update_query(table: str, sets: list[str]) -> str:
     return "UPDATE " + table + " SET " + ", ".join(sets) + " WHERE id = ?"
 
 
+def _parse_sort_mapped(raw: str, allowed: dict[str, str], default_sql: str) -> str:
+    clauses: list[str] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if part.startswith("-"):
+            field = part[1:]
+            direction = "DESC"
+        else:
+            field = part
+            direction = "ASC"
+        expr = allowed.get(field)
+        if expr is None:
+            raise ValidationError(
+                f"Invalid sort field '{field}'. Allowed: {', '.join(sorted(allowed.keys()))}"
+            )
+        clauses.append(expr + " " + direction)
+    return ", ".join(clauses) if clauses else default_sql
+
+
 def _row_to_project(row: aiosqlite.Row) -> Project:
     return Project(
         id=row["id"],
@@ -128,6 +156,22 @@ def _row_to_epic(row: aiosqlite.Row) -> Epic:
         created_by=row["created_by"],
         updated_by=row["updated_by"],
         created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
+
+
+def _row_to_epic_overview(row: aiosqlite.Row) -> EpicOverview:
+    return EpicOverview(
+        epic_key=row["epic_key"],
+        title=row["title"],
+        status=EpicStatus(row["status"]),
+        progress_pct=float(row["progress_pct"]),
+        stories_total=int(row["stories_total"]),
+        stories_done=int(row["stories_done"]),
+        stories_in_progress=int(row["stories_in_progress"]),
+        blocked_count=int(row["blocked_count"]),
+        stale_days=int(row["stale_days"]),
+        priority=row["priority"],
         updated_at=row["updated_at"],
     )
 
@@ -465,6 +509,98 @@ class SqliteEpicRepository(EpicRepository):
         total = await _fetch_count(self._db, count_q, params)
         rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
         return [_row_to_epic(r) for r in rows], total
+
+    async def list_overview(
+        self,
+        *,
+        project_id: str | None = None,
+        status: str | None = None,
+        owner: str | None = None,
+        is_blocked: bool | None = None,
+        label: str | None = None,
+        text: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-updated_at",
+    ) -> tuple[list[EpicOverview], int]:
+        where_parts: list[str] = []
+        params: list[Any] = []
+
+        if project_id:
+            where_parts.append("e.project_id = ?")
+            params.append(project_id)
+        if status:
+            where_parts.append("e.status = ?")
+            params.append(status)
+        if owner:
+            where_parts.append(
+                "EXISTS (SELECT 1 FROM stories so "
+                "WHERE so.epic_id = e.id AND so.current_assignee_agent_id = ?)"
+            )
+            params.append(owner)
+        if label:
+            where_parts.append(
+                "EXISTS ("
+                "SELECT 1 "
+                "FROM stories sls "
+                "JOIN story_labels sl ON sl.story_id = sls.id "
+                "JOIN labels l ON l.id = sl.label_id "
+                "WHERE sls.epic_id = e.id AND lower(l.name) = lower(?)"
+                ")"
+            )
+            params.append(label)
+        if text:
+            like = "%" + text.strip() + "%"
+            where_parts.append("(e.title LIKE ? OR e.key LIKE ?)")
+            params.extend([like, like])
+        if is_blocked is True:
+            where_parts.append("(e.is_blocked = 1 OR COALESCE(ss.blocked_count, 0) > 0)")
+        if is_blocked is False:
+            where_parts.append("(e.is_blocked = 0 AND COALESCE(ss.blocked_count, 0) = 0)")
+
+        where_sql = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+        base_sql = (
+            "SELECT "
+            "e.key AS epic_key, "
+            "e.title AS title, "
+            "e.status AS status, "
+            "CASE "
+            "  WHEN COALESCE(ss.stories_total, 0) = 0 THEN 0.0 "
+            "  ELSE ROUND(COALESCE(ss.stories_done, 0) * 100.0 / ss.stories_total, 2) "
+            "END AS progress_pct, "
+            "COALESCE(ss.stories_total, 0) AS stories_total, "
+            "COALESCE(ss.stories_done, 0) AS stories_done, "
+            "COALESCE(ss.stories_in_progress, 0) AS stories_in_progress, "
+            "COALESCE(ss.blocked_count, 0) AS blocked_count, "
+            "CAST(MAX(0, julianday('now') - julianday(e.updated_at)) AS INTEGER) AS stale_days, "
+            "e.priority AS priority, "
+            "e.updated_at AS updated_at "
+            "FROM epics e "
+            "LEFT JOIN ("
+            "  SELECT "
+            "    s.epic_id AS epic_id, "
+            "    COUNT(*) AS stories_total, "
+            "    SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END) AS stories_done, "
+            "    SUM(CASE WHEN s.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS stories_in_progress, "
+            "    SUM(CASE WHEN s.is_blocked = 1 THEN 1 ELSE 0 END) AS blocked_count "
+            "  FROM stories s "
+            "  WHERE s.epic_id IS NOT NULL "
+            "  GROUP BY s.epic_id"
+            ") ss ON ss.epic_id = e.id"
+            + where_sql
+        )
+
+        order_sql = _parse_sort_mapped(
+            sort,
+            _SORT_ALLOWED_EPIC_OVERVIEW,
+            "updated_at DESC, epic_key ASC",
+        )
+        count_q = "SELECT COUNT(*) FROM (" + base_sql + ") q"
+        select_q = base_sql + " ORDER BY " + order_sql + " LIMIT ? OFFSET ?"
+
+        total = await _fetch_count(self._db, count_q, params)
+        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        return [_row_to_epic_overview(r) for r in rows], total
 
     async def get_by_id(self, epic_id: str) -> Epic | None:
         row = await _fetch_one(self._db, "SELECT * FROM epics WHERE id = ?", [epic_id])
