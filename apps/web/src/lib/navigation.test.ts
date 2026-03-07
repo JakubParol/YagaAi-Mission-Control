@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { navModules } from "./navigation.js";
 
-test("planning sub-pages include List between Backlog and Settings", () => {
+test("planning sub-pages include Epics overview entry between List and Settings", () => {
   const planning = navModules.find((module) => module.href === "/planning");
   assert.ok(planning);
 
@@ -12,6 +12,7 @@ test("planning sub-pages include List between Backlog and Settings", () => {
     "/planning/board",
     "/planning/backlog",
     "/planning/list",
+    "/planning/epics-overview",
     "/planning/settings",
   ]);
 });
