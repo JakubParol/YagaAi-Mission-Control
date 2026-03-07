@@ -3,11 +3,22 @@ import test from "node:test";
 
 import {
   applyClientEpicOverviewFilters,
+  applyStoryPreviewFilters,
   buildEpicOverviewStats,
+  getEpicOverviewStoriesPreview,
+  getEpicOverviewStoriesPreviewOverflow,
   toPercentLabel,
   toStoriesLabel,
+  toStoryPreviewAssignee,
+  toStoryPreviewTitle,
+  toStoryPreviewUpdatedAt,
 } from "./overview-view-model.js";
-import type { EpicOverviewFilters, EpicOverviewItem } from "./overview-types.js";
+import type {
+  EpicOverviewFilters,
+  EpicOverviewItem,
+  EpicOverviewStoryPreview,
+  EpicOverviewStoryPreviewFilters,
+} from "./overview-types.js";
 
 const ITEMS: EpicOverviewItem[] = [
   {
@@ -57,6 +68,16 @@ function filters(overrides: Partial<EpicOverviewFilters> = {}): EpicOverviewFilt
   };
 }
 
+function previewFilters(
+  overrides: Partial<EpicOverviewStoryPreviewFilters> = {},
+): EpicOverviewStoryPreviewFilters {
+  return {
+    status: "",
+    blocked: "",
+    ...overrides,
+  };
+}
+
 test("buildEpicOverviewStats computes aggregated values", () => {
   const stats = buildEpicOverviewStats(ITEMS);
 
@@ -83,6 +104,124 @@ test("applyClientEpicOverviewFilters matches search, status and blocked", () => 
 test("near-done preset keeps only high-progress unblocked epics", () => {
   const result = applyClientEpicOverviewFilters(ITEMS, filters(), "near-done");
   assert.deepEqual(result.map((item) => item.epic_key), ["MC-399"]);
+});
+
+test("story preview helpers format title/assignee/updated_at", () => {
+  const story: EpicOverviewStoryPreview = {
+    story_id: "s-1",
+    story_key: "MC-401",
+    title: "Inline preview",
+    status: "TODO",
+    current_assignee_agent_id: "a-1",
+    assignee_label: "Naomi N",
+    is_blocked: false,
+    updated_at: "2026-03-07T10:30:00Z",
+  };
+
+  assert.equal(toStoryPreviewTitle(story), "MC-401 Inline preview");
+  assert.equal(toStoryPreviewAssignee(story), "Naomi N");
+  assert.equal(toStoryPreviewUpdatedAt(story), "07 Mar 2026, 10:30");
+});
+
+test("story preview helpers use fallbacks for missing data", () => {
+  const story: EpicOverviewStoryPreview = {
+    story_id: "s-2",
+    story_key: null,
+    title: "No key",
+    status: "TODO",
+    current_assignee_agent_id: null,
+    assignee_label: null,
+    is_blocked: false,
+    updated_at: null,
+  };
+
+  assert.equal(toStoryPreviewTitle(story), "No key");
+  assert.equal(toStoryPreviewAssignee(story), "Unassigned");
+  assert.equal(toStoryPreviewUpdatedAt(story), "n/a");
+});
+
+test("applyStoryPreviewFilters filters by status and blocked", () => {
+  const stories: EpicOverviewStoryPreview[] = [
+    {
+      story_id: "s-1",
+      story_key: "MC-401",
+      title: "One",
+      status: "TODO",
+      current_assignee_agent_id: null,
+      assignee_label: null,
+      is_blocked: false,
+      updated_at: "2026-03-07T10:30:00Z",
+    },
+    {
+      story_id: "s-2",
+      story_key: "MC-402",
+      title: "Two",
+      status: "IN_PROGRESS",
+      current_assignee_agent_id: null,
+      assignee_label: null,
+      is_blocked: true,
+      updated_at: "2026-03-07T10:30:00Z",
+    },
+  ];
+
+  const byStatus = applyStoryPreviewFilters(stories, previewFilters({ status: "TODO" }));
+  assert.deepEqual(byStatus.map((story) => story.story_id), ["s-1"]);
+
+  const byBlocked = applyStoryPreviewFilters(stories, previewFilters({ blocked: "true" }));
+  assert.deepEqual(byBlocked.map((story) => story.story_id), ["s-2"]);
+});
+
+test("preview helpers return limited rows and overflow count", () => {
+  const item: EpicOverviewItem = {
+    ...ITEMS[0],
+    stories_preview_total: 5,
+    stories_preview: [
+      {
+        story_id: "s-1",
+        story_key: "MC-401",
+        title: "One",
+        status: "TODO",
+        current_assignee_agent_id: null,
+        assignee_label: null,
+        is_blocked: false,
+        updated_at: "2026-03-07T10:30:00Z",
+      },
+      {
+        story_id: "s-2",
+        story_key: "MC-402",
+        title: "Two",
+        status: "TODO",
+        current_assignee_agent_id: null,
+        assignee_label: null,
+        is_blocked: false,
+        updated_at: "2026-03-07T10:30:00Z",
+      },
+      {
+        story_id: "s-3",
+        story_key: "MC-403",
+        title: "Three",
+        status: "TODO",
+        current_assignee_agent_id: null,
+        assignee_label: null,
+        is_blocked: false,
+        updated_at: "2026-03-07T10:30:00Z",
+      },
+      {
+        story_id: "s-4",
+        story_key: "MC-404",
+        title: "Four",
+        status: "TODO",
+        current_assignee_agent_id: null,
+        assignee_label: null,
+        is_blocked: false,
+        updated_at: "2026-03-07T10:30:00Z",
+      },
+    ],
+  };
+
+  const preview = getEpicOverviewStoriesPreview(item);
+  assert.equal(preview.length, 3);
+  assert.equal(getEpicOverviewStoriesPreviewOverflow(item), 2);
 });
 
 test("format helpers produce deterministic labels", () => {

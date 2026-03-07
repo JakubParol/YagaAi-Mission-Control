@@ -1,4 +1,15 @@
-import type { EpicStatus } from "@/lib/planning/types";
+import type { EpicStatus, ItemStatus } from "@/lib/planning/types";
+
+export interface EpicOverviewStoryPreview {
+  story_id: string;
+  story_key: string | null;
+  title: string;
+  status: ItemStatus;
+  current_assignee_agent_id: string | null;
+  assignee_label: string | null;
+  is_blocked: boolean;
+  updated_at: string | null;
+}
 
 export interface EpicOverviewItem {
   epic_key: string;
@@ -10,6 +21,8 @@ export interface EpicOverviewItem {
   stories_in_progress: number;
   blocked_count: number;
   stale_days: number;
+  stories_preview?: EpicOverviewStoryPreview[];
+  stories_preview_total?: number | null;
 }
 
 export interface EpicOverviewListEnvelope {
@@ -49,6 +62,11 @@ export interface EpicOverviewFilters {
   sort: EpicOverviewSortValue;
 }
 
+export interface EpicOverviewStoryPreviewFilters {
+  status: ItemStatus | "";
+  blocked: "" | "true" | "false";
+}
+
 export interface EpicOverviewPreset {
   key: "all" | "at-risk" | "near-done";
   label: string;
@@ -70,6 +88,11 @@ export const EPIC_OVERVIEW_DEFAULT_FILTERS: EpicOverviewFilters = {
   label: "",
   blocked: "",
   sort: "-updated_at",
+};
+
+export const EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS: EpicOverviewStoryPreviewFilters = {
+  status: "",
+  blocked: "",
 };
 
 export const EPIC_OVERVIEW_SORT_OPTIONS: ReadonlyArray<{ value: EpicOverviewSortValue; label: string }> = [

@@ -1,4 +1,12 @@
-import type { EpicOverviewFilters, EpicOverviewItem, EpicOverviewStats } from "./overview-types";
+import type {
+  EpicOverviewFilters,
+  EpicOverviewItem,
+  EpicOverviewStats,
+  EpicOverviewStoryPreview,
+  EpicOverviewStoryPreviewFilters,
+} from "./overview-types";
+
+const EPIC_OVERVIEW_STORY_PREVIEW_LIMIT = 3;
 
 function normalizeSearch(value: string): string {
   return value.trim().toLowerCase();
@@ -26,6 +34,22 @@ function matchesBlocked(item: EpicOverviewItem, blocked: EpicOverviewFilters["bl
 
 function matchesNearDonePreset(item: EpicOverviewItem): boolean {
   return item.progress_pct >= 70 && item.blocked_count === 0;
+}
+
+function matchesStoryStatus(
+  story: EpicOverviewStoryPreview,
+  status: EpicOverviewStoryPreviewFilters["status"],
+): boolean {
+  return status.length === 0 || story.status === status;
+}
+
+function matchesStoryBlocked(
+  story: EpicOverviewStoryPreview,
+  blocked: EpicOverviewStoryPreviewFilters["blocked"],
+): boolean {
+  if (blocked === "true") return story.is_blocked;
+  if (blocked === "false") return !story.is_blocked;
+  return true;
 }
 
 export function buildEpicOverviewStats(items: readonly EpicOverviewItem[]): EpicOverviewStats {
@@ -66,6 +90,17 @@ export function applyClientEpicOverviewFilters(
   });
 }
 
+export function applyStoryPreviewFilters(
+  stories: readonly EpicOverviewStoryPreview[],
+  filters: EpicOverviewStoryPreviewFilters,
+): EpicOverviewStoryPreview[] {
+  return stories.filter((story) => {
+    if (!matchesStoryStatus(story, filters.status)) return false;
+    if (!matchesStoryBlocked(story, filters.blocked)) return false;
+    return true;
+  });
+}
+
 export function toPercentLabel(value: number): string {
   const normalized = normalizePercent(value);
   return `${Math.round(normalized)}%`;
@@ -73,4 +108,49 @@ export function toPercentLabel(value: number): string {
 
 export function toStoriesLabel(item: EpicOverviewItem): string {
   return `${item.stories_done}/${item.stories_total} done · ${item.stories_in_progress} in progress`;
+}
+
+export function getEpicOverviewStoriesPreview(
+  item: EpicOverviewItem,
+  options?: { limit?: number },
+): EpicOverviewStoryPreview[] {
+  const limit = Math.max(1, options?.limit ?? EPIC_OVERVIEW_STORY_PREVIEW_LIMIT);
+  const preview = item.stories_preview ?? [];
+  return preview.slice(0, limit);
+}
+
+export function getEpicOverviewStoriesPreviewOverflow(
+  item: EpicOverviewItem,
+  options?: { limit?: number },
+): number {
+  const limit = Math.max(1, options?.limit ?? EPIC_OVERVIEW_STORY_PREVIEW_LIMIT);
+  const previewCount = item.stories_preview?.length ?? 0;
+  const total = Math.max(previewCount, item.stories_preview_total ?? 0);
+  return Math.max(0, total - limit);
+}
+
+export function toStoryPreviewTitle(story: EpicOverviewStoryPreview): string {
+  return story.story_key ? `${story.story_key} ${story.title}` : story.title;
+}
+
+export function toStoryPreviewAssignee(story: EpicOverviewStoryPreview): string {
+  if (story.assignee_label && story.assignee_label.trim().length > 0) {
+    return story.assignee_label;
+  }
+  return "Unassigned";
+}
+
+export function toStoryPreviewUpdatedAt(story: EpicOverviewStoryPreview): string {
+  if (!story.updated_at) return "n/a";
+  const value = new Date(story.updated_at);
+  if (Number.isNaN(value.getTime())) return story.updated_at;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(value);
 }
