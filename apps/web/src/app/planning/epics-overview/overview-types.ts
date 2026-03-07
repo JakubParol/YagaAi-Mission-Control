@@ -16,6 +16,7 @@ export interface EpicOverviewItem {
   title: string;
   status: EpicStatus;
   progress_pct: number;
+  progress_trend_7d: number;
   stories_total: number;
   stories_done: number;
   stories_in_progress: number;
@@ -78,6 +79,9 @@ export interface EpicOverviewStats {
   epicCount: number;
   averageProgressPct: number;
   blockedEpics: number;
+  blockedStories: number;
+  averageTrend7dPct: number;
+  maxStaleDays: number;
   staleEpics: number;
 }
 

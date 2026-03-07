@@ -26,6 +26,7 @@ const ITEMS: EpicOverviewItem[] = [
     title: "Epic Overview 2.0",
     status: "IN_PROGRESS",
     progress_pct: 72.4,
+    progress_trend_7d: 10,
     stories_total: 10,
     stories_done: 7,
     stories_in_progress: 2,
@@ -37,6 +38,7 @@ const ITEMS: EpicOverviewItem[] = [
     title: "CLI Stabilization",
     status: "TODO",
     progress_pct: 10,
+    progress_trend_7d: 0,
     stories_total: 8,
     stories_done: 1,
     stories_in_progress: 1,
@@ -48,6 +50,7 @@ const ITEMS: EpicOverviewItem[] = [
     title: "Web Polish",
     status: "DONE",
     progress_pct: 100,
+    progress_trend_7d: 20,
     stories_total: 5,
     stories_done: 5,
     stories_in_progress: 0,
@@ -83,6 +86,9 @@ test("buildEpicOverviewStats computes aggregated values", () => {
 
   assert.equal(stats.epicCount, 3);
   assert.equal(stats.blockedEpics, 1);
+  assert.equal(stats.blockedStories, 1);
+  assert.equal(stats.averageTrend7dPct, 10);
+  assert.equal(stats.maxStaleDays, 9);
   assert.equal(stats.staleEpics, 1);
   assert.equal(stats.averageProgressPct, 60.8);
 });
