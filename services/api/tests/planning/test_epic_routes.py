@@ -378,3 +378,138 @@ def test_list_epics_project_key_case_insensitive(client):
     data = resp.json()["data"]
     assert len(data) > 0
     assert all(e["project_id"] == "p1" for e in data)
+
+
+# ── Overview aggregate ────────────────────────────────────────────────────
+
+
+def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -> None:
+    e1 = client.post("/v1/planning/epics", json={"project_id": "p1", "title": "Payments"}).json()["data"]
+    e2 = client.post("/v1/planning/epics", json={"project_id": "p1", "title": "Reporting"}).json()["data"]
+
+    db_path = _setup_test_db
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(
+        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
+        ("lbl-api", "p1", "API", None, TS),
+    )
+    conn.execute(
+        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-ov-1", "p1", e1["id"], "Done story", "USER_STORY", "DONE", 0, "a1", TS, TS),
+    )
+    conn.execute(
+        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-ov-2", "p1", e1["id"], "In-progress story", "USER_STORY", "IN_PROGRESS", 0, "a2", TS, TS),
+    )
+    conn.execute(
+        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-ov-3", "p1", e1["id"], "Blocked story", "USER_STORY", "TODO", 1, None, TS, TS),
+    )
+    conn.execute(
+        "INSERT INTO story_labels (story_id, label_id, added_at) VALUES (?, ?, ?)",
+        ("s-ov-1", "lbl-api", TS),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get("/v1/planning/epics/overview", params={"project_id": "p1"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["total"] == 2
+    by_key = {item["epic_key"]: item for item in body["data"]}
+
+    payments = by_key[e1["key"]]
+    assert payments["title"] == "Payments"
+    assert payments["status"] == "TODO"
+    assert payments["stories_total"] == 3
+    assert payments["stories_done"] == 1
+    assert payments["stories_in_progress"] == 1
+    assert payments["blocked_count"] == 1
+    assert payments["progress_pct"] == 33.33
+    assert isinstance(payments["stale_days"], int)
+
+    reporting = by_key[e2["key"]]
+    assert reporting["stories_total"] == 0
+    assert reporting["stories_done"] == 0
+    assert reporting["stories_in_progress"] == 0
+    assert reporting["blocked_count"] == 0
+    assert reporting["progress_pct"] == 0.0
+
+
+def test_list_epics_overview_filters_and_sort(client, _setup_test_db) -> None:
+    e1 = client.post(
+        "/v1/planning/epics",
+        json={"project_id": "p1", "title": "Core API", "priority": 10},
+    ).json()["data"]
+    e2 = client.post(
+        "/v1/planning/epics",
+        json={"project_id": "p1", "title": "Edge API", "priority": 5},
+    ).json()["data"]
+
+    db_path = _setup_test_db
+    conn = sqlite3.connect(db_path)
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(
+        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
+        ("lbl-be", "p1", "Backend", None, TS),
+    )
+    conn.execute(
+        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-f-1", "p1", e1["id"], "Story 1", "USER_STORY", "DONE", 1, "a1", TS, TS),
+    )
+    conn.execute(
+        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-f-2", "p1", e1["id"], "Story 2", "USER_STORY", "DONE", 0, "a1", TS, TS),
+    )
+    conn.execute(
+        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("s-f-3", "p1", e2["id"], "Story 3", "USER_STORY", "IN_PROGRESS", 0, "a2", TS, TS),
+    )
+    conn.execute(
+        "INSERT INTO story_labels (story_id, label_id, added_at) VALUES (?, ?, ?)",
+        ("s-f-1", "lbl-be", TS),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(
+        "/v1/planning/epics/overview",
+        params={
+            "project_id": "p1",
+            "owner": "a1",
+            "label": "Backend",
+            "is_blocked": "true",
+            "text": "core",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) == 1
+    assert data[0]["epic_key"] == e1["key"]
+
+    sorted_resp = client.get(
+        "/v1/planning/epics/overview",
+        params={"project_id": "p1", "sort": "-progress_pct"},
+    )
+    assert sorted_resp.status_code == 200
+    sorted_data = sorted_resp.json()["data"]
+    assert sorted_data[0]["epic_key"] == e1["key"]
+    assert sorted_data[0]["progress_pct"] > sorted_data[1]["progress_pct"]
+
+
+def test_list_epics_overview_invalid_sort(client) -> None:
+    resp = client.get("/v1/planning/epics/overview", params={"sort": "title"})
+    assert resp.status_code == 400
+    assert "Invalid sort field" in resp.json()["error"]["message"]
+
+
+def test_list_epics_overview_limit_validation(client) -> None:
+    resp = client.get("/v1/planning/epics/overview", params={"limit": 0})
+    assert resp.status_code == 422
