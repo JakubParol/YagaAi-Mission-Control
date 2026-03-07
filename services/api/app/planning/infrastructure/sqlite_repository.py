@@ -46,6 +46,7 @@ _SORT_ALLOWED_EPIC = {"created_at", "updated_at", "title", "priority", "status"}
 _SORT_ALLOWED_EPIC_OVERVIEW = {
     "priority": "priority",
     "progress_pct": "progress_pct",
+    "progress_trend_7d": "progress_trend_7d",
     "updated_at": "updated_at",
     "blocked_count": "blocked_count",
 }
@@ -168,6 +169,7 @@ def _row_to_epic_overview(row: aiosqlite.Row) -> EpicOverview:
         title=row["title"],
         status=EpicStatus(row["status"]),
         progress_pct=float(row["progress_pct"]),
+        progress_trend_7d=float(row["progress_trend_7d"]),
         stories_total=int(row["stories_total"]),
         stories_done=int(row["stories_done"]),
         stories_in_progress=int(row["stories_in_progress"]),
@@ -570,6 +572,10 @@ class SqliteEpicRepository(EpicRepository):
             "  WHEN COALESCE(ss.stories_total, 0) = 0 THEN 0.0 "
             "  ELSE ROUND(COALESCE(ss.stories_done, 0) * 100.0 / ss.stories_total, 2) "
             "END AS progress_pct, "
+            "CASE "
+            "  WHEN COALESCE(ss.stories_total, 0) = 0 THEN 0.0 "
+            "  ELSE ROUND(COALESCE(ss.stories_done_last_7d, 0) * 100.0 / ss.stories_total, 2) "
+            "END AS progress_trend_7d, "
             "COALESCE(ss.stories_total, 0) AS stories_total, "
             "COALESCE(ss.stories_done, 0) AS stories_done, "
             "COALESCE(ss.stories_in_progress, 0) AS stories_in_progress, "
@@ -583,6 +589,7 @@ class SqliteEpicRepository(EpicRepository):
             "    s.epic_id AS epic_id, "
             "    COUNT(*) AS stories_total, "
             "    SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END) AS stories_done, "
+            "    SUM(CASE WHEN s.status = 'DONE' AND s.completed_at IS NOT NULL AND s.completed_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS stories_done_last_7d, "
             "    SUM(CASE WHEN s.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS stories_in_progress, "
             "    SUM(CASE WHEN s.is_blocked = 1 THEN 1 ELSE 0 END) AS blocked_count "
             "  FROM stories s "

@@ -40,7 +40,9 @@ def test_change_epic_status_quick_action_and_audit(client, _setup_test_db) -> No
     assert row == ("epic.status.changed", "agent-1", "agent", "epic", epic["id"])
 
 
-def test_bulk_story_status_partial_failure_returns_per_record_report(client, _setup_test_db) -> None:
+def test_bulk_story_status_partial_failure_returns_per_record_report(
+    client, _setup_test_db
+) -> None:
     resp = client.post(
         "/v1/planning/epics/bulk/story-status",
         json={"story_ids": ["s1", "missing-story"], "status": "DONE"},
