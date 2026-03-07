@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ThemedSelect,
   type ThemedSelectOption,
@@ -45,6 +46,8 @@ import {
 } from "./task-optimistic";
 import type { StoryDetail, TaskItem } from "./story-types";
 import { deleteStory } from "@/app/planning/story-actions";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type DialogState =
   | { kind: "loading"; forStoryId: string }
@@ -70,6 +73,7 @@ interface StoryDraft {
   title: string;
   story_type: string;
   description: string;
+  intent: string;
   priority: string;
   epic_id: string;
   blocked_reason: string;
@@ -89,10 +93,13 @@ interface NormalizedStory {
   title: string;
   story_type: string;
   description: string | null;
+  intent: string | null;
   priority: number | null;
   epic_id: string | null;
   blocked_reason: string | null;
 }
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const TASK_TYPE_OPTIONS = ["CODING", "TESTING", "RESEARCH", "DOCS", "OPS"] as const;
 const STORY_TYPE_OPTIONS = [
@@ -102,6 +109,14 @@ const STORY_TYPE_OPTIONS = [
   { value: "CHORE", label: "Chore" },
 ] as const;
 
+const STATUS_OPTIONS: { value: ItemStatus; label: string }[] = [
+  { value: "TODO", label: "Todo" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "CODE_REVIEW", label: "Code Review" },
+  { value: "VERIFY", label: "Verify" },
+  { value: "DONE", label: "Done" },
+];
+
 export const STORY_DETAIL_HEADER_LAYOUT = {
   actionsGroup: "ml-auto flex items-center gap-1.5",
 } as const;
@@ -109,6 +124,8 @@ export const STORY_DETAIL_HEADER_LAYOUT = {
 export function shouldShowStoryDetailActions(storyType: string | null | undefined): boolean {
   return isStoryActionsSupportedType(storyType);
 }
+
+// ─── Draft helpers ─────────────────────────────────────────────────────────────
 
 function initialTaskDraft(): TaskDraft {
   return {
@@ -135,6 +152,7 @@ function toStoryDraft(story: StoryDetail): StoryDraft {
     title: story.title ?? "",
     story_type: story.story_type ?? "USER_STORY",
     description: story.description ?? "",
+    intent: story.intent ?? "",
     priority: story.priority !== null ? String(story.priority) : "",
     epic_id: story.epic_id ?? "",
     blocked_reason: story.blocked_reason ?? "",
@@ -151,12 +169,14 @@ function parsePriority(value: string): number | null {
 function normalizeStoryDraft(draft: StoryDraft): NormalizedStory {
   const title = draft.title.trim();
   const description = draft.description.trim();
+  const intent = draft.intent.trim();
   const blockedReason = draft.blocked_reason.trim();
   const epicId = draft.epic_id.trim();
   return {
     title,
     story_type: draft.story_type,
     description: description === "" ? null : description,
+    intent: intent === "" ? null : intent,
     priority: parsePriority(draft.priority),
     epic_id: epicId === "" ? null : epicId,
     blocked_reason: blockedReason === "" ? null : blockedReason,
@@ -168,6 +188,7 @@ function normalizeStory(story: StoryDetail): NormalizedStory {
     title: story.title.trim(),
     story_type: story.story_type,
     description: story.description?.trim() || null,
+    intent: story.intent?.trim() || null,
     priority: story.priority,
     epic_id: story.epic_id,
     blocked_reason: story.blocked_reason?.trim() || null,
@@ -175,17 +196,20 @@ function normalizeStory(story: StoryDetail): NormalizedStory {
 }
 
 function isStoryDirty(draft: StoryDraft, story: StoryDetail): boolean {
-  const normalizedDraft = normalizeStoryDraft(draft);
-  const normalizedStory = normalizeStory(story);
+  const d = normalizeStoryDraft(draft);
+  const s = normalizeStory(story);
   return (
-    normalizedDraft.title !== normalizedStory.title ||
-    normalizedDraft.story_type !== normalizedStory.story_type ||
-    normalizedDraft.description !== normalizedStory.description ||
-    normalizedDraft.priority !== normalizedStory.priority ||
-    normalizedDraft.epic_id !== normalizedStory.epic_id ||
-    normalizedDraft.blocked_reason !== normalizedStory.blocked_reason
+    d.title !== s.title ||
+    d.story_type !== s.story_type ||
+    d.description !== s.description ||
+    d.intent !== s.intent ||
+    d.priority !== s.priority ||
+    d.epic_id !== s.epic_id ||
+    d.blocked_reason !== s.blocked_reason
   );
 }
+
+// ─── Date utilities ────────────────────────────────────────────────────────────
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -239,7 +263,7 @@ async function parseApiMessage(response: Response): Promise<string> {
     if (json.error?.message) return json.error.message;
     if (Array.isArray(json.detail) && json.detail[0]?.msg) return json.detail[0].msg;
   } catch {
-    // ignore and fallback below
+    // ignore
   }
   return `Request failed. HTTP ${response.status}.`;
 }
@@ -330,6 +354,8 @@ function toTaskEditDraft(task: TaskItem): TaskEditDraft {
   };
 }
 
+// ─── TaskRow ──────────────────────────────────────────────────────────────────
+
 function TaskRow({
   task,
   pending,
@@ -403,16 +429,24 @@ function TaskRow({
           size="xs"
           variant="destructive"
           aria-label="Delete task"
-          title="Delete task"
           disabled={pending}
           onClick={onDelete}
         >
-          <Trash2 className="size-3" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center justify-center">
+                <Trash2 className="size-3" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Delete task</TooltipContent>
+          </Tooltip>
         </Button>
       </div>
     </div>
   );
 }
+
+// ─── TaskForm ─────────────────────────────────────────────────────────────────
 
 function TaskForm({
   draft,
@@ -476,7 +510,7 @@ function TaskForm({
       </div>
 
       <div className="space-y-1">
-        <label className="text-xs text-muted-foreground">Estimate</label>
+        <label className="text-xs text-muted-foreground">Estimate (pts)</label>
         <input
           type="number"
           min={0}
@@ -498,10 +532,11 @@ function TaskForm({
           className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
         />
       </div>
-
     </div>
   );
 }
+
+// ─── TaskManager ──────────────────────────────────────────────────────────────
 
 function TaskManager({
   tasks,
@@ -628,7 +663,9 @@ function TaskManager({
 
       <div className="rounded-md border border-border/40 bg-card/20">
         {tasks.length === 0 ? (
-          <p className="px-3 py-5 text-sm italic text-muted-foreground">No tasks defined for this story.</p>
+          <p className="px-3 py-5 text-sm italic text-muted-foreground">
+            No tasks defined for this story.
+          </p>
         ) : (
           <div className="divide-y divide-border/20">
             {tasks.map((task) => (
@@ -649,6 +686,7 @@ function TaskManager({
         )}
       </div>
 
+      {/* Create task dialog */}
       <Dialog
         open={isCreateOpen}
         onOpenChange={(nextOpen) => {
@@ -684,6 +722,7 @@ function TaskManager({
         </DialogContent>
       </Dialog>
 
+      {/* Edit task dialog */}
       <Dialog
         open={editingTask !== null}
         onOpenChange={(nextOpen) => {
@@ -707,14 +746,16 @@ function TaskManager({
                   <select
                     value={editDraft.status}
                     disabled={pendingTaskIds.has(editingTask.id)}
-                    onChange={(event) => updateEditDraft("status", event.target.value as ItemStatus)}
+                    onChange={(event) =>
+                      updateEditDraft("status", event.target.value as ItemStatus)
+                    }
                     className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
                   >
-                    <option value="TODO">Todo</option>
-                    <option value="IN_PROGRESS">In progress</option>
-                    <option value="CODE_REVIEW">Code review</option>
-                    <option value="VERIFY">Verify</option>
-                    <option value="DONE">Done</option>
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -768,6 +809,8 @@ function TaskManager({
   );
 }
 
+// ─── StoryLabelManager ────────────────────────────────────────────────────────
+
 function StoryLabelManager({
   labels,
   availableLabels,
@@ -803,71 +846,127 @@ function StoryLabelManager({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Labels ({labels.length})</h3>
-        {isLoading && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+          Labels
+        </span>
+        {isLoading && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
       </div>
 
       {error && (
-        <p className="mb-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <p className="mb-2 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">
           {error}
         </p>
       )}
 
-      <div className="space-y-3 rounded-md border border-border/40 bg-card/20 p-3">
-        {labels.length === 0 ? (
-          <p className="text-xs italic text-muted-foreground">No labels attached to this story.</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {labels.map((label) => (
-              <button
-                key={label.id}
-                type="button"
-                disabled={pendingLabelIds.has(label.id)}
-                onClick={() => onDetachLabel(label.id)}
-                title={`Detach "${label.name}"`}
-                style={toLabelChipStyle(label.color)}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-                  "disabled:cursor-wait disabled:opacity-70",
-                )}
-              >
-                <span className="max-w-[12rem] truncate">{label.name}</span>
-                {pendingLabelIds.has(label.id) ? (
-                  <Loader2 className="size-2.5 animate-spin" />
-                ) : (
-                  <X className="size-2.5" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <ThemedSelect
-            value={selectedLabelId}
-            options={attachableOptions}
-            placeholder={
-              attachableLabels.length === 0
-                ? "No more labels to attach"
-                : "Select a label to attach"
-            }
-            disabled={isLoading || attachableLabels.length === 0}
-            onValueChange={onSelectLabel}
-          />
-          <Button
-            type="button"
-            size="sm"
-            disabled={!canAttach}
-            onClick={onAttachLabel}
-            className="w-full"
-          >
-            Attach label
-          </Button>
+      {labels.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {labels.map((label) => (
+            <button
+              key={label.id}
+              type="button"
+              disabled={pendingLabelIds.has(label.id)}
+              onClick={() => onDetachLabel(label.id)}
+              style={toLabelChipStyle(label.color)}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border border-border/50 bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+                "disabled:cursor-wait disabled:opacity-70",
+              )}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="max-w-[10rem] truncate">{label.name}</span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{`Detach "${label.name}"`}</TooltipContent>
+              </Tooltip>
+              {pendingLabelIds.has(label.id) ? (
+                <Loader2 className="size-2.5 animate-spin" />
+              ) : (
+                <X className="size-2.5" />
+              )}
+            </button>
+          ))}
         </div>
+      )}
+
+      {labels.length === 0 && !isLoading && (
+        <p className="mb-2 text-[11px] italic text-muted-foreground/50">No labels attached.</p>
+      )}
+
+      <div className="flex gap-1.5">
+        <ThemedSelect
+          value={selectedLabelId}
+          options={attachableOptions}
+          placeholder={attachableLabels.length === 0 ? "No labels to add" : "Add label…"}
+          disabled={isLoading || attachableLabels.length === 0}
+          onValueChange={onSelectLabel}
+          triggerClassName="h-7 text-xs flex-1"
+        />
+        <Button
+          type="button"
+          size="xs"
+          disabled={!canAttach}
+          onClick={onAttachLabel}
+        >
+          Add
+        </Button>
       </div>
     </div>
   );
 }
+
+// ─── ConfirmDiscardDialog ─────────────────────────────────────────────────────
+
+function ConfirmDiscardDialog({
+  open,
+  onKeepEditing,
+  onDiscard,
+}: {
+  open: boolean;
+  onKeepEditing: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onKeepEditing(); }}>
+      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>Discard changes?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          You have unsaved changes. If you close now, your edits will be lost.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onKeepEditing}>
+            Keep editing
+          </Button>
+          <Button type="button" variant="destructive" onClick={onDiscard}>
+            Discard changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── SidebarField ─────────────────────────────────────────────────────────────
+
+function SidebarField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+// ─── StoryDetailDialog ────────────────────────────────────────────────────────
 
 export function StoryDetailDialog({
   storyId,
@@ -905,6 +1004,8 @@ export function StoryDetailDialog({
   const [selectedLabelId, setSelectedLabelId] = useState("");
   const [labelError, setLabelError] = useState<string | null>(null);
   const [pendingLabelIds, setPendingLabelIds] = useState<Record<string, true>>({});
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
   const isActive = embedded ? storyId !== null : open;
 
   const viewState: DialogState = useMemo(() => {
@@ -923,6 +1024,8 @@ export function StoryDetailDialog({
     () => activeStory !== null && storyDraft !== null && isStoryDirty(storyDraft, activeStory),
     [activeStory, storyDraft],
   );
+
+  // ── Effects ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!storyId || !isActive) return;
@@ -964,7 +1067,9 @@ export function StoryDetailDialog({
           labels: mappedStoryLabels,
           label_ids: mappedLabelIds,
         };
-        const mappedTasks = ((tasksJson.data ?? []) as Record<string, unknown>[]).map(mapTaskFromApi);
+        const mappedTasks = (
+          (tasksJson.data ?? []) as Record<string, unknown>[]
+        ).map(mapTaskFromApi);
         setState({
           kind: "ok",
           forStoryId: storyId,
@@ -1005,7 +1110,9 @@ export function StoryDetailDialog({
     let cancelled = false;
     setIsLoadingEpics(true);
 
-    fetch(apiUrl(`/v1/planning/epics?project_id=${activeStory.project_id}&limit=100&sort=priority`))
+    fetch(
+      apiUrl(`/v1/planning/epics?project_id=${activeStory.project_id}&limit=100&sort=priority`),
+    )
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
@@ -1093,27 +1200,39 @@ export function StoryDetailDialog({
     };
   }, [hasUnsavedStoryChanges, isActive]);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const executeDialogClose = () => {
+    setStoryDraft(null);
+    setStoryDraftForId(null);
+    setStoryError(null);
+    setTaskError(null);
+    setPendingTaskIds({});
+    setStoryLabels([]);
+    setStoryLabelsForId(null);
+    setAvailableLabels([]);
+    setSelectedLabelId("");
+    setLabelError(null);
+    setPendingLabelIds({});
+    onOpenChange?.(false);
+  };
+
   const handleDialogOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       if (hasUnsavedStoryChanges) {
-        const confirmed = window.confirm(
-          "You have unsaved story changes. Discard changes and close?",
-        );
-        if (!confirmed) return;
+        setShowDiscardConfirm(true);
+        return;
       }
-      setStoryDraft(null);
-      setStoryDraftForId(null);
-      setStoryError(null);
-      setTaskError(null);
-      setPendingTaskIds({});
-      setStoryLabels([]);
-      setStoryLabelsForId(null);
-      setAvailableLabels([]);
-      setSelectedLabelId("");
-      setLabelError(null);
-      setPendingLabelIds({});
+      executeDialogClose();
+    } else {
+      onOpenChange?.(true);
     }
-    onOpenChange?.(nextOpen);
+  };
+
+  const handleCancelChanges = () => {
+    if (viewState.kind !== "ok") return;
+    setStoryDraft(toStoryDraft(viewState.story));
+    setStoryError(null);
   };
 
   const updateStoryDraft = (field: keyof StoryDraft, value: string) => {
@@ -1144,6 +1263,7 @@ export function StoryDetailDialog({
           title: normalized.title,
           story_type: normalized.story_type,
           description: normalized.description,
+          intent: normalized.intent,
           priority: normalized.priority,
           epic_id: normalized.epic_id,
           is_blocked: normalized.blocked_reason !== null,
@@ -1159,10 +1279,7 @@ export function StoryDetailDialog({
       const updatedStory = json.data as StoryDetail;
       setState((prev) => {
         if (prev.kind !== "ok") return prev;
-        return {
-          ...prev,
-          story: updatedStory,
-        };
+        return { ...prev, story: updatedStory };
       });
       setStoryDraft(toStoryDraft(updatedStory));
       setStoryDraftForId(updatedStory.id);
@@ -1196,10 +1313,7 @@ export function StoryDetailDialog({
         if (prev.kind !== "ok") return prev;
         return {
           ...prev,
-          story: {
-            ...prev.story,
-            ...updatedStory,
-          },
+          story: { ...prev.story, ...updatedStory },
         };
       });
       onStoryUpdated?.();
@@ -1228,7 +1342,7 @@ export function StoryDetailDialog({
         setStoryDraft(toStoryDraft(viewState.story));
         setStoryDraftForId(viewState.story.id);
       }
-      handleDialogOpenChange(false);
+      executeDialogClose();
     } catch (error) {
       setStoryError(error instanceof Error ? error.message : "Failed to delete story.");
     } finally {
@@ -1514,334 +1628,348 @@ export function StoryDetailDialog({
     await patchTask(taskId, toTaskStatusDonePatch());
   };
 
+  // ── Render ───────────────────────────────────────────────────────────────────
+
   const dialogBody = (
     <>
+      {/* Loading state */}
       {viewState.kind === "loading" && (
         <>
           {embedded ? (
-            <h2 className="sr-only">Loading story…</h2>
+            <h1 className="sr-only">Loading story…</h1>
           ) : (
             <DialogHeader>
               <DialogTitle className="sr-only">Loading story…</DialogTitle>
             </DialogHeader>
           )}
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-16">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
         </>
       )}
 
+      {/* Error state */}
       {viewState.kind === "error" && (
         <>
           {embedded ? (
-            <h2 className="sr-only">Error</h2>
+            <h1 className="sr-only">Error</h1>
           ) : (
             <DialogHeader>
               <DialogTitle className="sr-only">Error</DialogTitle>
             </DialogHeader>
           )}
-          <div className="py-8 text-center">
-            <AlertTriangle className="mx-auto mb-2 size-6 text-destructive" />
+          <div className="py-12 text-center">
+            <AlertTriangle className="mx-auto mb-3 size-6 text-destructive" />
             <p className="text-sm text-muted-foreground">{viewState.message}</p>
           </div>
         </>
       )}
 
-      {viewState.kind === "ok" && (
-        <>
-          {storyDraft ? (
-            /* ── Unified two-column layout (embedded page + dialog) ── */
-            <div className="flex flex-col gap-5">
-                {/* Title bar */}
-                {embedded ? (
-                  <div className="rounded-2xl border border-border/30 bg-card/50 px-6 py-5 shadow-sm">
-                    <div className="mb-2 flex items-center gap-2">
-                      <span className="font-mono text-xs tracking-wide text-muted-foreground">
-                        {viewState.story.key ?? "—"}
-                      </span>
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          STATUS_STYLE[viewState.story.status].bg,
-                          STATUS_STYLE[viewState.story.status].text,
-                        )}
+      {/* OK state — same layout in both embedded and dialog modes */}
+      {viewState.kind === "ok" && storyDraft && (
+        <div className="flex flex-col gap-5">
+
+          {/* ── Header ─────────────────────────────────────────────────────── */}
+          <div className="rounded-xl border border-border/30 bg-card/40 px-5 py-4 shadow-sm">
+            {/* Top row: key · status select · actions */}
+            <div className="mb-3 flex items-center gap-2">
+              <span className="font-mono text-[11px] tracking-wide text-muted-foreground">
+                {viewState.story.key ?? "—"}
+              </span>
+
+              {/* Inline status selector */}
+              <select
+                value={viewState.story.status}
+                disabled={isSavingStory}
+                onChange={(e) =>
+                  handleStoryStatusChange(viewState.story.id, e.target.value as ItemStatus)
+                }
+                className={cn(
+                  "h-5 cursor-pointer appearance-none rounded-full border-0 px-2 text-[10px] font-medium focus:outline-none focus:ring-1 focus:ring-ring",
+                  STATUS_STYLE[viewState.story.status].bg,
+                  STATUS_STYLE[viewState.story.status].text,
+                )}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+
+              {isSavingStory && (
+                <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+              )}
+
+              <div className={STORY_DETAIL_HEADER_LAYOUT.actionsGroup}>
+                {shouldShowStoryDetailActions(viewState.story.story_type) && (
+                  <StoryActionsMenu
+                    storyId={viewState.story.id}
+                    storyType={viewState.story.story_type}
+                    storyKey={viewState.story.key ?? null}
+                    storyTitle={viewState.story.title}
+                    storyStatus={viewState.story.status}
+                    onDelete={handleStoryDelete}
+                    onStatusChange={handleStoryStatusChange}
+                    onAddLabel={(storyId) => {
+                      if (storyId === viewState.story.id) {
+                        const labelSection = document.getElementById("story-detail-labels");
+                        labelSection?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }
+                    }}
+                    disabled={isSavingStory}
+                    isDeleting={isDeletingStory}
+                  />
+                )}
+                {/* "Open in new tab" — only shown in dialog (overlay) mode */}
+                {!embedded && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={`/planning/stories/${viewState.story.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
-                        {STATUS_LABEL[viewState.story.status]}
-                      </span>
-                      <div className={STORY_DETAIL_HEADER_LAYOUT.actionsGroup}>
-                        {shouldShowStoryDetailActions(viewState.story.story_type) && (
-                          <StoryActionsMenu
-                            storyId={viewState.story.id}
-                            storyType={viewState.story.story_type}
-                            storyKey={viewState.story.key ?? null}
-                            storyTitle={viewState.story.title}
-                            storyStatus={viewState.story.status}
-                            onDelete={handleStoryDelete}
-                            onStatusChange={handleStoryStatusChange}
-                            onAddLabel={(storyId) => {
-                              if (storyId === viewState.story.id) {
-                                const labelTab = document.getElementById("story-detail-labels");
-                                labelTab?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }
-                            }}
-                            disabled={isSavingStory}
-                            isDeleting={isDeletingStory}
-                          />
-                        )}
-                        {hasUnsavedStoryChanges && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={saveStory}
-                            disabled={isSavingStory || isDeletingStory}
-                          >
-                            {isSavingStory && <Loader2 className="size-3 animate-spin" />}
-                            Save
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    <h2 className="sr-only">{viewState.story.title}</h2>
-                    <input
-                      id="story-detail-title"
-                      value={storyDraft.title}
-                      onChange={(event) => updateStoryDraft("title", event.target.value)}
-                      className="w-full border-0 bg-transparent text-xl font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-0"
-                      placeholder="Story title…"
-                    />
-                  </div>
-                ) : (
-                  <DialogHeader className="gap-2">
-                    <div className="flex items-center gap-2 pr-8">
-                      <span className="font-mono text-xs tracking-wide text-muted-foreground">
-                        {viewState.story.key ?? "—"}
-                      </span>
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          STATUS_STYLE[viewState.story.status].bg,
-                          STATUS_STYLE[viewState.story.status].text,
-                        )}
-                      >
-                        {STATUS_LABEL[viewState.story.status]}
-                      </span>
-                      <div className={STORY_DETAIL_HEADER_LAYOUT.actionsGroup}>
-                        {shouldShowStoryDetailActions(viewState.story.story_type) && (
-                          <StoryActionsMenu
-                            storyId={viewState.story.id}
-                            storyType={viewState.story.story_type}
-                            storyKey={viewState.story.key ?? null}
-                            storyTitle={viewState.story.title}
-                            storyStatus={viewState.story.status}
-                            onDelete={handleStoryDelete}
-                            onStatusChange={handleStoryStatusChange}
-                            onAddLabel={(storyId) => {
-                              if (storyId === viewState.story.id) {
-                                const labelTab = document.getElementById("story-detail-labels");
-                                labelTab?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              }
-                            }}
-                            disabled={isSavingStory}
-                            isDeleting={isDeletingStory}
-                          />
-                        )}
-                        <a
-                          href={`/planning/stories/${viewState.story.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          <ExternalLink className="size-3.5" />
-                          Open in new tab
-                        </a>
-                      </div>
-                    </div>
-                    <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
-                    <input
-                      id="story-detail-title"
-                      value={storyDraft.title}
-                      onChange={(event) => updateStoryDraft("title", event.target.value)}
-                      className="w-full border-0 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-0"
-                      placeholder="Story title…"
-                    />
-                  </DialogHeader>
+                        <ExternalLink className="size-3.5" />
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Open in new tab</TooltipContent>
+                  </Tooltip>
                 )}
-
-                {storyError && (
-                  <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs text-red-300">
-                    {storyError}
-                  </p>
-                )}
-
-                {/* Two-column body */}
-                <div className="flex items-start gap-5">
-                  {/* Left: description + tasks */}
-                  <div className="min-w-0 flex-[2] space-y-4">
-                    <div className="rounded-2xl border border-border/30 bg-card/50 p-6 shadow-sm">
-                      <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
-                        Description
-                      </h3>
-                      <textarea
-                        id="story-detail-description"
-                        value={storyDraft.description}
-                        onChange={(event) => updateStoryDraft("description", event.target.value)}
-                        rows={14}
-                        placeholder="Write a description for this story…"
-                        className="w-full resize-y border-0 bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-0"
-                      />
-                    </div>
-
-                    <div className="rounded-2xl border border-border/30 bg-card/50 p-6 shadow-sm">
-                      <TaskManager
-                        tasks={viewState.tasks}
-                        isCreating={isCreatingTask}
-                        pendingTaskIds={pendingSet}
-                        error={taskError}
-                        onCreate={createTask}
-                        onPatch={patchTask}
-                        onMarkDone={markTaskDone}
-                        onDelete={deleteTask}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right: properties */}
-                  <div className="w-64 flex-none rounded-2xl border border-border/30 bg-card/50 p-5 shadow-sm">
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="story-detail-type"
-                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
-                        >
-                          Type
-                        </label>
-                        <select
-                          id="story-detail-type"
-                          value={storyDraft.story_type}
-                          onChange={(event) => updateStoryDraft("story_type", event.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
-                        >
-                          {STORY_TYPE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="story-detail-priority"
-                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
-                        >
-                          Priority
-                        </label>
-                        <input
-                          id="story-detail-priority"
-                          type="number"
-                          min={0}
-                          value={storyDraft.priority}
-                          onChange={(event) => updateStoryDraft("priority", event.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="story-detail-epic"
-                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
-                        >
-                          Epic
-                        </label>
-                        <select
-                          id="story-detail-epic"
-                          value={storyDraft.epic_id}
-                          disabled={isLoadingEpics}
-                          onChange={(event) => updateStoryDraft("epic_id", event.target.value)}
-                          className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
-                        >
-                          <option value="">No epic</option>
-                          {epics.map((epic) => (
-                            <option key={epic.id} value={epic.id}>
-                              {epic.key ? `${epic.key} ${epic.title}` : epic.title}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div id="story-detail-labels" className="border-t border-border/20 pt-4">
-                        <StoryLabelManager
-                          labels={storyLabels}
-                          availableLabels={availableLabels}
-                          selectedLabelId={selectedLabelId}
-                          isLoading={isLoadingLabels}
-                          pendingLabelIds={pendingLabelSet}
-                          error={labelError}
-                          onSelectLabel={setSelectedLabelId}
-                          onAttachLabel={attachLabel}
-                          onDetachLabel={detachLabel}
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 border-t border-border/20 pt-4">
-                        <label
-                          htmlFor="story-detail-blocked-reason"
-                          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50"
-                        >
-                          Blocked reason
-                        </label>
-                        <textarea
-                          id="story-detail-blocked-reason"
-                          value={storyDraft.blocked_reason}
-                          onChange={(event) => updateStoryDraft("blocked_reason", event.target.value)}
-                          rows={2}
-                          placeholder="Leave empty if not blocked."
-                          className="w-full resize-none rounded-lg border border-border/50 bg-background/60 px-2.5 py-2 text-sm text-foreground focus-ring placeholder:text-muted-foreground/40"
-                        />
-                      </div>
-
-                      <div className="space-y-2 border-t border-border/20 pt-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <Calendar className="size-3.5 shrink-0" />
-                          Created {formatDate(viewState.story.created_at) ?? "—"}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="size-3.5 shrink-0" />
-                          Updated {formatDateTime(viewState.story.updated_at) ?? "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {!embedded && hasUnsavedStoryChanges && (
-                  <div className="flex justify-end border-t border-border/40 pt-3">
-                    <Button type="button" size="sm" onClick={saveStory} disabled={isSavingStory}>
-                      {isSavingStory && <Loader2 className="size-3 animate-spin" />}
-                      Save story
-                    </Button>
-                  </div>
-                )}
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center justify-center py-10">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
-            </div>
+
+            {/* Title input */}
+            {embedded ? (
+              <h1 className="sr-only">{viewState.story.title}</h1>
+            ) : (
+              <DialogTitle className="sr-only">{viewState.story.title}</DialogTitle>
+            )}
+            <input
+              id="story-detail-title"
+              value={storyDraft.title}
+              onChange={(event) => updateStoryDraft("title", event.target.value)}
+              className="w-full border-0 bg-transparent text-xl font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-0"
+              placeholder="Story title…"
+            />
+          </div>
+
+          {/* Error banner */}
+          {storyError && (
+            <p className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs text-red-300">
+              {storyError}
+            </p>
           )}
-        </>
+
+          {/* ── Body: two-column layout ─────────────────────────────────── */}
+          <div className="flex items-start gap-5">
+
+            {/* Left: description + tasks */}
+            <div className="min-w-0 flex-[2] space-y-4">
+              <div className="rounded-xl border border-border/30 bg-card/40 p-5 shadow-sm">
+                <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+                  Intent
+                </h3>
+                <input
+                  id="story-detail-intent"
+                  value={storyDraft.intent}
+                  onChange={(event) => updateStoryDraft("intent", event.target.value)}
+                  placeholder="One-line goal or intent for this story…"
+                  className="mb-4 w-full border-0 bg-transparent text-sm italic text-muted-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-0"
+                />
+                <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+                  Description
+                </h3>
+                <textarea
+                  id="story-detail-description"
+                  value={storyDraft.description}
+                  onChange={(event) => updateStoryDraft("description", event.target.value)}
+                  rows={12}
+                  placeholder="Describe the work, acceptance criteria, context…"
+                  className="w-full resize-y border-0 bg-transparent text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-0"
+                />
+              </div>
+
+              <div className="rounded-xl border border-border/30 bg-card/40 p-5 shadow-sm">
+                <TaskManager
+                  tasks={viewState.tasks}
+                  isCreating={isCreatingTask}
+                  pendingTaskIds={pendingSet}
+                  error={taskError}
+                  onCreate={createTask}
+                  onPatch={patchTask}
+                  onMarkDone={markTaskDone}
+                  onDelete={deleteTask}
+                />
+              </div>
+            </div>
+
+            {/* Right: properties sidebar */}
+            <div className="w-64 flex-none space-y-4 rounded-xl border border-border/30 bg-card/40 p-5 shadow-sm">
+
+              <SidebarField label="Type">
+                <select
+                  id="story-detail-type"
+                  value={storyDraft.story_type}
+                  onChange={(event) => updateStoryDraft("story_type", event.target.value)}
+                  className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
+                >
+                  {STORY_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </SidebarField>
+
+              <SidebarField label="Priority">
+                <input
+                  id="story-detail-priority"
+                  type="number"
+                  min={0}
+                  value={storyDraft.priority}
+                  onChange={(event) => updateStoryDraft("priority", event.target.value)}
+                  placeholder="—"
+                  className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring placeholder:text-muted-foreground/40"
+                />
+              </SidebarField>
+
+              <SidebarField label="Epic">
+                <select
+                  id="story-detail-epic"
+                  value={storyDraft.epic_id}
+                  disabled={isLoadingEpics}
+                  onChange={(event) => updateStoryDraft("epic_id", event.target.value)}
+                  className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
+                >
+                  <option value="">No epic</option>
+                  {epics.map((epic) => (
+                    <option key={epic.id} value={epic.id}>
+                      {epic.key ? `${epic.key} ${epic.title}` : epic.title}
+                    </option>
+                  ))}
+                </select>
+              </SidebarField>
+
+              <div id="story-detail-labels" className="border-t border-border/20 pt-4">
+                <StoryLabelManager
+                  labels={storyLabels}
+                  availableLabels={availableLabels}
+                  selectedLabelId={selectedLabelId}
+                  isLoading={isLoadingLabels}
+                  pendingLabelIds={pendingLabelSet}
+                  error={labelError}
+                  onSelectLabel={setSelectedLabelId}
+                  onAttachLabel={attachLabel}
+                  onDetachLabel={detachLabel}
+                />
+              </div>
+
+              <div className="space-y-1.5 border-t border-border/20 pt-4">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">
+                  Blocked reason
+                </span>
+                <textarea
+                  id="story-detail-blocked-reason"
+                  value={storyDraft.blocked_reason}
+                  onChange={(event) => updateStoryDraft("blocked_reason", event.target.value)}
+                  rows={2}
+                  placeholder="Leave empty if not blocked."
+                  className="w-full resize-none rounded-lg border border-border/50 bg-background/60 px-2.5 py-2 text-sm text-foreground focus-ring placeholder:text-muted-foreground/40"
+                />
+              </div>
+
+              <div className="space-y-2 border-t border-border/20 pt-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="size-3.5 shrink-0" />
+                  Created {formatDate(viewState.story.created_at) ?? "—"}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="size-3.5 shrink-0" />
+                  Updated {formatDateTime(viewState.story.updated_at) ?? "—"}
+                </span>
+                {viewState.story.started_at && (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="size-3.5 shrink-0" />
+                    Started {formatDate(viewState.story.started_at)}
+                  </span>
+                )}
+                {viewState.story.completed_at && (
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="size-3.5 shrink-0 text-emerald-400" />
+                    Completed {formatDate(viewState.story.completed_at)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Footer: Save / Cancel ───────────────────────────────────── */}
+          <div className="flex items-center justify-end gap-2 border-t border-border/30 pt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={!hasUnsavedStoryChanges}
+              onClick={handleCancelChanges}
+            >
+              Discard changes
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!hasUnsavedStoryChanges || isSavingStory}
+              onClick={saveStory}
+            >
+              {isSavingStory && <Loader2 className="size-3 animate-spin" />}
+              Save changes
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading spinner while draft initializes */}
+      {viewState.kind === "ok" && !storyDraft && (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
       )}
     </>
   );
 
+  // Discard confirm dialog (themed, replaces window.confirm)
+  const discardConfirm = (
+    <ConfirmDiscardDialog
+      open={showDiscardConfirm}
+      onKeepEditing={() => setShowDiscardConfirm(false)}
+      onDiscard={() => {
+        setShowDiscardConfirm(false);
+        executeDialogClose();
+      }}
+    />
+  );
+
   if (embedded) {
-    return <div className="w-full">{dialogBody}</div>;
+    return (
+      <div className="w-full">
+        {dialogBody}
+        {discardConfirm}
+      </div>
+    );
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-6xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
-        {dialogBody}
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+        <DialogContent
+          className="sm:max-w-6xl max-h-[90vh] overflow-y-auto"
+          aria-describedby={undefined}
+        >
+          {dialogBody}
+        </DialogContent>
+      </Dialog>
+      {discardConfirm}
+    </>
   );
 }

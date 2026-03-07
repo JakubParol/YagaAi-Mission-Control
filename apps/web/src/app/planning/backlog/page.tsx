@@ -27,11 +27,15 @@ import {
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import type { StoryCardStory } from "@/components/planning/story-card";
-import { BacklogRow } from "@/components/planning/backlog-row";
+import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
-import { BacklogSectionHeader } from "@/components/planning/backlog-section-header";
+import { BacklogSectionHeader, type BacklogSiblingItem, type MoveDirection } from "@/components/planning/backlog-section-header";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import {
+  BacklogEditDialog,
+  type BacklogEditItem,
+} from "@/components/planning/backlog-edit-dialog";
 import { StoryForm } from "@/components/planning/story-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
@@ -79,12 +84,22 @@ type PageState =
   | { kind: "loading" }
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; sections: BacklogWithStories[]; assignees: PlanningFilterOption[] };
+  | {
+      kind: "ok";
+      sections: BacklogWithStories[];
+      assignees: PlanningFilterOption[];
+      assignableAgents: BacklogAssigneeOption[];
+    };
 
 type FetchResult =
   | { kind: "empty" }
   | { kind: "error"; message: string }
-  | { kind: "ok"; sections: BacklogWithStories[]; assignees: PlanningFilterOption[] };
+  | {
+      kind: "ok";
+      sections: BacklogWithStories[];
+      assignees: PlanningFilterOption[];
+      assignableAgents: BacklogAssigneeOption[];
+    };
 
 interface ScopedFetchResult {
   projectId: string;
@@ -117,6 +132,9 @@ interface PlanningAgentApiItem {
   id?: string;
   name?: string;
   last_name?: string | null;
+  initials?: string | null;
+  role?: string | null;
+  avatar?: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -185,7 +203,10 @@ function BacklogSection({
   section,
   isActiveSprint,
   hasAnyActiveSprint,
+  siblingBacklogs,
+  assigneeOptions,
   onStoryClick,
+  onStoryAssigneeChange,
   onAddToActiveSprint,
   onRemoveFromActiveSprint,
   onStartSprint,
@@ -193,7 +214,9 @@ function BacklogSection({
   onCreateStory,
   onStoryDelete,
   onStoryStatusChange,
+  onEditBoard,
   onDeleteBoard,
+  onMoveBoard,
   pendingStoryIds,
   pendingDeleteStoryIds,
   pendingSprintIds,
@@ -202,7 +225,10 @@ function BacklogSection({
   section: BacklogWithStories;
   isActiveSprint: boolean;
   hasAnyActiveSprint: boolean;
+  siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
+  assigneeOptions: readonly BacklogAssigneeOption[];
   onStoryClick: (storyId: string) => void;
+  onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
   onAddToActiveSprint: (storyId: string) => void;
   onRemoveFromActiveSprint: (storyId: string) => void;
   onStartSprint: (backlogId: string, backlogName: string) => void;
@@ -210,7 +236,9 @@ function BacklogSection({
   onCreateStory: (backlogId: string) => void;
   onStoryDelete: (storyId: string) => void;
   onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
+  onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
+  onMoveBoard: (backlogId: string, direction: MoveDirection) => void;
   pendingStoryIds: ReadonlySet<string>;
   pendingDeleteStoryIds: ReadonlySet<string>;
   pendingSprintIds: ReadonlySet<string>;
@@ -237,11 +265,14 @@ function BacklogSection({
         hasAnyActiveSprint={hasAnyActiveSprint}
         isSprintPending={isSprintPending}
         isBoardDeletePending={isBoardDeletePending}
+        siblingBacklogs={siblingBacklogs}
         onToggleCollapsed={() => setCollapsed(!collapsed)}
         onStartSprint={onStartSprint}
         onCompleteSprint={onCompleteSprint}
         onCreateStory={onCreateStory}
+        onEditBoard={onEditBoard}
         onDeleteBoard={onDeleteBoard}
+        onMoveBoard={onMoveBoard}
       />
 
       {/* Row list */}
@@ -260,6 +291,9 @@ function BacklogSection({
                   key={story.id}
                   item={story}
                   onClick={onStoryClick}
+                  assigneeOptions={assigneeOptions}
+                  assigneePending={pendingStoryIds.has(story.id)}
+                  onAssigneeChange={onStoryAssigneeChange}
                   actions={(
                     <div className="flex items-center justify-end gap-1">
                       <StoryActionsMenu
@@ -295,18 +329,26 @@ function BacklogSection({
           )}
 
           <div className="border-t border-border/20 px-3 py-1.5">
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={backlog.kind !== "BACKLOG"}
-              title={backlog.kind === "BACKLOG" ? "Create story" : "Only product backlog supports story creation"}
-              className="text-muted-foreground"
-              onClick={() => {
-                if (backlog.kind === "BACKLOG") onCreateStory(backlog.id);
-              }}
-            >
-              + Create
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={backlog.kind !== "BACKLOG"}
+                  className="text-muted-foreground"
+                  onClick={() => {
+                    if (backlog.kind === "BACKLOG") onCreateStory(backlog.id);
+                  }}
+                >
+                  + Create
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {backlog.kind === "BACKLOG"
+                  ? "Create story"
+                  : "Only product backlog supports story creation"}
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -344,6 +386,7 @@ function BacklogPageContent() {
   const [completeTargetBacklogId, setCompleteTargetBacklogId] = useState<string>("");
   const [completeDialogError, setCompleteDialogError] = useState<string | null>(null);
   const [deleteBoardDialog, setDeleteBoardDialog] = useState<DeleteBoardDialogState | null>(null);
+  const [editBoardBacklog, setEditBoardBacklog] = useState<BacklogEditItem | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -439,6 +482,7 @@ function BacklogPageContent() {
     { value: UNASSIGNED_FILTER_VALUE, label: "Unassigned" },
     ...(state.kind === "ok" ? state.assignees : []),
   ];
+  const assignableAgents = state.kind === "ok" ? state.assignableAgents : [];
 
   const totalStoryCount =
     state.kind === "ok"
@@ -557,7 +601,24 @@ function BacklogPageContent() {
       .filter((item): item is PlanningFilterOption => item !== null)
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    return { kind: "ok", sections, assignees };
+    const assignableAgents = agents
+      .filter((agent): agent is PlanningAgentApiItem & { id: string; name: string } => (
+        typeof agent.id === "string"
+        && agent.id.trim().length > 0
+        && typeof agent.name === "string"
+        && agent.name.trim().length > 0
+      ))
+      .map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        last_name: agent.last_name ?? null,
+        initials: agent.initials ?? null,
+        role: agent.role ?? null,
+        avatar: agent.avatar ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { kind: "ok", sections, assignees, assignableAgents };
   }, []);
 
   const refreshCurrentView = useCallback(async () => {
@@ -687,6 +748,35 @@ function BacklogPageContent() {
       } catch (error) {
         showErrorToast(
           error instanceof Error ? error.message : "Failed to update story status.",
+        );
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[storyId];
+          return next;
+        });
+      }
+    },
+    [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, showErrorToast],
+  );
+
+  const handleStoryAssigneeChange = useCallback(
+    async (storyId: string, nextAssigneeAgentId: string | null) => {
+      if (pendingStoryIds[storyId] || pendingDeleteStoryIds[storyId]) return;
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+      try {
+        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_assignee_agent_id: nextAssigneeAgentId }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update assignee. HTTP ${response.status}.`);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        showErrorToast(
+          error instanceof Error ? error.message : "Failed to update assignee.",
         );
       } finally {
         setPendingStoryIds((prev) => {
@@ -978,6 +1068,84 @@ function BacklogPageContent() {
     setDeleteBoardDialog(null);
   }, []);
 
+  const handleEditBoard = useCallback(
+    (backlogId: string) => {
+      if (state.kind !== "ok") return;
+      const section = state.sections.find((s) => s.backlog.id === backlogId);
+      if (!section) return;
+      const { backlog } = section;
+      setEditBoardBacklog({
+        id: backlog.id,
+        name: backlog.name,
+        kind: backlog.kind,
+        status: backlog.status,
+        goal: backlog.goal,
+        start_date: backlog.start_date,
+        end_date: backlog.end_date,
+        is_default: backlog.is_default,
+      });
+    },
+    [state],
+  );
+
+  const handleMoveBoard = useCallback(
+    async (backlogId: string, direction: MoveDirection) => {
+      if (state.kind !== "ok") return;
+
+      const moveable = state.sections
+        .map((s) => s.backlog)
+        .filter(
+          (b) => !(b.kind === "SPRINT" && b.status === "ACTIVE") && !b.is_default,
+        );
+
+      const currentIndex = moveable.findIndex((b) => b.id === backlogId);
+      if (currentIndex === -1) return;
+
+      let swapIndex: number;
+      if (direction === "top") swapIndex = 0;
+      else if (direction === "up") swapIndex = currentIndex - 1;
+      else if (direction === "down") swapIndex = currentIndex + 1;
+      else swapIndex = moveable.length - 1;
+
+      if (swapIndex === currentIndex || swapIndex < 0 || swapIndex >= moveable.length) return;
+
+      const current = moveable[currentIndex];
+      const swapWith = moveable[swapIndex];
+      const currentOrder = current.display_order ?? (currentIndex + 1) * 100;
+      const swapOrder = swapWith.display_order ?? (swapIndex + 1) * 100;
+
+      setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
+      try {
+        await Promise.all([
+          fetch(apiUrl(`/v1/planning/backlogs/${current.id}`), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ display_order: swapOrder }),
+          }).then((res) => {
+            if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
+          }),
+          fetch(apiUrl(`/v1/planning/backlogs/${swapWith.id}`), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ display_order: currentOrder }),
+          }).then((res) => {
+            if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
+          }),
+        ]);
+        await refreshCurrentView();
+      } catch (error) {
+        showErrorToast(error instanceof Error ? error.message : "Failed to reorder board.");
+      } finally {
+        setPendingBoardIds((prev) => {
+          const next = { ...prev };
+          delete next[backlogId];
+          return next;
+        });
+      }
+    },
+    [refreshCurrentView, showErrorToast, state],
+  );
+
   const handleDeleteBoardDialogConfirm = useCallback(async () => {
     if (!deleteBoardDialog) return;
     const { backlogId } = deleteBoardDialog;
@@ -1120,7 +1288,10 @@ function BacklogPageContent() {
                 section.backlog.status === "ACTIVE"
               }
               hasAnyActiveSprint={hasAnyActiveSprint}
+              siblingBacklogs={state.sections.map((s) => s.backlog)}
+              assigneeOptions={assignableAgents}
               onStoryClick={handleStoryClick}
+              onStoryAssigneeChange={handleStoryAssigneeChange}
               onAddToActiveSprint={handleAddToActiveSprint}
               onRemoveFromActiveSprint={handleRemoveFromActiveSprint}
               onStartSprint={handleStartSprint}
@@ -1128,7 +1299,9 @@ function BacklogPageContent() {
               onCreateStory={handleCreateStory}
               onStoryDelete={handleStoryDelete}
               onStoryStatusChange={handleStoryStatusChange}
+              onEditBoard={handleEditBoard}
               onDeleteBoard={handleDeleteBoard}
+              onMoveBoard={handleMoveBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
               pendingDeleteStoryIds={new Set(Object.keys(pendingDeleteStoryIds))}
               pendingSprintIds={new Set(Object.keys(pendingSprintIds))}
@@ -1382,6 +1555,22 @@ function BacklogPageContent() {
         onOpenChange={handleDialogClose}
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => {
+          void refreshCurrentView().catch((error) => {
+            showErrorToast(
+              error instanceof Error ? error.message : "Failed to refresh backlog data.",
+            );
+          });
+        }}
+      />
+
+      <BacklogEditDialog
+        backlog={editBoardBacklog}
+        open={editBoardBacklog !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setEditBoardBacklog(null);
+        }}
+        onSaved={() => {
+          setEditBoardBacklog(null);
           void refreshCurrentView().catch((error) => {
             showErrorToast(
               error instanceof Error ? error.message : "Failed to refresh backlog data.",

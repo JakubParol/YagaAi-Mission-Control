@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface StoryLabel {
@@ -13,6 +14,7 @@ interface StoryLabelChipsProps {
   maxVisible?: number;
   className?: string;
   chipClassName?: string;
+  allNamesTooltip?: boolean;
 }
 
 const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
@@ -41,37 +43,51 @@ export function StoryLabelChips({
   maxVisible = 2,
   className,
   chipClassName,
+  allNamesTooltip = false,
 }: StoryLabelChipsProps) {
   if (!labels || labels.length === 0) return null;
 
   const { visible, overflowCount } = splitVisibleStoryLabels(labels, maxVisible);
   const allNames = labels.map((label) => label.name).join(", ");
-
-  return (
+  const chips = (
     <div className={cn("flex min-w-0 items-center gap-1 overflow-hidden", className)}>
       {visible.map((label) => (
-        <span
-          key={label.id}
-          title={label.name}
-          style={toLabelChipStyle(label.color)}
-          className={cn(
-            "inline-flex min-w-0 max-w-[9rem] items-center rounded-full border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
-            "truncate",
-            chipClassName,
-          )}
-        >
-          {label.name}
-        </span>
+        <Tooltip key={label.id}>
+          <TooltipTrigger asChild>
+            <span
+              style={toLabelChipStyle(label.color)}
+              className={cn(
+                "inline-flex min-w-0 max-w-[9rem] items-center rounded-full border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground",
+                "truncate",
+                chipClassName,
+              )}
+            >
+              {label.name}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{label.name}</TooltipContent>
+        </Tooltip>
       ))}
       {overflowCount > 0 && (
-        <span
-          title={allNames}
-          className="inline-flex shrink-0 items-center rounded-full border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-        >
-          +{overflowCount}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex shrink-0 items-center rounded-full border border-border/50 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              +{overflowCount}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{allNames}</TooltipContent>
+        </Tooltip>
       )}
     </div>
+  );
+
+  if (!allNamesTooltip) return chips;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{chips}</TooltipTrigger>
+      <TooltipContent side="bottom">{allNames}</TooltipContent>
+    </Tooltip>
   );
 }
 

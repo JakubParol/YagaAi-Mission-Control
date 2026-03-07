@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { AssigneeAvatarTooltip } from "./assignee-avatar-tooltip.js";
 
-test("AssigneeAvatarTooltip renders avatar and hidden tooltip label", () => {
+test("AssigneeAvatarTooltip renders themed tooltip wrapper and avatar", () => {
   const markup = renderToStaticMarkup(
     React.createElement(AssigneeAvatarTooltip, {
       name: "Unassigned",
@@ -13,6 +13,6 @@ test("AssigneeAvatarTooltip renders avatar and hidden tooltip label", () => {
     }),
   );
 
-  assert.match(markup, /role="tooltip"/);
-  assert.match(markup, /Unassigned/);
+  assert.match(markup, /data-slot="tooltip"/);
+  assert.match(markup, /Unassigned assignee avatar/);
 });

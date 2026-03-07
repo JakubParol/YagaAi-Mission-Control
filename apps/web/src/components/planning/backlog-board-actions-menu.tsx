@@ -9,16 +9,26 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface BacklogBoardActionsMenuProps {
   backlogName: string;
   canDelete: boolean;
   isDeleting: boolean;
+  canMoveTop: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  canMoveBottom: boolean;
+  onEdit: () => void;
   onDelete: () => void;
+  onMoveTop: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onMoveBottom: () => void;
 }
 
 interface FloatingCoordinates {
@@ -78,13 +88,23 @@ export function BacklogBoardActionsMenu({
   backlogName,
   canDelete,
   isDeleting,
+  canMoveTop,
+  canMoveUp,
+  canMoveDown,
+  canMoveBottom,
+  onEdit,
   onDelete,
+  onMoveTop,
+  onMoveUp,
+  onMoveDown,
+  onMoveBottom,
 }: BacklogBoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [menuCoordinates, setMenuCoordinates] = useState<FloatingCoordinates | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const triggerDisabled = isDeleting || !canDelete;
+  const triggerDisabled = isDeleting;
+  const triggerTooltip = "Board actions";
 
   const updateFloatingPosition = useCallback(() => {
     if (typeof window === "undefined" || !open || !rootRef.current || !menuRef.current) {
@@ -175,14 +195,93 @@ export function BacklogBoardActionsMenu({
       <button
         type="button"
         role="menuitem"
-        disabled={triggerDisabled}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+          "text-foreground hover:bg-muted/50",
+        )}
+        onClick={() => {
+          setOpen(false);
+          onEdit();
+        }}
+      >
+        <Pencil className="size-3.5" />
+        Edit
+      </button>
+
+      {(canMoveTop || canMoveUp || canMoveDown || canMoveBottom) && (
+        <div className="my-1 border-t border-border/40" role="separator" />
+      )}
+
+      {canMoveTop && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveTop(); }}
+        >
+          <ChevronsUp className="size-3.5" />
+          Move to top
+        </button>
+      )}
+      {canMoveUp && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveUp(); }}
+        >
+          <ChevronUp className="size-3.5" />
+          Move up
+        </button>
+      )}
+      {canMoveDown && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveDown(); }}
+        >
+          <ChevronDown className="size-3.5" />
+          Move down
+        </button>
+      )}
+      {canMoveBottom && (
+        <button
+          type="button"
+          role="menuitem"
+          className={cn(
+            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+            "text-foreground hover:bg-muted/50",
+          )}
+          onClick={() => { setOpen(false); onMoveBottom(); }}
+        >
+          <ChevronsDown className="size-3.5" />
+          Move to bottom
+        </button>
+      )}
+
+      <div className="my-1 border-t border-border/40" role="separator" />
+
+      <button
+        type="button"
+        role="menuitem"
+        disabled={!canDelete || isDeleting}
         className={cn(
           "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
           "text-red-300 hover:bg-red-500/10",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
         onClick={() => {
-          if (triggerDisabled) return;
+          if (!canDelete || isDeleting) return;
           setOpen(false);
           onDelete();
         }}
@@ -200,24 +299,28 @@ export function BacklogBoardActionsMenu({
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-xs"
-        disabled={triggerDisabled}
-        title={canDelete ? "Board actions" : "Default board cannot be deleted"}
-        aria-label={`Open board actions for ${backlogName}`}
-        className="text-muted-foreground hover:text-foreground"
-        onClick={() =>
-          setOpen((prev) => {
-            const next = !prev;
-            if (!next) setMenuCoordinates(null);
-            return next;
-          })
-        }
-      >
-        {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <MoreHorizontal className="size-3.5" />}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            disabled={triggerDisabled}
+            aria-label={`Open board actions for ${backlogName}`}
+            className="text-muted-foreground hover:text-foreground"
+            onClick={() =>
+              setOpen((prev) => {
+                const next = !prev;
+                if (!next) setMenuCoordinates(null);
+                return next;
+              })
+            }
+          >
+            {isDeleting ? <Loader2 className="size-3.5 animate-spin" /> : <MoreHorizontal className="size-3.5" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{triggerTooltip}</TooltipContent>
+      </Tooltip>
 
       {menu && (typeof document !== "undefined" ? createPortal(menu, document.body) : menu)}
     </div>

@@ -46,8 +46,7 @@ test("StoryCard metadata row follows type+key then story points and unassigned s
 
   assert.match(markup, /data-testid="story-card-metadata-row"/);
   assert.match(markup, /MC-303/);
-  assert.match(markup, /title="Story points"/);
-  assert.match(markup, /title="Unassigned"/);
+  assert.match(markup, /aria-label="Unassigned"/);
 });
 
 test("StoryCard renders task progress when story has tasks", () => {
@@ -64,14 +63,12 @@ test("StoryCard renders task progress when story has tasks", () => {
 
   assert.match(markup, />2\/4</);
   const tasksIndex = markup.indexOf(">2/4<");
-  const priorityIndex = markup.indexOf("title=\"Priority 2\"");
-  const storyPointsIndex = markup.indexOf("title=\"Story points\"");
-  const assigneeIndex = markup.indexOf("title=\"Unassigned\"");
+  const metadataIndex = markup.indexOf("data-testid=\"story-card-metadata-row\"");
+  const assigneeIndex = markup.indexOf("aria-label=\"Unassigned\"");
 
   assert.ok(tasksIndex >= 0);
-  assert.ok(priorityIndex > tasksIndex);
-  assert.ok(storyPointsIndex > priorityIndex);
-  assert.ok(assigneeIndex > storyPointsIndex);
+  assert.ok(metadataIndex >= 0);
+  assert.ok(assigneeIndex > tasksIndex);
 });
 
 test("StoryCard renders assignee avatar with initials fallback when assignee has no image", () => {

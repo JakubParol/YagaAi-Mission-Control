@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   SIDEBAR_COLLAPSED_STORAGE_KEY,
   parseSidebarCollapsedPreference,
@@ -40,27 +41,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative min-h-screen bg-background">
-      {/* Desktop sidebar */}
-      <Sidebar
-        collapsed={isSidebarCollapsed}
-        onToggleCollapsed={handleSidebarToggle}
-      />
+    <TooltipProvider>
+      <div className="relative min-h-screen bg-background">
+        {/* Desktop sidebar */}
+        <Sidebar
+          collapsed={isSidebarCollapsed}
+          onToggleCollapsed={handleSidebarToggle}
+        />
 
-      {/* Main content — offset for floating sidebar */}
-      <div
-        className={
-          isSidebarCollapsed
-            ? "relative flex min-h-screen flex-col lg:pl-24"
-            : "relative flex min-h-screen flex-col lg:pl-72"
-        }
-      >
-        {/* Mobile header */}
-        <MobileHeader />
+        {/* Main content — offset for floating sidebar */}
+        <div
+          className={
+            isSidebarCollapsed
+              ? "relative flex min-h-screen flex-col lg:pl-24"
+              : "relative flex min-h-screen flex-col lg:pl-72"
+          }
+        >
+          {/* Mobile header */}
+          <MobileHeader />
 
-        {/* Page content */}
-        {children}
+          {/* Page content */}
+          {children}
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

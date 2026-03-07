@@ -10,9 +10,9 @@ export function BacklogRowsHeader() {
         BACKLOG_ROW_LAYOUT.gridTemplate,
       )}
     >
-      <span>Type</span>
-      <span>Key</span>
+      <span className="col-span-2">Key</span>
       <span>Title</span>
+      <span>Labels</span>
       <span>Epic</span>
       <span>Status</span>
       <span className="text-center">SP</span>

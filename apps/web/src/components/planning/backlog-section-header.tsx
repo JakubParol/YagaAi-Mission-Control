@@ -4,8 +4,18 @@ import { ChevronDown, ChevronRight, CircleCheckBig, Loader2, Play } from "lucide
 
 import { BacklogBoardActionsMenu } from "@/components/planning/backlog-board-actions-menu";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { BacklogKind, BacklogStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
+
+export type MoveDirection = "top" | "up" | "down" | "bottom";
+
+export interface BacklogSiblingItem {
+  id: string;
+  kind: BacklogKind;
+  status: BacklogStatus;
+  is_default: boolean;
+}
 
 interface BacklogSectionHeaderProps {
   backlog: {
@@ -20,11 +30,14 @@ interface BacklogSectionHeaderProps {
   hasAnyActiveSprint: boolean;
   isSprintPending: boolean;
   isBoardDeletePending: boolean;
+  siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
   onToggleCollapsed: () => void;
   onStartSprint: (backlogId: string, backlogName: string) => void;
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
+  onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
+  onMoveBoard: (backlogId: string, direction: MoveDirection) => void;
 }
 
 const KIND_LABEL: Record<BacklogKind, string> = {
@@ -66,7 +79,7 @@ function MetricChip({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-between gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+        "inline-flex h-5 items-center justify-between gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none",
         toneClassName,
       )}
     >
@@ -76,6 +89,14 @@ function MetricChip({
   );
 }
 
+function isPinnedTop(b: BacklogSiblingItem): boolean {
+  return b.kind === "SPRINT" && b.status === "ACTIVE";
+}
+
+function isPinnedBottom(b: BacklogSiblingItem): boolean {
+  return b.is_default;
+}
+
 export function BacklogSectionHeader({
   backlog,
   collapsed,
@@ -83,11 +104,14 @@ export function BacklogSectionHeader({
   hasAnyActiveSprint,
   isSprintPending,
   isBoardDeletePending,
+  siblingBacklogs,
   onToggleCollapsed,
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
+  onEditBoard,
   onDeleteBoard,
+  onMoveBoard,
 }: BacklogSectionHeaderProps) {
   const Chevron = collapsed ? ChevronRight : ChevronDown;
   const isSprint = backlog.kind === "SPRINT";
@@ -99,6 +123,16 @@ export function BacklogSectionHeader({
   const canStartSprint = isSprint && backlog.status !== "ACTIVE";
   const isStartBlockedByActive = canStartSprint && hasAnyActiveSprint;
   const canDeleteBoard = !backlog.is_default;
+
+  const moveableBacklogs = siblingBacklogs.filter(
+    (b) => !isPinnedTop(b) && !isPinnedBottom(b),
+  );
+  const moveableIndex = moveableBacklogs.findIndex((b) => b.id === backlog.id);
+  const isMoveable = moveableIndex !== -1;
+  const canMoveTop = isMoveable && moveableIndex > 0;
+  const canMoveUp = isMoveable && moveableIndex > 0;
+  const canMoveDown = isMoveable && moveableIndex < moveableBacklogs.length - 1;
+  const canMoveBottom = isMoveable && moveableIndex < moveableBacklogs.length - 1;
 
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5">
@@ -116,12 +150,16 @@ export function BacklogSectionHeader({
       </button>
 
       <div className="min-w-0">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
           <h3
             className="min-w-0 max-w-[24rem] shrink truncate text-sm font-semibold text-foreground"
-            title={backlog.name}
           >
-            {backlog.name}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="block truncate">{backlog.name}</span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{backlog.name}</TooltipContent>
+            </Tooltip>
           </h3>
 
           <span className="shrink-0 rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -137,21 +175,17 @@ export function BacklogSectionHeader({
             {backlog.status}
           </span>
 
-          <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+          <span className="inline-flex h-5 shrink-0 items-center text-[11px] text-muted-foreground tabular-nums">
             #{workItemCount}
           </span>
 
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-1">
             <MetricChip label="TODO" value={todoCount} toneClassName="bg-slate-500/10 text-slate-300" />
-          </div>
-          <div className="shrink-0">
             <MetricChip
               label="IN_PROGRESS"
               value={inProgressCount}
               toneClassName="bg-blue-500/10 text-blue-300"
             />
-          </div>
-          <div className="shrink-0">
             <MetricChip label="DONE" value={doneCount} toneClassName="bg-emerald-500/10 text-emerald-300" />
           </div>
         </div>
@@ -159,51 +193,72 @@ export function BacklogSectionHeader({
 
       <div className="flex shrink-0 items-center justify-end gap-1">
         {canCompleteSprint && (
-          <Button
-            variant="outline"
-            size="xs"
-            disabled={isSprintPending}
-            title="Complete sprint"
-            onClick={() => onCompleteSprint(backlog.id, backlog.name)}
-          >
-            {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <CircleCheckBig className="size-3" />}
-            Complete
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={isSprintPending}
+                onClick={() => onCompleteSprint(backlog.id, backlog.name)}
+              >
+                {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <CircleCheckBig className="size-3" />}
+                Complete
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Complete sprint</TooltipContent>
+          </Tooltip>
         )}
 
         {canStartSprint && (
-          <Button
-            variant="outline"
-            size="xs"
-            disabled={isSprintPending || isStartBlockedByActive}
-            title={
-              isStartBlockedByActive
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={isSprintPending || isStartBlockedByActive}
+                onClick={() => onStartSprint(backlog.id, backlog.name)}
+              >
+                {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
+                Start
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {isStartBlockedByActive
                 ? "Complete the current active sprint before starting another."
-                : "Start sprint"
-            }
-            onClick={() => onStartSprint(backlog.id, backlog.name)}
-          >
-            {isSprintPending ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
-            Start
-          </Button>
+                : "Start sprint"}
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {backlog.kind === "BACKLOG" && (
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={() => onCreateStory(backlog.id)}
-            title="Create work item"
-          >
-            Create
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => onCreateStory(backlog.id)}
+              >
+                Create
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Create work item</TooltipContent>
+          </Tooltip>
         )}
 
         <BacklogBoardActionsMenu
           backlogName={backlog.name}
           canDelete={canDeleteBoard}
           isDeleting={isBoardDeletePending}
+          canMoveTop={canMoveTop}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          canMoveBottom={canMoveBottom}
+          onEdit={() => onEditBoard(backlog.id)}
           onDelete={() => onDeleteBoard(backlog.id, backlog.name, backlog.is_default)}
+          onMoveTop={() => onMoveBoard(backlog.id, "top")}
+          onMoveUp={() => onMoveBoard(backlog.id, "up")}
+          onMoveDown={() => onMoveBoard(backlog.id, "down")}
+          onMoveBottom={() => onMoveBoard(backlog.id, "bottom")}
         />
       </div>
     </div>

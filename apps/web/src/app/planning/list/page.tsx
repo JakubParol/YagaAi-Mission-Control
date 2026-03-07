@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, ListTodo, Loader2 } from "lucide-react";
+import { ListTodo, Loader2 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
@@ -14,11 +14,11 @@ import {
 } from "@/components/planning/planning-filters";
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
+import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/backlog-row";
+import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
-import { StoryEpicDisplay } from "@/components/planning/story-epic-display";
-import { STATUS_LABEL, STATUS_STYLE } from "@/components/planning/story-card";
-import { StoryTaskProgress } from "@/components/planning/story-task-progress";
+import { STATUS_LABEL, type StoryCardStory } from "@/components/planning/story-card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dialog";
 import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
-import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
   buildPlanningListRows,
@@ -54,6 +53,9 @@ interface PlanningAgentApiItem {
   id?: string;
   name?: string;
   last_name?: string | null;
+  initials?: string | null;
+  role?: string | null;
+  avatar?: string | null;
 }
 
 interface PlanningListAssigneeOption {
@@ -70,6 +72,7 @@ type FetchResult =
       epics: PlanningEpicApiItem[];
       labels: PlanningListLabel[];
       assignees: PlanningListAssigneeOption[];
+      assignableAgents: BacklogAssigneeOption[];
     };
 
 interface ScopedFetchResult {
@@ -88,18 +91,12 @@ type PageState =
       epics: PlanningEpicApiItem[];
       labels: PlanningListLabel[];
       assignees: PlanningListAssigneeOption[];
+      assignableAgents: BacklogAssigneeOption[];
     };
 
 interface ListEnvelope<T> {
   data?: T[];
 }
-
-const LIST_ONE_ROW_GRID_TEMPLATE =
-  "grid-cols-[108px_84px_minmax(280px,2.5fr)_112px_72px_168px_148px_132px_44px]";
-const LIST_FALLBACK_PRIMARY_GRID_TEMPLATE =
-  "grid-cols-[108px_84px_minmax(0,1fr)_112px_44px]";
-const LIST_FALLBACK_SECONDARY_GRID_TEMPLATE =
-  "grid-cols-[72px_minmax(0,1fr)_minmax(0,0.8fr)_132px]";
 
 async function fetchList<T>(path: string): Promise<T[]> {
   const response = await fetch(apiUrl(path));
@@ -145,25 +142,33 @@ function buildLabelOptions(rows: PlanningListRow[]): PlanningListLabel[] {
   return [...labelsById.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function ItemTypeBadge({ rowType }: { rowType: PlanningListRow["row_type"] }) {
-  const Icon = rowType === "story" ? BookOpen : ListTodo;
-  const label = rowType === "story" ? "Story" : "Task";
-  const tone =
-    rowType === "story"
-      ? "bg-primary/15 text-primary border-primary/40"
-      : "bg-cyan-500/10 text-cyan-300 border-cyan-400/40";
+function toBacklogRowStory(
+  row: PlanningListRow,
+  assigneeById: ReadonlyMap<string, BacklogAssigneeOption>,
+): StoryCardStory {
+  const selectedAssignee =
+    row.current_assignee_agent_id ? assigneeById.get(row.current_assignee_agent_id) : null;
 
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-        tone,
-      )}
-    >
-      <Icon className="size-3" />
-      {label}
-    </span>
-  );
+  return {
+    id: row.id,
+    key: row.key,
+    title: row.title,
+    status: row.status,
+    priority: row.priority,
+    story_type: row.story_type ?? row.task_type ?? "TASK",
+    epic_key: row.epic_key,
+    epic_title: row.epic_title,
+    position: 0,
+    task_count: row.task_count,
+    done_task_count: row.done_task_count,
+    labels: row.labels,
+    assignee_agent_id: row.current_assignee_agent_id,
+    current_assignee_agent_id: row.current_assignee_agent_id,
+    assignee_name: selectedAssignee?.name ?? null,
+    assignee_last_name: selectedAssignee?.last_name ?? null,
+    assignee_initials: selectedAssignee?.initials ?? null,
+    assignee_avatar: selectedAssignee?.avatar ?? null,
+  };
 }
 
 function PlanningListPageContent() {
@@ -285,12 +290,30 @@ function PlanningListPageContent() {
       .filter((value): value is PlanningListAssigneeOption => value !== null)
       .sort((a, b) => a.label.localeCompare(b.label));
 
+    const assignableAgents = agents
+      .filter((agent): agent is PlanningAgentApiItem & { id: string; name: string } => (
+        typeof agent.id === "string"
+        && agent.id.trim().length > 0
+        && typeof agent.name === "string"
+        && agent.name.trim().length > 0
+      ))
+      .map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        last_name: agent.last_name ?? null,
+        initials: agent.initials ?? null,
+        role: agent.role ?? null,
+        avatar: agent.avatar ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     return {
       kind: "ok",
       rows,
       epics,
       labels,
       assignees,
+      assignableAgents,
     };
   }, []);
 
@@ -440,6 +463,8 @@ function PlanningListPageContent() {
         }))
       : []),
   ];
+  const assignableAgents = state.kind === "ok" ? state.assignableAgents : [];
+  const assigneeById = new Map(assignableAgents.map((agent) => [agent.id, agent]));
 
   const activeSelectedStoryId =
     state.kind === "ok" &&
@@ -458,6 +483,40 @@ function PlanningListPageContent() {
       ? visibleRows.find((row) => row.row_type === "story" && row.id === activeSelectedStoryId)
           ?.labels
       : undefined;
+
+  const handleRowAssigneeChange = useCallback(
+    async (
+      row: PlanningListRow,
+      nextAssigneeAgentId: string | null,
+    ) => {
+      if (pendingStoryIds[row.id]) return;
+      setPendingStoryIds((prev) => ({ ...prev, [row.id]: true }));
+      try {
+        const endpoint =
+          row.row_type === "story"
+            ? `/v1/planning/stories/${row.id}`
+            : `/v1/planning/tasks/${row.id}`;
+        const response = await fetch(apiUrl(endpoint), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ current_assignee_agent_id: nextAssigneeAgentId }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update assignee. HTTP ${response.status}.`);
+        }
+        await refreshCurrentView();
+      } catch (error) {
+        setErrorToast(error instanceof Error ? error.message : "Failed to update assignee.");
+      } finally {
+        setPendingStoryIds((prev) => {
+          const next = { ...prev };
+          delete next[row.id];
+          return next;
+        });
+      }
+    },
+    [pendingStoryIds, refreshCurrentView],
+  );
 
   return (
     <>
@@ -537,81 +596,34 @@ function PlanningListPageContent() {
             </div>
           ) : (
             <>
-              <header
-                className={cn(
-                  "hidden border-b border-border/40 bg-muted/30 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground 2xl:grid",
-                  LIST_ONE_ROW_GRID_TEMPLATE,
-                )}
-              >
-                <span>Type</span>
-                <span>Key</span>
-                <span>Title</span>
-                <span>Status</span>
-                <span>Priority</span>
-                <span>Epic</span>
-                <span>Labels</span>
-                <span>Updated</span>
-                <span className="text-right">Actions</span>
-              </header>
+              <BacklogRowsHeader />
 
               <div className="divide-y divide-border/20">
                 {visibleRows.map((row) => {
-                  const statusStyle = STATUS_STYLE[row.status];
-                  const labelsText =
-                    row.labels.length > 0
-                  ? row.labels.map((label) => label.name).join(", ")
-                  : "—";
-              const epicText =
-                row.epic_key && row.epic_title ? `${row.epic_key} ${row.epic_title}` : "—";
-              const taskProgressText =
-                row.task_count > 0 ? `${row.done_task_count}/${row.task_count}` : "—";
-              const isStoryRow = row.row_type === "story";
-              const isStoryDeletePending = isStoryRow && Boolean(pendingStoryIds[row.id]);
-              const openRowDetails = () => {
-                if (row.row_type === "story") {
-                  setSelectedStoryId(row.id);
-                } else {
-                  setSelectedTaskRow(row);
-                }
-              };
+                  const isStoryRow = row.row_type === "story";
+                  const isRowPending = Boolean(pendingStoryIds[row.id]);
+                  const rowItem = toBacklogRowStory(row, assigneeById);
 
                   return (
-                    <div
+                    <BacklogRow
                       key={`${row.row_type}:${row.id}`}
-                      role="button"
-                      tabIndex={isStoryDeletePending ? -1 : 0}
-                      aria-disabled={isStoryDeletePending}
-                      onClick={() => {
-                        if (isStoryDeletePending) return;
-                        openRowDetails();
+                      item={rowItem}
+                      assigneeOptions={assignableAgents}
+                      assigneePending={isRowPending}
+                      onAssigneeChange={(_, nextAssigneeAgentId) => {
+                        void handleRowAssigneeChange(row, nextAssigneeAgentId);
                       }}
-                      onKeyDown={(event) => {
-                        if (isStoryDeletePending) return;
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openRowDetails();
+                      onClick={() => {
+                        if (isRowPending) return;
+                        if (row.row_type === "story") {
+                          setSelectedStoryId(row.id);
+                        } else {
+                          setSelectedTaskRow(row);
                         }
                       }}
-                      className={cn(
-                        "w-full text-left transition-colors duration-100 hover:bg-muted/25 focus-ring",
-                        "px-3 py-2.5",
-                        isStoryDeletePending && "cursor-progress opacity-70",
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2 md:hidden">
-                        <ItemTypeBadge rowType={row.row_type} />
-                        <div className="flex items-center gap-1">
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                              statusStyle.bg,
-                              statusStyle.text,
-                            )}
-                          >
-                            <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-                            {STATUS_LABEL[row.status]}
-                          </span>
-                          {isStoryRow && (
+                      actions={(
+                        <div className="flex items-center justify-end gap-1">
+                          {isStoryRow ? (
                             <StoryActionsMenu
                               storyId={row.id}
                               storyType={row.story_type}
@@ -623,175 +635,13 @@ function PlanningListPageContent() {
                               onAddLabel={(storyId) => {
                                 setSelectedStoryId(storyId);
                               }}
-                              disabled={isStoryDeletePending}
-                              isDeleting={isStoryDeletePending}
+                              disabled={isRowPending}
+                              isDeleting={isRowPending}
                             />
-                          )}
+                          ) : null}
                         </div>
-                      </div>
-
-                  <div className="mt-2 space-y-1 md:hidden">
-                    <p className="text-sm text-foreground">
-                      {row.key ? `${row.key} · ` : ""}
-                      {row.title}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      Priority: {getPriorityLabel(row.priority)} | Epic: {epicText} | Tasks:{" "}
-                      {taskProgressText} | Updated: {formatUpdatedAt(row.updated_at)}
-                    </p>
-                  </div>
-
-                  <div className="hidden md:block">
-                    <div
-                      className={cn(
-                        "hidden items-center gap-3 2xl:grid",
-                        LIST_ONE_ROW_GRID_TEMPLATE,
                       )}
-                    >
-                      <ItemTypeBadge rowType={row.row_type} />
-                      <span className="font-mono text-[11px] text-muted-foreground">
-                        {row.key ?? "—"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm text-foreground">{row.title}</p>
-                        <p className="truncate text-[10px] text-muted-foreground">
-                          {row.row_type === "story"
-                            ? (row.story_type ?? "Story")
-                            : (row.task_type ?? "Task")}
-                        </p>
-                      </div>
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          statusStyle.bg,
-                          statusStyle.text,
-                        )}
-                      >
-                        <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-                        {STATUS_LABEL[row.status]}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {getPriorityLabel(row.priority)}
-                      </span>
-                      <span className="min-w-0">
-                        <StoryEpicDisplay
-                          epicKey={row.epic_key}
-                          epicTitle={row.epic_title}
-                          emptyLabel="—"
-                          className="w-full"
-                        />
-                      </span>
-                      <div className="min-w-0 space-y-0.5">
-                        <span className="block truncate text-xs text-muted-foreground" title={labelsText}>
-                          {labelsText}
-                        </span>
-                        <StoryTaskProgress
-                          doneCount={row.done_task_count}
-                          totalCount={row.task_count}
-                        />
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        {formatUpdatedAt(row.updated_at)}
-                      </span>
-                      <div className="justify-self-end">
-                        {isStoryRow && (
-                          <StoryActionsMenu
-                            storyId={row.id}
-                            storyType={row.story_type}
-                            storyKey={row.key}
-                            storyTitle={row.title}
-                            storyStatus={row.status}
-                            onDelete={handleStoryDelete}
-                            onStatusChange={handleStoryStatusChange}
-                            onAddLabel={(storyId) => {
-                              setSelectedStoryId(storyId);
-                            }}
-                            disabled={isStoryDeletePending}
-                            isDeleting={isStoryDeletePending}
-                          />
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="hidden space-y-1.5 md:block 2xl:hidden">
-                      <div
-                        className={cn(
-                          "grid items-center gap-3",
-                          LIST_FALLBACK_PRIMARY_GRID_TEMPLATE,
-                        )}
-                      >
-                        <ItemTypeBadge rowType={row.row_type} />
-                        <span className="font-mono text-[11px] text-muted-foreground">
-                          {row.key ?? "—"}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm text-foreground">{row.title}</p>
-                          <p className="truncate text-[10px] text-muted-foreground">
-                            {row.row_type === "story"
-                              ? (row.story_type ?? "Story")
-                              : (row.task_type ?? "Task")}
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                            statusStyle.bg,
-                            statusStyle.text,
-                          )}
-                        >
-                          <span className={cn("size-1.5 rounded-full", statusStyle.dot)} />
-                          {STATUS_LABEL[row.status]}
-                        </span>
-                        <div className="justify-self-end">
-                          {isStoryRow && (
-                            <StoryActionsMenu
-                              storyId={row.id}
-                              storyType={row.story_type}
-                              storyKey={row.key}
-                              storyTitle={row.title}
-                              storyStatus={row.status}
-                              onDelete={handleStoryDelete}
-                              onStatusChange={handleStoryStatusChange}
-                              onAddLabel={(storyId) => {
-                                setSelectedStoryId(storyId);
-                              }}
-                              disabled={isStoryDeletePending}
-                              isDeleting={isStoryDeletePending}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <div
-                        className={cn(
-                          "grid items-center gap-3 text-xs text-muted-foreground",
-                          LIST_FALLBACK_SECONDARY_GRID_TEMPLATE,
-                        )}
-                      >
-                        <span title={`Priority ${getPriorityLabel(row.priority)}`}>
-                          Prio: {getPriorityLabel(row.priority)}
-                        </span>
-                        <span className="min-w-0">
-                          <StoryEpicDisplay
-                            epicKey={row.epic_key}
-                            epicTitle={row.epic_title}
-                            emptyLabel="—"
-                            className="w-full"
-                          />
-                        </span>
-                        <span className="min-w-0 space-y-0.5">
-                          <span className="block truncate" title={labelsText}>
-                            Labels: {labelsText}
-                          </span>
-                          <StoryTaskProgress
-                            doneCount={row.done_task_count}
-                            totalCount={row.task_count}
-                          />
-                        </span>
-                        <span className="text-right">{formatUpdatedAt(row.updated_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                    </div>
+                    />
                   );
                 })}
               </div>
