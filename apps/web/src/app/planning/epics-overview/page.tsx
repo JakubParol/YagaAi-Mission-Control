@@ -299,7 +299,9 @@ function EpicOverviewPageContent() {
 
   const pageState = !singleProjectId
     ? { kind: "no-project" as const }
-    : state;
+    : state.kind === "no-project"
+      ? { kind: "loading" as const }
+      : state;
 
   return (
     <>
