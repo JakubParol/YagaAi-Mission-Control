@@ -23,7 +23,7 @@ fi
 docker compose -f "$RUNTIME_DIR/docker-compose.yml" stop api web worker dapr-api dapr-web dapr-worker >/dev/null 2>&1 || true
 
 docker compose -f "$RUNTIME_DIR/docker-compose.yml" cp "$BACKUP_FILE" "sqlite:/data/mission-control.db"
-docker compose -f "$RUNTIME_DIR/docker-compose.yml" exec -T sqlite sh -lc "sqlite3 /data/mission-control.db 'PRAGMA quick_check;'"
+docker compose -f "$RUNTIME_DIR/docker-compose.yml" exec -T sqlite sh -lc "CHECK_RESULT=\$(sqlite3 /data/mission-control.db 'PRAGMA quick_check;'); [ \"\$CHECK_RESULT\" = \"ok\" ]"
 
 docker compose -f "$RUNTIME_DIR/docker-compose.yml" up -d api web worker dapr-api dapr-web dapr-worker --wait
 

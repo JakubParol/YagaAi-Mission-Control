@@ -21,7 +21,8 @@ fi
 
 TMP_DEST="/data/backup-${TIMESTAMP}.db"
 
-docker compose -f "$RUNTIME_DIR/docker-compose.yml" exec -T sqlite sh -lc "sqlite3 /data/mission-control.db '.backup $TMP_DEST' && sqlite3 $TMP_DEST 'PRAGMA quick_check;'"
+docker compose -f "$RUNTIME_DIR/docker-compose.yml" exec -T sqlite sh -lc "sqlite3 /data/mission-control.db '.backup $TMP_DEST'"
+docker compose -f "$RUNTIME_DIR/docker-compose.yml" exec -T sqlite sh -lc "CHECK_RESULT=\$(sqlite3 $TMP_DEST 'PRAGMA quick_check;'); [ \"\$CHECK_RESULT\" = \"ok\" ]"
 docker compose -f "$RUNTIME_DIR/docker-compose.yml" cp "sqlite:$TMP_DEST" "$BACKUP_PATH"
 docker compose -f "$RUNTIME_DIR/docker-compose.yml" exec -T sqlite sh -lc "rm -f $TMP_DEST"
 
