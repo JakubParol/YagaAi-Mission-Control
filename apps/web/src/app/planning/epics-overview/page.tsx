@@ -90,6 +90,14 @@ function parsePreset(value: string | null): PresetKey {
   return "all";
 }
 
+function parseSort(value: string | null): EpicOverviewFilters["sort"] {
+  const allowed = new Set(EPIC_OVERVIEW_SORT_OPTIONS.map((item) => item.value));
+  if (value && allowed.has(value as EpicOverviewFilters["sort"])) {
+    return value as EpicOverviewFilters["sort"];
+  }
+  return EPIC_OVERVIEW_DEFAULT_FILTERS.sort;
+}
+
 function statusVariant(status: EpicStatus): "outline" | "secondary" | "default" {
   if (status === "DONE") return "default";
   if (status === "IN_PROGRESS") return "secondary";
@@ -131,7 +139,7 @@ function EpicOverviewPageContent() {
     ownerId: searchParams.get(FILTER_KEYS.ownerId) ?? EPIC_OVERVIEW_DEFAULT_FILTERS.ownerId,
     label: searchParams.get(FILTER_KEYS.label) ?? EPIC_OVERVIEW_DEFAULT_FILTERS.label,
     blocked: parseBlocked(searchParams.get(FILTER_KEYS.blocked)),
-    sort: (searchParams.get(FILTER_KEYS.sort) as EpicOverviewFilters["sort"]) ?? EPIC_OVERVIEW_DEFAULT_FILTERS.sort,
+    sort: parseSort(searchParams.get(FILTER_KEYS.sort)),
   }), [searchParams]);
 
   const preset = parsePreset(searchParams.get(FILTER_KEYS.preset));
