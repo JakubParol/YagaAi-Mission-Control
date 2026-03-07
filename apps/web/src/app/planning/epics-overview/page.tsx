@@ -279,10 +279,23 @@ function EpicOverviewPageContent() {
   const [storyErrorByEpicKey, setStoryErrorByEpicKey] = useState<Record<string, string>>({});
   const previewByEpicKeyRef = useRef<Record<string, PreviewState>>({});
   const previewFetchInFlightRef = useRef<Set<string>>(new Set());
+  const activeProjectIdRef = useRef<string | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0]
     : null;
+
+  useEffect(() => {
+    activeProjectIdRef.current = singleProjectId;
+    previewFetchInFlightRef.current.clear();
+    previewByEpicKeyRef.current = {};
+    setExpandedByEpicKey({});
+    setPreviewByEpicKey({});
+    setPreviewFiltersByEpicKey({});
+    setStoryPendingById({});
+    setStoryErrorByEpicKey({});
+    setState(singleProjectId ? { kind: "loading" } : { kind: "no-project" });
+  }, [singleProjectId]);
 
   const filters = useMemo<EpicOverviewFilters>(() => ({
     search: searchParams.get(FILTER_KEYS.search) ?? EPIC_OVERVIEW_DEFAULT_FILTERS.search,
@@ -411,11 +424,13 @@ function EpicOverviewPageContent() {
   }, [agentLabelById, singleProjectId]);
 
   const ensurePreviewLoaded = useCallback(async (epicKey: string) => {
+    const requestProjectId = activeProjectIdRef.current;
+    const fetchScopeKey = `${requestProjectId ?? "none"}:${epicKey}`;
     const currentState = previewByEpicKeyRef.current[epicKey];
     if (currentState?.kind === "ready") return;
-    if (previewFetchInFlightRef.current.has(epicKey)) return;
+    if (previewFetchInFlightRef.current.has(fetchScopeKey)) return;
 
-    previewFetchInFlightRef.current.add(epicKey);
+    previewFetchInFlightRef.current.add(fetchScopeKey);
     setPreviewByEpicKey((current) => ({
       ...current,
       [epicKey]: { kind: "loading" },
@@ -423,6 +438,7 @@ function EpicOverviewPageContent() {
 
     try {
       const stories = await fetchStoriesPreview(epicKey);
+      if (activeProjectIdRef.current !== requestProjectId) return;
       setPreviewByEpicKey((current) => ({
         ...current,
         [epicKey]: {
@@ -431,6 +447,7 @@ function EpicOverviewPageContent() {
         },
       }));
     } catch (error) {
+      if (activeProjectIdRef.current !== requestProjectId) return;
       setPreviewByEpicKey((current) => ({
         ...current,
         [epicKey]: {
@@ -439,7 +456,7 @@ function EpicOverviewPageContent() {
         },
       }));
     } finally {
-      previewFetchInFlightRef.current.delete(epicKey);
+      previewFetchInFlightRef.current.delete(fetchScopeKey);
     }
   }, [fetchStoriesPreview]);
 
