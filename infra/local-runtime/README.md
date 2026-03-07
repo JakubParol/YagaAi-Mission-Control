@@ -29,6 +29,21 @@ This creates `infra/local-runtime/.env` from `.env.example` when missing and sta
 ./infra/local-runtime/reset.sh  # stop runtime and remove volumes (fresh state)
 ```
 
+## SQLite durability (backup & restore)
+
+- Persistent DB path inside runtime: `/runtime/sqlite/mission-control.db` (api/web) backed by Docker volume `sqlite-data` (`/data/mission-control.db` in sqlite service).
+- API startup now runs strict SQLite migration + integrity checks; startup fails fast on corruption or invalid path.
+
+```bash
+# Create verified backup (quick_check must return ok)
+./infra/local-runtime/scripts/sqlite-backup.sh
+
+# Restore from backup file and restart dependent services
+./infra/local-runtime/scripts/sqlite-restore.sh infra/local-runtime/backups/mission-control-YYYYMMDD-HHMMSS.db
+```
+
+If API fails with corruption diagnostics, restore from latest verified backup and restart runtime.
+
 ## Health contracts
 
 - `sqlite`: DB file exists in mounted volume.
