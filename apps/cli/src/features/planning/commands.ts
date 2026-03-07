@@ -1,5 +1,6 @@
 import { Command } from "commander";
 
+import type { OutputMode } from "../../core/config";
 import { CliUsageError } from "../../core/errors";
 import { unwrapEnvelope } from "../../core/envelope";
 import type { ApiClient } from "../../core/http";
@@ -76,6 +77,19 @@ type TaskAssignmentsOptions = SelectorOptions;
 interface BacklogProjectScopeOptions {
   projectId?: string;
   projectKey?: string;
+}
+
+interface EpicOverviewOptions {
+  output?: OutputMode;
+  projectId?: string;
+  projectKey?: string;
+  status?: string;
+  isBlocked?: string;
+  label?: string;
+  owner?: string;
+  text?: string;
+  limit?: number;
+  offset?: number;
 }
 
 function addSelectConvenienceOptions(command: Command): Command {
@@ -195,6 +209,14 @@ function normalizeBacklogTransitionKind(value: unknown): string {
     throw new CliUsageError("Backlog kind transition requires a non-empty string 'kind' value.");
   }
   return value;
+}
+
+function parseOutputModeOption(raw: string): OutputMode {
+  const mode = raw.trim().toLowerCase();
+  if (mode === "table" || mode === "json") {
+    return mode;
+  }
+  throw new CliUsageError(`Invalid output mode '${raw}'. Expected: table or json.`);
 }
 
 function resolvePathContext(
@@ -720,6 +742,39 @@ function registerLabelCommands(resource: Command, getContext: ContextFactory): v
     });
 }
 
+function registerEpicCommands(resource: Command, getContext: ContextFactory): void {
+  resource
+    .command("overview")
+    .description("List epic overview aggregate with filters and pagination")
+    .option("--output <mode>", "output mode override: table|json", parseOutputModeOption)
+    .option("--project-id <id>", "filter by project UUID")
+    .option("--project-key <key>", "filter by project key (e.g. MC)")
+    .option("--status <status>", "status filter")
+    .option("--is-blocked <true|false>", "is_blocked filter")
+    .option("--label <label>", "label filter")
+    .option("--owner <id>", "owner (agent id) filter")
+    .option("--text <text>", "search text filter")
+    .option("--limit <n>", "page size", (raw) => parseIntegerOption(raw, "limit"))
+    .option("--offset <n>", "offset", (raw) => parseIntegerOption(raw, "offset"))
+    .action(async (opts: EpicOverviewOptions, command: Command) => {
+      validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
+      const ctx = getContext(command);
+      const query: Record<string, string | number> = {};
+      if (opts.projectId) query.project_id = opts.projectId;
+      if (opts.projectKey) query.project_key = opts.projectKey;
+      if (opts.status) query.status = opts.status;
+      if (opts.isBlocked) query.is_blocked = opts.isBlocked;
+      if (opts.label) query.label = opts.label;
+      if (opts.owner) query.owner = opts.owner;
+      if (opts.text) query.text = opts.text;
+      if (opts.limit !== undefined) query.limit = opts.limit;
+      if (opts.offset !== undefined) query.offset = opts.offset;
+
+      const payload = await ctx.client.get("/v1/planning/epics/overview", { query });
+      printPayload(payload, opts.output ?? ctx.config.output);
+    });
+}
+
 function registerAgentCommands(resource: Command, getContext: ContextFactory): void {
   resource
     .command("sync")
@@ -814,6 +869,10 @@ export function registerPlanningCommands(program: Command, getContext: ContextFa
 
     if (name === "task") {
       registerTaskCommands(resource, getContext);
+    }
+
+    if (name === "epic") {
+      registerEpicCommands(resource, getContext);
     }
 
     if (name === "agent") {
