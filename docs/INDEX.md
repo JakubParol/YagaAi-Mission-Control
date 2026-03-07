@@ -27,6 +27,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 
 | Document | Description |
 |---|---|
+| [MC-386_USABILITY_TEST.md](./MC-386_USABILITY_TEST.md) | Internal usability scenarios and click-reduction evidence for epic overview UX |
 | [README.md](../README.md) | Project overview, setup, deployment |
 | [AGENTS.md](../AGENTS.md) | AI agent context, rules, required reading |
 

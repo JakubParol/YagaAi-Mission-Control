@@ -58,18 +58,27 @@ export function buildEpicOverviewStats(items: readonly EpicOverviewItem[]): Epic
       epicCount: 0,
       averageProgressPct: 0,
       blockedEpics: 0,
+      blockedStories: 0,
+      averageTrend7dPct: 0,
+      maxStaleDays: 0,
       staleEpics: 0,
     };
   }
 
   const totalProgress = items.reduce((acc, item) => acc + normalizePercent(item.progress_pct), 0);
+  const totalTrend7d = items.reduce((acc, item) => acc + normalizePercent(item.progress_trend_7d), 0);
   const blockedEpics = items.filter((item) => item.blocked_count > 0).length;
+  const blockedStories = items.reduce((acc, item) => acc + Math.max(0, item.blocked_count), 0);
+  const maxStaleDays = items.reduce((max, item) => Math.max(max, Math.max(0, item.stale_days)), 0);
   const staleEpics = items.filter((item) => item.stale_days >= 7).length;
 
   return {
     epicCount: items.length,
     averageProgressPct: Math.round((totalProgress / items.length) * 10) / 10,
     blockedEpics,
+    blockedStories,
+    averageTrend7dPct: Math.round((totalTrend7d / items.length) * 10) / 10,
+    maxStaleDays,
     staleEpics,
   };
 }

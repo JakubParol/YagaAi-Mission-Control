@@ -131,6 +131,7 @@ class EpicOverview:
     title: str
     status: EpicStatus
     progress_pct: float
+    progress_trend_7d: float
     stories_total: int
     stories_done: int
     stories_in_progress: int

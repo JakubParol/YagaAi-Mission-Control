@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
@@ -150,6 +150,22 @@ function parseSort(value: string | null): EpicOverviewFilters["sort"] {
   return EPIC_OVERVIEW_DEFAULT_FILTERS.sort;
 }
 
+function isShortcutInputTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  return target.isContentEditable;
+}
+
+export function getAdjacentEpicKey(epicKeys: readonly string[], currentKey: string | null, step: number): string | null {
+  if (epicKeys.length === 0) return null;
+  if (!currentKey) return epicKeys[0];
+  const index = epicKeys.indexOf(currentKey);
+  if (index < 0) return epicKeys[0];
+  const nextIndex = Math.max(0, Math.min(epicKeys.length - 1, index + step));
+  return epicKeys[nextIndex] ?? epicKeys[0];
+}
+
 function statusVariant(status: EpicStatus): "outline" | "secondary" | "default" {
   if (status === "DONE") return "default";
   if (status === "IN_PROGRESS") return "secondary";
@@ -283,6 +299,8 @@ function EpicOverviewPageContent() {
   >({});
   const [storyPendingById, setStoryPendingById] = useState<Record<string, boolean>>({});
   const [storyErrorByEpicKey, setStoryErrorByEpicKey] = useState<Record<string, string>>({});
+  const [selectedEpicKey, setSelectedEpicKey] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0]
@@ -495,6 +513,12 @@ function EpicOverviewPageContent() {
 
   const stats = useMemo(() => buildEpicOverviewStats(rows), [rows]);
 
+  const selectedEpic = useMemo(() => {
+    if (rows.length === 0) return null;
+    if (!selectedEpicKey) return rows[0] ?? null;
+    return rows.find((item) => item.epic_key === selectedEpicKey) ?? rows[0] ?? null;
+  }, [rows, selectedEpicKey]);
+
   const statusOptions = [
     { value: "", label: "Status: All" },
     { value: "TODO", label: "TODO" },
@@ -547,6 +571,62 @@ function EpicOverviewPageContent() {
       ? { kind: "loading" as const }
       : state;
 
+  useEffect(() => {
+    if (rows.length === 0) {
+      setSelectedEpicKey(null);
+      return;
+    }
+
+    setSelectedEpicKey((current) => (
+      current && rows.some((item) => item.epic_key === current)
+        ? current
+        : rows[0].epic_key
+    ));
+  }, [rows]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (isShortcutInputTarget(event.target)) return;
+
+      if (event.key === "/") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      if (event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        const nextKey = getAdjacentEpicKey(rows.map((item) => item.epic_key), selectedEpicKey, 1);
+        if (!nextKey) return;
+        setSelectedEpicKey(nextKey);
+        return;
+      }
+
+      if (event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        const nextKey = getAdjacentEpicKey(rows.map((item) => item.epic_key), selectedEpicKey, -1);
+        if (!nextKey) return;
+        setSelectedEpicKey(nextKey);
+        return;
+      }
+
+      if (event.key.toLowerCase() === "o") {
+        if (!selectedEpicKey) return;
+        event.preventDefault();
+        setExpandedByEpicKey((current) => ({
+          ...current,
+          [selectedEpicKey]: true,
+        }));
+        void ensurePreviewLoaded(selectedEpicKey);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [ensurePreviewLoaded, rows, selectedEpicKey]);
+
   const setPreviewFilter = useCallback(
     (epicKey: string, patch: Partial<EpicOverviewStoryPreviewFilters>) => {
       setPreviewFiltersByEpicKey((current) => ({
@@ -559,6 +639,22 @@ function EpicOverviewPageContent() {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!selectedEpic) return;
+    void ensurePreviewLoaded(selectedEpic.epic_key);
+  }, [ensurePreviewLoaded, selectedEpic]);
+
+  const selectedPreviewState = selectedEpic
+    ? (previewByEpicKey[selectedEpic.epic_key] ?? { kind: "idle" as const })
+    : ({ kind: "idle" as const });
+  const selectedPreviewFilters = selectedEpic
+    ? (previewFiltersByEpicKey[selectedEpic.epic_key] ?? EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS)
+    : EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS;
+  const selectedStories = selectedPreviewState.kind === "ready"
+    ? applyStoryPreviewFilters(selectedPreviewState.stories, selectedPreviewFilters)
+    : [];
+  const selectedActionError = selectedEpic ? storyErrorByEpicKey[selectedEpic.epic_key] : undefined;
 
   const clearStoryError = useCallback((epicKey: string) => {
     setStoryErrorByEpicKey((current) => {
@@ -709,6 +805,7 @@ function EpicOverviewPageContent() {
           <div className="flex w-full flex-col gap-2">
             <div className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/40 p-2">
               <input
+                ref={searchInputRef}
                 type="text"
                 value={filters.search}
                 onChange={(event) => updateParam(FILTER_KEYS.search, event.target.value)}
@@ -817,7 +914,7 @@ function EpicOverviewPageContent() {
 
       {pageState.kind === "ok" && (
         <>
-          <section className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Radar className="size-3.5" />
@@ -829,25 +926,33 @@ function EpicOverviewPageContent() {
             <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <TrendingUp className="size-3.5" />
-                Avg progress
+                Avg progress (all)
               </div>
               <p className="mt-1 text-xl font-semibold text-foreground">{toPercentLabel(stats.averageProgressPct)}</p>
             </div>
 
             <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <ShieldAlert className="size-3.5" />
-                Blocked epics
+                <TrendingUp className="size-3.5" />
+                Avg trend (7d)
               </div>
-              <p className="mt-1 text-xl font-semibold text-foreground">{stats.blockedEpics}</p>
+              <p className="mt-1 text-xl font-semibold text-foreground">+{toPercentLabel(stats.averageTrend7dPct)}</p>
+            </div>
+
+            <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <ShieldAlert className="size-3.5" />
+                Blocked stories
+              </div>
+              <p className="mt-1 text-xl font-semibold text-foreground">{stats.blockedStories}</p>
             </div>
 
             <div className="rounded-lg border border-border/60 bg-card/30 px-3 py-2.5">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <TimerReset className="size-3.5" />
-                Stale (≥7d)
+                Last update age
               </div>
-              <p className="mt-1 text-xl font-semibold text-foreground">{stats.staleEpics}</p>
+              <p className="mt-1 text-xl font-semibold text-foreground">{stats.maxStaleDays}d</p>
             </div>
           </section>
 
@@ -858,8 +963,9 @@ function EpicOverviewPageContent() {
               description="No epic matches active filters/preset. Adjust filters to broaden scope."
             />
           ) : (
-            <section className="overflow-hidden rounded-lg border border-border/60 bg-card/20">
-              <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2 border-b border-border/30 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+            <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
+              <div className="overflow-hidden rounded-lg border border-border/60 bg-card/20">
+                <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2 border-b border-border/30 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <span aria-hidden="true" />
                 <span>Epic</span>
                 <span>Title</span>
@@ -880,8 +986,19 @@ function EpicOverviewPageContent() {
                   const actionError = storyErrorByEpicKey[item.epic_key];
 
                   return (
-                    <article key={item.epic_key} className="px-3 py-2.5">
-                      <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2">
+                    <article key={item.epic_key} className={cn("px-3 py-2.5", selectedEpic?.epic_key === item.epic_key ? "bg-primary/5" : "")}>
+                      <div
+                        className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedEpicKey(item.epic_key)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedEpicKey(item.epic_key);
+                          }
+                        }}
+                      >
                         <button
                           type="button"
                           aria-label={isExpanded ? `Collapse ${item.epic_key}` : `Expand ${item.epic_key}`}
@@ -1065,7 +1182,151 @@ function EpicOverviewPageContent() {
                   );
                 })}
               </div>
-            </section>
+            </div>
+
+            <aside className="rounded-lg border border-border/60 bg-card/20 p-3">
+              <div className="mb-3 rounded border border-border/50 bg-background/40 px-2 py-1.5 text-[11px] text-muted-foreground">
+                Shortcuts: <span className="font-mono">/</span> focus filter, <span className="font-mono">j/k</span> next/prev epic, <span className="font-mono">o</span> open preview
+              </div>
+
+              {selectedEpic ? (
+                <div className="space-y-3">
+                  <div className="rounded border border-border/50 bg-background/40 px-2.5 py-2">
+                    <p className="font-mono text-[11px] text-muted-foreground">{selectedEpic.epic_key}</p>
+                    <p className="mt-1 text-sm text-foreground">{selectedEpic.title}</p>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+                      <span>{toPercentLabel(selectedEpic.progress_pct)} progress</span>
+                      <span>+{toPercentLabel(selectedEpic.progress_trend_7d)} / 7d</span>
+                      <span>{selectedEpic.stale_days}d stale</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExpandedByEpicKey((current) => ({
+                          ...current,
+                          [selectedEpic.epic_key]: true,
+                        }));
+                        void ensurePreviewLoaded(selectedEpic.epic_key);
+                      }}
+                      className="inline-flex h-8 items-center rounded border border-border/60 px-2 text-xs text-foreground transition-colors hover:border-border"
+                    >
+                      Open preview (o)
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ThemedSelect
+                      value={selectedPreviewFilters.status}
+                      options={previewStatusOptions}
+                      placeholder="Story status"
+                      onValueChange={(value) => setPreviewFilter(selectedEpic.epic_key, { status: value as ItemStatus | "" })}
+                      triggerClassName="h-8 min-w-[170px] bg-background/80 text-xs"
+                      contentClassName="w-[220px]"
+                    />
+                    <ThemedSelect
+                      value={selectedPreviewFilters.blocked}
+                      options={previewBlockedOptions}
+                      placeholder="Blocked"
+                      onValueChange={(value) => setPreviewFilter(selectedEpic.epic_key, { blocked: value as "" | "true" | "false" })}
+                      triggerClassName="h-8 min-w-[160px] bg-background/80 text-xs"
+                      contentClassName="w-[210px]"
+                    />
+                  </div>
+
+                  {selectedActionError ? (
+                    <p className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200">
+                      {selectedActionError}
+                    </p>
+                  ) : null}
+
+                  {selectedPreviewState.kind === "loading" || selectedPreviewState.kind === "idle" ? (
+                    <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      Loading story preview...
+                    </div>
+                  ) : null}
+
+                  {selectedPreviewState.kind === "error" ? (
+                    <div className="rounded border border-red-500/40 bg-red-500/10 px-2 py-2 text-xs text-red-200">
+                      {selectedPreviewState.message}
+                    </div>
+                  ) : null}
+
+                  {selectedPreviewState.kind === "ready" ? (
+                    selectedStories.length === 0 ? (
+                      <div className="rounded border border-border/40 bg-background/40 px-2 py-3 text-xs text-muted-foreground">
+                        No stories match preview filters.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedStories.map((story) => {
+                          const pending = Boolean(storyPendingById[story.story_id]);
+
+                          return (
+                            <div key={story.story_id} className="rounded border border-border/40 bg-background/35 p-2">
+                              <div className="mb-1.5 flex items-center justify-between gap-2">
+                                <span className="truncate font-mono text-[11px] text-muted-foreground">{story.story_key ?? "—"}</span>
+                                <Badge variant={storyStatusVariant(story.status)} className="h-fit w-fit text-[10px]">
+                                  {story.status.replaceAll("_", " ")}
+                                </Badge>
+                              </div>
+                              <p className="truncate text-xs text-foreground" title={toStoryPreviewTitle(story)}>{story.title}</p>
+                              <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                                <span>{toStoryPreviewAssignee(story)}</span>
+                                <StoryBlockedBadge blocked={story.is_blocked} />
+                                <span>{toStoryPreviewUpdatedAt(story)}</span>
+                              </div>
+                              <div className="mt-2 flex items-center gap-1.5">
+                                <Link
+                                  href={`/planning/stories/${story.story_id}`}
+                                  className="inline-flex h-7 items-center gap-1 rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border"
+                                >
+                                  Details
+                                  <ExternalLink className="size-3" />
+                                </Link>
+
+                                <ThemedSelect
+                                  value={story.status}
+                                  options={previewStatusOptions.slice(1)}
+                                  placeholder="Status"
+                                  disabled={pending}
+                                  onValueChange={(value) => {
+                                    const status = parseItemStatus(value);
+                                    if (!status || status === story.status) return;
+                                    void changeStoryStatus(selectedEpic.epic_key, story, status);
+                                  }}
+                                  triggerClassName="h-7 min-w-[118px] bg-background/80 text-[10px]"
+                                  contentClassName="w-[170px]"
+                                />
+
+                                <button
+                                  type="button"
+                                  disabled={pending}
+                                  onClick={() => {
+                                    void addStoryToSprint(selectedEpic.epic_key, story);
+                                  }}
+                                  className="inline-flex h-7 items-center rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Add to sprint
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded border border-border/40 bg-background/35 px-3 py-6 text-sm text-muted-foreground">
+                  Select an epic to open split-view details.
+                </div>
+              )}
+            </aside>
+          </section>
           )}
         </>
       )}

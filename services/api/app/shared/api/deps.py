@@ -140,8 +140,7 @@ async def _ensure_backlog_indexes(db: aiosqlite.Connection) -> None:
 
 async def _ensure_activity_log_table(db: aiosqlite.Connection) -> None:
     try:
-        await db.execute(
-            """
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS activity_log (
               id TEXT PRIMARY KEY,
               event_name TEXT NOT NULL,
@@ -154,14 +153,11 @@ async def _ensure_activity_log_table(db: aiosqlite.Connection) -> None:
               occurred_at TEXT NOT NULL,
               created_at TEXT NOT NULL
             )
-            """
-        )
-        await db.execute(
-            """
+            """)
+        await db.execute("""
             CREATE INDEX IF NOT EXISTS idx_activity_log_entity
               ON activity_log(entity_type, entity_id, occurred_at)
-            """
-        )
+            """)
         await db.commit()
     except sqlite3.OperationalError as exc:
         lowered = str(exc).lower()

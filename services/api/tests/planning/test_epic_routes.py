@@ -404,6 +404,10 @@ def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -
         ("s-ov-1", "p1", e1["id"], "Done story", "USER_STORY", "DONE", 0, "a1", TS, TS),
     )
     conn.execute(
+        "UPDATE stories SET completed_at = datetime('now', '-2 days') WHERE id = ?",
+        ("s-ov-1",),
+    )
+    conn.execute(
         "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
         "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
@@ -445,6 +449,7 @@ def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -
     assert payments["stories_in_progress"] == 1
     assert payments["blocked_count"] == 1
     assert payments["progress_pct"] == 33.33
+    assert payments["progress_trend_7d"] == 33.33
     assert isinstance(payments["stale_days"], int)
 
     reporting = by_key[e2["key"]]
@@ -453,6 +458,7 @@ def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -
     assert reporting["stories_in_progress"] == 0
     assert reporting["blocked_count"] == 0
     assert reporting["progress_pct"] == 0.0
+    assert reporting["progress_trend_7d"] == 0.0
 
 
 def test_list_epics_overview_filters_and_sort(client, _setup_test_db) -> None:

@@ -208,7 +208,7 @@ Purpose: return a lightweight, paginated aggregate for Epic health/progress view
 
 Query:
 - Filters: `project_id`, `project_key`, `status`, `owner`, `is_blocked`, `label`, `text`
-- Sort: `priority`, `progress_pct`, `updated_at`, `blocked_count` (supports `-` prefix)
+- Sort: `priority`, `progress_pct`, `progress_trend_7d`, `updated_at`, `blocked_count` (supports `-` prefix)
 - Pagination: `limit`, `offset`
 
 Response item fields:
@@ -216,6 +216,7 @@ Response item fields:
 - `title`
 - `status`
 - `progress_pct`
+- `progress_trend_7d` (percentage-point completion gain in the last 7 days)
 - `stories_total`
 - `stories_done`
 - `stories_in_progress`
