@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Mission Control — deploy after merge to main
-set -e
+set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -12,6 +12,16 @@ git pull origin main
 # --- API ---
 echo "Installing API dependencies..."
 cd services/api
+
+# Heal stale/broken virtualenvs (e.g. python symlink points to removed interpreter)
+if [ -d ".venv" ]; then
+  if [ ! -x ".venv/bin/python" ] || ! .venv/bin/python -V >/dev/null 2>&1; then
+    BROKEN_SUFFIX="$(date +%Y%m%d%H%M%S)"
+    echo "Detected broken API virtualenv; rotating .venv -> .venv.broken.${BROKEN_SUFFIX}"
+    mv .venv ".venv.broken.${BROKEN_SUFFIX}" || rm -rf .venv
+  fi
+fi
+
 poetry install --only main --no-interaction
 cd ../..
 
@@ -24,7 +34,10 @@ set +a
 cd apps/web
 
 echo "Cleaning .next..."
-rm -rf .next
+if ! rm -rf .next 2>/dev/null; then
+  echo "Standard cleanup failed (likely root-owned artifacts); retrying with sudo..."
+  sudo rm -rf .next
+fi
 
 echo "Building..."
 npm run build
