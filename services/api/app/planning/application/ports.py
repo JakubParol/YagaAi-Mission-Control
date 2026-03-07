@@ -7,6 +7,7 @@ from app.planning.domain.models import (
     BacklogStoryItem,
     BacklogTaskItem,
     Epic,
+    EpicOverview,
     Label,
     Project,
     Story,
@@ -61,6 +62,21 @@ class EpicRepository(ABC):
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Epic], int]: ...
+
+    @abstractmethod
+    async def list_overview(
+        self,
+        *,
+        project_id: str | None = None,
+        status: str | None = None,
+        owner: str | None = None,
+        is_blocked: bool | None = None,
+        label: str | None = None,
+        text: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-updated_at",
+    ) -> tuple[list[EpicOverview], int]: ...
 
     @abstractmethod
     async def get_by_id(self, epic_id: str) -> Epic | None: ...

@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.planning.application.ports import EpicRepository
-from app.planning.domain.models import Epic, EpicStatus, StatusMode
+from app.planning.domain.models import Epic, EpicOverview, EpicStatus, StatusMode
 from app.shared.api.errors import NotFoundError, ValidationError
 from app.shared.utils import new_uuid, utc_now
 
@@ -37,6 +37,31 @@ class EpicService:
             raise NotFoundError(f"Epic with key '{key}' not found")
         story_count = await self._epic_repo.get_story_count(epic.id)
         return epic, story_count
+
+    async def list_epic_overview(
+        self,
+        *,
+        project_id: str | None = None,
+        status: str | None = None,
+        owner: str | None = None,
+        is_blocked: bool | None = None,
+        label: str | None = None,
+        text: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-updated_at",
+    ) -> tuple[list[EpicOverview], int]:
+        return await self._epic_repo.list_overview(
+            project_id=project_id,
+            status=status,
+            owner=owner,
+            is_blocked=is_blocked,
+            label=label,
+            text=text,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+        )
 
     async def create_epic(
         self,

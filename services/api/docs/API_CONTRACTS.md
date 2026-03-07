@@ -202,6 +202,31 @@ Query: `project_id`, `project_key`, `status`, `is_blocked`, `sort`, `limit`, `of
 
 `project_key` — same behavior as stories (see above).
 
+#### `GET /v1/planning/epics/overview` — Epic Overview aggregate
+
+Purpose: return a lightweight, paginated aggregate for Epic health/progress views.
+
+Query:
+- Filters: `project_id`, `project_key`, `status`, `owner`, `is_blocked`, `label`, `text`
+- Sort: `priority`, `progress_pct`, `updated_at`, `blocked_count` (supports `-` prefix)
+- Pagination: `limit`, `offset`
+
+Response item fields:
+- `epic_key`
+- `title`
+- `status`
+- `progress_pct`
+- `stories_total`
+- `stories_done`
+- `stories_in_progress`
+- `blocked_count`
+- `stale_days`
+
+Notes:
+- `owner` filters by assignee agent id found on stories in the epic.
+- `label` matches by label name attached to stories in the epic.
+- `text` performs partial match against epic `title` and `key`.
+
 #### `GET /v1/planning/epics/by-key/{key}` — Get epic by key
 
 Returns the same response as `GET .../epics/{id}`. Key lookup is case-insensitive.
