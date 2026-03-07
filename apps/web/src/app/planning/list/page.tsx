@@ -298,7 +298,7 @@ function PlanningListPageContent() {
         && agent.name.trim().length > 0
       ))
       .map((agent) => ({
-        id: agent.id,
+        id: String(agent.id),
         name: String(agent.name),
         last_name: agent.last_name ?? null,
         initials: agent.initials ?? null,
