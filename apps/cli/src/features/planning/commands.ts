@@ -88,9 +88,25 @@ interface EpicOverviewOptions {
   label?: string;
   owner?: string;
   text?: string;
+  sort?: string;
   limit?: number;
   offset?: number;
 }
+
+interface EpicStoriesOptions extends CommonFilterOptions {
+  output?: OutputMode;
+  filter?: string[];
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
+const EPIC_OVERVIEW_SORT_ALIASES: Record<string, string> = {
+  priority: "priority",
+  progress: "progress_pct",
+  updated: "updated_at",
+  blocked: "blocked_count",
+};
 
 function addSelectConvenienceOptions(command: Command): Command {
   return command
@@ -217,6 +233,68 @@ function parseOutputModeOption(raw: string): OutputMode {
     return mode;
   }
   throw new CliUsageError(`Invalid output mode '${raw}'. Expected: table or json.`);
+}
+
+function normalizeEpicOverviewSort(raw: string): string {
+  const tokens = raw
+    .split(",")
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+
+  if (tokens.length === 0) {
+    throw new CliUsageError("Epic overview sort cannot be empty.");
+  }
+
+  const normalized: string[] = [];
+  for (const token of tokens) {
+    const descending = token.startsWith("-");
+    const base = descending ? token.slice(1) : token;
+    const mapped = EPIC_OVERVIEW_SORT_ALIASES[base];
+    if (!mapped) {
+      const allowed = Object.keys(EPIC_OVERVIEW_SORT_ALIASES).join(", ");
+      throw new CliUsageError(
+        `Unsupported epic overview sort key '${base}'. Allowed keys: ${allowed}.`,
+      );
+    }
+    normalized.push(descending ? `-${mapped}` : mapped);
+  }
+
+  return normalized.join(",");
+}
+
+function projectEpicOverviewTablePayload(payload: unknown): unknown {
+  const envelope = unwrapEnvelope(payload);
+  if (!Array.isArray(envelope.data)) {
+    return payload;
+  }
+
+  const projected = envelope.data.map((row) => {
+    if (!row || typeof row !== "object") {
+      return row;
+    }
+
+    const item = row as Record<string, unknown>;
+    const storiesDone = Number(item.stories_done ?? 0);
+    const storiesTotal = Number(item.stories_total ?? 0);
+    const blockedCount = Number(item.blocked_count ?? 0);
+    const progressPct = Number(item.progress_pct ?? 0);
+    const staleDays = Number(item.stale_days ?? 0);
+
+    return {
+      epic_key: item.epic_key ?? "",
+      title: item.title ?? "",
+      status: item.status ?? "",
+      progress: `${progressPct.toFixed(2)}%`,
+      done_total: `${storiesDone}/${storiesTotal}`,
+      blocked: blockedCount,
+      stale_days: staleDays,
+    };
+  });
+
+  return {
+    data: projected,
+    meta: envelope.meta ?? {},
+  };
 }
 
 function resolvePathContext(
@@ -754,8 +832,19 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
     .option("--label <label>", "label filter")
     .option("--owner <id>", "owner (agent id) filter")
     .option("--text <text>", "search text filter")
+    .option(
+      "--sort <sort>",
+      "sort aliases: priority,progress,updated,blocked (supports '-' prefix)",
+    )
     .option("--limit <n>", "page size", (raw) => parseIntegerOption(raw, "limit"))
     .option("--offset <n>", "offset", (raw) => parseIntegerOption(raw, "offset"))
+    .addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  mc epic overview --project-key MC --status IN_PROGRESS --sort -progress\n" +
+        "  mc epic overview --project-key MC --is-blocked true --sort -blocked --output table\n" +
+        "  mc epic overview --project-key MC --label CLI --sort updated --output json",
+    )
     .action(async (opts: EpicOverviewOptions, command: Command) => {
       validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
       const ctx = getContext(command);
@@ -767,13 +856,55 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
       if (opts.label) query.label = opts.label;
       if (opts.owner) query.owner = opts.owner;
       if (opts.text) query.text = opts.text;
+      if (opts.sort) query.sort = normalizeEpicOverviewSort(opts.sort);
       if (opts.limit !== undefined) query.limit = opts.limit;
       if (opts.offset !== undefined) query.offset = opts.offset;
 
       const payload = await ctx.client.get("/v1/planning/epics/overview", { query });
+      const outputMode = opts.output ?? ctx.config.output;
+      if (outputMode === "table") {
+        printPayload(projectEpicOverviewTablePayload(payload), outputMode);
+        return;
+      }
+      printPayload(payload, outputMode);
+    });
+
+  addSelectConvenienceOptions(
+    resource
+      .command("stories")
+      .description("List stories for a specific epic (drill-down)")
+      .option("--output <mode>", "output mode override: table|json", parseOutputModeOption)
+      .option("--filter <field=value>", "query filter (repeatable)", collectOption, [])
+      .option("--sort <sort>", "sort spec, e.g. priority,-updated_at")
+      .option("--limit <n>", "page size", (raw) => parseIntegerOption(raw, "limit"))
+      .option("--offset <n>", "offset", (raw) => parseIntegerOption(raw, "offset")),
+  )
+    .addHelpText(
+      "after",
+      "\nExamples:\n" +
+        "  mc epic stories --epic-key MC-380 --project-key MC\n" +
+        "  mc epic stories --epic-key MC-380 --status TODO,IN_PROGRESS --sort -updated_at\n" +
+        "  mc epic stories --epic-id <uuid> --output json",
+    )
+    .action(async (opts: EpicStoriesOptions, command: Command) => {
+      validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
+      validateMutuallyExclusive(opts.epicId, opts.epicKey, "--epic-id", "--epic-key");
+      if (!opts.epicId && !opts.epicKey) {
+        throw new CliUsageError("Provide --epic-id or --epic-key for epic drill-down.");
+      }
+
+      const ctx = getContext(command);
+      const query = mergeQuery({}, parseKeyValueList(opts.filter));
+      mergeQuery(query, buildConvenienceQuery(opts));
+      if (opts.sort) query.sort = opts.sort;
+      if (opts.limit !== undefined) query.limit = opts.limit;
+      if (opts.offset !== undefined) query.offset = opts.offset;
+
+      const payload = await ctx.client.get("/v1/planning/stories", { query });
       printPayload(payload, opts.output ?? ctx.config.output);
     });
 }
+
 
 function registerAgentCommands(resource: Command, getContext: ContextFactory): void {
   resource

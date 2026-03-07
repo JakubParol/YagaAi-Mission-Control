@@ -34,6 +34,8 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 |---|---|
 | `/v1/planning/projects` | `mc project ...` |
 | `/v1/planning/projects/{id}/epics` | `mc epic ... --project <id>` |
+| `/v1/planning/epics/overview` | `mc epic overview ...` |
+| `/v1/planning/stories?epic_key=<key>` | `mc epic stories --epic-key <key> ...` |
 | `/v1/planning/stories` | `mc story ...` |
 | `/v1/planning/tasks` | `mc task ...` |
 | `/v1/planning/backlogs` | `mc backlog ...` |
