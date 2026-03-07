@@ -25,6 +25,7 @@ interface BacklogSectionHeaderProps {
   onStartSprint: (backlogId: string, backlogName: string) => void;
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
+  onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
 }
 
@@ -88,6 +89,7 @@ export function BacklogSectionHeader({
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
+  onEditBoard,
   onDeleteBoard,
 }: BacklogSectionHeaderProps) {
   const Chevron = collapsed ? ChevronRight : ChevronDown;
@@ -216,6 +218,7 @@ export function BacklogSectionHeader({
           backlogName={backlog.name}
           canDelete={canDeleteBoard}
           isDeleting={isBoardDeletePending}
+          onEdit={() => onEditBoard(backlog.id)}
           onDelete={() => onDeleteBoard(backlog.id, backlog.name, backlog.is_default)}
         />
       </div>

@@ -32,6 +32,10 @@ import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
 import { BacklogSectionHeader } from "@/components/planning/backlog-section-header";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import {
+  BacklogEditDialog,
+  type BacklogEditItem,
+} from "@/components/planning/backlog-edit-dialog";
 import { StoryForm } from "@/components/planning/story-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -209,6 +213,7 @@ function BacklogSection({
   onCreateStory,
   onStoryDelete,
   onStoryStatusChange,
+  onEditBoard,
   onDeleteBoard,
   pendingStoryIds,
   pendingDeleteStoryIds,
@@ -228,6 +233,7 @@ function BacklogSection({
   onCreateStory: (backlogId: string) => void;
   onStoryDelete: (storyId: string) => void;
   onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
+  onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
   pendingStoryIds: ReadonlySet<string>;
   pendingDeleteStoryIds: ReadonlySet<string>;
@@ -259,6 +265,7 @@ function BacklogSection({
         onStartSprint={onStartSprint}
         onCompleteSprint={onCompleteSprint}
         onCreateStory={onCreateStory}
+        onEditBoard={onEditBoard}
         onDeleteBoard={onDeleteBoard}
       />
 
@@ -373,6 +380,7 @@ function BacklogPageContent() {
   const [completeTargetBacklogId, setCompleteTargetBacklogId] = useState<string>("");
   const [completeDialogError, setCompleteDialogError] = useState<string | null>(null);
   const [deleteBoardDialog, setDeleteBoardDialog] = useState<DeleteBoardDialogState | null>(null);
+  const [editBoardBacklog, setEditBoardBacklog] = useState<BacklogEditItem | null>(null);
 
   const handleStoryClick = useCallback((storyId: string) => {
     setSelectedStoryId(storyId);
@@ -1054,6 +1062,26 @@ function BacklogPageContent() {
     setDeleteBoardDialog(null);
   }, []);
 
+  const handleEditBoard = useCallback(
+    (backlogId: string) => {
+      if (state.kind !== "ok") return;
+      const section = state.sections.find((s) => s.backlog.id === backlogId);
+      if (!section) return;
+      const { backlog } = section;
+      setEditBoardBacklog({
+        id: backlog.id,
+        name: backlog.name,
+        kind: backlog.kind,
+        status: backlog.status,
+        goal: backlog.goal,
+        start_date: backlog.start_date,
+        end_date: backlog.end_date,
+        is_default: backlog.is_default,
+      });
+    },
+    [state],
+  );
+
   const handleDeleteBoardDialogConfirm = useCallback(async () => {
     if (!deleteBoardDialog) return;
     const { backlogId } = deleteBoardDialog;
@@ -1206,6 +1234,7 @@ function BacklogPageContent() {
               onCreateStory={handleCreateStory}
               onStoryDelete={handleStoryDelete}
               onStoryStatusChange={handleStoryStatusChange}
+              onEditBoard={handleEditBoard}
               onDeleteBoard={handleDeleteBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
               pendingDeleteStoryIds={new Set(Object.keys(pendingDeleteStoryIds))}
@@ -1460,6 +1489,22 @@ function BacklogPageContent() {
         onOpenChange={handleDialogClose}
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => {
+          void refreshCurrentView().catch((error) => {
+            showErrorToast(
+              error instanceof Error ? error.message : "Failed to refresh backlog data.",
+            );
+          });
+        }}
+      />
+
+      <BacklogEditDialog
+        backlog={editBoardBacklog}
+        open={editBoardBacklog !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setEditBoardBacklog(null);
+        }}
+        onSaved={() => {
+          setEditBoardBacklog(null);
           void refreshCurrentView().catch((error) => {
             showErrorToast(
               error instanceof Error ? error.message : "Failed to refresh backlog data.",

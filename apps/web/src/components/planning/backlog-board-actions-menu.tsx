@@ -9,7 +9,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,6 +19,7 @@ interface BacklogBoardActionsMenuProps {
   backlogName: string;
   canDelete: boolean;
   isDeleting: boolean;
+  onEdit: () => void;
   onDelete: () => void;
 }
 
@@ -79,14 +80,15 @@ export function BacklogBoardActionsMenu({
   backlogName,
   canDelete,
   isDeleting,
+  onEdit,
   onDelete,
 }: BacklogBoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [menuCoordinates, setMenuCoordinates] = useState<FloatingCoordinates | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const triggerDisabled = isDeleting || !canDelete;
-  const triggerTooltip = canDelete ? "Board actions" : "Default board cannot be deleted";
+  const triggerDisabled = isDeleting;
+  const triggerTooltip = "Board actions";
 
   const updateFloatingPosition = useCallback(() => {
     if (typeof window === "undefined" || !open || !rootRef.current || !menuRef.current) {
@@ -177,14 +179,29 @@ export function BacklogBoardActionsMenu({
       <button
         type="button"
         role="menuitem"
-        disabled={triggerDisabled}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+          "text-foreground hover:bg-muted/50",
+        )}
+        onClick={() => {
+          setOpen(false);
+          onEdit();
+        }}
+      >
+        <Pencil className="size-3.5" />
+        Edit
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        disabled={!canDelete || isDeleting}
         className={cn(
           "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
           "text-red-300 hover:bg-red-500/10",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
         onClick={() => {
-          if (triggerDisabled) return;
+          if (!canDelete || isDeleting) return;
           setOpen(false);
           onDelete();
         }}
