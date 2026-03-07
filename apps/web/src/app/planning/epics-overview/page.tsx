@@ -1,9 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
   Loader2,
   Radar,
   ShieldAlert,
@@ -17,17 +21,22 @@ import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { Badge } from "@/components/ui/badge";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import { apiUrl } from "@/lib/api-client";
-import type { EpicStatus } from "@/lib/planning/types";
+import type { EpicStatus, ItemStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import {
   applyClientEpicOverviewFilters,
+  applyStoryPreviewFilters,
   buildEpicOverviewStats,
   toPercentLabel,
   toStoriesLabel,
+  toStoryPreviewAssignee,
+  toStoryPreviewTitle,
+  toStoryPreviewUpdatedAt,
 } from "./overview-view-model";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,
+  EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS,
   EPIC_OVERVIEW_PRESETS,
   EPIC_OVERVIEW_SORT_OPTIONS,
   type EpicOverviewAgent,
@@ -35,6 +44,8 @@ import {
   type EpicOverviewItem,
   type EpicOverviewLabel,
   type EpicOverviewListEnvelope,
+  type EpicOverviewStoryPreview,
+  type EpicOverviewStoryPreviewFilters,
 } from "./overview-types";
 
 const FILTER_KEYS = {
@@ -63,6 +74,34 @@ interface LabelListEnvelope {
   }>;
 }
 
+interface StoryListEnvelope {
+  data?: Array<{
+    id?: string;
+    key?: string | null;
+    title?: string;
+    status?: string;
+    current_assignee_agent_id?: string | null;
+    is_blocked?: boolean;
+    updated_at?: string;
+  }>;
+}
+
+interface BulkOperationEnvelope {
+  data?: {
+    results?: Array<{
+      entity_id?: string;
+      success?: boolean;
+      timestamp?: string;
+      error_code?: string | null;
+      error_message?: string | null;
+    }>;
+  };
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
 interface FetchResult {
   rows: EpicOverviewItem[];
   agents: EpicOverviewAgent[];
@@ -75,9 +114,22 @@ type PageState =
   | { kind: "error"; message: string }
   | { kind: "ok"; rows: EpicOverviewItem[]; agents: EpicOverviewAgent[]; labels: EpicOverviewLabel[] };
 
+type PreviewState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; stories: EpicOverviewStoryPreview[] };
+
 function parseEpicStatus(value: string | null): EpicStatus | "" {
   if (value === "TODO" || value === "IN_PROGRESS" || value === "DONE") return value;
   return "";
+}
+
+function parseItemStatus(value: string | null | undefined): ItemStatus | null {
+  if (value === "TODO" || value === "IN_PROGRESS" || value === "CODE_REVIEW" || value === "VERIFY" || value === "DONE") {
+    return value;
+  }
+  return null;
 }
 
 function parseBlocked(value: string | null): EpicOverviewFilters["blocked"] {
@@ -104,6 +156,13 @@ function statusVariant(status: EpicStatus): "outline" | "secondary" | "default" 
   return "outline";
 }
 
+function storyStatusVariant(status: ItemStatus): "outline" | "secondary" | "default" {
+  if (status === "DONE") return "default";
+  if (status === "IN_PROGRESS") return "secondary";
+  if (status === "CODE_REVIEW" || status === "VERIFY") return "secondary";
+  return "outline";
+}
+
 function resolveAgentLabel(agent: { id?: string; name?: string; last_name?: string | null }): string | null {
   if (!agent.id || !agent.name) return null;
   const fullName = [agent.name, agent.last_name ?? ""].join(" ").trim();
@@ -122,12 +181,108 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
+function StoryBlockedBadge({ blocked }: { blocked: boolean }) {
+  if (blocked) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-300">
+        <AlertTriangle className="size-3" />
+        blocked
+      </span>
+    );
+  }
+  return <span className="text-[10px] text-emerald-300">ok</span>;
+}
+
+async function parseApiErrorPayload(response: Response): Promise<{ code?: string; message?: string }> {
+  try {
+    const payload = (await response.json()) as { error?: { code?: string; message?: string } };
+    return {
+      code: payload.error?.code,
+      message: payload.error?.message,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export async function toActionHttpErrorMessage(
+  response: Response,
+  action: "status" | "add-to-sprint",
+): Promise<string> {
+  const payload = await parseApiErrorPayload(response);
+  const code = payload.code;
+  const message = payload.message;
+
+  if (code === "UNAUTHORIZED") {
+    return "Authentication is required to perform this action.";
+  }
+  if (code === "FORBIDDEN") {
+    return "You do not have permission to perform this action.";
+  }
+  if (code === "UNPROCESSABLE_ENTITY") {
+    return action === "status"
+      ? "Status update request is invalid. Refresh and try again."
+      : "Add-to-sprint request is invalid. Refresh and try again.";
+  }
+  if (code === "VALIDATION_ERROR") {
+    return action === "add-to-sprint"
+      ? "Select a single project before adding a story to sprint."
+      : "Status update validation failed.";
+  }
+  if (message && message.trim().length > 0) {
+    return message;
+  }
+  return action === "status"
+    ? `Failed to update story status. HTTP ${response.status}.`
+    : `Failed to add story to sprint. HTTP ${response.status}.`;
+}
+
+export function toBulkResultErrorMessage(
+  result: { error_code?: string | null; error_message?: string | null },
+  action: "status" | "add-to-sprint",
+): string {
+  if (result.error_message && result.error_message.trim().length > 0) {
+    return result.error_message;
+  }
+
+  if (result.error_code === "UNAUTHORIZED") {
+    return "Authentication is required to perform this action.";
+  }
+  if (result.error_code === "FORBIDDEN") {
+    return "You do not have permission to perform this action.";
+  }
+  if (result.error_code === "UNPROCESSABLE_ENTITY") {
+    return action === "status"
+      ? "Status update request is invalid. Refresh and try again."
+      : "Add-to-sprint request is invalid. Refresh and try again.";
+  }
+  if (result.error_code === "NO_ACTIVE_SPRINT") {
+    return "No active sprint is available for this project.";
+  }
+  if (result.error_code === "BUSINESS_RULE_VIOLATION") {
+    return action === "status"
+      ? "Story status cannot be changed in the current state."
+      : "Story cannot be added to active sprint from its current backlog.";
+  }
+
+  return action === "status"
+    ? "Failed to update story status."
+    : "Failed to add story to sprint.";
+}
+
 function EpicOverviewPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const [state, setState] = useState<PageState>({ kind: "no-project" });
+  const [expandedByEpicKey, setExpandedByEpicKey] = useState<Record<string, boolean>>({});
+  const [previewByEpicKey, setPreviewByEpicKey] = useState<Record<string, PreviewState>>({});
+  const [previewFiltersByEpicKey, setPreviewFiltersByEpicKey] = useState<
+    Record<string, EpicOverviewStoryPreviewFilters>
+  >({});
+  const [storyPendingById, setStoryPendingById] = useState<Record<string, boolean>>({});
+  const [storyErrorByEpicKey, setStoryErrorByEpicKey] = useState<Record<string, string>>({});
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0]
@@ -226,6 +381,80 @@ function EpicOverviewPageContent() {
     return { rows, agents, labels };
   }, [filters.blocked, filters.label, filters.ownerId, filters.search, filters.sort, filters.status]);
 
+  const agentLabelById = useMemo(() => {
+    if (state.kind !== "ok") return new Map<string, string>();
+    return new Map<string, string>(state.agents.map((agent) => [agent.id, agent.label]));
+  }, [state]);
+
+  const fetchStoriesPreview = useCallback(async (epicKey: string): Promise<EpicOverviewStoryPreview[]> => {
+    const params = new URLSearchParams();
+    params.set("epic_key", epicKey);
+    params.set("sort", "-updated_at");
+    params.set("limit", "100");
+
+    const response = await fetch(apiUrl(`/v1/planning/stories?${params.toString()}`));
+    if (!response.ok) {
+      throw new Error(`Failed to load stories preview. HTTP ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as StoryListEnvelope;
+    const rows = payload.data ?? [];
+
+    return rows.flatMap((row) => {
+      const id = row.id;
+      const title = row.title;
+      const status = parseItemStatus(row.status);
+      if (!id || !title || !status) return [];
+      const assigneeId = row.current_assignee_agent_id ?? null;
+      return [{
+        story_id: id,
+        story_key: row.key ?? null,
+        title,
+        status,
+        current_assignee_agent_id: assigneeId,
+        assignee_label: assigneeId ? (agentLabelById.get(assigneeId) ?? null) : null,
+        is_blocked: row.is_blocked ?? false,
+        updated_at: row.updated_at ?? null,
+      } satisfies EpicOverviewStoryPreview];
+    });
+  }, [agentLabelById]);
+
+  const ensurePreviewLoaded = useCallback(async (epicKey: string) => {
+    let shouldFetch = false;
+    setPreviewByEpicKey((current) => {
+      const existing = current[epicKey];
+      if (existing && (existing.kind === "loading" || existing.kind === "ready")) {
+        return current;
+      }
+      shouldFetch = true;
+      return {
+        ...current,
+        [epicKey]: { kind: "loading" },
+      };
+    });
+
+    if (!shouldFetch) return;
+
+    try {
+      const stories = await fetchStoriesPreview(epicKey);
+      setPreviewByEpicKey((current) => ({
+        ...current,
+        [epicKey]: {
+          kind: "ready",
+          stories,
+        },
+      }));
+    } catch (error) {
+      setPreviewByEpicKey((current) => ({
+        ...current,
+        [epicKey]: {
+          kind: "error",
+          message: error instanceof Error ? error.message : "Failed to load story preview.",
+        },
+      }));
+    }
+  }, [fetchStoriesPreview]);
+
   const refreshCurrentView = useCallback(async () => {
     if (!singleProjectId) throw new Error("Select a single project before refreshing.");
     const result = await fetchOverview(singleProjectId);
@@ -293,6 +522,21 @@ function EpicOverviewPageContent() {
     { value: "false", label: "Unblocked only" },
   ];
 
+  const previewStatusOptions = [
+    { value: "", label: "Story status: All" },
+    { value: "TODO", label: "TODO" },
+    { value: "IN_PROGRESS", label: "IN PROGRESS" },
+    { value: "CODE_REVIEW", label: "CODE REVIEW" },
+    { value: "VERIFY", label: "VERIFY" },
+    { value: "DONE", label: "DONE" },
+  ];
+
+  const previewBlockedOptions = [
+    { value: "", label: "Blocked: All" },
+    { value: "true", label: "Blocked only" },
+    { value: "false", label: "Unblocked only" },
+  ];
+
   const topContext = state.kind === "ok"
     ? `${rows.length} of ${state.rows.length} epics visible`
     : undefined;
@@ -302,6 +546,157 @@ function EpicOverviewPageContent() {
     : state.kind === "no-project"
       ? { kind: "loading" as const }
       : state;
+
+  const setPreviewFilter = useCallback(
+    (epicKey: string, patch: Partial<EpicOverviewStoryPreviewFilters>) => {
+      setPreviewFiltersByEpicKey((current) => ({
+        ...current,
+        [epicKey]: {
+          ...(current[epicKey] ?? EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS),
+          ...patch,
+        },
+      }));
+    },
+    [],
+  );
+
+  const clearStoryError = useCallback((epicKey: string) => {
+    setStoryErrorByEpicKey((current) => {
+      if (!current[epicKey]) return current;
+      const next = { ...current };
+      delete next[epicKey];
+      return next;
+    });
+  }, []);
+
+  const setStoryError = useCallback((epicKey: string, message: string) => {
+    setStoryErrorByEpicKey((current) => ({
+      ...current,
+      [epicKey]: message,
+    }));
+  }, []);
+
+  const markStoryPending = useCallback((storyId: string, pending: boolean) => {
+    setStoryPendingById((current) => {
+      if (pending) {
+        return { ...current, [storyId]: true };
+      }
+      if (!current[storyId]) return current;
+      const next = { ...current };
+      delete next[storyId];
+      return next;
+    });
+  }, []);
+
+  const updateCachedStory = useCallback((
+    epicKey: string,
+    storyId: string,
+    patch: Partial<EpicOverviewStoryPreview>,
+  ) => {
+    setPreviewByEpicKey((current) => {
+      const entry = current[epicKey];
+      if (!entry || entry.kind !== "ready") return current;
+      const nextStories = entry.stories.map((story) => (
+        story.story_id === storyId
+          ? { ...story, ...patch }
+          : story
+      ));
+      return {
+        ...current,
+        [epicKey]: {
+          kind: "ready",
+          stories: nextStories,
+        },
+      };
+    });
+  }, []);
+
+  const changeStoryStatus = useCallback(async (
+    epicKey: string,
+    story: EpicOverviewStoryPreview,
+    nextStatus: ItemStatus,
+  ) => {
+    if (storyPendingById[story.story_id]) return;
+
+    markStoryPending(story.story_id, true);
+    clearStoryError(epicKey);
+
+    try {
+      const response = await fetch(apiUrl("/v1/planning/epics/bulk/story-status"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story_ids: [story.story_id],
+          status: nextStatus,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await toActionHttpErrorMessage(response, "status"));
+      }
+
+      const payload = (await response.json()) as BulkOperationEnvelope;
+      const result = payload.data?.results?.find((item) => item.entity_id === story.story_id);
+      if (!result || !result.success) {
+        throw new Error(toBulkResultErrorMessage(result ?? {}, "status"));
+      }
+
+      updateCachedStory(epicKey, story.story_id, {
+        status: nextStatus,
+        updated_at: result.timestamp ?? story.updated_at,
+      });
+    } catch (error) {
+      setStoryError(
+        epicKey,
+        error instanceof Error ? error.message : "Failed to update story status.",
+      );
+    } finally {
+      markStoryPending(story.story_id, false);
+    }
+  }, [clearStoryError, markStoryPending, setStoryError, storyPendingById, updateCachedStory]);
+
+  const addStoryToSprint = useCallback(async (epicKey: string, story: EpicOverviewStoryPreview) => {
+    if (!singleProjectId) {
+      setStoryError(epicKey, "Select a single project before adding a story to sprint.");
+      return;
+    }
+    if (storyPendingById[story.story_id]) return;
+
+    markStoryPending(story.story_id, true);
+    clearStoryError(epicKey);
+
+    try {
+      const response = await fetch(
+        apiUrl(`/v1/planning/epics/bulk/active-sprint/add?project_id=${singleProjectId}`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ story_ids: [story.story_id] }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(await toActionHttpErrorMessage(response, "add-to-sprint"));
+      }
+
+      const payload = (await response.json()) as BulkOperationEnvelope;
+      const result = payload.data?.results?.find((item) => item.entity_id === story.story_id);
+      if (!result || !result.success) {
+        throw new Error(toBulkResultErrorMessage(result ?? {}, "add-to-sprint"));
+      }
+
+      updateCachedStory(epicKey, story.story_id, {
+        updated_at: result.timestamp ?? story.updated_at,
+      });
+    } catch (error) {
+      setStoryError(
+        epicKey,
+        error instanceof Error ? error.message : "Failed to add story to sprint.",
+      );
+    } finally {
+      markStoryPending(story.story_id, false);
+    }
+  }, [clearStoryError, markStoryPending, setStoryError, singleProjectId, storyPendingById, updateCachedStory]);
 
   return (
     <>
@@ -464,7 +859,8 @@ function EpicOverviewPageContent() {
             />
           ) : (
             <section className="overflow-hidden rounded-lg border border-border/60 bg-card/20">
-              <div className="grid grid-cols-[120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2 border-b border-border/30 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2 border-b border-border/30 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <span aria-hidden="true" />
                 <span>Epic</span>
                 <span>Title</span>
                 <span>Status</span>
@@ -474,42 +870,200 @@ function EpicOverviewPageContent() {
               </div>
 
               <div className="divide-y divide-border/20">
-                {rows.map((item) => (
-                  <article
-                    key={item.epic_key}
-                    className="grid grid-cols-[120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2 px-3 py-2.5"
-                  >
-                    <p className="font-mono text-xs text-muted-foreground">{item.epic_key}</p>
-                    <p className="truncate text-sm text-foreground" title={item.title}>{item.title}</p>
+                {rows.map((item) => {
+                  const isExpanded = expandedByEpicKey[item.epic_key] ?? false;
+                  const previewState = previewByEpicKey[item.epic_key] ?? { kind: "idle" as const };
+                  const previewFilters = previewFiltersByEpicKey[item.epic_key] ?? EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS;
+                  const stories = previewState.kind === "ready"
+                    ? applyStoryPreviewFilters(previewState.stories, previewFilters)
+                    : [];
+                  const actionError = storyErrorByEpicKey[item.epic_key];
 
-                    <Badge variant={statusVariant(item.status)} className="h-fit w-fit text-[11px]">
-                      {item.status.replaceAll("_", " ")}
-                    </Badge>
+                  return (
+                    <article key={item.epic_key} className="px-3 py-2.5">
+                      <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2">
+                        <button
+                          type="button"
+                          aria-label={isExpanded ? `Collapse ${item.epic_key}` : `Expand ${item.epic_key}`}
+                          onClick={() => {
+                            const nextExpanded = !isExpanded;
+                            setExpandedByEpicKey((current) => ({
+                              ...current,
+                              [item.epic_key]: nextExpanded,
+                            }));
+                            if (nextExpanded) {
+                              void ensurePreviewLoaded(item.epic_key);
+                            }
+                          }}
+                          className="inline-flex size-7 items-center justify-center rounded border border-border/60 text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                        >
+                          {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                        </button>
 
-                    <div className="space-y-1">
-                      <ProgressBar value={item.progress_pct} />
-                      <p className="text-[11px] text-muted-foreground">{toPercentLabel(item.progress_pct)}</p>
-                    </div>
+                        <p className="pt-1 font-mono text-xs text-muted-foreground">{item.epic_key}</p>
+                        <p className="truncate pt-1 text-sm text-foreground" title={item.title}>{item.title}</p>
 
-                    <p className="text-[11px] text-muted-foreground">{toStoriesLabel(item)}</p>
+                        <Badge variant={statusVariant(item.status)} className="h-fit w-fit text-[11px]">
+                          {item.status.replaceAll("_", " ")}
+                        </Badge>
 
-                    <div className="flex items-center gap-1 text-[11px]">
-                      {item.blocked_count > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-red-300">
-                          <AlertTriangle className="size-3" />
-                          {item.blocked_count}
-                        </span>
-                      ) : (
-                        <span className="text-emerald-300">ok</span>
-                      )}
-                      {item.stale_days >= 7 ? (
-                        <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-amber-300">
-                          {item.stale_days}d
-                        </span>
+                        <div className="space-y-1">
+                          <ProgressBar value={item.progress_pct} />
+                          <p className="text-[11px] text-muted-foreground">{toPercentLabel(item.progress_pct)}</p>
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground">{toStoriesLabel(item)}</p>
+
+                        <div className="flex items-center gap-1 text-[11px]">
+                          {item.blocked_count > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-red-300">
+                              <AlertTriangle className="size-3" />
+                              {item.blocked_count}
+                            </span>
+                          ) : (
+                            <span className="text-emerald-300">ok</span>
+                          )}
+                          {item.stale_days >= 7 ? (
+                            <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-amber-300">
+                              {item.stale_days}d
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {isExpanded ? (
+                        <div className="ml-10 mt-3 rounded-md border border-border/40 bg-background/30 p-3">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <ThemedSelect
+                              value={previewFilters.status}
+                              options={previewStatusOptions}
+                              placeholder="Story status"
+                              onValueChange={(value) => setPreviewFilter(item.epic_key, { status: value as ItemStatus | "" })}
+                              triggerClassName="h-8 min-w-[170px] bg-background/80 text-xs"
+                              contentClassName="w-[220px]"
+                            />
+                            <ThemedSelect
+                              value={previewFilters.blocked}
+                              options={previewBlockedOptions}
+                              placeholder="Blocked"
+                              onValueChange={(value) => setPreviewFilter(item.epic_key, { blocked: value as "" | "true" | "false" })}
+                              triggerClassName="h-8 min-w-[160px] bg-background/80 text-xs"
+                              contentClassName="w-[210px]"
+                            />
+                          </div>
+
+                          {actionError ? (
+                            <p className="mb-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-xs text-red-200">
+                              {actionError}
+                            </p>
+                          ) : null}
+
+                          {previewState.kind === "loading" || previewState.kind === "idle" ? (
+                            <div className="flex items-center gap-2 py-5 text-sm text-muted-foreground">
+                              <Loader2 className="size-4 animate-spin" />
+                              Loading story preview...
+                            </div>
+                          ) : null}
+
+                          {previewState.kind === "error" ? (
+                            <div className="rounded border border-red-500/40 bg-red-500/10 px-2 py-2 text-xs text-red-200">
+                              {previewState.message}
+                            </div>
+                          ) : null}
+
+                          {previewState.kind === "ready" ? (
+                            stories.length === 0 ? (
+                              <div className="rounded border border-border/40 bg-background/40 px-2 py-3 text-xs text-muted-foreground">
+                                No stories match preview filters.
+                              </div>
+                            ) : (
+                              <div className="overflow-hidden rounded border border-border/40">
+                                <div className="grid grid-cols-[120px_minmax(0,1fr)_130px_140px_110px_150px_260px] gap-2 border-b border-border/30 bg-background/50 px-2 py-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                                  <span>Story</span>
+                                  <span>Title</span>
+                                  <span>Status</span>
+                                  <span>Assignee</span>
+                                  <span>Blocked</span>
+                                  <span>Updated</span>
+                                  <span>Quick actions</span>
+                                </div>
+                                <div className="divide-y divide-border/20">
+                                  {stories.map((story) => {
+                                    const pending = Boolean(storyPendingById[story.story_id]);
+
+                                    return (
+                                      <div
+                                        key={story.story_id}
+                                        className="grid grid-cols-[120px_minmax(0,1fr)_130px_140px_110px_150px_260px] gap-2 px-2 py-2"
+                                      >
+                                        <span className="truncate font-mono text-[11px] text-muted-foreground">
+                                          {story.story_key ?? "—"}
+                                        </span>
+
+                                        <span className="truncate text-xs text-foreground" title={toStoryPreviewTitle(story)}>
+                                          {story.title}
+                                        </span>
+
+                                        <Badge variant={storyStatusVariant(story.status)} className="h-fit w-fit text-[10px]">
+                                          {story.status.replaceAll("_", " ")}
+                                        </Badge>
+
+                                        <span className="truncate text-xs text-muted-foreground">
+                                          {toStoryPreviewAssignee(story)}
+                                        </span>
+
+                                        <StoryBlockedBadge blocked={story.is_blocked} />
+
+                                        <span className="text-xs text-muted-foreground">
+                                          {toStoryPreviewUpdatedAt(story)}
+                                        </span>
+
+                                        <div className="flex items-center gap-1.5">
+                                          <Link
+                                            href={`/planning/stories/${story.story_id}`}
+                                            className="inline-flex h-7 items-center gap-1 rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border"
+                                          >
+                                            Details
+                                            <ExternalLink className="size-3" />
+                                          </Link>
+
+                                          <ThemedSelect
+                                            value={story.status}
+                                            options={previewStatusOptions.slice(1)}
+                                            placeholder="Status"
+                                            disabled={pending}
+                                            onValueChange={(value) => {
+                                              const status = parseItemStatus(value);
+                                              if (!status || status === story.status) return;
+                                              void changeStoryStatus(item.epic_key, story, status);
+                                            }}
+                                            triggerClassName="h-7 min-w-[118px] bg-background/80 text-[10px]"
+                                            contentClassName="w-[170px]"
+                                          />
+
+                                          <button
+                                            type="button"
+                                            disabled={pending}
+                                            onClick={() => {
+                                              void addStoryToSprint(item.epic_key, story);
+                                            }}
+                                            className="inline-flex h-7 items-center rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border disabled:cursor-not-allowed disabled:opacity-60"
+                                          >
+                                            Add to sprint
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )
+                          ) : null}
+                        </div>
                       ) : null}
-                    </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
             </section>
           )}
