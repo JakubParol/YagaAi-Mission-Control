@@ -586,8 +586,7 @@ class SqliteEpicRepository(EpicRepository):
             "  FROM stories s "
             "  WHERE s.epic_id IS NOT NULL "
             "  GROUP BY s.epic_id"
-            ") ss ON ss.epic_id = e.id"
-            + where_sql
+            ") ss ON ss.epic_id = e.id" + where_sql
         )
 
         order_sql = _parse_sort_mapped(

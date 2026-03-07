@@ -384,8 +384,12 @@ def test_list_epics_project_key_case_insensitive(client):
 
 
 def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -> None:
-    e1 = client.post("/v1/planning/epics", json={"project_id": "p1", "title": "Payments"}).json()["data"]
-    e2 = client.post("/v1/planning/epics", json={"project_id": "p1", "title": "Reporting"}).json()["data"]
+    e1 = client.post("/v1/planning/epics", json={"project_id": "p1", "title": "Payments"}).json()[
+        "data"
+    ]
+    e2 = client.post("/v1/planning/epics", json={"project_id": "p1", "title": "Reporting"}).json()[
+        "data"
+    ]
 
     db_path = _setup_test_db
     conn = sqlite3.connect(db_path)
@@ -402,7 +406,18 @@ def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -
     conn.execute(
         "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
         "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-ov-2", "p1", e1["id"], "In-progress story", "USER_STORY", "IN_PROGRESS", 0, "a2", TS, TS),
+        (
+            "s-ov-2",
+            "p1",
+            e1["id"],
+            "In-progress story",
+            "USER_STORY",
+            "IN_PROGRESS",
+            0,
+            "a2",
+            TS,
+            TS,
+        ),
     )
     conn.execute(
         "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
