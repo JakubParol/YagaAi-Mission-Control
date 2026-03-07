@@ -299,7 +299,7 @@ function PlanningListPageContent() {
       ))
       .map((agent) => ({
         id: agent.id,
-        name: agent.name,
+        name: String(agent.name),
         last_name: agent.last_name ?? null,
         initials: agent.initials ?? null,
         role: agent.role ?? null,
