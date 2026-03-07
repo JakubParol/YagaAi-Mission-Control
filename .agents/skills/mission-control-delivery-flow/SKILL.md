@@ -30,9 +30,10 @@ Prefer `--output json` for deterministic parsing.
 2. If the planning element is not attached to the current sprint in the MC project, attach it.
 3. If it is not attached to an epic, attach the story to an epic – you can get the list of epics and choose the best one.
 4. Add labels to the user story.
-5. Checkout `main`.
-6. Pull the latest changes.
-7. Create a new implementation branch using the planning element code and a short description.
+5. Assign UserStory to Naomi.
+6. Checkout `main`.
+7. Pull the latest changes.
+8. Create a new implementation branch using the planning element code and a short description.
 
 ## Phase 1 — Implementation
 
@@ -44,7 +45,7 @@ Prefer `--output json` for deterministic parsing.
    - implement code + commit,
    - run quality gates (see `mission-control-test-gate`),
    - set task `DONE` via `mc task update`.
-   - Di it for each singke task - Status must be updated before you proceed to another task in the loop.
+   - Do it for each singke task - Status must be updated before you proceed to another task in the loop.
 
 ## Phase 2 — Pull Request
 
@@ -53,7 +54,7 @@ Prefer `--output json` for deterministic parsing.
 
 ## Phase 3 — Review and fixes
 
-7. Run `/review` (self-review) or perform CodeReview by yourself if /review-pr is not avaiable.
+7. Run `/review` (self-review) or perform CodeReview by yourself if /review is not avaiable.
 8. Each finding must be injected into the PR as a comment with gh cli
 9. Fix all findings (including small issues), resolve comments in PR, commit and push.
 
