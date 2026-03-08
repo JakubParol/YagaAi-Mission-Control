@@ -64,6 +64,44 @@ def db_path(tmp_path, monkeypatch):
           processed_at TEXT NOT NULL,
           PRIMARY KEY (stream_key, consumer_group, message_id)
         );
+
+        CREATE TABLE orchestration_runs (
+          run_id TEXT PRIMARY KEY,
+          status TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          current_step_id TEXT,
+          last_event_type TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          terminal_at TEXT
+        );
+
+        CREATE TABLE orchestration_run_steps (
+          step_id TEXT NOT NULL,
+          run_id TEXT NOT NULL REFERENCES orchestration_runs(run_id) ON DELETE CASCADE,
+          status TEXT NOT NULL,
+          last_event_type TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          terminal_at TEXT,
+          PRIMARY KEY (run_id, step_id)
+        );
+
+        CREATE TABLE orchestration_run_timeline (
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          step_id TEXT,
+          message_id TEXT,
+          event_type TEXT NOT NULL,
+          decision TEXT NOT NULL,
+          reason_code TEXT,
+          reason_message TEXT,
+          correlation_id TEXT NOT NULL,
+          causation_id TEXT,
+          payload_json TEXT NOT NULL,
+          occurred_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
         """)
     conn.close()
 

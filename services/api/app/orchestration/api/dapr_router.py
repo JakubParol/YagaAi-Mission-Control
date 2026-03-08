@@ -2,7 +2,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.config import settings
+from app.orchestration.application.worker_state_machine_service import WorkerStateMachineService
+from app.orchestration.dependencies import get_worker_state_machine_service
 
 router = APIRouter(tags=["orchestration"])
 
@@ -39,16 +43,37 @@ async def dapr_healthz() -> dict[str, str]:
 
 
 @router.post("/v1/orchestration/dapr/events")
-async def handle_dapr_orchestration_event(cloud_event: dict[str, Any]) -> dict[str, str]:
+async def handle_dapr_orchestration_event(
+    cloud_event: dict[str, Any],
+    worker_state_service: WorkerStateMachineService = Depends(get_worker_state_machine_service),
+) -> dict[str, str]:
     data = cloud_event.get("data")
     if not isinstance(data, dict):
         data = cloud_event
 
     run_id = str(data.get("run_id") or "unknown-run")
+    event_type = str(data.get("type") or cloud_event.get("type") or "unknown-event")
+    message_id = str(cloud_event.get("id") or f"{run_id}:{event_type}")
     correlation_id = str(
         data.get("correlation_id") or cloud_event.get("traceid") or "unknown-correlation"
     )
     occurred_at = str(data.get("occurred_at") or datetime.now(tz=UTC).isoformat())
+    event_payload = data.get("payload")
+    if not isinstance(event_payload, dict):
+        event_payload = {}
+
+    worker_result = await worker_state_service.process_message(
+        stream_key="dapr:orchestration.events",
+        consumer_group=settings.orchestration_worker_consumer_group,
+        consumer_name="dapr-bridge",
+        message_id=message_id,
+        run_id=run_id,
+        event_type=event_type,
+        correlation_id=correlation_id,
+        causation_id=None,
+        occurred_at=occurred_at,
+        payload=event_payload,
+    )
 
     state_key = f"orchestration:last-event:{run_id}"
     state_payload = {
@@ -89,4 +114,9 @@ async def handle_dapr_orchestration_event(cloud_event: dict[str, Any]) -> dict[s
                 detail=f"Failed to invoke worker acknowledgement endpoint via Dapr: {error}",
             ) from error
 
-    return {"status": "SUCCESS", "run_id": run_id, "occurred_at": occurred_at}
+    return {
+        "status": "SUCCESS",
+        "run_id": run_id,
+        "occurred_at": occurred_at,
+        "transition_decision": str(worker_result.get("decision", "")),
+    }

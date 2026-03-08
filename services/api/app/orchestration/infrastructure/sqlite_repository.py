@@ -3,7 +3,16 @@ import json
 import aiosqlite
 
 from app.orchestration.application.ports import OrchestrationRepository
-from app.orchestration.domain.models import CommandEnvelope, OutboxEventEnvelope, OutboxStatus
+from app.orchestration.domain.models import (
+    CommandEnvelope,
+    OrchestrationRun,
+    OrchestrationStep,
+    OutboxEventEnvelope,
+    OutboxStatus,
+    RunStatus,
+    RunTimelineEntry,
+    StepStatus,
+)
 
 
 class SqliteOrchestrationRepository(OrchestrationRepository):
@@ -292,3 +301,203 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
         except Exception:
             await self._db.rollback()
             raise
+
+    async def get_run(self, *, run_id: str) -> OrchestrationRun | None:
+        cursor = await self._db.execute(
+            """
+            SELECT
+              run_id, status, correlation_id, current_step_id, last_event_type,
+              created_at, updated_at, terminal_at
+            FROM orchestration_runs
+            WHERE run_id = ?
+            LIMIT 1
+            """,
+            (run_id,),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row is None:
+            return None
+        return OrchestrationRun(
+            run_id=str(row[0]),
+            status=RunStatus(str(row[1])),
+            correlation_id=str(row[2]),
+            current_step_id=(str(row[3]) if row[3] else None),
+            last_event_type=str(row[4]),
+            created_at=str(row[5]),
+            updated_at=str(row[6]),
+            terminal_at=(str(row[7]) if row[7] else None),
+        )
+
+    async def create_run(self, *, run: OrchestrationRun) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO orchestration_runs(
+              run_id, status, correlation_id, current_step_id, last_event_type,
+              created_at, updated_at, terminal_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run.run_id,
+                run.status.value,
+                run.correlation_id,
+                run.current_step_id,
+                run.last_event_type,
+                run.created_at,
+                run.updated_at,
+                run.terminal_at,
+            ),
+        )
+        await self._db.commit()
+
+    async def update_run_status(
+        self,
+        *,
+        run_id: str,
+        status: RunStatus,
+        current_step_id: str | None,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+    ) -> None:
+        await self._db.execute(
+            """
+            UPDATE orchestration_runs
+            SET status = ?,
+                current_step_id = ?,
+                last_event_type = ?,
+                updated_at = ?,
+                terminal_at = ?
+            WHERE run_id = ?
+            """,
+            (
+                status.value,
+                current_step_id,
+                last_event_type,
+                updated_at,
+                terminal_at,
+                run_id,
+            ),
+        )
+        await self._db.commit()
+
+    async def list_in_flight_runs(self) -> list[OrchestrationRun]:
+        cursor = await self._db.execute("""
+            SELECT
+              run_id, status, correlation_id, current_step_id, last_event_type,
+              created_at, updated_at, terminal_at
+            FROM orchestration_runs
+            WHERE status IN ('PENDING', 'RUNNING')
+            ORDER BY created_at ASC, run_id ASC
+            """)
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [
+            OrchestrationRun(
+                run_id=str(row[0]),
+                status=RunStatus(str(row[1])),
+                correlation_id=str(row[2]),
+                current_step_id=(str(row[3]) if row[3] else None),
+                last_event_type=str(row[4]),
+                created_at=str(row[5]),
+                updated_at=str(row[6]),
+                terminal_at=(str(row[7]) if row[7] else None),
+            )
+            for row in rows
+        ]
+
+    async def get_step(self, *, run_id: str, step_id: str) -> OrchestrationStep | None:
+        cursor = await self._db.execute(
+            """
+            SELECT
+              step_id, run_id, status, last_event_type, created_at, updated_at, terminal_at
+            FROM orchestration_run_steps
+            WHERE run_id = ? AND step_id = ?
+            LIMIT 1
+            """,
+            (run_id, step_id),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row is None:
+            return None
+        return OrchestrationStep(
+            step_id=str(row[0]),
+            run_id=str(row[1]),
+            status=StepStatus(str(row[2])),
+            last_event_type=str(row[3]),
+            created_at=str(row[4]),
+            updated_at=str(row[5]),
+            terminal_at=(str(row[6]) if row[6] else None),
+        )
+
+    async def create_step(self, *, step: OrchestrationStep) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO orchestration_run_steps(
+              step_id, run_id, status, last_event_type, created_at, updated_at, terminal_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                step.step_id,
+                step.run_id,
+                step.status.value,
+                step.last_event_type,
+                step.created_at,
+                step.updated_at,
+                step.terminal_at,
+            ),
+        )
+        await self._db.commit()
+
+    async def update_step_status(
+        self,
+        *,
+        run_id: str,
+        step_id: str,
+        status: StepStatus,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+    ) -> None:
+        await self._db.execute(
+            """
+            UPDATE orchestration_run_steps
+            SET status = ?,
+                last_event_type = ?,
+                updated_at = ?,
+                terminal_at = ?
+            WHERE run_id = ? AND step_id = ?
+            """,
+            (status.value, last_event_type, updated_at, terminal_at, run_id, step_id),
+        )
+        await self._db.commit()
+
+    async def append_timeline_entry(self, *, entry: RunTimelineEntry) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO orchestration_run_timeline(
+              id, run_id, step_id, message_id, event_type, decision, reason_code, reason_message,
+              correlation_id, causation_id, payload_json, occurred_at, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entry.id,
+                entry.run_id,
+                entry.step_id,
+                entry.message_id,
+                entry.event_type,
+                entry.decision.value,
+                entry.reason_code,
+                entry.reason_message,
+                entry.correlation_id,
+                entry.causation_id,
+                json.dumps(entry.payload, separators=(",", ":"), sort_keys=True),
+                entry.occurred_at,
+                entry.created_at,
+            ),
+        )
+        await self._db.commit()
