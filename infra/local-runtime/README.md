@@ -1,6 +1,6 @@
 # Local runtime (Docker + Dapr)
 
-Deterministic local stack for Mission Control story MC-415.
+Deterministic local stack for Mission Control stories MC-415 and MC-372.
 
 ## Topology
 
@@ -8,7 +8,7 @@ Deterministic local stack for Mission Control story MC-415.
 - `redis`
 - `api` (FastAPI on `:5001`)
 - `web` (Next.js on `:3000`)
-- `worker` (heartbeat worker validating API + Redis reachability)
+- `worker` (HTTP worker that publishes orchestration heartbeats via Dapr pub/sub and receives API acknowledgements via Dapr service invocation)
 - `dapr-placement`
 - Dapr sidecars: `dapr-api`, `dapr-web`, `dapr-worker`
 
@@ -21,6 +21,22 @@ CLI stays host-executed (`apps/cli`), not containerized.
 ```
 
 This creates `infra/local-runtime/.env` from `.env.example` when missing and starts all services with health-gated startup (`docker compose up -d --wait`).
+
+`up.sh` also performs explicit Dapr metadata validation on API/Web/Worker sidecars and fails fast when required components are not loaded.
+
+## Dapr component versioning and overrides
+
+Defaults are defined in `infra/local-runtime/.env.example`:
+
+- `MC_DAPR_VERSION=1.14.4` — pins both `daprio/dapr` and `daprio/daprd` images.
+- `MC_DAPR_COMPONENTS_PATH=./dapr/components` — mounted component manifest directory.
+- `MC_WORKER_PUBLISH_INTERVAL_SECONDS=15` — worker heartbeat publish cadence.
+
+Override strategy:
+
+1. Copy `.env.example` to `.env` (auto-created by `up.sh` if missing).
+2. Override values in `.env` for local experiments.
+3. Keep component manifests in version control under `infra/local-runtime/dapr/components/` so startup is reproducible across machines.
 
 ## Lifecycle
 
@@ -50,7 +66,7 @@ If API fails with corruption diagnostics, restore from latest verified backup an
 - `redis`: `redis-cli ping` must return success.
 - `api`: `GET /healthz` responds.
 - `web`: root page (`/`) responds.
-- `worker`: API and Redis reachability checks pass.
+- `worker`: `/healthz` responds and reports last Dapr publish/ack state.
 - `dapr-*`: tied to app container lifecycles (`network_mode: service:<app>`), started after app readiness.
 
 ## Triage for unhealthy services
@@ -78,3 +94,4 @@ If API fails with corruption diagnostics, restore from latest verified backup an
 1. `docker compose -f infra/local-runtime/docker-compose.yml logs dapr-placement dapr-api dapr-web dapr-worker --tail=200`
 2. Confirm component files are mounted under `/components`.
 3. Check sidecar app binding ports (`--app-port`) match app services.
+4. Run `./infra/local-runtime/up.sh` and verify no `Dapr metadata missing components` error is reported.

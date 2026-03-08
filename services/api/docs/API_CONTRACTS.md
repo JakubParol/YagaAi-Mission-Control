@@ -1185,6 +1185,57 @@ Transactional guarantee:
 - command and outbox inserts are performed in one DB transaction,
 - on outbox insert failure, command insert is rolled back (no partial write).
 
+### 6.2) Dapr bridge endpoints (local runtime)
+
+These endpoints support local runtime event exchange between worker and API via Dapr pub/sub + service invocation.
+
+#### `GET /dapr/subscribe` — Dapr subscription discovery
+
+Returns runtime subscription contract for Dapr sidecar:
+
+```jsonc
+[
+  {
+    "pubsubname": "local-pubsub",
+    "topic": "orchestration.events",
+    "routes": {
+      "default": "v1/orchestration/dapr/events"
+    }
+  }
+]
+```
+
+#### `POST /v1/orchestration/dapr/events` — Worker event ingress (via Dapr pub/sub)
+
+Accepts Dapr CloudEvent envelope (or plain JSON fallback), persists the latest run event into Dapr state store (`local-statestore`), then invokes worker ack endpoint through Dapr service invocation:
+
+- state write: `POST /v1.0/state/local-statestore` (through sidecar),
+- invocation: `POST /v1.0/invoke/mission-control-worker/method/orchestration/ack` (through sidecar).
+
+Success response `200`:
+
+```jsonc
+{
+  "status": "SUCCESS",
+  "run_id": "local-run-123",
+  "occurred_at": "2026-03-08T12:00:00Z"
+}
+```
+
+Failure mode:
+- if state write or worker invocation through Dapr fails, endpoint returns `503` with root-cause details in `detail`.
+
+#### `GET /healthz/dapr` — Dapr sidecar readiness probe
+
+Checks API-side Dapr metadata endpoint (`/v1.0/metadata`) and returns:
+
+```jsonc
+{ "status": "ok" }
+```
+
+Failure mode:
+- returns `503` when sidecar metadata is unreachable.
+
 ---
 
 ## Navigation

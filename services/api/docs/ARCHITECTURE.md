@@ -191,7 +191,7 @@ Local dev can use `services/api/.env.local` (preferred) or `.env`.
 ## 7) API Versioning & Routing
 
 - All module endpoints live under `/v1/{module}`.
-- Health check (`/healthz`) stays at root (unversioned).
+- Root (unversioned) endpoints are reserved for platform hooks (`/healthz`, `/dapr/subscribe`, `/healthz/dapr`).
 - Each module has its own `router.py` aggregating sub-routers.
 
 ```python
@@ -199,12 +199,14 @@ Local dev can use `services/api/.env.local` (preferred) or `.env`.
 from app.shared.api.health import health_router
 from app.planning.api.router import planning_router
 from app.observability.api.router import observability_router
+from app.orchestration.api.dapr_router import orchestration_dapr_router
 from app.orchestration.api.router import orchestration_router
 
 app.include_router(health_router)
 app.include_router(planning_router, prefix="/v1/planning")
 app.include_router(observability_router, prefix="/v1/observability")
 app.include_router(orchestration_router, prefix="/v1/orchestration")
+app.include_router(orchestration_dapr_router)
 ```
 
 When v2 is needed, add v2 routers per module. Old versions stay until deprecated.
