@@ -1256,6 +1256,34 @@ Contract guarantees:
 - filtering is available for run id, run status, event type, and time range.
 - pagination order is deterministic and stable for repeated queries.
 
+#### `GET /v1/orchestration/metrics` — Get orchestration health metrics
+
+Returns local-runtime diagnostics for queue health and failure paths.
+
+Response `200`:
+```jsonc
+{
+  "data": {
+    "queue_pending": 2,
+    "queue_oldest_pending_age_seconds": 14,
+    "retries_total": 6,
+    "dead_letter_total": 1,
+    "watchdog_interventions": 3,
+    "run_latency_avg_ms": 412.5,
+    "run_latency_p95_ms": 900.0,
+    "generated_at": "2026-03-08T12:00:00Z"
+  }
+}
+```
+
+Field semantics:
+- `queue_pending`: outbox rows currently waiting for delivery (`status=PENDING`).
+- `queue_oldest_pending_age_seconds`: age of oldest pending outbox item (seconds, nullable when queue empty).
+- `retries_total`: outbox rows with `retry_attempt > 1`.
+- `dead_letter_total`: outbox rows dead-lettered or marked failed.
+- `watchdog_interventions`: accepted timeline entries of `orchestration.watchdog.action`.
+- `run_latency_*`: latency distribution over terminal runs (`terminal_at - created_at`, milliseconds).
+
 ### 6.3) Dapr bridge endpoints (local runtime)
 
 These endpoints support local runtime event exchange between worker and API via Dapr pub/sub + service invocation.
@@ -1295,6 +1323,11 @@ Success response `200`:
 
 Failure mode:
 - if state write or worker invocation through Dapr fails, endpoint returns `503` with root-cause details in `detail`.
+
+Trace/correlation handling:
+- `correlation_id` is read from event payload (`data.correlation_id`) or CloudEvent `traceid`.
+- `causation_id` is read from `data.causation_id`; if absent, `traceparent` is used as fallback.
+- extracted `correlation_id`/`causation_id` are propagated into run timeline records and worker ack payload.
 
 #### `GET /healthz/dapr` — Dapr sidecar readiness probe
 

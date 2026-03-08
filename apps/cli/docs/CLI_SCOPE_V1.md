@@ -33,6 +33,7 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 - Run command submission (`/commands`)
 - Run status read model (`/runs/{run_id}`)
 - Run timeline tailing (`/timeline`)
+- Run health metrics (`/metrics`)
 
 ## Endpoint-to-Command Mapping (v1)
 
@@ -53,6 +54,7 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 | `/v1/orchestration/commands` | `mc run submit ...` |
 | `/v1/orchestration/runs/{run_id}` | `mc run status --run-id <id>` |
 | `/v1/orchestration/timeline` | `mc run tail --run-id <id> ...` |
+| `/v1/orchestration/metrics` | `mc run metrics` |
 
 ## Non-goals (v1)
 

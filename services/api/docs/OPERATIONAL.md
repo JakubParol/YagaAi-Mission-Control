@@ -48,20 +48,26 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 
 ### Structured Logging
 
-- All logs are JSON-formatted (structured).
-- Every request gets a `request_id` (UUID, via `X-Request-Id` header or auto-generated).
-- Log fields: `timestamp`, `level`, `request_id`, `method`, `path`, `status_code`, `duration_ms`, `actor_id`.
-- Use Python `logging` with a JSON formatter (e.g. `python-json-logger`).
+- All API logs are JSON-formatted (structured) and include an `event` field.
+- Every request gets a `request_id` (`X-Request-Id` header or auto-generated UUID) and the response echoes it.
+- Request completion/failure logs include: `request_id`, `method`, `path`, `status_code`, `duration_ms`, `actor_id`, `actor_type`, and optional `correlation_id`.
+- Orchestration services emit correlation-aware events (`orchestration.command.accepted`, `orchestration.worker.transition_applied`, `orchestration.delivery.retry_scheduled`, `orchestration.delivery.dead_lettered`, `orchestration.watchdog.action_applied`).
 
 ### Health Check
 
 - `GET /healthz` — existing endpoint, returns `{"status": "ok"}`.
 - Future: add `/readyz` that checks DB connectivity.
 
-### Metrics (v2)
+### Metrics
 
-- Deferred: Prometheus metrics via `prometheus-fastapi-instrumentator` or similar.
-- Key metrics: request count, latency histogram, error rate by endpoint.
+- Orchestration operational metrics are exposed via `GET /v1/orchestration/metrics`.
+- Current metrics: queue pending + oldest age, retries total, dead-letter total, watchdog interventions, terminal run latency avg/p95.
+- This endpoint is intended for local runtime diagnostics and incident triage.
+
+### Trace Context
+
+- Dapr ingress (`POST /v1/orchestration/dapr/events`) propagates `correlation_id` and `causation_id` into worker state-machine timeline writes.
+- Fallback behavior: when `data.causation_id` is absent, CloudEvent `traceparent` is used as `causation_id`.
 
 ---
 
@@ -105,7 +111,7 @@ Implementation:
 | Optimistic locking (ETag/version) | SQLite serialization sufficient for v1 | v2 |
 | Comments & attachments endpoints | Lower priority, entities exist in DB | v1.1 |
 | Agents sync | `POST /v1/planning/agents/sync` upserts/deactivates by OpenClaw config; manual agents remain untouched | v1.1 |
-| Prometheus metrics | Structured logs sufficient for v1 | v2 |
+| Prometheus exporter / scraping | JSON/API metrics are sufficient for local runtime v1 | v2 |
 
 ---
 
