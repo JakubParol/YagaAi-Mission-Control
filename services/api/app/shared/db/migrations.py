@@ -165,6 +165,7 @@ def _migration_20260308_001(db: sqlite3.Connection) -> None:
           published_at TEXT,
           last_error TEXT,
           dead_lettered_at TEXT,
+          dead_letter_payload_json TEXT,
           created_at TEXT NOT NULL
         )
         """)
@@ -191,6 +192,8 @@ def _migration_20260308_002(db: sqlite3.Connection) -> None:
         )
     if not _column_exists(db, "orchestration_outbox", "dead_lettered_at"):
         db.execute("ALTER TABLE orchestration_outbox ADD COLUMN dead_lettered_at TEXT")
+    if not _column_exists(db, "orchestration_outbox", "dead_letter_payload_json"):
+        db.execute("ALTER TABLE orchestration_outbox ADD COLUMN dead_letter_payload_json TEXT")
 
 
 _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [

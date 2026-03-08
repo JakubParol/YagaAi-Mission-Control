@@ -121,6 +121,7 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "retry_attempt",
         "max_attempts",
         "dead_lettered_at",
+        "dead_letter_payload_json",
     }.issubset(outbox_columns)
 
     active_sprints = conn.execute(

@@ -43,6 +43,7 @@ def db_path(tmp_path, monkeypatch):
           published_at TEXT,
           last_error TEXT,
           dead_lettered_at TEXT,
+          dead_letter_payload_json TEXT,
           created_at TEXT NOT NULL
         );
         """)

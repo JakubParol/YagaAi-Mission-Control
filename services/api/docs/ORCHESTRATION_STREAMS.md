@@ -67,6 +67,8 @@ When `attempt > max_attempts`, event is moved to dead-letter stream with replay 
 - `source_message_id`
 - `replay_hint`
 
+The API outbox persists dead-letter details in queryable fields (`dead_lettered_at`, `dead_letter_payload_json`) for operator diagnostics and replay tooling.
+
 ## Navigation
 
 - ↑ [Docs Index](./INDEX.md)
