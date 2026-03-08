@@ -105,7 +105,8 @@ class BacklogService:
 
         if "status" in data and not allow_status_update:
             raise BusinessRuleError(
-                "Backlog status is lifecycle-managed. Use /backlogs/{id}/start or /backlogs/{id}/complete."
+                "Backlog status is lifecycle-managed. Use /backlogs/{id}/start "
+                "or /backlogs/{id}/complete."
             )
 
         if "kind" in data and not allow_kind_update:
@@ -352,7 +353,8 @@ class BacklogService:
         if unfinished_story_ids:
             preview = ", ".join(unfinished_story_ids[:5])
             raise BusinessRuleError(
-                f"Cannot complete sprint {backlog_id}; unfinished stories ({len(unfinished_story_ids)}): {preview}"
+                f"Cannot complete sprint {backlog_id}; "
+                f"unfinished stories ({len(unfinished_story_ids)}): {preview}"
             )
 
         updated = await self.update_backlog(
@@ -403,7 +405,8 @@ class BacklogService:
             }
         if current_backlog_id != product_backlog.id:
             raise BusinessRuleError(
-                f"Story {story_id} must be in product backlog {product_backlog.id} to join active sprint"
+                f"Story {story_id} must be in product backlog {product_backlog.id} "
+                "to join active sprint"
             )
 
         moved_item = await self._repo.move_story_item(
@@ -455,7 +458,8 @@ class BacklogService:
             }
         if current_backlog_id != sprint.id:
             raise BusinessRuleError(
-                f"Story {story_id} must be in active sprint {sprint.id} to return to product backlog"
+                f"Story {story_id} must be in active sprint {sprint.id} "
+                "to return to product backlog"
             )
 
         moved_item = await self._repo.move_story_item(

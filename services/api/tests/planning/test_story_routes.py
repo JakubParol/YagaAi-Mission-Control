@@ -5,7 +5,8 @@ Coverage:
 - POST /v1/planning/stories — create with/without project, with epic, key generation
 - GET /v1/planning/stories — list with project/epic/status filters, pagination, sorting
 - GET /v1/planning/stories/{id} — single story with task_count aggregation
-- PATCH /v1/planning/stories/{id} — update fields, status transitions, completed_at/started_at lifecycle
+- PATCH /v1/planning/stories/{id} — update fields, status transitions,
+  completed_at/started_at lifecycle
 - DELETE /v1/planning/stories/{id} — hard delete, ON DELETE SET NULL on tasks
 - POST /v1/planning/stories/{id}/labels — attach label (conflict, not found)
 - DELETE /v1/planning/stories/{id}/labels/{label_id} — detach label
@@ -416,7 +417,7 @@ def test_update_story_in_progress_sets_started_at(client) -> None:
 
     # started_at should not change on subsequent status updates
     first_started = data["started_at"]
-    resp2 = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "CODE_REVIEW"})
+    client.patch(f"/v1/planning/stories/{story_id}", json={"status": "CODE_REVIEW"})
     resp3 = client.patch(f"/v1/planning/stories/{story_id}", json={"status": "IN_PROGRESS"})
     assert resp3.json()["data"]["started_at"] == first_started
 

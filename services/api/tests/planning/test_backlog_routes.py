@@ -353,7 +353,8 @@ def test_list_backlogs_repairs_multiple_active_sprints_and_creates_index(client,
 
     check = sqlite3.connect(db_path)
     active_count = check.execute(
-        "SELECT COUNT(*) FROM backlogs WHERE project_id = 'p1' AND kind = 'SPRINT' AND status = 'ACTIVE'"
+        "SELECT COUNT(*) FROM backlogs WHERE project_id = 'p1' "
+        "AND kind = 'SPRINT' AND status = 'ACTIVE'"
     ).fetchone()[0]
     idx_row = check.execute(
         "SELECT name FROM sqlite_master WHERE type = 'index' "

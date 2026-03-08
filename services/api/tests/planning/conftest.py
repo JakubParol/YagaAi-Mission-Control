@@ -273,7 +273,10 @@ def _setup_test_db(tmp_path, monkeypatch):
 
         INSERT INTO agents (id, openclaw_key, name, last_name, initials, role, avatar, is_active, source, created_at, updated_at)
         VALUES
-          ('a1', 'agent-1', 'Agent', 'Alpha', 'AA', 'developer', 'https://cdn.example.com/agent-1.png', 1, 'manual', '{TS}', '{TS}'),
+          (
+            'a1', 'agent-1', 'Agent', 'Alpha', 'AA', 'developer',
+            'https://cdn.example.com/agent-1.png', 1, 'manual', '{TS}', '{TS}'
+          ),
           ('a2', 'agent-2', 'Agent', 'Beta', NULL, 'reviewer', NULL, 1, 'manual', '{TS}', '{TS}');
         """)
     conn.close()

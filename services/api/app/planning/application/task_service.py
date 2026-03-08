@@ -74,7 +74,8 @@ class TaskService:
                 project_id = story_project_id
             elif project_id != story_project_id:
                 raise ConflictError(
-                    f"Task project {project_id} conflicts with story {story_id} project {story_project_id}"
+                    f"Task project {project_id} conflicts with story {story_id} "
+                    f"project {story_project_id}"
                 )
 
         key: str | None = None
@@ -149,7 +150,8 @@ class TaskService:
                 raise ValidationError(f"Story {data['story_id']} does not exist")
             if existing.project_id != story_project_id:
                 raise ConflictError(
-                    f"Task project {existing.project_id} conflicts with story {data['story_id']} project {story_project_id}"
+                    f"Task project {existing.project_id} conflicts with story {data['story_id']} "
+                    f"project {story_project_id}"
                 )
 
         if blocked_reason_in_payload and blocked_reason is not None and not next_is_blocked:

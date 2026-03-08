@@ -589,7 +589,9 @@ class SqliteEpicRepository(EpicRepository):
             "    s.epic_id AS epic_id, "
             "    COUNT(*) AS stories_total, "
             "    SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END) AS stories_done, "
-            "    SUM(CASE WHEN s.status = 'DONE' AND s.completed_at IS NOT NULL AND s.completed_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS stories_done_last_7d, "
+            "    SUM(CASE WHEN s.status = 'DONE' AND s.completed_at IS NOT NULL "
+            "             AND s.completed_at >= datetime('now', '-7 days') "
+            "        THEN 1 ELSE 0 END) AS stories_done_last_7d, "
             "    SUM(CASE WHEN s.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS stories_in_progress, "
             "    SUM(CASE WHEN s.is_blocked = 1 THEN 1 ELSE 0 END) AS blocked_count "
             "  FROM stories s "
@@ -1471,8 +1473,16 @@ class SqliteBacklogRepository(BacklogRepository):
                       e.key AS epic_key,
                       e.title AS epic_title,
                       bs.position,
-                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0) AS task_count,
-                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id AND t.status = 'DONE'), 0) AS done_task_count
+                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0)
+                        AS task_count,
+                      COALESCE(
+                        (
+                          SELECT COUNT(*)
+                          FROM tasks t
+                          WHERE t.story_id = s.id AND t.status = 'DONE'
+                        ),
+                        0
+                      ) AS done_task_count
                FROM backlog_stories bs
                JOIN stories s ON s.id = bs.story_id
                LEFT JOIN epics e ON e.id = s.epic_id
@@ -1518,8 +1528,16 @@ class SqliteBacklogRepository(BacklogRepository):
                       e.key AS epic_key,
                       e.title AS epic_title,
                       bs.position,
-                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0) AS task_count,
-                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id AND t.status = 'DONE'), 0) AS done_task_count
+                      COALESCE((SELECT COUNT(*) FROM tasks t WHERE t.story_id = s.id), 0)
+                        AS task_count,
+                      COALESCE(
+                        (
+                          SELECT COUNT(*)
+                          FROM tasks t
+                          WHERE t.story_id = s.id AND t.status = 'DONE'
+                        ),
+                        0
+                      ) AS done_task_count
                FROM backlog_stories bs
                JOIN stories s ON s.id = bs.story_id
                LEFT JOIN epics e ON e.id = s.epic_id
