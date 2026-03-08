@@ -45,6 +45,35 @@ Override strategy:
 ./infra/local-runtime/reset.sh  # stop runtime and remove volumes (fresh state)
 ```
 
+## Orchestration smoke suite (MC-378)
+
+Run deterministic orchestration smoke coverage (happy path + retry + dead-letter + watchdog):
+
+```bash
+./infra/local-runtime/scripts/orchestration-smoke.py
+```
+
+Run against an already running stack:
+
+```bash
+./infra/local-runtime/scripts/orchestration-smoke.py --skip-up
+```
+
+CI-style (runtime booted separately, non-default API host):
+
+```bash
+./infra/local-runtime/scripts/orchestration-smoke.py --skip-up --api-base http://127.0.0.1:5101
+```
+
+The script emits JSONL diagnostics for each scenario and suite summary. Failure entries include:
+
+- `scenario`
+- `component` (implicated service/module)
+- `run_id`
+- `correlation_id`
+- `message`
+- `details`
+
 ## SQLite durability (backup & restore)
 
 - Persistent DB path inside runtime: `/runtime/sqlite/mission-control.db` (api/web) backed by Docker volume `sqlite-data` (`/data/mission-control.db` in sqlite service).
