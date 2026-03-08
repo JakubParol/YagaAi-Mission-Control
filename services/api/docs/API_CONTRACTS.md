@@ -1,7 +1,7 @@
 # API Contracts — Mission Control v1
 
-**Status:** Draft v1.2
-**Date:** 2026-03-01
+**Status:** Draft v1.3
+**Date:** 2026-03-08
 **Applies to:** `services/api` — all `/v1` module endpoints
 
 ---
@@ -1087,6 +1087,96 @@ Response:
   }
 }
 ```
+
+---
+
+## 6) Orchestration Module — `/v1/orchestration`
+
+### 6.1) Commands
+
+**Base path:** `/v1/orchestration/commands`
+
+#### `POST /v1/orchestration/commands` — Submit orchestration command
+
+Accepts a versioned command envelope, validates taxonomy and metadata, and atomically persists:
+- command record (`orchestration_commands`),
+- derived accepted event in transactional outbox (`orchestration_outbox`).
+
+Response `202`:
+```jsonc
+{
+  "data": {
+    "status": "ACCEPTED",
+    "command": {
+      "id": "...",
+      "kind": "COMMAND",
+      "type": "orchestration.run.submit",
+      "schema_version": "1.0",
+      "occurred_at": "2026-03-08T09:00:00Z",
+      "producer": "mc-cli",
+      "correlation_id": "corr-123",
+      "causation_id": null,
+      "payload": { "run_id": "run-123" }
+    },
+    "outbox_event": {
+      "id": "...",
+      "kind": "EVENT",
+      "type": "orchestration.run.submit.accepted",
+      "schema_version": "1.0",
+      "occurred_at": "2026-03-08T09:00:00Z",
+      "producer": "mc-cli",
+      "correlation_id": "corr-123",
+      "causation_id": null,
+      "payload": {
+        "accepted_command_id": "...",
+        "accepted_command_type": "orchestration.run.submit",
+        "command_payload": { "run_id": "run-123" }
+      }
+    }
+  }
+}
+```
+
+Request:
+```jsonc
+{
+  "command_type": "orchestration.run.submit",
+  "schema_version": "1.0",
+  "payload": { "run_id": "run-123" },
+  "metadata": {
+    "producer": "mc-cli",
+    "correlation_id": "corr-123",
+    "causation_id": null,
+    "occurred_at": "2026-03-08T09:00:00Z"
+  }
+}
+```
+
+Validation rules:
+- `command_type` must follow taxonomy `domain.aggregate.action` (lowercase segments),
+- `schema_version` must match `<major>.<minor>`,
+- supported schema range: `1.0` through `1.1`,
+- metadata fields `producer`, `correlation_id`, `occurred_at` are required and non-blank.
+
+Validation errors return `400` with machine-actionable `details`:
+```jsonc
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Unsupported schema minor version",
+    "details": [
+      {
+        "field": "schema_version",
+        "message": "supported minor range is 0-1; got 2"
+      }
+    ]
+  }
+}
+```
+
+Transactional guarantee:
+- command and outbox inserts are performed in one DB transaction,
+- on outbox insert failure, command insert is rolled back (no partial write).
 
 ---
 

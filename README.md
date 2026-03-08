@@ -1,6 +1,6 @@
 # Mission Control
 
-Management platform for AI agent workflows. Combines a web dashboard with a REST API powering two domain modules: **planning** (work management) and **observability** (LLM costs).
+Management platform for AI agent workflows. Combines a web dashboard with a REST API powering three domain modules: **planning** (work management), **observability** (LLM costs), and **orchestration** (versioned command intake + transactional outbox).
 
 ## Repository Structure
 
