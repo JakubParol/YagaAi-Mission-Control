@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3100"]
+    orchestration_stream_prefix: str = "mc:orchestration"
+    orchestration_stream_version: int = 1
+    orchestration_stream_partitions: int = 8
+    orchestration_worker_consumer_group: str = "orchestration-workers-v1"
+    orchestration_watchdog_consumer_group: str = "orchestration-watchdog-v1"
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 
