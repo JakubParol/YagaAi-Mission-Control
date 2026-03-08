@@ -102,6 +102,7 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "20260307_004",
         "20260308_001",
         "20260308_002",
+        "20260308_003",
     ]
 
     command_columns = {
@@ -123,6 +124,22 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "dead_lettered_at",
         "dead_letter_payload_json",
     }.issubset(outbox_columns)
+
+    consumer_offset_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(orchestration_consumer_offsets)").fetchall()
+    }
+    assert {"stream_key", "consumer_group", "consumer_name", "last_message_id"}.issubset(
+        consumer_offset_columns
+    )
+
+    processed_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(orchestration_processed_messages)").fetchall()
+    }
+    assert {"stream_key", "consumer_group", "message_id", "correlation_id"}.issubset(
+        processed_columns
+    )
 
     active_sprints = conn.execute(
         "SELECT COUNT(*) FROM backlogs WHERE project_id='p1' AND kind='SPRINT' AND status='ACTIVE'"

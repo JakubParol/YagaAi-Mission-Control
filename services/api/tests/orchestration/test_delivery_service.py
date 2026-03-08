@@ -57,6 +57,46 @@ class _FakeRepo(OrchestrationRepository):
             "dead_letter_payload": dead_letter_payload,
         }
 
+    async def get_consumer_offset(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+    ) -> str | None:
+        return None
+
+    async def upsert_consumer_offset(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        last_message_id: str,
+        updated_at: str,
+    ) -> None:
+        return None
+
+    async def is_message_processed(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        message_id: str,
+    ) -> bool:
+        return False
+
+    async def mark_message_processed(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None:
+        return None
+
 
 def _event(*, retry_attempt: int, max_attempts: int = 3) -> OutboxEventEnvelope:
     return OutboxEventEnvelope(

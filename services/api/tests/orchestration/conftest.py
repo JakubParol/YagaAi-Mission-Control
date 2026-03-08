@@ -46,6 +46,24 @@ def db_path(tmp_path, monkeypatch):
           dead_letter_payload_json TEXT,
           created_at TEXT NOT NULL
         );
+
+        CREATE TABLE orchestration_consumer_offsets (
+          stream_key TEXT NOT NULL,
+          consumer_group TEXT NOT NULL,
+          consumer_name TEXT NOT NULL,
+          last_message_id TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (stream_key, consumer_group, consumer_name)
+        );
+
+        CREATE TABLE orchestration_processed_messages (
+          stream_key TEXT NOT NULL,
+          consumer_group TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          processed_at TEXT NOT NULL,
+          PRIMARY KEY (stream_key, consumer_group, message_id)
+        );
         """)
     conn.close()
 

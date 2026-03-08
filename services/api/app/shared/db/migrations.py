@@ -196,6 +196,33 @@ def _migration_20260308_002(db: sqlite3.Connection) -> None:
         db.execute("ALTER TABLE orchestration_outbox ADD COLUMN dead_letter_payload_json TEXT")
 
 
+def _migration_20260308_003(db: sqlite3.Connection) -> None:
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_consumer_offsets (
+          stream_key TEXT NOT NULL,
+          consumer_group TEXT NOT NULL,
+          consumer_name TEXT NOT NULL,
+          last_message_id TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (stream_key, consumer_group, consumer_name)
+        )
+        """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_processed_messages (
+          stream_key TEXT NOT NULL,
+          consumer_group TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          processed_at TEXT NOT NULL,
+          PRIMARY KEY (stream_key, consumer_group, message_id)
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_processed_messages_correlation
+          ON orchestration_processed_messages(correlation_id)
+        """)
+
+
 _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (Migration("20260307_001", "add missing agents profile columns"), _migration_20260307_001),
     (Migration("20260307_002", "add stories.current_assignee_agent_id"), _migration_20260307_002),
@@ -211,6 +238,10 @@ _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (
         Migration("20260308_002", "add orchestration outbox retry/dead-letter columns"),
         _migration_20260308_002,
+    ),
+    (
+        Migration("20260308_003", "create orchestration consumer recovery tables"),
+        _migration_20260308_003,
     ),
 ]
 

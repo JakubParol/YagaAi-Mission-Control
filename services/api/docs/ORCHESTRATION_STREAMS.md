@@ -69,6 +69,18 @@ When `attempt > max_attempts`, event is moved to dead-letter stream with replay 
 
 The API outbox persists dead-letter details in queryable fields (`dead_lettered_at`, `dead_letter_payload_json`) for operator diagnostics and replay tooling.
 
+## Restart/rebalance recovery contract
+
+Consumer recovery state is persisted to support restart and rebalance scenarios:
+
+- `orchestration_consumer_offsets`: checkpoint (`last_message_id`) per `stream_key + consumer_group + consumer_name`
+- `orchestration_processed_messages`: idempotency ledger keyed by `stream_key + consumer_group + message_id`
+
+Worker loop should:
+1. Read checkpoint on startup (`0-0` fallback if missing).
+2. Skip message processing when idempotency ledger already contains the message id.
+3. After successful processing, append to idempotency ledger and advance checkpoint.
+
 ## Navigation
 
 - ↑ [Docs Index](./INDEX.md)

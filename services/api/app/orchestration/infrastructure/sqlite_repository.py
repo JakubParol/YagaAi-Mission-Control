@@ -171,3 +171,85 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             ),
         )
         await self._db.commit()
+
+    async def get_consumer_offset(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+    ) -> str | None:
+        cursor = await self._db.execute(
+            """
+            SELECT last_message_id
+            FROM orchestration_consumer_offsets
+            WHERE stream_key = ? AND consumer_group = ? AND consumer_name = ?
+            LIMIT 1
+            """,
+            (stream_key, consumer_group, consumer_name),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return str(row[0]) if row else None
+
+    async def upsert_consumer_offset(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        last_message_id: str,
+        updated_at: str,
+    ) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO orchestration_consumer_offsets(
+              stream_key, consumer_group, consumer_name, last_message_id, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(stream_key, consumer_group, consumer_name)
+            DO UPDATE SET last_message_id=excluded.last_message_id, updated_at=excluded.updated_at
+            """,
+            (stream_key, consumer_group, consumer_name, last_message_id, updated_at),
+        )
+        await self._db.commit()
+
+    async def is_message_processed(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        message_id: str,
+    ) -> bool:
+        cursor = await self._db.execute(
+            """
+            SELECT 1
+            FROM orchestration_processed_messages
+            WHERE stream_key = ? AND consumer_group = ? AND message_id = ?
+            LIMIT 1
+            """,
+            (stream_key, consumer_group, message_id),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return row is not None
+
+    async def mark_message_processed(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None:
+        await self._db.execute(
+            """
+            INSERT OR IGNORE INTO orchestration_processed_messages(
+              stream_key, consumer_group, message_id, correlation_id, processed_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (stream_key, consumer_group, message_id, correlation_id, processed_at),
+        )
+        await self._db.commit()
