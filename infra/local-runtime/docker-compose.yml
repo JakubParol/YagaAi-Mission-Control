@@ -115,11 +115,11 @@ services:
       start_period: 15s
 
   dapr-placement:
-    image: daprio/dapr:1.14.4
+    image: daprio/dapr:${MC_DAPR_VERSION:-1.14.4}
     command: ["./placement", "--port", "50006"]
 
   dapr-api:
-    image: daprio/daprd:1.14.4
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
     network_mode: service:api
     depends_on:
       api:
@@ -141,10 +141,10 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ./dapr/components:/components
+      - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
   dapr-web:
-    image: daprio/daprd:1.14.4
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
     network_mode: service:web
     depends_on:
       web:
@@ -166,10 +166,10 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ./dapr/components:/components
+      - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
   dapr-worker:
-    image: daprio/daprd:1.14.4
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
     network_mode: service:worker
     depends_on:
       worker:
@@ -189,7 +189,7 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ./dapr/components:/components
+      - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
 volumes:
   sqlite-data:
