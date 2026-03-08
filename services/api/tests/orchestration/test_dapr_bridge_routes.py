@@ -59,6 +59,16 @@ def test_dapr_subscribe_contract(client) -> None:
     ]
 
 
+def test_dapr_subscribe_returns_empty_when_ingest_disabled(client, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.orchestration.api.dapr_router.settings.orchestration_dapr_ingest_enabled", False
+    )
+
+    response = client.get("/dapr/subscribe")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_dapr_healthz_success(client) -> None:
     fake = _FakeAsyncClient(
         get_responses=[
@@ -213,3 +223,19 @@ def test_dapr_event_bridge_uses_traceparent_as_fallback_causation(client, db_pat
     ).fetchone()
     conn.close()
     assert row == ("00-fallback-parent-span-01",)
+
+
+def test_dapr_event_bridge_returns_ignored_when_ingest_disabled(client, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.orchestration.api.dapr_router.settings.orchestration_dapr_ingest_enabled", False
+    )
+
+    response = client.post(
+        "/v1/orchestration/dapr/events",
+        json={"data": {"run_id": "run-ignored", "correlation_id": "corr-ignored"}},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "IGNORED"
+    assert payload["reason"] == "ORCHESTRATION_DAPR_INGEST_DISABLED"

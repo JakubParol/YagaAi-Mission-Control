@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.config import settings
 from app.orchestration.api.schemas import (
     EnvelopePayload,
     OrchestrationHealthMetricsResponse,
@@ -33,11 +34,24 @@ from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 router = APIRouter(tags=["orchestration"])
 
 
+def _ensure_capability_enabled(*, enabled: bool, capability: str) -> None:
+    if enabled:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=f"Orchestration capability disabled: {capability}",
+    )
+
+
 @router.post("/commands", status_code=202)
 async def submit_command(
     body: SubmitCommandRequest,
     service: CommandService = Depends(get_command_service),
 ) -> Envelope[SubmitCommandResponse]:
+    _ensure_capability_enabled(
+        enabled=settings.orchestration_commands_enabled,
+        capability="orchestration.commands",
+    )
     command, outbox_event = await service.submit_command(
         command_type=body.command_type,
         schema_version=body.schema_version,
@@ -77,6 +91,10 @@ async def watchdog_sweep(
     body: WatchdogSweepRequest,
     service: WatchdogService = Depends(get_watchdog_service),
 ) -> Envelope[WatchdogSweepResponse]:
+    _ensure_capability_enabled(
+        enabled=settings.orchestration_watchdog_enabled,
+        capability="orchestration.watchdog",
+    )
     decisions = await service.evaluate_stale_runs(
         watchdog_instance=body.watchdog_instance,
         evaluated_at=body.evaluated_at,

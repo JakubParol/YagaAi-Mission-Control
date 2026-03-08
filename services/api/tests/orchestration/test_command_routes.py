@@ -102,6 +102,18 @@ def test_submit_command_rejects_blank_metadata_with_details(client, db_path) -> 
     assert _count_rows(db_path, "orchestration_outbox") == 0
 
 
+def test_submit_command_returns_503_when_capability_disabled(client, monkeypatch, db_path) -> None:
+    monkeypatch.setattr(
+        "app.orchestration.api.router.settings.orchestration_commands_enabled", False
+    )
+
+    response = client.post("/v1/orchestration/commands", json=_valid_body())
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Orchestration capability disabled: orchestration.commands"
+    assert _count_rows(db_path, "orchestration_commands") == 0
+    assert _count_rows(db_path, "orchestration_outbox") == 0
+
+
 @pytest.mark.asyncio
 async def test_outbox_insert_failure_rolls_back_command_insert(db_path: str) -> None:
     async with aiosqlite.connect(db_path) as db:

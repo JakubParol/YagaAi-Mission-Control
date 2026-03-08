@@ -29,6 +29,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 |---|---|
 | [MC-386_USABILITY_TEST.md](./MC-386_USABILITY_TEST.md) | Internal usability scenarios and click-reduction evidence for epic overview UX |
 | [MC-416_FAILURE_TRIAGE_WALKTHROUGH.md](./MC-416_FAILURE_TRIAGE_WALKTHROUGH.md) | Operator walkthrough for orchestration timeline failure triage in `/planning/timeline` |
+| [MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md](./MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md) | Rollout controls, staged enablement matrix, rollback playbook, and operations runbook for orchestration runtime |
 | [README.md](../README.md) | Project overview, setup, deployment |
 | [AGENTS.md](../AGENTS.md) | AI agent context, rules, required reading |
 

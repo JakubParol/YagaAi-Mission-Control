@@ -32,6 +32,7 @@ PYLINT_TARGETS="app"
 if [[ "$SKIP_TESTS" == false ]]; then
     PYLINT_TARGETS="app tests"
 fi
+FORMAT_TARGETS="app tests"
 
 declare -A RESULTS
 FAILED=0
@@ -79,11 +80,11 @@ run_pylint() {
 
 # --- Black & isort ---
 if [[ "$FIX" == true ]]; then
-    run_tool "Black (fix)" black .
-    run_tool "isort (fix)" isort .
+    run_tool "Black (fix)" black $FORMAT_TARGETS
+    run_tool "isort (fix)" isort $FORMAT_TARGETS
 else
-    run_tool "Black (check)" black --check --diff .
-    run_tool "isort (check)" isort --check-only --diff .
+    run_tool "Black (check)" black --check --diff $FORMAT_TARGETS
+    run_tool "isort (check)" isort --check-only --diff $FORMAT_TARGETS
 fi
 
 # --- Pylint ---
@@ -102,8 +103,8 @@ run_tool "Bandit" bandit -r app -ll -ii -q
 if [[ "$FIX" == true ]]; then
     echo ""
     echo "› Post-fix checks"
-    poetry run black --check --diff . || true
-    poetry run isort --check-only --diff . || true
+    poetry run black --check --diff $FORMAT_TARGETS || true
+    poetry run isort --check-only --diff $FORMAT_TARGETS || true
 fi
 
 # --- Summary ---
