@@ -129,3 +129,58 @@ class RunTimelineEntry:
     payload: dict[str, Any]
     occurred_at: str
     created_at: str
+
+
+@dataclass
+class RunReadModel:
+    run_id: str
+    status: RunStatus
+    correlation_id: str
+    causation_id: str | None
+    current_step_id: str | None
+    last_event_type: str
+    run_type: str
+    lease_owner: str | None
+    lease_token: str | None
+    last_heartbeat_at: str | None
+    watchdog_timeout_at: str | None
+    watchdog_attempt: int
+    watchdog_state: str
+    terminal_at: str | None
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class TimelineEntryReadModel:
+    id: str
+    run_id: str
+    run_status: RunStatus
+    step_id: str | None
+    message_id: str | None
+    event_type: str
+    decision: TransitionDecision
+    reason_code: str | None
+    reason_message: str | None
+    correlation_id: str
+    causation_id: str | None
+    payload: dict[str, Any]
+    occurred_at: str
+    created_at: str
+
+
+@dataclass
+class RunAttemptReadModel:
+    outbox_event_id: str
+    command_id: str
+    run_id: str
+    event_type: str
+    occurred_at: str
+    status: OutboxStatus
+    retry_attempt: int
+    max_attempts: int
+    next_retry_at: str | None
+    dead_lettered_at: str | None
+    last_error: str | None
+    correlation_id: str
+    causation_id: str | None

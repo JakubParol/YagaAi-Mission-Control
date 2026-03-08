@@ -5,9 +5,12 @@ from app.orchestration.domain.models import (
     OrchestrationRun,
     OrchestrationStep,
     OutboxEventEnvelope,
+    RunAttemptReadModel,
+    RunReadModel,
     RunStatus,
     RunTimelineEntry,
     StepStatus,
+    TimelineEntryReadModel,
 )
 
 
@@ -166,3 +169,38 @@ class OrchestrationRepository(ABC):
         watchdog_state: str,
         clear_lease: bool,
     ) -> bool: ...
+
+    @abstractmethod
+    async def list_runs(
+        self,
+        *,
+        run_id: str | None,
+        status: RunStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[RunReadModel], int]: ...
+
+    @abstractmethod
+    async def get_run_read_model(self, *, run_id: str) -> RunReadModel | None: ...
+
+    @abstractmethod
+    async def list_timeline_entries(
+        self,
+        *,
+        run_id: str | None,
+        run_status: RunStatus | None,
+        event_type: str | None,
+        occurred_after: str | None,
+        occurred_before: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[TimelineEntryReadModel], int]: ...
+
+    @abstractmethod
+    async def list_run_attempts(
+        self,
+        *,
+        run_id: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[RunAttemptReadModel], int]: ...
