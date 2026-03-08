@@ -151,6 +151,16 @@ export function registerOrchestrationCommands(
     });
 
   run
+    .command("metrics")
+    .description("show orchestration health metrics")
+    .action(async (_opts: unknown, command: Command) => {
+      const ctx = getContext(command);
+      const payload = await ctx.client.get("/v1/orchestration/metrics");
+      logCliEvent("cli.run.metrics");
+      printPayload(payload, ctx.config.output);
+    });
+
+  run
     .command("tail")
     .description("tail run timeline events")
     .requiredOption("--run-id <id>", "run identifier")

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.orchestration.api.schemas import (
     EnvelopePayload,
+    OrchestrationHealthMetricsResponse,
     RunAttemptResponse,
     RunStateResponse,
     SubmitCommandRequest,
@@ -22,6 +23,7 @@ from app.orchestration.dependencies import (
 )
 from app.orchestration.domain.models import (
     EnvelopeKind,
+    OrchestrationHealthMetrics,
     RunAttemptReadModel,
     RunReadModel,
     TimelineEntryReadModel,
@@ -151,6 +153,14 @@ async def list_run_attempts(
     )
 
 
+@router.get("/metrics")
+async def get_orchestration_metrics(
+    service: RunReadModelService = Depends(get_run_read_model_service),
+) -> Envelope[OrchestrationHealthMetricsResponse]:
+    metrics = await service.get_health_metrics()
+    return Envelope(data=_to_orchestration_metrics_response(metrics))
+
+
 def _to_run_state_response(run: RunReadModel) -> RunStateResponse:
     return RunStateResponse(
         run_id=run.run_id,
@@ -211,4 +221,19 @@ def _to_run_attempt_response(attempt: RunAttemptReadModel) -> RunAttemptResponse
         last_error=attempt.last_error,
         correlation_id=attempt.correlation_id,
         causation_id=attempt.causation_id,
+    )
+
+
+def _to_orchestration_metrics_response(
+    metrics: OrchestrationHealthMetrics,
+) -> OrchestrationHealthMetricsResponse:
+    return OrchestrationHealthMetricsResponse(
+        queue_pending=metrics.queue_pending,
+        queue_oldest_pending_age_seconds=metrics.queue_oldest_pending_age_seconds,
+        retries_total=metrics.retries_total,
+        dead_letter_total=metrics.dead_letter_total,
+        watchdog_interventions=metrics.watchdog_interventions,
+        run_latency_avg_ms=metrics.run_latency_avg_ms,
+        run_latency_p95_ms=metrics.run_latency_p95_ms,
+        generated_at=metrics.generated_at,
     )

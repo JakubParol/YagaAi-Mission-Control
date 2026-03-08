@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 
 from app.orchestration.domain.models import (
     CommandEnvelope,
+    OrchestrationHealthSnapshot,
     OrchestrationRun,
     OrchestrationStep,
     OutboxEventEnvelope,
@@ -204,3 +205,6 @@ class OrchestrationRepository(ABC):
         limit: int,
         offset: int,
     ) -> tuple[list[RunAttemptReadModel], int]: ...
+
+    @abstractmethod
+    async def get_health_snapshot(self) -> OrchestrationHealthSnapshot: ...

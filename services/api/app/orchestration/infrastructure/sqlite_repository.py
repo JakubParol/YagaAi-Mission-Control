@@ -5,6 +5,7 @@ import aiosqlite
 from app.orchestration.application.ports import OrchestrationRepository
 from app.orchestration.domain.models import (
     CommandEnvelope,
+    OrchestrationHealthSnapshot,
     OrchestrationRun,
     OrchestrationStep,
     OutboxEventEnvelope,
@@ -924,4 +925,71 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
                 for row in rows
             ],
             total,
+        )
+
+    async def get_health_snapshot(self) -> OrchestrationHealthSnapshot:
+        pending_cursor = await self._db.execute("""
+            SELECT COUNT(*), MIN(available_at)
+            FROM orchestration_outbox
+            WHERE status = 'PENDING'
+            """)
+        pending_row = await pending_cursor.fetchone()
+        await pending_cursor.close()
+        queue_pending = int(pending_row[0] if pending_row and pending_row[0] is not None else 0)
+        queue_oldest_pending_at = (
+            str(pending_row[1]) if pending_row and pending_row[1] is not None else None
+        )
+
+        retries_cursor = await self._db.execute("""
+            SELECT COUNT(*)
+            FROM orchestration_outbox
+            WHERE retry_attempt > 1
+            """)
+        retries_row = await retries_cursor.fetchone()
+        await retries_cursor.close()
+        retries_total = int(retries_row[0] if retries_row and retries_row[0] is not None else 0)
+
+        dead_letter_cursor = await self._db.execute("""
+            SELECT COUNT(*)
+            FROM orchestration_outbox
+            WHERE dead_lettered_at IS NOT NULL OR status = 'FAILED'
+            """)
+        dead_letter_row = await dead_letter_cursor.fetchone()
+        await dead_letter_cursor.close()
+        dead_letter_total = int(
+            dead_letter_row[0] if dead_letter_row and dead_letter_row[0] is not None else 0
+        )
+
+        watchdog_cursor = await self._db.execute("""
+            SELECT COUNT(*)
+            FROM orchestration_run_timeline
+            WHERE event_type = 'orchestration.watchdog.action'
+              AND decision = 'ACCEPTED'
+            """)
+        watchdog_row = await watchdog_cursor.fetchone()
+        await watchdog_cursor.close()
+        watchdog_interventions = int(
+            watchdog_row[0] if watchdog_row and watchdog_row[0] is not None else 0
+        )
+
+        latencies_cursor = await self._db.execute("""
+            SELECT ((julianday(terminal_at) - julianday(created_at)) * 86400000.0)
+            FROM orchestration_runs
+            WHERE terminal_at IS NOT NULL
+            """)
+        latency_rows = await latencies_cursor.fetchall()
+        await latencies_cursor.close()
+        run_latencies_ms = [
+            float(row[0])
+            for row in latency_rows
+            if row and row[0] is not None and float(row[0]) >= 0
+        ]
+
+        return OrchestrationHealthSnapshot(
+            queue_pending=queue_pending,
+            queue_oldest_pending_at=queue_oldest_pending_at,
+            retries_total=retries_total,
+            dead_letter_total=dead_letter_total,
+            watchdog_interventions=watchdog_interventions,
+            run_latencies_ms=run_latencies_ms,
         )

@@ -184,3 +184,25 @@ class RunAttemptReadModel:
     last_error: str | None
     correlation_id: str
     causation_id: str | None
+
+
+@dataclass
+class OrchestrationHealthSnapshot:
+    queue_pending: int
+    queue_oldest_pending_at: str | None
+    retries_total: int
+    dead_letter_total: int
+    watchdog_interventions: int
+    run_latencies_ms: list[float]
+
+
+@dataclass
+class OrchestrationHealthMetrics:
+    queue_pending: int
+    queue_oldest_pending_age_seconds: int | None
+    retries_total: int
+    dead_letter_total: int
+    watchdog_interventions: int
+    run_latency_avg_ms: float | None
+    run_latency_p95_ms: float | None
+    generated_at: str
