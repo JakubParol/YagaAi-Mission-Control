@@ -97,6 +97,18 @@ class _FakeRepo(OrchestrationRepository):
     ) -> None:
         return None
 
+    async def mark_message_processed_and_checkpoint(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None:
+        return None
+
 
 def _event(*, retry_attempt: int, max_attempts: int = 3) -> OutboxEventEnvelope:
     return OutboxEventEnvelope(

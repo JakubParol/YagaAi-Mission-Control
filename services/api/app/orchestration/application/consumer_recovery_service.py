@@ -43,17 +43,11 @@ class ConsumerRecoveryService:
         correlation_id: str,
     ) -> None:
         now = utc_now()
-        await self._repo.mark_message_processed(
-            stream_key=stream_key,
-            consumer_group=consumer_group,
-            message_id=message_id,
-            correlation_id=correlation_id,
-            processed_at=now,
-        )
-        await self._repo.upsert_consumer_offset(
+        await self._repo.mark_message_processed_and_checkpoint(
             stream_key=stream_key,
             consumer_group=consumer_group,
             consumer_name=consumer_name,
-            last_message_id=message_id,
-            updated_at=now,
+            message_id=message_id,
+            correlation_id=correlation_id,
+            processed_at=now,
         )

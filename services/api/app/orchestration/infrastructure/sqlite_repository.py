@@ -253,3 +253,42 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             (stream_key, consumer_group, message_id, correlation_id, processed_at),
         )
         await self._db.commit()
+
+    async def mark_message_processed_and_checkpoint(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None:
+        try:
+            await self._db.execute("BEGIN")
+            await self._db.execute(
+                """
+                INSERT OR IGNORE INTO orchestration_processed_messages(
+                  stream_key, consumer_group, message_id, correlation_id, processed_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (stream_key, consumer_group, message_id, correlation_id, processed_at),
+            )
+            await self._db.execute(
+                """
+                INSERT INTO orchestration_consumer_offsets(
+                  stream_key, consumer_group, consumer_name, last_message_id, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(stream_key, consumer_group, consumer_name)
+                DO UPDATE SET
+                  last_message_id=excluded.last_message_id,
+                  updated_at=excluded.updated_at
+                """,
+                (stream_key, consumer_group, consumer_name, message_id, processed_at),
+            )
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise

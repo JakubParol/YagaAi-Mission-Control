@@ -75,3 +75,15 @@ class OrchestrationRepository(ABC):
         correlation_id: str,
         processed_at: str,
     ) -> None: ...
+
+    @abstractmethod
+    async def mark_message_processed_and_checkpoint(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None: ...
