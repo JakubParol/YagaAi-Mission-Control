@@ -9,9 +9,13 @@ from app.orchestration.domain.models import (
     OrchestrationStep,
     OutboxEventEnvelope,
     OutboxStatus,
+    RunAttemptReadModel,
+    RunReadModel,
     RunStatus,
     RunTimelineEntry,
     StepStatus,
+    TimelineEntryReadModel,
+    TransitionDecision,
 )
 
 
@@ -661,3 +665,263 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             )
         await self._db.commit()
         return int(cursor.rowcount or 0) > 0
+
+    async def list_runs(
+        self,
+        *,
+        run_id: str | None,
+        status: RunStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[RunReadModel], int]:
+        status_value = status.value if status is not None else None
+        condition_params: tuple[object, ...] = (
+            run_id,
+            run_id,
+            status_value,
+            status_value,
+        )
+        count_cursor = await self._db.execute(
+            """
+            SELECT COUNT(*)
+            FROM orchestration_runs r
+            WHERE (? IS NULL OR r.run_id = ?)
+              AND (? IS NULL OR r.status = ?)
+            """,
+            condition_params,
+        )
+        count_row = await count_cursor.fetchone()
+        await count_cursor.close()
+        total = int(count_row[0] if count_row else 0)
+
+        list_cursor = await self._db.execute(
+            """
+            SELECT
+              r.run_id,
+              r.status,
+              r.correlation_id,
+              (
+                SELECT t.causation_id
+                FROM orchestration_run_timeline t
+                WHERE t.run_id = r.run_id
+                ORDER BY t.occurred_at DESC, t.id DESC
+                LIMIT 1
+              ) AS causation_id,
+              r.current_step_id,
+              r.last_event_type,
+              r.run_type,
+              r.lease_owner,
+              r.lease_token,
+              r.last_heartbeat_at,
+              r.watchdog_timeout_at,
+              r.watchdog_attempt,
+              r.watchdog_state,
+              r.terminal_at,
+              r.created_at,
+              r.updated_at
+            FROM orchestration_runs r
+            WHERE (? IS NULL OR r.run_id = ?)
+              AND (? IS NULL OR r.status = ?)
+            ORDER BY r.updated_at DESC, r.run_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (*condition_params, limit, offset),
+        )
+        rows = await list_cursor.fetchall()
+        await list_cursor.close()
+
+        return (
+            [
+                RunReadModel(
+                    run_id=str(row[0]),
+                    status=RunStatus(str(row[1])),
+                    correlation_id=str(row[2]),
+                    causation_id=(str(row[3]) if row[3] else None),
+                    current_step_id=(str(row[4]) if row[4] else None),
+                    last_event_type=str(row[5]),
+                    run_type=str(row[6] or "DEFAULT"),
+                    lease_owner=(str(row[7]) if row[7] else None),
+                    lease_token=(str(row[8]) if row[8] else None),
+                    last_heartbeat_at=(str(row[9]) if row[9] else None),
+                    watchdog_timeout_at=(str(row[10]) if row[10] else None),
+                    watchdog_attempt=int(row[11] or 0),
+                    watchdog_state=str(row[12] or "NONE"),
+                    terminal_at=(str(row[13]) if row[13] else None),
+                    created_at=str(row[14]),
+                    updated_at=str(row[15]),
+                )
+                for row in rows
+            ],
+            total,
+        )
+
+    async def get_run_read_model(self, *, run_id: str) -> RunReadModel | None:
+        rows, _ = await self.list_runs(run_id=run_id, status=None, limit=1, offset=0)
+        if not rows:
+            return None
+        return rows[0]
+
+    async def list_timeline_entries(
+        self,
+        *,
+        run_id: str | None,
+        run_status: RunStatus | None,
+        event_type: str | None,
+        occurred_after: str | None,
+        occurred_before: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[TimelineEntryReadModel], int]:
+        status_value = run_status.value if run_status is not None else None
+        condition_params: tuple[object, ...] = (
+            run_id,
+            run_id,
+            status_value,
+            status_value,
+            event_type,
+            event_type,
+            occurred_after,
+            occurred_after,
+            occurred_before,
+            occurred_before,
+        )
+        count_cursor = await self._db.execute(
+            """
+            SELECT COUNT(*)
+            FROM orchestration_run_timeline t
+            INNER JOIN orchestration_runs r ON r.run_id = t.run_id
+            WHERE (? IS NULL OR t.run_id = ?)
+              AND (? IS NULL OR r.status = ?)
+              AND (? IS NULL OR t.event_type = ?)
+              AND (? IS NULL OR t.occurred_at >= ?)
+              AND (? IS NULL OR t.occurred_at <= ?)
+            """,
+            condition_params,
+        )
+        count_row = await count_cursor.fetchone()
+        await count_cursor.close()
+        total = int(count_row[0] if count_row else 0)
+
+        list_cursor = await self._db.execute(
+            """
+            SELECT
+              t.id,
+              t.run_id,
+              r.status,
+              t.step_id,
+              t.message_id,
+              t.event_type,
+              t.decision,
+              t.reason_code,
+              t.reason_message,
+              t.correlation_id,
+              t.causation_id,
+              t.payload_json,
+              t.occurred_at,
+              t.created_at
+            FROM orchestration_run_timeline t
+            INNER JOIN orchestration_runs r ON r.run_id = t.run_id
+            WHERE (? IS NULL OR t.run_id = ?)
+              AND (? IS NULL OR r.status = ?)
+              AND (? IS NULL OR t.event_type = ?)
+              AND (? IS NULL OR t.occurred_at >= ?)
+              AND (? IS NULL OR t.occurred_at <= ?)
+            ORDER BY t.occurred_at DESC, t.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (*condition_params, limit, offset),
+        )
+        rows = await list_cursor.fetchall()
+        await list_cursor.close()
+
+        return (
+            [
+                TimelineEntryReadModel(
+                    id=str(row[0]),
+                    run_id=str(row[1]),
+                    run_status=RunStatus(str(row[2])),
+                    step_id=(str(row[3]) if row[3] else None),
+                    message_id=(str(row[4]) if row[4] else None),
+                    event_type=str(row[5]),
+                    decision=TransitionDecision(str(row[6])),
+                    reason_code=(str(row[7]) if row[7] else None),
+                    reason_message=(str(row[8]) if row[8] else None),
+                    correlation_id=str(row[9]),
+                    causation_id=(str(row[10]) if row[10] else None),
+                    payload=(json.loads(str(row[11])) if row[11] else {}),
+                    occurred_at=str(row[12]),
+                    created_at=str(row[13]),
+                )
+                for row in rows
+            ],
+            total,
+        )
+
+    async def list_run_attempts(
+        self,
+        *,
+        run_id: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[RunAttemptReadModel], int]:
+        count_cursor = await self._db.execute(
+            """
+            SELECT COUNT(*)
+            FROM orchestration_outbox o
+            INNER JOIN orchestration_runs r ON r.correlation_id = o.correlation_id
+            WHERE r.run_id = ?
+            """,
+            (run_id,),
+        )
+        count_row = await count_cursor.fetchone()
+        await count_cursor.close()
+        total = int(count_row[0] if count_row else 0)
+
+        list_cursor = await self._db.execute(
+            """
+            SELECT
+              o.id,
+              o.command_id,
+              r.run_id,
+              o.event_type,
+              o.occurred_at,
+              o.status,
+              o.retry_attempt,
+              o.max_attempts,
+              o.available_at,
+              o.dead_lettered_at,
+              o.last_error,
+              o.correlation_id,
+              o.causation_id
+            FROM orchestration_outbox o
+            INNER JOIN orchestration_runs r ON r.correlation_id = o.correlation_id
+            WHERE r.run_id = ?
+            ORDER BY o.occurred_at DESC, o.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (run_id, limit, offset),
+        )
+        rows = await list_cursor.fetchall()
+        await list_cursor.close()
+
+        return (
+            [
+                RunAttemptReadModel(
+                    outbox_event_id=str(row[0]),
+                    command_id=str(row[1]),
+                    run_id=str(row[2]),
+                    event_type=str(row[3]),
+                    occurred_at=str(row[4]),
+                    status=OutboxStatus(str(row[5])),
+                    retry_attempt=int(row[6]),
+                    max_attempts=int(row[7]),
+                    next_retry_at=(str(row[8]) if row[8] else None),
+                    dead_lettered_at=(str(row[9]) if row[9] else None),
+                    last_error=(str(row[10]) if row[10] else None),
+                    correlation_id=str(row[11]),
+                    causation_id=(str(row[12]) if row[12] else None),
+                )
+                for row in rows
+            ],
+            total,
+        )

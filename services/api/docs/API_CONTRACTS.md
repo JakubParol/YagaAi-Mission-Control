@@ -1185,7 +1185,78 @@ Transactional guarantee:
 - command and outbox inserts are performed in one DB transaction,
 - on outbox insert failure, command insert is rolled back (no partial write).
 
-### 6.2) Dapr bridge endpoints (local runtime)
+### 6.2) Run read model (timeline/attempts/state)
+
+Read endpoints for operational triage and UI/CLI diagnostics.
+
+#### `GET /v1/orchestration/runs` — List run state read models
+
+Query:
+- `run_id` (optional exact match)
+- `status` (optional: `PENDING|RUNNING|SUCCEEDED|FAILED|CANCELLED`)
+- `limit`, `offset`
+
+Response item fields:
+- `run_id`, `status`
+- `correlation_id`, `causation_id`
+- `current_step_id`, `last_event_type`, `run_type`
+- `lease_owner`, `lease_token`, `last_heartbeat_at`
+- `watchdog_timeout_at`, `watchdog_attempt`, `watchdog_state`
+- `terminal_at`, `created_at`, `updated_at`
+
+Ordering/pagination:
+- deterministic order: `updated_at DESC`, then `run_id DESC`
+- offset-based pagination via `limit`/`offset`
+
+#### `GET /v1/orchestration/runs/{run_id}` — Get single run state
+
+Returns the same shape as list items.  
+Returns `404 NOT_FOUND` when run does not exist.
+
+#### `GET /v1/orchestration/timeline` — List timeline events
+
+Query:
+- `run_id` (optional exact match)
+- `status` (optional run-status filter)
+- `event_type` (optional exact match)
+- `occurred_after`, `occurred_before` (optional ISO-8601 range)
+- `limit`, `offset`
+
+Response item fields:
+- `id`, `run_id`, `run_status`
+- `step_id`, `message_id`
+- `event_type`, `decision`, `reason_code`, `reason_message`
+- `correlation_id`, `causation_id`
+- `payload`, `occurred_at`, `created_at`
+- `is_watchdog_action`, `watchdog_action`
+
+Ordering/pagination:
+- deterministic order: `occurred_at DESC`, then `id DESC`
+- offset-based pagination via `limit`/`offset`
+
+#### `GET /v1/orchestration/runs/{run_id}/attempts` — List run delivery attempts
+
+Attempts are sourced from outbox rows correlated to the run by `correlation_id`.
+
+Query:
+- `limit`, `offset`
+
+Response item fields:
+- `outbox_event_id`, `command_id`, `run_id`, `event_type`
+- `occurred_at`, `status`
+- `retry_attempt`, `max_attempts`, `next_retry_at`
+- `dead_lettered_at`, `last_error`
+- `correlation_id`, `causation_id`
+
+Returns `404 NOT_FOUND` when run does not exist.
+
+Contract guarantees:
+- `correlation_id` and `causation_id` are present in run/timeline/attempt responses
+  (causation can be `null` when unavailable by source event).
+- filtering is available for run id, run status, event type, and time range.
+- pagination order is deterministic and stable for repeated queries.
+
+### 6.3) Dapr bridge endpoints (local runtime)
 
 These endpoints support local runtime event exchange between worker and API via Dapr pub/sub + service invocation.
 

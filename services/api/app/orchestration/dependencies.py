@@ -2,6 +2,7 @@ import aiosqlite
 from fastapi import Depends
 
 from app.orchestration.application.command_service import CommandService
+from app.orchestration.application.read_model_service import RunReadModelService
 from app.orchestration.application.watchdog_service import WatchdogService
 from app.orchestration.application.worker_state_machine_service import WorkerStateMachineService
 from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
@@ -24,3 +25,9 @@ async def get_watchdog_service(
     db: aiosqlite.Connection = Depends(get_db),
 ) -> WatchdogService:
     return WatchdogService(repo=SqliteOrchestrationRepository(db))
+
+
+async def get_run_read_model_service(
+    db: aiosqlite.Connection = Depends(get_db),
+) -> RunReadModelService:
+    return RunReadModelService(repo=SqliteOrchestrationRepository(db))

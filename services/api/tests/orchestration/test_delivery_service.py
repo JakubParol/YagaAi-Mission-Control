@@ -8,9 +8,12 @@ from app.orchestration.domain.models import (
     OrchestrationStep,
     OutboxEventEnvelope,
     OutboxStatus,
+    RunAttemptReadModel,
+    RunReadModel,
     RunStatus,
     RunTimelineEntry,
     StepStatus,
+    TimelineEntryReadModel,
 )
 from app.shared.api.errors import NotFoundError
 
@@ -188,6 +191,41 @@ class _FakeRepo(OrchestrationRepository):
         clear_lease: bool,
     ) -> bool:
         return True
+
+    async def list_runs(
+        self,
+        *,
+        run_id: str | None,
+        status: RunStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[RunReadModel], int]:
+        return [], 0
+
+    async def get_run_read_model(self, *, run_id: str) -> RunReadModel | None:
+        return None
+
+    async def list_timeline_entries(
+        self,
+        *,
+        run_id: str | None,
+        run_status: RunStatus | None,
+        event_type: str | None,
+        occurred_after: str | None,
+        occurred_before: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[TimelineEntryReadModel], int]:
+        return [], 0
+
+    async def list_run_attempts(
+        self,
+        *,
+        run_id: str,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[RunAttemptReadModel], int]:
+        return [], 0
 
 
 def _event(*, retry_attempt: int, max_attempts: int = 3) -> OutboxEventEnvelope:
