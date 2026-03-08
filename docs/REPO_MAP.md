@@ -10,7 +10,7 @@ Overview of all projects and components in this monorepo.
 |---|---|---|---|
 | **Web** | `apps/web/` | Next.js 15 | Dashboard UI — LLM costs, planning views |
 | **CLI** | `apps/cli/` | Planned | Command-line interface for Mission Control |
-| **API** | `services/api/` | FastAPI (Python) | REST API — planning and observability modules |
+| **API** | `services/api/` | FastAPI (Python) | REST API — planning, observability, and orchestration modules |
 
 ---
 
@@ -49,12 +49,13 @@ TypeScript CLI (`mc`) built with Commander.js. Mirrors API resources as command 
 
 ## API (`services/api/`)
 
-FastAPI REST service with two domain modules:
+FastAPI REST service with three domain modules:
 
 | Module | Prefix | Domain |
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
 | **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
+| **orchestration** | `/v1/orchestration` | Versioned command ingestion and transactional event outbox |
 
 | Item | Detail |
 |---|---|

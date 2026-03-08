@@ -1,6 +1,6 @@
 # Mission Control API (`services/api`)
 
-FastAPI REST service for Mission Control — planning and observability modules.
+FastAPI REST service for Mission Control — planning, observability, and orchestration modules.
 
 ## Run locally
 
@@ -31,7 +31,12 @@ app/
 │   ├── application/         # Services + ports (ABCs)
 │   ├── domain/              # Models, enums, invariants
 │   └── infrastructure/      # Repository implementations
-└── observability/           # /v1/observability — LLM costs, requests, Langfuse import
+├── observability/           # /v1/observability — LLM costs, requests, Langfuse import
+│   ├── api/
+│   ├── application/
+│   ├── domain/
+│   └── infrastructure/
+└── orchestration/           # /v1/orchestration — command ingestion + outbox
     ├── api/
     ├── application/
     ├── domain/

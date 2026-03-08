@@ -26,6 +26,7 @@ The API is a single FastAPI service with multiple domain modules:
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
 | **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
+| **orchestration** | `/v1/orchestration` | Versioned command ingestion + transactional outbox |
 
 Each module is self-contained and follows the same internal structure.
 
@@ -71,7 +72,7 @@ services/api/
 │   │   └── infrastructure/      # Port implementations
 │   │       └── repository.py    # Async SQL queries
 │   │
-│   └── observability/           # Module: /v1/observability/...
+│   ├── observability/           # Module: /v1/observability/...
 │       ├── api/
 │       │   └── router.py
 │       ├── application/
@@ -84,9 +85,22 @@ services/api/
 │           ├── langfuse_repository.py
 │           └── langfuse_client.py
 │
+│   └── orchestration/           # Module: /v1/orchestration/...
+│       ├── api/
+│       │   ├── router.py
+│       │   └── schemas.py
+│       ├── application/
+│       │   ├── command_service.py
+│       │   └── ports.py
+│       ├── domain/
+│       │   └── models.py
+│       └── infrastructure/
+│           └── sqlite_repository.py
+│
 ├── tests/
 │   ├── planning/
-│   └── observability/
+│   ├── observability/
+│   └── orchestration/
 ├── docs/
 └── pyproject.toml
 ```
@@ -185,10 +199,12 @@ Local dev can use `services/api/.env.local` (preferred) or `.env`.
 from app.shared.api.health import health_router
 from app.planning.api.router import planning_router
 from app.observability.api.router import observability_router
+from app.orchestration.api.router import orchestration_router
 
 app.include_router(health_router)
 app.include_router(planning_router, prefix="/v1/planning")
 app.include_router(observability_router, prefix="/v1/observability")
+app.include_router(orchestration_router, prefix="/v1/orchestration")
 ```
 
 When v2 is needed, add v2 routers per module. Old versions stay until deprecated.
