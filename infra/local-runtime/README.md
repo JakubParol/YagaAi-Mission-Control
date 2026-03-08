@@ -95,3 +95,17 @@ If API fails with corruption diagnostics, restore from latest verified backup an
 2. Confirm component files are mounted under `/components`.
 3. Check sidecar app binding ports (`--app-port`) match app services.
 4. Run `./infra/local-runtime/up.sh` and verify no `Dapr metadata missing components` error is reported.
+
+## Failed run triage workflow
+
+Use this workflow when a run looks stuck or failed:
+
+1. Check run status and lease/watchdog state:
+   `mc run status --run-id <run-id> --output json`
+2. Check orchestration health metrics (queue lag, retries, dead letters, latency):
+   `mc run metrics --output json`
+3. Tail timeline for failure/watchdog events:
+   `mc run tail --run-id <run-id> --event-type orchestration.watchdog.action --max-polls 5 --interval-ms 2000 --output json`
+4. Inspect API + worker structured logs for the same `correlation_id`:
+   - `docker compose -f infra/local-runtime/docker-compose.yml logs api --tail=300`
+   - `docker compose -f infra/local-runtime/docker-compose.yml logs worker --tail=300`

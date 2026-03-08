@@ -239,3 +239,161 @@ def test_run_attempts_endpoint_returns_attempts_and_not_found(client, db_path: s
     not_found = client.get("/v1/orchestration/runs/run-missing/attempts")
     assert not_found.status_code == 404
     assert not_found.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_orchestration_metrics_endpoint_returns_queue_and_latency_metrics(
+    client, db_path: str
+) -> None:
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        INSERT INTO orchestration_runs(
+          run_id, status, correlation_id, current_step_id, last_event_type,
+          created_at, updated_at, run_type, lease_owner, lease_token,
+          last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "run-metrics-1",
+            "SUCCEEDED",
+            "corr-metrics-1",
+            None,
+            "orchestration.run.succeeded",
+            "2026-03-08T10:00:00Z",
+            "2026-03-08T10:00:03Z",
+            "DEFAULT",
+            None,
+            None,
+            None,
+            None,
+            0,
+            "NONE",
+            "2026-03-08T10:00:03Z",
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO orchestration_runs(
+          run_id, status, correlation_id, current_step_id, last_event_type,
+          created_at, updated_at, run_type, lease_owner, lease_token,
+          last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "run-metrics-2",
+            "FAILED",
+            "corr-metrics-2",
+            None,
+            "orchestration.run.failed",
+            "2026-03-08T10:00:00Z",
+            "2026-03-08T10:00:08Z",
+            "DEFAULT",
+            None,
+            None,
+            None,
+            None,
+            0,
+            "FAILED_BY_WATCHDOG",
+            "2026-03-08T10:00:08Z",
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO orchestration_outbox(
+          id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
+          causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
+          published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "out-metrics-1",
+            "cmd-metrics-1",
+            "orchestration.run.submit.accepted",
+            "1.0",
+            "2026-03-08T10:00:00Z",
+            "mc-cli",
+            "corr-metrics-1",
+            None,
+            '{"run_id":"run-metrics-1"}',
+            "PENDING",
+            2,
+            5,
+            "2026-03-08T10:00:00Z",
+            None,
+            "WORKER_ERROR: timeout",
+            None,
+            None,
+            "2026-03-08T10:00:00Z",
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO orchestration_outbox(
+          id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
+          causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
+          published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "out-metrics-2",
+            "cmd-metrics-2",
+            "orchestration.run.submit.accepted",
+            "1.0",
+            "2026-03-08T10:00:00Z",
+            "mc-cli",
+            "corr-metrics-2",
+            None,
+            '{"run_id":"run-metrics-2"}',
+            "FAILED",
+            5,
+            5,
+            "2026-03-08T10:00:00Z",
+            None,
+            "WORKER_ERROR: poison payload",
+            "2026-03-08T10:01:00Z",
+            '{"dead_letter_reason":"MAX_ATTEMPTS_EXCEEDED"}',
+            "2026-03-08T10:00:00Z",
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO orchestration_run_timeline(
+          id, run_id, step_id, message_id, event_type, decision, reason_code, reason_message,
+          correlation_id, causation_id, payload_json, occurred_at, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "timeline-metrics-1",
+            "run-metrics-2",
+            None,
+            "msg-metrics-1",
+            "orchestration.watchdog.action",
+            "ACCEPTED",
+            "RUN_TIMEOUT",
+            "Watchdog applied FAIL",
+            "corr-metrics-2",
+            None,
+            '{"action":"FAIL"}',
+            "2026-03-08T10:01:00Z",
+            "2026-03-08T10:01:00Z",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.get("/v1/orchestration/metrics")
+    assert response.status_code == 200
+
+    payload = response.json()["data"]
+    assert payload["queue_pending"] == 1
+    assert payload["retries_total"] == 2
+    assert payload["dead_letter_total"] == 1
+    assert payload["watchdog_interventions"] == 1
+    assert payload["run_latency_avg_ms"] is not None
+    assert payload["run_latency_p95_ms"] is not None
+    assert payload["generated_at"]

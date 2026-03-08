@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 from typing import Any
@@ -14,10 +15,12 @@ from app.orchestration.domain.models import (
     OutboxStatus,
 )
 from app.shared.api.errors import ValidationError
+from app.shared.logging import log_event
 from app.shared.utils import new_uuid, utc_now
 
 _COMMAND_TYPE_RE = re.compile(r"^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9_]*){2,}$")
 _SCHEMA_VERSION_RE = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)$")
+logger = logging.getLogger(__name__)
 
 
 class CommandService:
@@ -95,9 +98,21 @@ class CommandService:
             max_attempts=self._default_max_attempts,
             next_retry_at=occurred_at,
         )
-        return await self._repo.create_command_with_outbox(
+        created_command, created_outbox_event = await self._repo.create_command_with_outbox(
             command=command, outbox_event=outbox_event
         )
+        log_event(
+            logger,
+            level=logging.INFO,
+            event="orchestration.command.accepted",
+            command_id=created_command.id,
+            command_type=created_command.command_type,
+            correlation_id=created_command.correlation_id,
+            causation_id=created_command.causation_id,
+            run_id=str(payload.get("run_id", "")),
+            outbox_event_id=created_outbox_event.id,
+        )
+        return created_command, created_outbox_event
 
     def _validate_command_type(self, command_type: str) -> None:
         if _COMMAND_TYPE_RE.fullmatch(command_type):

@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Any
 
@@ -7,14 +8,29 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.config import settings
 from app.orchestration.application.worker_state_machine_service import WorkerStateMachineService
 from app.orchestration.dependencies import get_worker_state_machine_service
+from app.shared.logging import log_event
 
 router = APIRouter(tags=["orchestration"])
+logger = logging.getLogger(__name__)
 
 _DAPR_HTTP_BASE = "http://127.0.0.1:3500"
 _PUBSUB_NAME = "local-pubsub"
 _TOPIC_NAME = "orchestration.events"
 _STATESTORE_NAME = "local-statestore"
 _WORKER_APP_ID = "mission-control-worker"
+
+
+def _extract_causation_id(cloud_event: dict[str, Any], data: dict[str, Any]) -> str | None:
+    for key in ("causation_id", "causationId"):
+        raw = data.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    traceparent = cloud_event.get("traceparent")
+    if isinstance(traceparent, str) and traceparent.strip():
+        return traceparent.strip()
+
+    return None
 
 
 @router.get("/dapr/subscribe")
@@ -57,10 +73,20 @@ async def handle_dapr_orchestration_event(
     correlation_id = str(
         data.get("correlation_id") or cloud_event.get("traceid") or "unknown-correlation"
     )
+    causation_id = _extract_causation_id(cloud_event, data)
     occurred_at = str(data.get("occurred_at") or datetime.now(tz=UTC).isoformat())
     event_payload = data.get("payload")
     if not isinstance(event_payload, dict):
         event_payload = {}
+    traceid = cloud_event.get("traceid")
+    if isinstance(traceid, str) and traceid.strip():
+        event_payload.setdefault("trace_id", traceid.strip())
+    traceparent = cloud_event.get("traceparent")
+    if isinstance(traceparent, str) and traceparent.strip():
+        event_payload.setdefault("traceparent", traceparent.strip())
+    tracestate = cloud_event.get("tracestate")
+    if isinstance(tracestate, str) and tracestate.strip():
+        event_payload.setdefault("tracestate", tracestate.strip())
 
     worker_result = await worker_state_service.process_message(
         stream_key="dapr:orchestration.events",
@@ -70,9 +96,20 @@ async def handle_dapr_orchestration_event(
         run_id=run_id,
         event_type=event_type,
         correlation_id=correlation_id,
-        causation_id=None,
+        causation_id=causation_id,
         occurred_at=occurred_at,
         payload=event_payload,
+    )
+    log_event(
+        logger,
+        level=logging.INFO,
+        event="orchestration.dapr.event_ingested",
+        run_id=run_id,
+        event_type=event_type,
+        correlation_id=correlation_id,
+        causation_id=causation_id,
+        message_id=message_id,
+        decision=str(worker_result.get("decision", "")),
     )
 
     state_key = f"orchestration:last-event:{run_id}"
@@ -80,12 +117,14 @@ async def handle_dapr_orchestration_event(
         "run_id": run_id,
         "received_at": datetime.now(tz=UTC).isoformat(),
         "correlation_id": correlation_id,
+        "causation_id": causation_id,
         "event": data,
     }
     ack_payload = {
         "run_id": run_id,
         "acknowledged_at": datetime.now(tz=UTC).isoformat(),
         "correlation_id": correlation_id,
+        "causation_id": causation_id,
         "status": "ACCEPTED",
     }
 

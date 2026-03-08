@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -13,6 +14,7 @@ from app.orchestration.domain.models import (
     StepStatus,
     TransitionDecision,
 )
+from app.shared.logging import log_event
 from app.shared.utils import new_uuid, utc_now
 
 _RUN_EVENT_TO_STATUS: dict[str, RunStatus] = {
@@ -55,6 +57,7 @@ _STEP_ALLOWED_TRANSITIONS: dict[StepStatus, set[StepStatus]] = {
 class WorkerStateMachineService:
     def __init__(self, repo: OrchestrationRepository) -> None:
         self._repo = repo
+        self._logger = logging.getLogger(__name__)
 
     async def process_message(
         self,
@@ -76,6 +79,15 @@ class WorkerStateMachineService:
             message_id=message_id,
         )
         if duplicate:
+            log_event(
+                self._logger,
+                level=logging.INFO,
+                event="orchestration.worker.duplicate_message",
+                run_id=run_id,
+                message_id=message_id,
+                event_type=event_type,
+                correlation_id=correlation_id,
+            )
             return {"decision": TransitionDecision.DUPLICATE.value, "run_id": run_id}
 
         decision = TransitionDecision.REJECTED
@@ -126,6 +138,18 @@ class WorkerStateMachineService:
             message_id=message_id,
             correlation_id=correlation_id,
             processed_at=utc_now(),
+        )
+        log_event(
+            self._logger,
+            level=logging.INFO,
+            event="orchestration.worker.transition_applied",
+            run_id=run_id,
+            event_type=event_type,
+            message_id=message_id,
+            decision=decision.value,
+            reason_code=reason_code,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
         )
 
         return {

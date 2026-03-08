@@ -26,6 +26,22 @@ class FakeApiClient {
       return { data: { run_id: "run-123", status: "RUNNING" }, meta: {} };
     }
 
+    if (path === "/v1/orchestration/metrics") {
+      return {
+        data: {
+          queue_pending: 1,
+          queue_oldest_pending_age_seconds: 12,
+          retries_total: 3,
+          dead_letter_total: 1,
+          watchdog_interventions: 2,
+          run_latency_avg_ms: 120.5,
+          run_latency_p95_ms: 300,
+          generated_at: "2026-03-08T10:00:00Z",
+        },
+        meta: {},
+      };
+    }
+
     if (path === "/v1/orchestration/timeline") {
       this.timelineCount += 1;
       if (this.timelineCount === 1) {
@@ -144,6 +160,21 @@ test("run status URL-encodes run id path segment", async () => {
     {
       method: "GET",
       path: "/v1/orchestration/runs/run%2F123",
+      options: undefined,
+    },
+  ]);
+});
+
+test("run metrics fetches orchestration health metrics", async () => {
+  const client = new FakeApiClient();
+  const program = createProgram(client);
+
+  await run(program, ["run", "metrics"]);
+
+  assert.deepEqual(client.calls, [
+    {
+      method: "GET",
+      path: "/v1/orchestration/metrics",
       options: undefined,
     },
   ]);

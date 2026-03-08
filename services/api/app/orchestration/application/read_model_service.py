@@ -1,7 +1,9 @@
-from datetime import datetime
+import math
+from datetime import UTC, datetime
 
 from app.orchestration.application.ports import OrchestrationRepository
 from app.orchestration.domain.models import (
+    OrchestrationHealthMetrics,
     RunAttemptReadModel,
     RunReadModel,
     RunStatus,
@@ -72,6 +74,23 @@ class RunReadModelService:
             raise NotFoundError(f"Run {run_id} not found")
         return await self._repo.list_run_attempts(run_id=run_id, limit=limit, offset=offset)
 
+    async def get_health_metrics(self) -> OrchestrationHealthMetrics:
+        snapshot = await self._repo.get_health_snapshot()
+        generated_at = datetime.now(tz=UTC).isoformat().replace("+00:00", "Z")
+        queue_oldest_pending_age_seconds = self._age_seconds(snapshot.queue_oldest_pending_at)
+        run_latency_avg_ms = self._average(snapshot.run_latencies_ms)
+        run_latency_p95_ms = self._percentile(snapshot.run_latencies_ms, 0.95)
+        return OrchestrationHealthMetrics(
+            queue_pending=snapshot.queue_pending,
+            queue_oldest_pending_age_seconds=queue_oldest_pending_age_seconds,
+            retries_total=snapshot.retries_total,
+            dead_letter_total=snapshot.dead_letter_total,
+            watchdog_interventions=snapshot.watchdog_interventions,
+            run_latency_avg_ms=run_latency_avg_ms,
+            run_latency_p95_ms=run_latency_p95_ms,
+            generated_at=generated_at,
+        )
+
     def _parse_status(self, value: str | None) -> RunStatus | None:
         if value is None:
             return None
@@ -103,3 +122,27 @@ class RunReadModelService:
                 "Invalid timestamp",
                 details=[{"field": field, "message": "must be a valid ISO-8601 timestamp"}],
             ) from exc
+
+    def _age_seconds(self, value: str | None) -> int | None:
+        if value is None:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        now = datetime.now(tz=UTC)
+        return max(int((now - parsed.astimezone(UTC)).total_seconds()), 0)
+
+    def _average(self, values: list[float]) -> float | None:
+        if not values:
+            return None
+        return round(sum(values) / len(values), 3)
+
+    def _percentile(self, values: list[float], ratio: float) -> float | None:
+        if not values:
+            return None
+        sorted_values = sorted(values)
+        index = max(math.ceil(len(sorted_values) * ratio) - 1, 0)
+        return round(sorted_values[index], 3)

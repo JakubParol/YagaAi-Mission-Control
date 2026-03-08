@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from app.config import settings
@@ -11,6 +12,7 @@ from app.orchestration.domain.models import (
     TransitionDecision,
     WatchdogAction,
 )
+from app.shared.logging import log_event
 from app.shared.utils import new_uuid, utc_now
 
 
@@ -21,6 +23,7 @@ def _parse_iso8601(value: str) -> datetime:
 class WatchdogService:
     def __init__(self, repo: OrchestrationRepository) -> None:
         self._repo = repo
+        self._logger = logging.getLogger(__name__)
 
     async def evaluate_stale_runs(
         self, *, watchdog_instance: str, evaluated_at: str
@@ -66,6 +69,16 @@ class WatchdogService:
                         "reason_code": "WATCHDOG_CAS_CONFLICT",
                     }
                 )
+                log_event(
+                    self._logger,
+                    level=logging.WARNING,
+                    event="orchestration.watchdog.cas_conflict",
+                    run_id=run.run_id,
+                    action=action.value,
+                    reason_code="WATCHDOG_CAS_CONFLICT",
+                    correlation_id=run.correlation_id,
+                    watchdog_instance=watchdog_instance,
+                )
                 continue
 
             await self._append_watchdog_timeline(
@@ -84,6 +97,16 @@ class WatchdogService:
                     "action": action.value,
                     "reason_code": reason_code,
                 }
+            )
+            log_event(
+                self._logger,
+                level=logging.WARNING,
+                event="orchestration.watchdog.action_applied",
+                run_id=run.run_id,
+                action=action.value,
+                reason_code=reason_code,
+                correlation_id=run.correlation_id,
+                watchdog_instance=watchdog_instance,
             )
         return decisions
 

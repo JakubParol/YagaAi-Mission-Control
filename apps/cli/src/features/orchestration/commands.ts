@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { isObject, unwrapEnvelope } from "../../core/envelope";
 import { CliUsageError } from "../../core/errors";
 import { parseIntegerOption } from "../../core/kv";
+import { logCliEvent } from "../../core/log";
 import { printPayload } from "../../core/output";
 import type { ContextFactory } from "../../core/runtime";
 
@@ -126,6 +127,12 @@ export function registerOrchestrationCommands(
             },
           },
         });
+        logCliEvent("cli.run.submit", {
+          run_id: opts.runId,
+          correlation_id: opts.correlationId ?? opts.runId,
+          command_type: opts.commandType,
+          schema_version: opts.schemaVersion,
+        });
         printPayload(payload, ctx.config.output);
       },
     );
@@ -139,6 +146,17 @@ export function registerOrchestrationCommands(
       const payload = await ctx.client.get(
         `/v1/orchestration/runs/${encodeURIComponent(opts.runId)}`,
       );
+      logCliEvent("cli.run.status", { run_id: opts.runId });
+      printPayload(payload, ctx.config.output);
+    });
+
+  run
+    .command("metrics")
+    .description("show orchestration health metrics")
+    .action(async (_opts: unknown, command: Command) => {
+      const ctx = getContext(command);
+      const payload = await ctx.client.get("/v1/orchestration/metrics");
+      logCliEvent("cli.run.metrics");
       printPayload(payload, ctx.config.output);
     });
 
@@ -225,6 +243,11 @@ export function registerOrchestrationCommands(
 
           if (fresh.length > 0) {
             const sorted = [...fresh].sort(compareTimelineAsc);
+            logCliEvent("cli.run.tail.batch", {
+              run_id: opts.runId,
+              batch_size: sorted.length,
+              poll: polls + 1,
+            });
             printPayload({ data: sorted, meta }, ctx.config.output);
           }
 

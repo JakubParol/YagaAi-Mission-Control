@@ -34,7 +34,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 
 | Group | Core Commands |
 |---|---|
-| `run` | `submit`, `status`, `tail` |
+| `run` | `submit`, `status`, `metrics`, `tail` |
 
 ## Observability Commands
 
@@ -94,6 +94,7 @@ mc obs requests list --model claude-sonnet-4-20250514 --limit 50
 mc obs import run
 mc run submit --run-id run-123
 mc run status --run-id run-123
+mc run metrics
 mc run tail --run-id run-123 --max-polls 3 --interval-ms 1000
 ```
 
@@ -106,7 +107,10 @@ mc run submit --run-id incident-2026-03-08 --correlation-id incident-2026-03-08
 # 2) Check current run state (status, watchdog info, lease details)
 mc run status --run-id incident-2026-03-08 --output json
 
-# 3) Tail latest timeline events for triage
+# 3) Inspect queue/retry/dead-letter and latency metrics
+mc run metrics --output json
+
+# 4) Tail latest timeline events for triage
 mc run tail --run-id incident-2026-03-08 --event-type orchestration.watchdog.action --max-polls 5 --interval-ms 2000 --output json
 ```
 

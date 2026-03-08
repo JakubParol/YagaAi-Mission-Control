@@ -4,6 +4,7 @@ from app.orchestration.application.delivery_service import DeliveryService
 from app.orchestration.application.ports import OrchestrationRepository
 from app.orchestration.domain.models import (
     CommandEnvelope,
+    OrchestrationHealthSnapshot,
     OrchestrationRun,
     OrchestrationStep,
     OutboxEventEnvelope,
@@ -226,6 +227,16 @@ class _FakeRepo(OrchestrationRepository):
         offset: int,
     ) -> tuple[list[RunAttemptReadModel], int]:
         return [], 0
+
+    async def get_health_snapshot(self) -> OrchestrationHealthSnapshot:
+        return OrchestrationHealthSnapshot(
+            queue_pending=0,
+            queue_oldest_pending_at=None,
+            retries_total=0,
+            dead_letter_total=0,
+            watchdog_interventions=0,
+            run_latencies_ms=[],
+        )
 
 
 def _event(*, retry_attempt: int, max_attempts: int = 3) -> OutboxEventEnvelope:
