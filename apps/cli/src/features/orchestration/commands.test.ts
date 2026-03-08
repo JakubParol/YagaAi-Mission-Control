@@ -134,6 +134,21 @@ test("run status fetches run read model by id", async () => {
   ]);
 });
 
+test("run status URL-encodes run id path segment", async () => {
+  const client = new FakeApiClient();
+  const program = createProgram(client);
+
+  await run(program, ["run", "status", "--run-id", "run/123"]);
+
+  assert.deepEqual(client.calls, [
+    {
+      method: "GET",
+      path: "/v1/orchestration/runs/run%2F123",
+      options: undefined,
+    },
+  ]);
+});
+
 test("run tail once fetches timeline with filters", async () => {
   const client = new FakeApiClient();
   const program = createProgram(client);

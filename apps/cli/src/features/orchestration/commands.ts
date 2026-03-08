@@ -136,7 +136,9 @@ export function registerOrchestrationCommands(
     .requiredOption("--run-id <id>", "run identifier")
     .action(async (opts: { runId: string }, command: Command) => {
       const ctx = getContext(command);
-      const payload = await ctx.client.get(`/v1/orchestration/runs/${opts.runId}`);
+      const payload = await ctx.client.get(
+        `/v1/orchestration/runs/${encodeURIComponent(opts.runId)}`,
+      );
       printPayload(payload, ctx.config.output);
     });
 
