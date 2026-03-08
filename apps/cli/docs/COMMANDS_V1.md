@@ -30,6 +30,12 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | `agent` | `list`, `get`, `create`, `update`, `delete`, `sync` |
 | `label` | `list`, `get`, `create`, `update`, `delete`, `attach-story`, `detach-story`, `attach-task`, `detach-task` |
 
+## Orchestration Commands
+
+| Group | Core Commands |
+|---|---|
+| `run` | `submit`, `status`, `tail` |
+
 ## Observability Commands
 
 | Group | Core Commands |
@@ -86,6 +92,22 @@ mc label attach-task --task-id <uuid> --label-id <uuid>
 mc obs costs --days 7
 mc obs requests list --model claude-sonnet-4-20250514 --limit 50
 mc obs import run
+mc run submit --run-id run-123
+mc run status --run-id run-123
+mc run tail --run-id run-123 --max-polls 3 --interval-ms 1000
+```
+
+## Failure Debug Workflow Example
+
+```bash
+# 1) Submit run command envelope
+mc run submit --run-id incident-2026-03-08 --correlation-id incident-2026-03-08
+
+# 2) Check current run state (status, watchdog info, lease details)
+mc run status --run-id incident-2026-03-08 --output json
+
+# 3) Tail latest timeline events for triage
+mc run tail --run-id incident-2026-03-08 --event-type orchestration.watchdog.action --max-polls 5 --interval-ms 2000 --output json
 ```
 
 Agent fallback precedence for consumers is: `avatar` -> `initials` -> derived initials from `name` + `last_name` -> first letter of `name`.
