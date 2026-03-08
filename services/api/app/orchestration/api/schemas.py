@@ -33,3 +33,13 @@ class SubmitCommandResponse(BaseModel):
     status: str
     command: EnvelopePayload
     outbox_event: EnvelopePayload
+
+
+class WatchdogSweepRequest(BaseModel):
+    watchdog_instance: str = Field(..., min_length=1, max_length=100)
+    evaluated_at: str = Field(..., min_length=1, max_length=64)
+
+
+class WatchdogSweepResponse(BaseModel):
+    status: str
+    decisions: list[dict[str, str]]

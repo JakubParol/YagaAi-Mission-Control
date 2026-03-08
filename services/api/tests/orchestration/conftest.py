@@ -73,6 +73,13 @@ def db_path(tmp_path, monkeypatch):
           last_event_type TEXT NOT NULL,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
+          run_type TEXT NOT NULL DEFAULT 'DEFAULT',
+          lease_owner TEXT,
+          lease_token TEXT,
+          last_heartbeat_at TEXT,
+          watchdog_timeout_at TEXT,
+          watchdog_attempt INTEGER NOT NULL DEFAULT 0,
+          watchdog_state TEXT NOT NULL DEFAULT 'NONE',
           terminal_at TEXT
         );
 

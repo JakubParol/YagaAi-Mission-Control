@@ -137,3 +137,32 @@ class OrchestrationRepository(ABC):
 
     @abstractmethod
     async def append_timeline_entry(self, *, entry: RunTimelineEntry) -> None: ...
+
+    @abstractmethod
+    async def compare_and_set_run_lease(
+        self,
+        *,
+        run_id: str,
+        expected_lease_token: str | None,
+        lease_owner: str | None,
+        new_lease_token: str | None,
+        heartbeat_at: str | None,
+        timeout_at: str | None,
+        updated_at: str,
+    ) -> bool: ...
+
+    @abstractmethod
+    async def apply_watchdog_action_if_lease_matches(
+        self,
+        *,
+        run_id: str,
+        expected_lease_token: str | None,
+        next_status: RunStatus,
+        current_step_id: str | None,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+        watchdog_attempt: int,
+        watchdog_state: str,
+        clear_lease: bool,
+    ) -> bool: ...

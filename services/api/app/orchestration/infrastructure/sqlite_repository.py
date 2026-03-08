@@ -307,7 +307,8 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             """
             SELECT
               run_id, status, correlation_id, current_step_id, last_event_type,
-              created_at, updated_at, terminal_at
+              created_at, updated_at, run_type, lease_owner, lease_token,
+              last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
             FROM orchestration_runs
             WHERE run_id = ?
             LIMIT 1
@@ -326,7 +327,14 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             last_event_type=str(row[4]),
             created_at=str(row[5]),
             updated_at=str(row[6]),
-            terminal_at=(str(row[7]) if row[7] else None),
+            run_type=str(row[7] or "DEFAULT"),
+            lease_owner=(str(row[8]) if row[8] else None),
+            lease_token=(str(row[9]) if row[9] else None),
+            last_heartbeat_at=(str(row[10]) if row[10] else None),
+            watchdog_timeout_at=(str(row[11]) if row[11] else None),
+            watchdog_attempt=int(row[12] or 0),
+            watchdog_state=str(row[13] or "NONE"),
+            terminal_at=(str(row[14]) if row[14] else None),
         )
 
     async def create_run(self, *, run: OrchestrationRun) -> None:
@@ -334,9 +342,10 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             """
             INSERT INTO orchestration_runs(
               run_id, status, correlation_id, current_step_id, last_event_type,
-              created_at, updated_at, terminal_at
+              created_at, updated_at, run_type, lease_owner, lease_token,
+              last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run.run_id,
@@ -346,6 +355,13 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
                 run.last_event_type,
                 run.created_at,
                 run.updated_at,
+                run.run_type,
+                run.lease_owner,
+                run.lease_token,
+                run.last_heartbeat_at,
+                run.watchdog_timeout_at,
+                run.watchdog_attempt,
+                run.watchdog_state,
                 run.terminal_at,
             ),
         )
@@ -386,7 +402,8 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
         cursor = await self._db.execute("""
             SELECT
               run_id, status, correlation_id, current_step_id, last_event_type,
-              created_at, updated_at, terminal_at
+              created_at, updated_at, run_type, lease_owner, lease_token,
+              last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
             FROM orchestration_runs
             WHERE status IN ('PENDING', 'RUNNING')
             ORDER BY created_at ASC, run_id ASC
@@ -402,7 +419,14 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
                 last_event_type=str(row[4]),
                 created_at=str(row[5]),
                 updated_at=str(row[6]),
-                terminal_at=(str(row[7]) if row[7] else None),
+                run_type=str(row[7] or "DEFAULT"),
+                lease_owner=(str(row[8]) if row[8] else None),
+                lease_token=(str(row[9]) if row[9] else None),
+                last_heartbeat_at=(str(row[10]) if row[10] else None),
+                watchdog_timeout_at=(str(row[11]) if row[11] else None),
+                watchdog_attempt=int(row[12] or 0),
+                watchdog_state=str(row[13] or "NONE"),
+                terminal_at=(str(row[14]) if row[14] else None),
             )
             for row in rows
         ]
@@ -501,3 +525,139 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             ),
         )
         await self._db.commit()
+
+    async def compare_and_set_run_lease(
+        self,
+        *,
+        run_id: str,
+        expected_lease_token: str | None,
+        lease_owner: str | None,
+        new_lease_token: str | None,
+        heartbeat_at: str | None,
+        timeout_at: str | None,
+        updated_at: str,
+    ) -> bool:
+        if expected_lease_token is None:
+            cursor = await self._db.execute(
+                """
+                UPDATE orchestration_runs
+                SET lease_owner = ?,
+                    lease_token = ?,
+                    last_heartbeat_at = ?,
+                    watchdog_timeout_at = ?,
+                    updated_at = ?
+                WHERE run_id = ? AND lease_token IS NULL
+                """,
+                (
+                    lease_owner,
+                    new_lease_token,
+                    heartbeat_at,
+                    timeout_at,
+                    updated_at,
+                    run_id,
+                ),
+            )
+        else:
+            cursor = await self._db.execute(
+                """
+                UPDATE orchestration_runs
+                SET lease_owner = ?,
+                    lease_token = ?,
+                    last_heartbeat_at = ?,
+                    watchdog_timeout_at = ?,
+                    updated_at = ?
+                WHERE run_id = ? AND lease_token = ?
+                """,
+                (
+                    lease_owner,
+                    new_lease_token,
+                    heartbeat_at,
+                    timeout_at,
+                    updated_at,
+                    run_id,
+                    expected_lease_token,
+                ),
+            )
+        await self._db.commit()
+        return int(cursor.rowcount or 0) > 0
+
+    async def apply_watchdog_action_if_lease_matches(
+        self,
+        *,
+        run_id: str,
+        expected_lease_token: str | None,
+        next_status: RunStatus,
+        current_step_id: str | None,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+        watchdog_attempt: int,
+        watchdog_state: str,
+        clear_lease: bool,
+    ) -> bool:
+        lease_owner = None if clear_lease else "watchdog"
+        lease_token = None if clear_lease else expected_lease_token
+        heartbeat_at = None if clear_lease else updated_at
+        if expected_lease_token is None:
+            cursor = await self._db.execute(
+                """
+                UPDATE orchestration_runs
+                SET status = ?,
+                    current_step_id = ?,
+                    last_event_type = ?,
+                    updated_at = ?,
+                    terminal_at = ?,
+                    watchdog_attempt = ?,
+                    watchdog_state = ?,
+                    lease_owner = ?,
+                    lease_token = ?,
+                    last_heartbeat_at = ?
+                WHERE run_id = ? AND lease_token IS NULL
+                """,
+                (
+                    next_status.value,
+                    current_step_id,
+                    last_event_type,
+                    updated_at,
+                    terminal_at,
+                    watchdog_attempt,
+                    watchdog_state,
+                    lease_owner,
+                    lease_token,
+                    heartbeat_at,
+                    run_id,
+                ),
+            )
+        else:
+            cursor = await self._db.execute(
+                """
+                UPDATE orchestration_runs
+                SET status = ?,
+                    current_step_id = ?,
+                    last_event_type = ?,
+                    updated_at = ?,
+                    terminal_at = ?,
+                    watchdog_attempt = ?,
+                    watchdog_state = ?,
+                    lease_owner = ?,
+                    lease_token = ?,
+                    last_heartbeat_at = ?
+                WHERE run_id = ? AND lease_token = ?
+                """,
+                (
+                    next_status.value,
+                    current_step_id,
+                    last_event_type,
+                    updated_at,
+                    terminal_at,
+                    watchdog_attempt,
+                    watchdog_state,
+                    lease_owner,
+                    lease_token,
+                    heartbeat_at,
+                    run_id,
+                    expected_lease_token,
+                ),
+            )
+        await self._db.commit()
+        return int(cursor.rowcount or 0) > 0

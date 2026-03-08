@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     orchestration_retry_max_attempts: int = 5
     orchestration_retry_base_backoff_seconds: int = 5
     orchestration_retry_max_backoff_seconds: int = 300
+    orchestration_watchdog_stale_lease_seconds: int = 90
+    orchestration_watchdog_heartbeat_grace_seconds: int = 90
+    orchestration_watchdog_default_timeout_seconds: int = 900
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 

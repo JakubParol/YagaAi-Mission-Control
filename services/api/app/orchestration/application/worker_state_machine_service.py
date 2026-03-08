@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from app.config import settings
 from app.orchestration.application.ports import OrchestrationRepository
 from app.orchestration.domain.models import (
     OrchestrationRun,
@@ -87,6 +89,7 @@ class WorkerStateMachineService:
                 event_type=event_type,
                 correlation_id=correlation_id,
                 occurred_at=occurred_at,
+                payload=payload,
             )
         elif event_type in _STEP_EVENT_TO_STATUS:
             decision, reason_code, reason_message = await self._apply_step_transition(
@@ -163,6 +166,7 @@ class WorkerStateMachineService:
         event_type: str,
         correlation_id: str,
         occurred_at: str,
+        payload: dict[str, Any],
     ) -> tuple[TransitionDecision, str | None, str | None]:
         target_status = _RUN_EVENT_TO_STATUS[event_type]
         run = await self._repo.get_run(run_id=run_id)
@@ -183,6 +187,13 @@ class WorkerStateMachineService:
                     last_event_type=event_type,
                     created_at=occurred_at,
                     updated_at=occurred_at,
+                    run_type=self._extract_run_type(payload),
+                    lease_owner=None,
+                    lease_token=None,
+                    last_heartbeat_at=None,
+                    watchdog_timeout_at=self._default_timeout_at(occurred_at),
+                    watchdog_attempt=0,
+                    watchdog_state="NONE",
                     terminal_at=None,
                 )
             )
@@ -203,6 +214,26 @@ class WorkerStateMachineService:
             updated_at=occurred_at,
             terminal_at=(occurred_at if target_status in _TERMINAL_RUN_STATUSES else None),
         )
+        if target_status == RunStatus.RUNNING:
+            await self._repo.compare_and_set_run_lease(
+                run_id=run_id,
+                expected_lease_token=run.lease_token,
+                lease_owner=self._extract_lease_owner(payload),
+                new_lease_token=self._extract_lease_token(payload),
+                heartbeat_at=occurred_at,
+                timeout_at=self._default_timeout_at(occurred_at),
+                updated_at=occurred_at,
+            )
+        if target_status in _TERMINAL_RUN_STATUSES:
+            await self._repo.compare_and_set_run_lease(
+                run_id=run_id,
+                expected_lease_token=run.lease_token,
+                lease_owner=None,
+                new_lease_token=None,
+                heartbeat_at=None,
+                timeout_at=run.watchdog_timeout_at,
+                updated_at=occurred_at,
+            )
         return TransitionDecision.ACCEPTED, None, None
 
     async def _apply_step_transition(
@@ -291,3 +322,33 @@ class WorkerStateMachineService:
         if isinstance(raw, str) and raw.strip():
             return raw.strip()
         return None
+
+    def _extract_run_type(self, payload: dict[str, Any]) -> str:
+        raw = payload.get("run_type")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip().upper()
+        return "DEFAULT"
+
+    def _extract_lease_owner(self, payload: dict[str, Any]) -> str:
+        for key in ("lease_owner", "worker_instance", "worker_id"):
+            raw = payload.get(key)
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+        return "worker-unknown"
+
+    def _extract_lease_token(self, payload: dict[str, Any]) -> str:
+        raw = payload.get("lease_token")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+        return new_uuid()
+
+    def _default_timeout_at(self, occurred_at: str) -> str:
+        base = datetime.fromisoformat(occurred_at.replace("Z", "+00:00")).astimezone(UTC)
+        return (
+            (base + timedelta(seconds=settings.orchestration_watchdog_default_timeout_seconds))
+            .isoformat()
+            .replace(
+                "+00:00",
+                "Z",
+            )
+        )

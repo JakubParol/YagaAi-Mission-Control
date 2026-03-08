@@ -104,6 +104,7 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "20260308_002",
         "20260308_003",
         "20260308_004",
+        "20260308_005",
     ]
 
     command_columns = {
@@ -145,7 +146,19 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
     run_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(orchestration_runs)").fetchall()
     }
-    assert {"run_id", "status", "correlation_id", "last_event_type"}.issubset(run_columns)
+    assert {
+        "run_id",
+        "status",
+        "correlation_id",
+        "last_event_type",
+        "run_type",
+        "lease_owner",
+        "lease_token",
+        "last_heartbeat_at",
+        "watchdog_timeout_at",
+        "watchdog_attempt",
+        "watchdog_state",
+    }.issubset(run_columns)
 
     step_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(orchestration_run_steps)").fetchall()

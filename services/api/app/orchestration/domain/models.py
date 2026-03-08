@@ -44,6 +44,12 @@ class TransitionDecision(StrEnum):
     DUPLICATE = "DUPLICATE"
 
 
+class WatchdogAction(StrEnum):
+    RETRY = "RETRY"
+    FAIL = "FAIL"
+    QUARANTINE = "QUARANTINE"
+
+
 @dataclass
 class CommandEnvelope:
     id: str
@@ -87,6 +93,13 @@ class OrchestrationRun:
     last_event_type: str
     created_at: str
     updated_at: str
+    run_type: str = "DEFAULT"
+    lease_owner: str | None = None
+    lease_token: str | None = None
+    last_heartbeat_at: str | None = None
+    watchdog_timeout_at: str | None = None
+    watchdog_attempt: int = 0
+    watchdog_state: str = "NONE"
     terminal_at: str | None = None
 
 

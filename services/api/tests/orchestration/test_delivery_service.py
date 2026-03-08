@@ -160,6 +160,35 @@ class _FakeRepo(OrchestrationRepository):
     async def append_timeline_entry(self, *, entry: RunTimelineEntry) -> None:
         return None
 
+    async def compare_and_set_run_lease(
+        self,
+        *,
+        run_id: str,
+        expected_lease_token: str | None,
+        lease_owner: str | None,
+        new_lease_token: str | None,
+        heartbeat_at: str | None,
+        timeout_at: str | None,
+        updated_at: str,
+    ) -> bool:
+        return True
+
+    async def apply_watchdog_action_if_lease_matches(
+        self,
+        *,
+        run_id: str,
+        expected_lease_token: str | None,
+        next_status: RunStatus,
+        current_step_id: str | None,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+        watchdog_attempt: int,
+        watchdog_state: str,
+        clear_lease: bool,
+    ) -> bool:
+        return True
+
 
 def _event(*, retry_attempt: int, max_attempts: int = 3) -> OutboxEventEnvelope:
     return OutboxEventEnvelope(

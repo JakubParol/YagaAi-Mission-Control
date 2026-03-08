@@ -233,6 +233,13 @@ def _migration_20260308_004(db: sqlite3.Connection) -> None:
           last_event_type TEXT NOT NULL,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
+          run_type TEXT NOT NULL DEFAULT 'DEFAULT',
+          lease_owner TEXT,
+          lease_token TEXT,
+          last_heartbeat_at TEXT,
+          watchdog_timeout_at TEXT,
+          watchdog_attempt INTEGER NOT NULL DEFAULT 0,
+          watchdog_state TEXT NOT NULL DEFAULT 'NONE',
           terminal_at TEXT
         )
         """)
@@ -286,6 +293,35 @@ def _migration_20260308_004(db: sqlite3.Connection) -> None:
         """)
 
 
+def _migration_20260308_005(db: sqlite3.Connection) -> None:
+    if not _table_exists(db, "orchestration_runs"):
+        return
+    if not _column_exists(db, "orchestration_runs", "run_type"):
+        db.execute(
+            "ALTER TABLE orchestration_runs ADD COLUMN run_type TEXT NOT NULL DEFAULT 'DEFAULT'"
+        )
+    if not _column_exists(db, "orchestration_runs", "lease_owner"):
+        db.execute("ALTER TABLE orchestration_runs ADD COLUMN lease_owner TEXT")
+    if not _column_exists(db, "orchestration_runs", "lease_token"):
+        db.execute("ALTER TABLE orchestration_runs ADD COLUMN lease_token TEXT")
+    if not _column_exists(db, "orchestration_runs", "last_heartbeat_at"):
+        db.execute("ALTER TABLE orchestration_runs ADD COLUMN last_heartbeat_at TEXT")
+    if not _column_exists(db, "orchestration_runs", "watchdog_timeout_at"):
+        db.execute("ALTER TABLE orchestration_runs ADD COLUMN watchdog_timeout_at TEXT")
+    if not _column_exists(db, "orchestration_runs", "watchdog_attempt"):
+        db.execute(
+            "ALTER TABLE orchestration_runs ADD COLUMN watchdog_attempt INTEGER NOT NULL DEFAULT 0"
+        )
+    if not _column_exists(db, "orchestration_runs", "watchdog_state"):
+        db.execute(
+            "ALTER TABLE orchestration_runs ADD COLUMN watchdog_state TEXT NOT NULL DEFAULT 'NONE'"
+        )
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_runs_lease_token
+          ON orchestration_runs(lease_token)
+        """)
+
+
 _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (Migration("20260307_001", "add missing agents profile columns"), _migration_20260307_001),
     (Migration("20260307_002", "add stories.current_assignee_agent_id"), _migration_20260307_002),
@@ -309,6 +345,10 @@ _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (
         Migration("20260308_004", "create orchestration run state + timeline ledger tables"),
         _migration_20260308_004,
+    ),
+    (
+        Migration("20260308_005", "add watchdog lease/heartbeat/timeout columns to runs"),
+        _migration_20260308_005,
     ),
 ]
 

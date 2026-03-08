@@ -4,9 +4,12 @@ from app.orchestration.api.schemas import (
     EnvelopePayload,
     SubmitCommandRequest,
     SubmitCommandResponse,
+    WatchdogSweepRequest,
+    WatchdogSweepResponse,
 )
 from app.orchestration.application.command_service import CommandService
-from app.orchestration.dependencies import get_command_service
+from app.orchestration.application.watchdog_service import WatchdogService
+from app.orchestration.dependencies import get_command_service, get_watchdog_service
 from app.orchestration.domain.models import EnvelopeKind
 from app.shared.api.envelope import Envelope
 
@@ -50,3 +53,20 @@ async def submit_command(
         ),
     )
     return Envelope(data=response)
+
+
+@router.post("/watchdog/sweep")
+async def watchdog_sweep(
+    body: WatchdogSweepRequest,
+    service: WatchdogService = Depends(get_watchdog_service),
+) -> Envelope[WatchdogSweepResponse]:
+    decisions = await service.evaluate_stale_runs(
+        watchdog_instance=body.watchdog_instance,
+        evaluated_at=body.evaluated_at,
+    )
+    return Envelope(
+        data=WatchdogSweepResponse(
+            status="OK",
+            decisions=decisions,
+        )
+    )
