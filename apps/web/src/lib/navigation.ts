@@ -23,6 +23,7 @@ export const navModules: NavModule[] = [
       { href: "/planning/board", label: "Board" },
       { href: "/planning/backlog", label: "Backlog" },
       { href: "/planning/list", label: "List" },
+      { href: "/planning/timeline", label: "Timeline" },
       { href: "/planning/epics-overview", label: "Epics" },
       { href: "/planning/settings", label: "Settings" },
     ],
