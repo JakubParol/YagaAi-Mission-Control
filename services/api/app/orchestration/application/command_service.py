@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+from app.config import settings
 from app.orchestration.application.ports import OrchestrationRepository
 from app.orchestration.domain.models import (
     MAX_SUPPORTED_SCHEMA_MINOR,
@@ -22,6 +23,8 @@ _SCHEMA_VERSION_RE = re.compile(r"^(?P<major>\d+)\.(?P<minor>\d+)$")
 class CommandService:
     def __init__(self, repo: OrchestrationRepository) -> None:
         self._repo = repo
+        self._default_max_attempts = settings.orchestration_retry_max_attempts
+        self._base_backoff_seconds = settings.orchestration_retry_base_backoff_seconds
 
     async def submit_command(
         self,
@@ -80,9 +83,17 @@ class CommandService:
                 "accepted_command_id": command_id,
                 "accepted_command_type": command_type,
                 "command_payload": payload,
+                "delivery": self._build_delivery_metadata(
+                    occurred_at=occurred_at,
+                    retry_attempt=1,
+                    max_attempts=self._default_max_attempts,
+                ),
             },
             status=OutboxStatus.PENDING,
             created_at=created_at,
+            retry_attempt=1,
+            max_attempts=self._default_max_attempts,
+            next_retry_at=occurred_at,
         )
         return await self._repo.create_command_with_outbox(
             command=command, outbox_event=outbox_event
@@ -154,3 +165,22 @@ class CommandService:
                 "Invalid timestamp",
                 details=[{"field": field, "message": "must be a valid ISO-8601 timestamp"}],
             ) from exc
+
+    def _build_delivery_metadata(
+        self,
+        *,
+        occurred_at: str,
+        retry_attempt: int,
+        max_attempts: int,
+    ) -> dict[str, Any]:
+        bounded_max_attempts = max(max_attempts, 1)
+        next_backoff_seconds = min(
+            self._base_backoff_seconds * (2 ** max(retry_attempt - 1, 0)),
+            settings.orchestration_retry_max_backoff_seconds,
+        )
+        return {
+            "attempt": retry_attempt,
+            "max_attempts": bounded_max_attempts,
+            "next_retry_at": occurred_at,
+            "backoff_seconds": next_backoff_seconds,
+        }

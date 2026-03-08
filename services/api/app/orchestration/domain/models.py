@@ -49,3 +49,7 @@ class OutboxEventEnvelope:
     payload: dict[str, Any]
     status: OutboxStatus
     created_at: str
+    retry_attempt: int = 1
+    max_attempts: int = 5
+    next_retry_at: str | None = None
+    dead_lettered_at: str | None = None

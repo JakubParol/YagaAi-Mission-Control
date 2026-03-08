@@ -101,6 +101,7 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "20260307_003",
         "20260307_004",
         "20260308_001",
+        "20260308_002",
     ]
 
     command_columns = {
@@ -111,9 +112,16 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
     outbox_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(orchestration_outbox)").fetchall()
     }
-    assert {"command_id", "event_type", "available_at", "payload_json", "status"}.issubset(
-        outbox_columns
-    )
+    assert {
+        "command_id",
+        "event_type",
+        "available_at",
+        "payload_json",
+        "status",
+        "retry_attempt",
+        "max_attempts",
+        "dead_lettered_at",
+    }.issubset(outbox_columns)
 
     active_sprints = conn.execute(
         "SELECT COUNT(*) FROM backlogs WHERE project_id='p1' AND kind='SPRINT' AND status='ACTIVE'"

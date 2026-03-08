@@ -37,9 +37,12 @@ def db_path(tmp_path, monkeypatch):
           causation_id TEXT,
           payload_json TEXT NOT NULL,
           status TEXT NOT NULL,
+          retry_attempt INTEGER NOT NULL DEFAULT 1,
+          max_attempts INTEGER NOT NULL DEFAULT 5,
           available_at TEXT NOT NULL,
           published_at TEXT,
           last_error TEXT,
+          dead_lettered_at TEXT,
           created_at TEXT NOT NULL
         );
         """)

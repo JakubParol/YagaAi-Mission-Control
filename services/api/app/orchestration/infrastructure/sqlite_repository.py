@@ -43,10 +43,10 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
                 """
                 INSERT INTO orchestration_outbox(
                   id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
-                  causation_id, payload_json, status, available_at,
-                  published_at, last_error, created_at
+                  causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
+                  published_at, last_error, dead_lettered_at, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     outbox_event.id,
@@ -59,9 +59,12 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
                     outbox_event.causation_id,
                     json.dumps(outbox_event.payload, separators=(",", ":"), sort_keys=True),
                     outbox_event.status.value,
-                    outbox_event.created_at,
+                    outbox_event.retry_attempt,
+                    outbox_event.max_attempts,
+                    outbox_event.next_retry_at or outbox_event.created_at,
                     None,
                     None,
+                    outbox_event.dead_lettered_at,
                     outbox_event.created_at,
                 ),
             )

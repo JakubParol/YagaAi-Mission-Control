@@ -159,9 +159,12 @@ def _migration_20260308_001(db: sqlite3.Connection) -> None:
           causation_id TEXT,
           payload_json TEXT NOT NULL,
           status TEXT NOT NULL,
+          retry_attempt INTEGER NOT NULL DEFAULT 1,
+          max_attempts INTEGER NOT NULL DEFAULT 5,
           available_at TEXT NOT NULL,
           published_at TEXT,
           last_error TEXT,
+          dead_lettered_at TEXT,
           created_at TEXT NOT NULL
         )
         """)
@@ -175,6 +178,21 @@ def _migration_20260308_001(db: sqlite3.Connection) -> None:
         """)
 
 
+def _migration_20260308_002(db: sqlite3.Connection) -> None:
+    if not _table_exists(db, "orchestration_outbox"):
+        return
+    if not _column_exists(db, "orchestration_outbox", "retry_attempt"):
+        db.execute(
+            "ALTER TABLE orchestration_outbox ADD COLUMN retry_attempt INTEGER NOT NULL DEFAULT 1"
+        )
+    if not _column_exists(db, "orchestration_outbox", "max_attempts"):
+        db.execute(
+            "ALTER TABLE orchestration_outbox ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 5"
+        )
+    if not _column_exists(db, "orchestration_outbox", "dead_lettered_at"):
+        db.execute("ALTER TABLE orchestration_outbox ADD COLUMN dead_lettered_at TEXT")
+
+
 _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (Migration("20260307_001", "add missing agents profile columns"), _migration_20260307_001),
     (Migration("20260307_002", "add stories.current_assignee_agent_id"), _migration_20260307_002),
@@ -186,6 +204,10 @@ _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (
         Migration("20260308_001", "create orchestration command + outbox tables"),
         _migration_20260308_001,
+    ),
+    (
+        Migration("20260308_002", "add orchestration outbox retry/dead-letter columns"),
+        _migration_20260308_002,
     ),
 ]
 
