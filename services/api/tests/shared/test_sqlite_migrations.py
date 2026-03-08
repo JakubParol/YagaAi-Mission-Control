@@ -103,6 +103,7 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "20260308_001",
         "20260308_002",
         "20260308_003",
+        "20260308_004",
     ]
 
     command_columns = {
@@ -139,6 +140,23 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
     }
     assert {"stream_key", "consumer_group", "message_id", "correlation_id"}.issubset(
         processed_columns
+    )
+
+    run_columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(orchestration_runs)").fetchall()
+    }
+    assert {"run_id", "status", "correlation_id", "last_event_type"}.issubset(run_columns)
+
+    step_columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(orchestration_run_steps)").fetchall()
+    }
+    assert {"step_id", "run_id", "status", "last_event_type"}.issubset(step_columns)
+
+    timeline_columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(orchestration_run_timeline)").fetchall()
+    }
+    assert {"run_id", "event_type", "decision", "correlation_id", "payload_json"}.issubset(
+        timeline_columns
     )
 
     active_sprints = conn.execute(

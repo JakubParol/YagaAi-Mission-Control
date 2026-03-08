@@ -1,6 +1,14 @@
 from abc import ABC, abstractmethod
 
-from app.orchestration.domain.models import CommandEnvelope, OutboxEventEnvelope
+from app.orchestration.domain.models import (
+    CommandEnvelope,
+    OrchestrationRun,
+    OrchestrationStep,
+    OutboxEventEnvelope,
+    RunStatus,
+    RunTimelineEntry,
+    StepStatus,
+)
 
 
 class OrchestrationRepository(ABC):
@@ -87,3 +95,45 @@ class OrchestrationRepository(ABC):
         correlation_id: str,
         processed_at: str,
     ) -> None: ...
+
+    @abstractmethod
+    async def get_run(self, *, run_id: str) -> OrchestrationRun | None: ...
+
+    @abstractmethod
+    async def create_run(self, *, run: OrchestrationRun) -> None: ...
+
+    @abstractmethod
+    async def update_run_status(
+        self,
+        *,
+        run_id: str,
+        status: RunStatus,
+        current_step_id: str | None,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+    ) -> None: ...
+
+    @abstractmethod
+    async def list_in_flight_runs(self) -> list[OrchestrationRun]: ...
+
+    @abstractmethod
+    async def get_step(self, *, run_id: str, step_id: str) -> OrchestrationStep | None: ...
+
+    @abstractmethod
+    async def create_step(self, *, step: OrchestrationStep) -> None: ...
+
+    @abstractmethod
+    async def update_step_status(
+        self,
+        *,
+        run_id: str,
+        step_id: str,
+        status: StepStatus,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+    ) -> None: ...
+
+    @abstractmethod
+    async def append_timeline_entry(self, *, entry: RunTimelineEntry) -> None: ...

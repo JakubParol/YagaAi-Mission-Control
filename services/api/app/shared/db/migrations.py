@@ -223,6 +223,69 @@ def _migration_20260308_003(db: sqlite3.Connection) -> None:
         """)
 
 
+def _migration_20260308_004(db: sqlite3.Connection) -> None:
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_runs (
+          run_id TEXT PRIMARY KEY,
+          status TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          current_step_id TEXT,
+          last_event_type TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          terminal_at TEXT
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_runs_status_updated_at
+          ON orchestration_runs(status, updated_at)
+        """)
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_run_steps (
+          step_id TEXT NOT NULL,
+          run_id TEXT NOT NULL REFERENCES orchestration_runs(run_id) ON DELETE CASCADE,
+          status TEXT NOT NULL,
+          last_event_type TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          terminal_at TEXT,
+          PRIMARY KEY (run_id, step_id)
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_run_steps_run_status
+          ON orchestration_run_steps(run_id, status, updated_at)
+        """)
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_run_timeline (
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL,
+          step_id TEXT,
+          message_id TEXT,
+          event_type TEXT NOT NULL,
+          decision TEXT NOT NULL,
+          reason_code TEXT,
+          reason_message TEXT,
+          correlation_id TEXT NOT NULL,
+          causation_id TEXT,
+          payload_json TEXT NOT NULL,
+          occurred_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_run_timeline_run_created
+          ON orchestration_run_timeline(run_id, created_at)
+        """)
+    db.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_orchestration_run_timeline_message
+          ON orchestration_run_timeline(message_id)
+          WHERE message_id IS NOT NULL
+        """)
+
+
 _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (Migration("20260307_001", "add missing agents profile columns"), _migration_20260307_001),
     (Migration("20260307_002", "add stories.current_assignee_agent_id"), _migration_20260307_002),
@@ -242,6 +305,10 @@ _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (
         Migration("20260308_003", "create orchestration consumer recovery tables"),
         _migration_20260308_003,
+    ),
+    (
+        Migration("20260308_004", "create orchestration run state + timeline ledger tables"),
+        _migration_20260308_004,
     ),
 ]
 

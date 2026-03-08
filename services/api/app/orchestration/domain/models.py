@@ -22,6 +22,28 @@ class OutboxStatus(StrEnum):
     FAILED = "FAILED"
 
 
+class RunStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class StepStatus(StrEnum):
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    SKIPPED = "SKIPPED"
+
+
+class TransitionDecision(StrEnum):
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    DUPLICATE = "DUPLICATE"
+
+
 @dataclass
 class CommandEnvelope:
     id: str
@@ -54,3 +76,43 @@ class OutboxEventEnvelope:
     next_retry_at: str | None = None
     dead_lettered_at: str | None = None
     dead_letter_payload: dict[str, Any] | None = None
+
+
+@dataclass
+class OrchestrationRun:
+    run_id: str
+    status: RunStatus
+    correlation_id: str
+    current_step_id: str | None
+    last_event_type: str
+    created_at: str
+    updated_at: str
+    terminal_at: str | None = None
+
+
+@dataclass
+class OrchestrationStep:
+    step_id: str
+    run_id: str
+    status: StepStatus
+    last_event_type: str
+    created_at: str
+    updated_at: str
+    terminal_at: str | None = None
+
+
+@dataclass
+class RunTimelineEntry:
+    id: str
+    run_id: str
+    step_id: str | None
+    message_id: str | None
+    event_type: str
+    decision: TransitionDecision
+    reason_code: str | None
+    reason_message: str | None
+    correlation_id: str
+    causation_id: str | None
+    payload: dict[str, Any]
+    occurred_at: str
+    created_at: str

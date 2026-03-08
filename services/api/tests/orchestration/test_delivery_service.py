@@ -2,7 +2,16 @@ import pytest
 
 from app.orchestration.application.delivery_service import DeliveryService
 from app.orchestration.application.ports import OrchestrationRepository
-from app.orchestration.domain.models import CommandEnvelope, OutboxEventEnvelope, OutboxStatus
+from app.orchestration.domain.models import (
+    CommandEnvelope,
+    OrchestrationRun,
+    OrchestrationStep,
+    OutboxEventEnvelope,
+    OutboxStatus,
+    RunStatus,
+    RunTimelineEntry,
+    StepStatus,
+)
 from app.shared.api.errors import NotFoundError
 
 
@@ -107,6 +116,48 @@ class _FakeRepo(OrchestrationRepository):
         correlation_id: str,
         processed_at: str,
     ) -> None:
+        return None
+
+    async def get_run(self, *, run_id: str) -> OrchestrationRun | None:
+        return None
+
+    async def create_run(self, *, run: OrchestrationRun) -> None:
+        return None
+
+    async def update_run_status(
+        self,
+        *,
+        run_id: str,
+        status: RunStatus,
+        current_step_id: str | None,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+    ) -> None:
+        return None
+
+    async def list_in_flight_runs(self) -> list[OrchestrationRun]:
+        return []
+
+    async def get_step(self, *, run_id: str, step_id: str) -> OrchestrationStep | None:
+        return None
+
+    async def create_step(self, *, step: OrchestrationStep) -> None:
+        return None
+
+    async def update_step_status(
+        self,
+        *,
+        run_id: str,
+        step_id: str,
+        status: StepStatus,
+        last_event_type: str,
+        updated_at: str,
+        terminal_at: str | None,
+    ) -> None:
+        return None
+
+    async def append_timeline_entry(self, *, entry: RunTimelineEntry) -> None:
         return None
 
 
