@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -7,10 +8,17 @@ logger = logging.getLogger(__name__)
 
 
 class AppError(Exception):
-    def __init__(self, status_code: int, message: str, code: str = "APP_ERROR") -> None:
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        code: str = "APP_ERROR",
+        details: list[dict[str, Any]] | None = None,
+    ) -> None:
         self.status_code = status_code
         self.message = message
         self.code = code
+        self.details = details or []
         super().__init__(message)
 
 
@@ -20,8 +28,12 @@ class NotFoundError(AppError):
 
 
 class ValidationError(AppError):
-    def __init__(self, message: str = "Validation failed") -> None:
-        super().__init__(400, message, "VALIDATION_ERROR")
+    def __init__(
+        self,
+        message: str = "Validation failed",
+        details: list[dict[str, Any]] | None = None,
+    ) -> None:
+        super().__init__(400, message, "VALIDATION_ERROR", details=details)
 
 
 class BusinessRuleError(AppError):
@@ -35,9 +47,12 @@ class ConflictError(AppError):
 
 
 async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
+    error_payload: dict[str, Any] = {"code": exc.code, "message": exc.message}
+    if exc.details:
+        error_payload["details"] = exc.details
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": {"code": exc.code, "message": exc.message}},
+        content={"error": error_payload},
     )
 
 
