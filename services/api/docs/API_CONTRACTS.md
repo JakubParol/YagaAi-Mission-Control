@@ -1130,7 +1130,13 @@ Response `202`:
       "payload": {
         "accepted_command_id": "...",
         "accepted_command_type": "orchestration.run.submit",
-        "command_payload": { "run_id": "run-123" }
+        "command_payload": { "run_id": "run-123" },
+        "delivery": {
+          "attempt": 1,
+          "max_attempts": 5,
+          "next_retry_at": "2026-03-08T09:00:00Z",
+          "backoff_seconds": 5
+        }
       }
     }
   }
@@ -1157,6 +1163,7 @@ Validation rules:
 - `schema_version` must match `<major>.<minor>`,
 - supported schema range: `1.0` through `1.1`,
 - metadata fields `producer`, `correlation_id`, `occurred_at` are required and non-blank.
+- outbox delivery metadata is initialized with bounded retry policy (`attempt=1`, configurable `max_attempts`, exponential `backoff_seconds`).
 
 Validation errors return `400` with machine-actionable `details`:
 ```jsonc

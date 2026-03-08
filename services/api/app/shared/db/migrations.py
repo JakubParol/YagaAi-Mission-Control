@@ -159,9 +159,13 @@ def _migration_20260308_001(db: sqlite3.Connection) -> None:
           causation_id TEXT,
           payload_json TEXT NOT NULL,
           status TEXT NOT NULL,
+          retry_attempt INTEGER NOT NULL DEFAULT 1,
+          max_attempts INTEGER NOT NULL DEFAULT 5,
           available_at TEXT NOT NULL,
           published_at TEXT,
           last_error TEXT,
+          dead_lettered_at TEXT,
+          dead_letter_payload_json TEXT,
           created_at TEXT NOT NULL
         )
         """)
@@ -172,6 +176,50 @@ def _migration_20260308_001(db: sqlite3.Connection) -> None:
     db.execute("""
         CREATE INDEX IF NOT EXISTS idx_orchestration_outbox_command_id
           ON orchestration_outbox(command_id)
+        """)
+
+
+def _migration_20260308_002(db: sqlite3.Connection) -> None:
+    if not _table_exists(db, "orchestration_outbox"):
+        return
+    if not _column_exists(db, "orchestration_outbox", "retry_attempt"):
+        db.execute(
+            "ALTER TABLE orchestration_outbox ADD COLUMN retry_attempt INTEGER NOT NULL DEFAULT 1"
+        )
+    if not _column_exists(db, "orchestration_outbox", "max_attempts"):
+        db.execute(
+            "ALTER TABLE orchestration_outbox ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 5"
+        )
+    if not _column_exists(db, "orchestration_outbox", "dead_lettered_at"):
+        db.execute("ALTER TABLE orchestration_outbox ADD COLUMN dead_lettered_at TEXT")
+    if not _column_exists(db, "orchestration_outbox", "dead_letter_payload_json"):
+        db.execute("ALTER TABLE orchestration_outbox ADD COLUMN dead_letter_payload_json TEXT")
+
+
+def _migration_20260308_003(db: sqlite3.Connection) -> None:
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_consumer_offsets (
+          stream_key TEXT NOT NULL,
+          consumer_group TEXT NOT NULL,
+          consumer_name TEXT NOT NULL,
+          last_message_id TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (stream_key, consumer_group, consumer_name)
+        )
+        """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_processed_messages (
+          stream_key TEXT NOT NULL,
+          consumer_group TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          processed_at TEXT NOT NULL,
+          PRIMARY KEY (stream_key, consumer_group, message_id)
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_processed_messages_correlation
+          ON orchestration_processed_messages(correlation_id)
         """)
 
 
@@ -186,6 +234,14 @@ _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (
         Migration("20260308_001", "create orchestration command + outbox tables"),
         _migration_20260308_001,
+    ),
+    (
+        Migration("20260308_002", "add orchestration outbox retry/dead-letter columns"),
+        _migration_20260308_002,
+    ),
+    (
+        Migration("20260308_003", "create orchestration consumer recovery tables"),
+        _migration_20260308_003,
     ),
 ]
 

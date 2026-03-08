@@ -101,6 +101,8 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
         "20260307_003",
         "20260307_004",
         "20260308_001",
+        "20260308_002",
+        "20260308_003",
     ]
 
     command_columns = {
@@ -111,8 +113,32 @@ def test_migrations_are_applied_and_idempotent(tmp_path: Path) -> None:
     outbox_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(orchestration_outbox)").fetchall()
     }
-    assert {"command_id", "event_type", "available_at", "payload_json", "status"}.issubset(
-        outbox_columns
+    assert {
+        "command_id",
+        "event_type",
+        "available_at",
+        "payload_json",
+        "status",
+        "retry_attempt",
+        "max_attempts",
+        "dead_lettered_at",
+        "dead_letter_payload_json",
+    }.issubset(outbox_columns)
+
+    consumer_offset_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(orchestration_consumer_offsets)").fetchall()
+    }
+    assert {"stream_key", "consumer_group", "consumer_name", "last_message_id"}.issubset(
+        consumer_offset_columns
+    )
+
+    processed_columns = {
+        row[1]
+        for row in conn.execute("PRAGMA table_info(orchestration_processed_messages)").fetchall()
+    }
+    assert {"stream_key", "consumer_group", "message_id", "correlation_id"}.issubset(
+        processed_columns
     )
 
     active_sprints = conn.execute(

@@ -13,6 +13,7 @@
 - [API Contracts](./API_CONTRACTS.md) — response envelope, error model, pagination/filter/sort, all module endpoints
 - [Auth](./AUTH.md) — v1 actor-identity headers, future auth plan
 - [Operational Notes](./OPERATIONAL.md) — idempotency, concurrency, logging, audit hooks, deferred items
+- [Orchestration Streams](./ORCHESTRATION_STREAMS.md) — Redis stream keys, partitions, consumer groups, retry/dead-letter metadata contract
 
 ### Planning module
 

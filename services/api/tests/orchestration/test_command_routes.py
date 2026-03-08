@@ -50,6 +50,11 @@ def test_submit_command_accepts_compatible_schema_versions(
     assert data["command"]["schema_version"] == schema_version
     assert data["outbox_event"]["schema_version"] == schema_version
     assert data["outbox_event"]["type"] == "orchestration.run.submit.accepted"
+    delivery = data["outbox_event"]["payload"]["delivery"]
+    assert delivery["attempt"] == 1
+    assert delivery["max_attempts"] == 5
+    assert delivery["backoff_seconds"] == 5
+    assert delivery["next_retry_at"] == "2026-03-08T09:00:00Z"
 
     assert _count_rows(db_path, "orchestration_commands") == 1
     assert _count_rows(db_path, "orchestration_outbox") == 1
