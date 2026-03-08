@@ -1,0 +1,92 @@
+from datetime import UTC, datetime
+from typing import Any
+
+import httpx
+from fastapi import APIRouter, HTTPException, status
+
+router = APIRouter(tags=["orchestration"])
+
+_DAPR_HTTP_BASE = "http://127.0.0.1:3500"
+_PUBSUB_NAME = "local-pubsub"
+_TOPIC_NAME = "orchestration.events"
+_STATESTORE_NAME = "local-statestore"
+_WORKER_APP_ID = "mission-control-worker"
+
+
+@router.get("/dapr/subscribe")
+async def dapr_subscribe() -> list[dict[str, Any]]:
+    return [
+        {
+            "pubsubname": _PUBSUB_NAME,
+            "topic": _TOPIC_NAME,
+            "routes": {"default": "v1/orchestration/dapr/events"},
+        }
+    ]
+
+
+@router.get("/healthz/dapr")
+async def dapr_healthz() -> dict[str, str]:
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            response = await client.get(f"{_DAPR_HTTP_BASE}/v1.0/metadata")
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Dapr sidecar metadata unavailable: {error}",
+            ) from error
+    return {"status": "ok"}
+
+
+@router.post("/v1/orchestration/dapr/events")
+async def handle_dapr_orchestration_event(cloud_event: dict[str, Any]) -> dict[str, str]:
+    data = cloud_event.get("data")
+    if not isinstance(data, dict):
+        data = cloud_event
+
+    run_id = str(data.get("run_id") or "unknown-run")
+    correlation_id = str(
+        data.get("correlation_id") or cloud_event.get("traceid") or "unknown-correlation"
+    )
+    occurred_at = str(data.get("occurred_at") or datetime.now(tz=UTC).isoformat())
+
+    state_key = f"orchestration:last-event:{run_id}"
+    state_payload = {
+        "run_id": run_id,
+        "received_at": datetime.now(tz=UTC).isoformat(),
+        "correlation_id": correlation_id,
+        "event": data,
+    }
+    ack_payload = {
+        "run_id": run_id,
+        "acknowledged_at": datetime.now(tz=UTC).isoformat(),
+        "correlation_id": correlation_id,
+        "status": "ACCEPTED",
+    }
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        try:
+            save_state_response = await client.post(
+                f"{_DAPR_HTTP_BASE}/v1.0/state/{_STATESTORE_NAME}",
+                json=[{"key": state_key, "value": state_payload}],
+            )
+            save_state_response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Failed to persist orchestration event in Dapr state store: {error}",
+            ) from error
+
+        try:
+            invoke_response = await client.post(
+                (f"{_DAPR_HTTP_BASE}/v1.0/invoke/{_WORKER_APP_ID}" "/method/orchestration/ack"),
+                json=ack_payload,
+            )
+            invoke_response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Failed to invoke worker acknowledgement endpoint via Dapr: {error}",
+            ) from error
+
+    return {"status": "SUCCESS", "run_id": run_id, "occurred_at": occurred_at}
