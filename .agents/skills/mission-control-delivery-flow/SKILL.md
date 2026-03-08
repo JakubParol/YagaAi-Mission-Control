@@ -26,6 +26,7 @@ Prefer `--output json` for deterministic parsing.
 
 ## Phase 0 - Preparation
 
+0. Set thinking to High!
 1. Read the planning element details using the MC CLI by element code.
 2. If the planning element is not attached to the current sprint in the MC project, attach it.
 3. If it is not attached to an epic, attach the story to an epic – you can get the list of epics and choose the best one.
@@ -39,8 +40,9 @@ Prefer `--output json` for deterministic parsing.
 
 1. **Plan atomic tasks** for the target planning element
 2. **Create tasks** in the story via `mc task create`.
-3. **Start story**: set story `IN_PROGRESS` via `mc story update`.
-4. For each task:
+3. Set thinking to Medium!
+4. **Start story**: set story `IN_PROGRESS` via `mc story update`.
+5. For each task:
    - set task `IN_PROGRESS` via `mc task update`,
    - implement code + commit,
    - run quality gates (see `mission-control-test-gate`),
