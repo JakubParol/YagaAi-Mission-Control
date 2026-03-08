@@ -28,6 +28,12 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 - Requests
 - Imports
 
+### Orchestration (`/v1/orchestration`)
+
+- Run command submission (`/commands`)
+- Run status read model (`/runs/{run_id}`)
+- Run timeline tailing (`/timeline`)
+
 ## Endpoint-to-Command Mapping (v1)
 
 | API Resource | Example CLI Group |
@@ -44,6 +50,9 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 | `/v1/observability/costs` | `mc obs costs ...` |
 | `/v1/observability/requests` | `mc obs requests ...` |
 | `/v1/observability/imports` | `mc obs import ...` |
+| `/v1/orchestration/commands` | `mc run submit ...` |
+| `/v1/orchestration/runs/{run_id}` | `mc run status --run-id <id>` |
+| `/v1/orchestration/timeline` | `mc run tail --run-id <id> ...` |
 
 ## Non-goals (v1)
 
