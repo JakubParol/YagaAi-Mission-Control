@@ -87,39 +87,41 @@ services:
 
   worker:
     image: python:3.12-alpine
+    working_dir: /workspace
     env_file:
       - .env
     environment:
       MC_WORKER_API_HEALTH_URL: http://api:5001/healthz
       MC_WORKER_REDIS_HOST: redis
       MC_WORKER_REDIS_PORT: 6379
+      MC_WORKER_DAPR_HTTP_URL: http://127.0.0.1:3520
+      MC_WORKER_APP_PORT: 8000
+      MC_WORKER_PUBLISH_INTERVAL_SECONDS: ${MC_WORKER_PUBLISH_INTERVAL_SECONDS:-15}
     command:
       - /bin/sh
       - -lc
       - |
-        pip install --no-cache-dir redis >/dev/null
-        while true; do
-          python -c "import os,urllib.request,redis; urllib.request.urlopen(os.environ['MC_WORKER_API_HEALTH_URL'], timeout=2); redis.Redis(host=os.environ['MC_WORKER_REDIS_HOST'], port=int(os.environ['MC_WORKER_REDIS_PORT']), socket_connect_timeout=2).ping(); print('worker heartbeat: api+redis ok')"
-          sleep 10
-        done
+        python /workspace/infra/local-runtime/worker/app.py
+    volumes:
+      - ../../:/workspace
     depends_on:
       api:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://api:5001/healthz', timeout=2)\" && python -c \"import socket; s=socket.create_connection(('redis',6379),2); s.close()\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)\" && python -c \"import urllib.request; urllib.request.urlopen('http://api:5001/healthz', timeout=2)\" && python -c \"import socket; s=socket.create_connection(('redis',6379),2); s.close()\""]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 15s
 
   dapr-placement:
-    image: daprio/dapr:1.14.4
+    image: daprio/dapr:${MC_DAPR_VERSION:-1.14.4}
     command: ["./placement", "--port", "50006"]
 
   dapr-api:
-    image: daprio/daprd:1.14.4
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
     network_mode: service:api
     depends_on:
       api:
@@ -141,10 +143,10 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ./dapr/components:/components
+      - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
   dapr-web:
-    image: daprio/daprd:1.14.4
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
     network_mode: service:web
     depends_on:
       web:
@@ -166,10 +168,10 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ./dapr/components:/components
+      - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
   dapr-worker:
-    image: daprio/daprd:1.14.4
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
     network_mode: service:worker
     depends_on:
       worker:
@@ -180,6 +182,8 @@ services:
       - ./daprd
       - --app-id
       - mission-control-worker
+      - --app-port
+      - "8000"
       - --dapr-http-port
       - "3520"
       - --dapr-grpc-port
@@ -189,7 +193,7 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ./dapr/components:/components
+      - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
 volumes:
   sqlite-data:

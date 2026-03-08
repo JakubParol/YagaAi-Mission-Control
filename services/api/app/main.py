@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.observability.api.router import router as observability_router
+from app.orchestration.api.dapr_router import router as orchestration_dapr_router
 from app.orchestration.api.router import router as orchestration_router
 from app.planning.api.router import router as planning_router
 from app.shared.api.errors import AppError, app_error_handler, generic_error_handler
@@ -28,3 +29,4 @@ app.include_router(health_router)
 app.include_router(planning_router, prefix="/v1/planning")
 app.include_router(observability_router, prefix="/v1/observability")
 app.include_router(orchestration_router, prefix="/v1/orchestration")
+app.include_router(orchestration_dapr_router)
