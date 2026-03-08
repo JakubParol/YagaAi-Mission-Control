@@ -43,12 +43,14 @@ async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str
             message_id="1710000000000-0",
             run_id="run-1",
             event_type="orchestration.run.submit.accepted",
+            payload={"run_type": "BATCH"},
         )
         await _process(
             service,
             message_id="1710000000000-1",
             run_id="run-1",
             event_type="orchestration.run.started",
+            payload={"lease_owner": "worker-a", "lease_token": "lease-abc"},
         )
         await _process(
             service,
@@ -83,7 +85,9 @@ async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str
 
     assert run is not None
     assert run.status.value == "SUCCEEDED"
+    assert run.run_type == "BATCH"
     assert run.terminal_at is not None
+    assert run.lease_token is None
     assert step is not None
     assert step.status.value == "SUCCEEDED"
     assert timeline_count == 5
