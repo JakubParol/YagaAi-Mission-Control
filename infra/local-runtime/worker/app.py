@@ -31,6 +31,17 @@ def _iso_now() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
+def _log(level: str, event: str, **fields: object) -> None:
+    payload = {
+        "timestamp": _iso_now(),
+        "level": level,
+        "service": "mission-control-worker",
+        "event": event,
+        **fields,
+    }
+    print(json.dumps(payload, separators=(",", ":"), sort_keys=True), flush=True)
+
+
 def _check_api_health() -> None:
     with urllib.request.urlopen(API_HEALTH_URL, timeout=3):
         return
@@ -73,6 +84,14 @@ def _publish_orchestration_event() -> None:
     with _state_lock:
         global _latest_publish
         _latest_publish = event
+    _log(
+        "INFO",
+        "worker.orchestration_event.published",
+        run_id=event["run_id"],
+        event_type=event["type"],
+        correlation_id=event["correlation_id"],
+        event_id=event["event_id"],
+    )
 
 
 def _set_last_error(error: str | None) -> None:
@@ -88,10 +107,9 @@ def _publisher_loop() -> None:
             _check_redis_health()
             _publish_orchestration_event()
             _set_last_error(None)
-            print(f"[worker] published orchestration heartbeat via Dapr at {_iso_now()}", flush=True)
         except (OSError, urllib.error.URLError, urllib.error.HTTPError, ValueError) as error:
             _set_last_error(str(error))
-            print(f"[worker] publish failed: {error}", flush=True)
+            _log("ERROR", "worker.orchestration_event.publish_failed", error=str(error))
         time.sleep(PUBLISH_INTERVAL_SECONDS)
 
 
@@ -131,17 +149,25 @@ class WorkerHandler(BaseHTTPRequestHandler):
         with _state_lock:
             global _latest_ack
             _latest_ack = payload
+        _log(
+            "INFO",
+            "worker.orchestration_ack.received",
+            run_id=str(payload.get("run_id", "")),
+            correlation_id=str(payload.get("correlation_id", "")),
+            causation_id=str(payload.get("causation_id", "")),
+            status=str(payload.get("status", "")),
+        )
         self._send_json(200, {"status": "ACK_RECEIVED"})
 
     def log_message(self, format: str, *args: Any) -> None:
-        print(f"[worker-http] {format % args}", flush=True)
+        _log("INFO", "worker.http.access", message=format % args)
 
 
 def main() -> None:
     publisher = threading.Thread(target=_publisher_loop, daemon=True)
     publisher.start()
     server = ThreadingHTTPServer(("0.0.0.0", WORKER_APP_PORT), WorkerHandler)
-    print(f"[worker] listening on 0.0.0.0:{WORKER_APP_PORT}", flush=True)
+    _log("INFO", "worker.http.started", bind=f"0.0.0.0:{WORKER_APP_PORT}")
     server.serve_forever()
 
 

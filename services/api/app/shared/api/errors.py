@@ -3,6 +3,9 @@ from typing import Any
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
+
+from app.shared.logging import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +60,27 @@ async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
 
 
 async def generic_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error("%s %s failed: %s", request.method, request.url.path, exc)
-    return JSONResponse(
+    request_id = getattr(request.state, "request_id", None)
+    correlation_id = request.headers.get("X-Correlation-Id")
+    actor_id = request.headers.get("X-Actor-Id")
+    actor_type = request.headers.get("X-Actor-Type")
+    log_event(
+        logger,
+        level=logging.ERROR,
+        event="http.request.failed",
+        request_id=request_id,
+        method=request.method,
+        path=request.url.path,
+        status_code=500,
+        actor_id=actor_id,
+        actor_type=actor_type,
+        correlation_id=correlation_id,
+        error=str(exc),
+    )
+    response: Response = JSONResponse(
         status_code=500,
         content={"error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}},
     )
+    if isinstance(request_id, str) and request_id:
+        response.headers["X-Request-Id"] = request_id
+    return response

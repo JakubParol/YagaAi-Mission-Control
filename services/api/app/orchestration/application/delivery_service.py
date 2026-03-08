@@ -1,9 +1,11 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.config import settings
 from app.orchestration.application.ports import OrchestrationRepository
 from app.shared.api.errors import NotFoundError
+from app.shared.logging import log_event
 
 
 def _parse_iso8601(value: str) -> datetime:
@@ -26,6 +28,7 @@ class DeliveryService:
             f"{settings.orchestration_stream_prefix}:dead-letter:v"
             f"{settings.orchestration_stream_version}"
         )
+        self._logger = logging.getLogger(__name__)
 
     async def record_processing_failure(
         self,
@@ -67,6 +70,17 @@ class DeliveryService:
                 last_error=last_error,
                 payload=payload,
             )
+            log_event(
+                self._logger,
+                level=logging.WARNING,
+                event="orchestration.delivery.retry_scheduled",
+                outbox_event_id=outbox_event_id,
+                correlation_id=event.correlation_id,
+                retry_attempt=next_attempt,
+                max_attempts=event.max_attempts,
+                next_retry_at=_to_iso8601(next_retry_dt),
+                error_code=error_code,
+            )
             return {
                 "decision": "RETRY",
                 "outbox_event_id": outbox_event_id,
@@ -94,6 +108,16 @@ class DeliveryService:
             dead_lettered_at=_to_iso8601(now_dt),
             last_error=last_error,
             dead_letter_payload=dead_letter_payload,
+        )
+        log_event(
+            self._logger,
+            level=logging.ERROR,
+            event="orchestration.delivery.dead_lettered",
+            outbox_event_id=outbox_event_id,
+            correlation_id=event.correlation_id,
+            max_attempts=event.max_attempts,
+            dead_letter_stream=self._dead_letter_stream,
+            error_code=error_code,
         )
         return {
             "decision": "DEAD_LETTER",
