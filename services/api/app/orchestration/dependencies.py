@@ -1,6 +1,12 @@
+import aiosqlite
+from fastapi import Depends
+
 from app.orchestration.application.command_service import CommandService
-from app.orchestration.infrastructure.in_memory_repository import InMemoryOrchestrationRepository
+from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
+from app.shared.api.deps import get_db
 
 
-async def get_command_service() -> CommandService:
-    return CommandService(repo=InMemoryOrchestrationRepository())
+async def get_command_service(
+    db: aiosqlite.Connection = Depends(get_db),
+) -> CommandService:
+    return CommandService(repo=SqliteOrchestrationRepository(db))

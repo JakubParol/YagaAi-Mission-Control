@@ -128,6 +128,53 @@ def _migration_20260307_004(db: sqlite3.Connection) -> None:
         """)
 
 
+def _migration_20260308_001(db: sqlite3.Connection) -> None:
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_commands (
+          id TEXT PRIMARY KEY,
+          command_type TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          occurred_at TEXT NOT NULL,
+          producer TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          causation_id TEXT,
+          payload_json TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_commands_created_at
+          ON orchestration_commands(created_at)
+        """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS orchestration_outbox (
+          id TEXT PRIMARY KEY,
+          command_id TEXT NOT NULL REFERENCES orchestration_commands(id) ON DELETE CASCADE,
+          event_type TEXT NOT NULL,
+          schema_version TEXT NOT NULL,
+          occurred_at TEXT NOT NULL,
+          producer TEXT NOT NULL,
+          correlation_id TEXT NOT NULL,
+          causation_id TEXT,
+          payload_json TEXT NOT NULL,
+          status TEXT NOT NULL,
+          available_at TEXT NOT NULL,
+          published_at TEXT,
+          last_error TEXT,
+          created_at TEXT NOT NULL
+        )
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_outbox_status_available_at
+          ON orchestration_outbox(status, available_at)
+        """)
+    db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_orchestration_outbox_command_id
+          ON orchestration_outbox(command_id)
+        """)
+
+
 _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
     (Migration("20260307_001", "add missing agents profile columns"), _migration_20260307_001),
     (Migration("20260307_002", "add stories.current_assignee_agent_id"), _migration_20260307_002),
@@ -136,6 +183,10 @@ _MIGRATIONS: list[tuple[Migration, Callable[[sqlite3.Connection], None]]] = [
         _migration_20260307_003,
     ),
     (Migration("20260307_004", "create activity log table + index"), _migration_20260307_004),
+    (
+        Migration("20260308_001", "create orchestration command + outbox tables"),
+        _migration_20260308_001,
+    ),
 ]
 
 
