@@ -64,7 +64,8 @@ services:
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_URL: http://api:5001
+      NEXT_PUBLIC_API_URL: /api
+      API_URL: http://api:5001
       PORT: 3000
     command:
       - /bin/sh
