@@ -103,6 +103,11 @@ Tasks:
 2. Add rollback path (Postgres -> SQLite fallback during grace period).
 3. Define deprecation date for SQLite local path.
 
+Implementation status:
+- Local runtime docs updated for Postgres-first operation.
+- Rollout runbook backup step migrated to Postgres backup script.
+- SQLite service removed from default local runtime compose path.
+
 Exit criteria:
 - Runbook fully executable by non-implementing engineer.
 
@@ -138,7 +143,7 @@ Mitigation: strict phased gates, no opportunistic refactors during migration.
 - [x] Postgres schema migration path implemented
 - [x] Schema parity check script implemented (`services/api/scripts/schema_parity_check.py`)
 - [x] SQLite -> Postgres data migration script/tooling (`services/api/scripts/sqlite_to_postgres_migrate.py`)
-- [ ] Cutover config defaults to Postgres
-- [ ] Smoke + failure-path suite green on Postgres
-- [ ] Runbooks updated
-- [ ] SQLite fallback/deprecation policy documented
+- [x] Cutover config defaults to Postgres
+- [x] Smoke + failure-path suite green on Postgres
+- [x] Runbooks updated
+- [x] SQLite fallback/deprecation policy documented (SQLite removed from default local runtime compose)

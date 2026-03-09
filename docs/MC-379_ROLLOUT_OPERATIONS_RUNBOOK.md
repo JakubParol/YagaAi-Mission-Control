@@ -89,7 +89,7 @@ Apply the least disruptive level first.
 1. Freeze change window and announce incident channel ownership.
 2. Create verified DB backup:
 ```bash
-./infra/local-runtime/scripts/sqlite-backup.sh
+./infra/local-runtime/scripts/postgres-backup.sh
 ```
 3. Set fallback flags in runtime env (`infra/local-runtime/.env`) or deployment env:
 ```bash

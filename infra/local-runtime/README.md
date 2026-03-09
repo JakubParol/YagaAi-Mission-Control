@@ -1,11 +1,10 @@
 # Local runtime (Docker + Dapr)
 
-Deterministic local stack for Mission Control stories MC-415 and MC-372.
+Deterministic local stack for Mission Control orchestration runtime.
 
 ## Topology
 
-- `sqlite` (volume-backed DB file; current active app persistence path)
-- `postgres` (server DB service; migration Phase 1 bootstrap)
+- `postgres` (primary persistent DB service)
 - `redis`
 - `api` (FastAPI on `:5001`)
 - `web` (Next.js on `:3000`)
@@ -25,11 +24,9 @@ This creates `infra/local-runtime/.env` from `.env.example` when missing and sta
 
 `up.sh` also performs explicit Dapr metadata validation on API/Web/Worker sidecars and fails fast when required components are not loaded.
 
-## PostgreSQL bootstrap (migration Phase 1)
+## PostgreSQL runtime defaults
 
-Postgres service is now included in local runtime as a bootstrap step for SQLite -> PostgreSQL migration.
-
-Current state:
+Postgres is the default local persistence path.
 
 - container: `postgres` (`postgres:16-alpine`)
 - volume: `postgres-data`
@@ -39,7 +36,10 @@ Current state:
   - `MC_POSTGRES_USER`
   - `MC_POSTGRES_PASSWORD`
 
-Important: in this phase, application runtime still uses SQLite path for persistence. Postgres is provisioned and health-checked, ready for schema/data cutover in next phases.
+API uses:
+
+- `MC_API_DB_ENGINE=postgres`
+- `MC_API_POSTGRES_DSN=postgresql://<user>:<pass>@postgres:5432/<db>`
 
 ## Dapr component versioning and overrides
 
@@ -62,7 +62,7 @@ Override strategy:
 ./infra/local-runtime/reset.sh  # stop runtime and remove volumes (fresh state)
 ```
 
-## Orchestration smoke suite (MC-378)
+## Orchestration smoke suite
 
 Run deterministic orchestration smoke coverage (happy path + retry + dead-letter + watchdog):
 
@@ -82,33 +82,19 @@ CI-style (runtime booted separately, non-default API host):
 ./infra/local-runtime/scripts/orchestration-smoke.py --skip-up --api-base http://127.0.0.1:5101
 ```
 
-The script emits JSONL diagnostics for each scenario and suite summary. Failure entries include:
-
-- `scenario`
-- `component` (implicated service/module)
-- `run_id`
-- `correlation_id`
-- `message`
-- `details`
-
-## SQLite durability (backup & restore)
-
-- Persistent DB path inside runtime: `/runtime/sqlite/mission-control.db` (api/web) backed by Docker volume `sqlite-data` (`/data/mission-control.db` in sqlite service).
-- API startup now runs strict SQLite migration + integrity checks; startup fails fast on corruption or invalid path.
+## PostgreSQL backup/restore
 
 ```bash
-# Create verified backup (quick_check must return ok)
-./infra/local-runtime/scripts/sqlite-backup.sh
+# Create SQL dump backup
+./infra/local-runtime/scripts/postgres-backup.sh
 
-# Restore from backup file and restart dependent services
-./infra/local-runtime/scripts/sqlite-restore.sh infra/local-runtime/backups/mission-control-YYYYMMDD-HHMMSS.db
+# Restore from SQL dump
+./infra/local-runtime/scripts/postgres-restore.sh infra/local-runtime/backups/mission-control-postgres-YYYYMMDD-HHMMSS.sql
 ```
-
-If API fails with corruption diagnostics, restore from latest verified backup and restart runtime.
 
 ## Health contracts
 
-- `sqlite`: DB file exists in mounted volume.
+- `postgres`: `pg_isready` must pass.
 - `redis`: `redis-cli ping` must return success.
 - `api`: `GET /healthz` responds.
 - `web`: root page (`/`) responds.
@@ -120,7 +106,7 @@ If API fails with corruption diagnostics, restore from latest verified backup an
 ### `api` unhealthy
 
 1. `docker compose -f infra/local-runtime/docker-compose.yml logs api --tail=200`
-2. Validate DB volume mount: `docker compose -f infra/local-runtime/docker-compose.yml exec api ls -la /runtime/sqlite`
+2. Verify DB connection values in `infra/local-runtime/.env` (`MC_POSTGRES_*`, DSN inputs).
 3. Confirm dependency health: `docker compose -f infra/local-runtime/docker-compose.yml ps`
 
 ### `web` unhealthy
@@ -141,17 +127,3 @@ If API fails with corruption diagnostics, restore from latest verified backup an
 2. Confirm component files are mounted under `/components`.
 3. Check sidecar app binding ports (`--app-port`) match app services.
 4. Run `./infra/local-runtime/up.sh` and verify no `Dapr metadata missing components` error is reported.
-
-## Failed run triage workflow
-
-Use this workflow when a run looks stuck or failed:
-
-1. Check run status and lease/watchdog state:
-   `mc run status --run-id <run-id> --output json`
-2. Check orchestration health metrics (queue lag, retries, dead letters, latency):
-   `mc run metrics --output json`
-3. Tail timeline for failure/watchdog events:
-   `mc run tail --run-id <run-id> --event-type orchestration.watchdog.action --max-polls 5 --interval-ms 2000 --output json`
-4. Inspect API + worker structured logs for the same `correlation_id`:
-   - `docker compose -f infra/local-runtime/docker-compose.yml logs api --tail=300`
-   - `docker compose -f infra/local-runtime/docker-compose.yml logs worker --tail=300`

@@ -1,18 +1,6 @@
 name: mission-control-local
 
 services:
-  sqlite:
-    image: alpine:3.22
-    command: ["/bin/sh", "-c", "mkdir -p /data && touch /data/mission-control.db && tail -f /dev/null"]
-    volumes:
-      - sqlite-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /data/mission-control.db"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 2s
-
   redis:
     image: redis:7.4-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -56,12 +44,9 @@ services:
         poetry run uvicorn app.main:app --host 0.0.0.0 --port 5001
     volumes:
       - ../../:/workspace
-      - sqlite-data:/runtime/sqlite
     ports:
       - "${MC_API_PORT:-5001}:5001"
     depends_on:
-      sqlite:
-        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
@@ -80,7 +65,6 @@ services:
       - .env
     environment:
       NEXT_PUBLIC_API_URL: http://api:5001
-      MC_DB_PATH: /runtime/sqlite/mission-control.db
       PORT: 3000
     command:
       - /bin/sh
@@ -90,7 +74,6 @@ services:
         npm run dev -- --hostname 0.0.0.0 --port 3000
     volumes:
       - ../../:/workspace
-      - sqlite-data:/runtime/sqlite
     ports:
       - "${MC_WEB_PORT:-3000}:3000"
     depends_on:
@@ -214,5 +197,4 @@ services:
       - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
 volumes:
-  sqlite-data:
   postgres-data:
