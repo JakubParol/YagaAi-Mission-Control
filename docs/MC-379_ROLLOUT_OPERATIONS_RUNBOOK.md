@@ -9,6 +9,9 @@ Primary scope:
 
 - capability-level feature flags for command intake, Dapr ingest, and watchdog sweep
 - environment-by-environment rollout sequencing with owner checkpoints
+- deterministic rollback/fallback procedure with rehearsal evidence
+- incident runbook for queue congestion, dead-letter replay, and watchdog actions
+- release-readiness handoff checklist executable by a non-implementing engineer
 
 ## Rollout controls
 
@@ -57,6 +60,82 @@ MC_API_ORCHESTRATION_COMMANDS_ENABLED=true
 MC_API_ORCHESTRATION_DAPR_INGEST_ENABLED=true
 MC_API_ORCHESTRATION_WATCHDOG_ENABLED=true
 ```
+
+## Rollback and fallback playbook (MC-459)
+
+### Rollback triggers
+
+Start rollback/fallback when any trigger persists after one standard retry cycle:
+
+| Trigger | Signal | Threshold |
+|---|---|---|
+| Queue congestion | `GET /v1/orchestration/metrics` -> `queue_pending`, `queue_oldest_pending_age_seconds` | pending backlog grows for >= 10 min or oldest pending > 300s |
+| Dead-letter growth | `dead_letter_total` grows release-over-release | any unexpected increase during rollout window |
+| Watchdog instability | timeline flood of `orchestration.watchdog.action` with repeated RETRY/QUARANTINE | repeated actions on same run without forward progress |
+| Ingest instability | repeated `503` from `/v1/orchestration/dapr/events` or `/healthz/dapr` | >= 3 consecutive failures in < 5 min |
+
+### Fallback levels
+
+Apply the least disruptive level first.
+
+| Level | Commands | Dapr ingest | Watchdog | Use when |
+|---|---:|---:|---:|---|
+| L1 (stabilize) | ON | ON | OFF | watchdog churn without core ingest failure |
+| L2 (drain) | ON | OFF | OFF | ingest path unstable, keep manual command intake |
+| L3 (freeze) | OFF | OFF | OFF | severe incident, prevent new orchestration mutations |
+
+### Execution steps
+
+1. Freeze change window and announce incident channel ownership.
+2. Create verified DB backup:
+```bash
+./infra/local-runtime/scripts/sqlite-backup.sh
+```
+3. Set fallback flags in runtime env (`infra/local-runtime/.env`) or deployment env:
+```bash
+MC_API_ORCHESTRATION_COMMANDS_ENABLED=<true|false>
+MC_API_ORCHESTRATION_DAPR_INGEST_ENABLED=<true|false>
+MC_API_ORCHESTRATION_WATCHDOG_ENABLED=<true|false>
+```
+4. Restart API and worker path:
+```bash
+docker compose -f infra/local-runtime/docker-compose.yml --env-file infra/local-runtime/.env restart api dapr-api worker dapr-worker
+```
+5. Validate capability gates:
+```bash
+API_BASE=http://127.0.0.1:${MC_API_PORT:-5001}
+curl -sS "${API_BASE}/healthz"
+curl -sS "${API_BASE}/v1/orchestration/metrics"
+```
+6. Confirm expected gate behavior:
+- commands OFF: `POST /v1/orchestration/commands` returns `503`
+- ingest OFF: `/dapr/subscribe` empty and Dapr event ingress returns `status=IGNORED`
+- watchdog OFF: `POST /v1/orchestration/watchdog/sweep` returns `503`
+
+### Post-rollback verification checklist
+
+- API and worker containers healthy (`docker compose ... ps`).
+- `queue_oldest_pending_age_seconds` no longer increasing.
+- no new unexpected dead-letter growth.
+- manual run submit path (if Commands ON) accepted and visible in run read model.
+- incident timeline captured with correlation IDs and chosen fallback level.
+
+### Local rehearsal evidence
+
+Validated on 2026-03-09 (UTC) using deterministic smoke suite:
+
+```bash
+./infra/local-runtime/scripts/orchestration-smoke.py --skip-up --api-base http://127.0.0.1:5101
+```
+
+Observed result:
+- `happy_path`: PASS
+- `retry_path`: PASS (`retry_attempt=2`)
+- `dead_letter_path`: PASS (`dead_letter_total=1`)
+- `watchdog_timeout_path`: PASS (`watchdog_action=RETRY`)
+- `suite.result`: PASS (`scenarios_failed=0`)
+
+Note: smoke default is `http://127.0.0.1:5001`; this environment exposes API on port `5101` (`MC_API_PORT=5101`), so `--api-base` was required.
 
 ## Navigation
 
