@@ -4,7 +4,8 @@ Deterministic local stack for Mission Control stories MC-415 and MC-372.
 
 ## Topology
 
-- `sqlite` (volume-backed DB file)
+- `sqlite` (volume-backed DB file; current active app persistence path)
+- `postgres` (server DB service; migration Phase 1 bootstrap)
 - `redis`
 - `api` (FastAPI on `:5001`)
 - `web` (Next.js on `:3000`)
@@ -23,6 +24,22 @@ CLI stays host-executed (`apps/cli`), not containerized.
 This creates `infra/local-runtime/.env` from `.env.example` when missing and starts all services with health-gated startup (`docker compose up -d --wait`).
 
 `up.sh` also performs explicit Dapr metadata validation on API/Web/Worker sidecars and fails fast when required components are not loaded.
+
+## PostgreSQL bootstrap (migration Phase 1)
+
+Postgres service is now included in local runtime as a bootstrap step for SQLite -> PostgreSQL migration.
+
+Current state:
+
+- container: `postgres` (`postgres:16-alpine`)
+- volume: `postgres-data`
+- host port: `${MC_POSTGRES_PORT}` (default `5432`)
+- DB credentials via `.env`:
+  - `MC_POSTGRES_DB`
+  - `MC_POSTGRES_USER`
+  - `MC_POSTGRES_PASSWORD`
+
+Important: in this phase, application runtime still uses SQLite path for persistence. Postgres is provisioned and health-checked, ready for schema/data cutover in next phases.
 
 ## Dapr component versioning and overrides
 

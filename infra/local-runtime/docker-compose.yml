@@ -22,6 +22,22 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${MC_POSTGRES_DB:-mission_control}
+      POSTGRES_USER: ${MC_POSTGRES_USER:-mission_control}
+      POSTGRES_PASSWORD: ${MC_POSTGRES_PASSWORD:-mission_control_dev}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${MC_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MC_POSTGRES_USER:-mission_control} -d ${MC_POSTGRES_DB:-mission_control}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   api:
     image: python:3.12-slim
     working_dir: /workspace/services/api
@@ -47,6 +63,8 @@ services:
       sqlite:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/healthz', timeout=2)\""]
@@ -197,3 +215,4 @@ services:
 
 volumes:
   sqlite-data:
+  postgres-data:
