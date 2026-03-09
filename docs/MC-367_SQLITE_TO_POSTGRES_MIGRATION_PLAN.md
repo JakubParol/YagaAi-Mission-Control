@@ -74,6 +74,11 @@ Tasks:
    - key entity spot checks,
    - referential integrity checks.
 
+Implementation status:
+- Added migrator script: `services/api/scripts/sqlite_to_postgres_migrate.py`
+- Supports dry-run (`--json`) and execute mode (`--migrate`) with row-count parity report.
+- Supports strict gate (`--strict`) and idempotent reruns (truncate+reload path).
+
 Exit criteria:
 - Data parity checks pass.
 
@@ -132,7 +137,7 @@ Mitigation: strict phased gates, no opportunistic refactors during migration.
 - [ ] Compose includes healthy Postgres service
 - [x] Postgres schema migration path implemented
 - [x] Schema parity check script implemented (`services/api/scripts/schema_parity_check.py`)
-- [ ] SQLite -> Postgres data migration script/tooling
+- [x] SQLite -> Postgres data migration script/tooling (`services/api/scripts/sqlite_to_postgres_migrate.py`)
 - [ ] Cutover config defaults to Postgres
 - [ ] Smoke + failure-path suite green on Postgres
 - [ ] Runbooks updated
