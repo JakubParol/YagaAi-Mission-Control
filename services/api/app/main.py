@@ -13,10 +13,14 @@ from app.orchestration.api.router import router as orchestration_router
 from app.planning.api.router import router as planning_router
 from app.shared.api.errors import AppError, app_error_handler, generic_error_handler
 from app.shared.api.health import router as health_router
-from app.shared.db import migrate_sqlite_or_raise
+from app.shared.db import migrate_postgres_or_raise, migrate_sqlite_or_raise
 from app.shared.logging import configure_logging, log_event
 
-migrate_sqlite_or_raise(settings.db_path)
+if settings.db_engine == "postgres":
+    migrate_postgres_or_raise(settings.postgres_dsn)
+else:
+    migrate_sqlite_or_raise(settings.db_path)
+
 configure_logging(level=settings.log_level)
 
 logger = logging.getLogger(__name__)

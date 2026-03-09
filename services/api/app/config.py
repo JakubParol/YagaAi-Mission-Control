@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     db_path: str = ""
+    postgres_dsn: str = ""
+    db_engine: str = "sqlite"
     openclaw_config_path: str = str(Path.home() / ".openclaw" / "openclaw.json")
     langfuse_host: str = ""
     langfuse_public_key: str = ""
@@ -49,6 +51,11 @@ class Settings(BaseSettings):
     def resolve_shared_env_vars(self) -> "Settings":
         if not self.db_path:
             self.db_path = os.environ.get("MC_DB_PATH", "")
+
+        if not self.postgres_dsn:
+            self.postgres_dsn = os.environ.get("MC_POSTGRES_DSN", "")
+
+        self.db_engine = (self.db_engine or os.environ.get("MC_DB_ENGINE", "sqlite")).lower()
         if not self.openclaw_config_path:
             self.openclaw_config_path = os.environ.get(
                 "OPENCLAW_CONFIG_PATH", str(Path.home() / ".openclaw" / "openclaw.json")
@@ -60,9 +67,18 @@ class Settings(BaseSettings):
         if not self.langfuse_secret_key:
             self.langfuse_secret_key = os.environ.get("LANGFUSE_SECRET_KEY", "")
 
-        if not self.db_path:
-            msg = "MC_API_DB_PATH or MC_DB_PATH must be set"
+        if self.db_engine not in {"sqlite", "postgres"}:
+            msg = "MC_API_DB_ENGINE must be one of: sqlite, postgres"
             raise ValueError(msg)
+
+        if self.db_engine == "sqlite" and not self.db_path:
+            msg = "MC_API_DB_PATH or MC_DB_PATH must be set when MC_API_DB_ENGINE=sqlite"
+            raise ValueError(msg)
+
+        if self.db_engine == "postgres" and not self.postgres_dsn:
+            msg = "MC_API_POSTGRES_DSN or MC_POSTGRES_DSN must be set when MC_API_DB_ENGINE=postgres"
+            raise ValueError(msg)
+
         return self
 
 
