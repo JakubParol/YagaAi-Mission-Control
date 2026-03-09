@@ -38,7 +38,7 @@ Virtualenv dla API został wygenerowany w innym kontekście ścieżek (np. konte
 1. Przywrócić stabilny start `mission-control-api.service` na `127.0.0.1:5001`.
 2. Przywrócić działanie `mc` (planning + orchestration).
 3. Potwierdzić zdrowie runtime’u przez smoke testy (minimum happy path + fault paths).
-4. Domknąć warstwę operacyjną MC-379 (rollback/runbook), żeby taki incydent był szybki do odtworzenia.
+4. Warstwa operacyjna MC-379 (rollback/runbook) jest domknięta; użyć jej jako baseline podczas recovery i rolloutu.
 
 ---
 
@@ -180,11 +180,25 @@ mc run tail --run-id <run-id> --max-polls 5 --interval-ms 2000 --output json
    - weryfikacja shebang `uvicorn`,
    - `poetry run python -V`,
    - `curl /healthz` przed restartem web.
-4. Dokończyć MC-459 i MC-460 (rollback + pełny runbook operatorski) jako warunek zamknięcia MC-379.
+4. Utrzymywać aktualny runbook MC-379 i traktować go jako obowiązkowy playbook operacyjny przy rollback/recovery.
 
 ---
 
-## 7) Definition of Recovered
+## 7) Powiązanie z MC-379 runbook
+
+Rollout/recovery wykonujemy razem z:
+
+- `docs/MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md`
+
+To jest aktualny, domknięty playbook dla:
+
+- staged enablement,
+- fallback levels (L1/L2/L3),
+- rollback triggers,
+- incident operations (queue/dead-letter/watchdog),
+- release-readiness handoff.
+
+## 8) Definition of Recovered
 
 System uznajemy za odzyskany, gdy wszystkie punkty są spełnione:
 

@@ -1,7 +1,7 @@
 # MC-367 — Full Project Context (DB-grounded)
 
 > Źródło prawdy: SQLite planning DB (`/home/kuba/mission-control/data/mission-control.db`) + repo docs (`infra/local-runtime`, `apps/cli`, `docs/MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md`).
-> Wygenerowano: 2026-03-09 07:38:37Z (UTC)
+> Wygenerowano: 2026-03-09 08:55:00Z (UTC)
 
 ## 1) Po co ten projekt (cel biznesowo-techniczny)
 
@@ -16,10 +16,12 @@ Celem MC-367 jest zbudowanie **deterministycznego, lokalnego runtime’u orkiest
 
 - **Epic key:** MC-367
 - **Title:** Mission Control on OpenClaw: Local Runtime on Docker + Event-Driven Orchestration (Redis/Dapr)
-- **Status:** TODO
+- **Status (DB):** TODO
 - **Priority:** 1
 - **Created at:** 2026-03-07T13:51:07.348002+00:00
 - **Updated at:** 2026-03-07T17:49:38.612822+00:00
+
+> Uwaga: status epiku jest manualny; może być opóźniony względem statusów US/tasków.
 
 ### Opis epiku (oryginał z DB)
 
@@ -46,17 +48,17 @@ Deliver a deterministic local-first orchestration runtime for Mission Control us
 4. API/Web/CLI expose consistent run timeline diagnostics with correlation IDs.
 5. Rollout/rollback/runbook artifacts are complete and actionable for the team.
 
-## 3) Co było i co już zostało dostarczone
+## 3) Co było i co jest teraz (snapshot po domknięciu MC-379)
 
-Ten refactor przeorał Mission Control z „działa/nie działa” w stronę pełnego runtime’u event-driven. Na dziś z backlogu MC-367:
+Refactor przeorał Mission Control z „działa/nie działa” w kierunku pełnego runtime’u event-driven. Aktualny obraz backlogu MC-367:
 
 - **US łącznie:** 13
-- **DONE:** 12
-- **IN_PROGRESS:** 1
+- **DONE:** 13
+- **IN_PROGRESS:** 0
 - **TODO:** 0
 - **BLOCKED:** 0
 
-Największe domknięte obszary:
+Największe dowiezione obszary:
 
 - bootstrap lokalnego runtime’u (Docker + health gates),
 - migracje/durability SQLite + backup/restore,
@@ -65,11 +67,12 @@ Największe domknięte obszary:
 - Dapr bridge (pub/sub, invocation, state),
 - state machine workera + watchdog,
 - API read model timeline + Web UX + CLI run submit/status/tail,
-- smoke suite (happy path + failure-path).
+- smoke suite (happy path + failure-path),
+- rollout controls + rollback playbook + operations runbook (**MC-379 done**).
 
-## 4) Do czego dążymy (target operating model)
+## 4) Docelowy model działania (operacyjnie)
 
-Docelowo Mission Control ma działać jako **lokalny, powtarzalny system orkiestracji**:
+Mission Control działa jako **lokalny, powtarzalny system orkiestracji**:
 
 1. Komenda trafia do API.
 2. API waliduje payload i atomowo zapisuje command + outbox event.
@@ -140,7 +143,7 @@ MC_API_ORCHESTRATION_WATCHDOG_ENABLED=true
 | MC-376 | DONE | USER_STORY | Extend CLI with run submit/status/tail commands over orchestration APIs | 2026-03-08T17:40:25.748863+00:00 | 2026-03-08T17:46:10.597817+00:00 |
 | MC-377 | DONE | USER_STORY | Ship observability baseline: structured logs, core metrics, and trace correlation | 2026-03-08T18:35:28.130052+00:00 | 2026-03-08T18:50:44.984211+00:00 |
 | MC-378 | DONE | USER_STORY | Build end-to-end orchestration smoke suite with failure-path coverage | 2026-03-08T18:53:44.499556+00:00 | 2026-03-08T19:01:50.175608+00:00 |
-| MC-379 | IN_PROGRESS | USER_STORY | Document rollout controls, rollback playbook, and operations runbook | 2026-03-08T19:37:59.439050+00:00 | — |
+| MC-379 | DONE | USER_STORY | Document rollout controls, rollback playbook, and operations runbook | 2026-03-08T19:37:59.439050+00:00 | 2026-03-09T08:01:54.727969+00:00 |
 | MC-415 | DONE | USER_STORY | Bootstrap deterministic local Docker runtime (api/web/worker/redis/sqlite + Dapr) | 2026-03-07T18:42:28.297362+00:00 | 2026-03-07T19:02:26.942130+00:00 |
 | MC-416 | DONE | USER_STORY | Web timeline UX for orchestration runs (filters, drill-down, failure context) | 2026-03-08T17:18:10.001824+00:00 | 2026-03-08T17:32:37.973241+00:00 |
 
@@ -465,15 +468,15 @@ Acceptance Criteria:
 | MC-456 | DONE | 2 | Add failure-path scenarios covering retry, dead-letter, and watchdog timeout recovery | Extend smoke suite with at least three deterministic fault scenarios validating critical orchestration resilience paths. | 2026-03-08T18:57:31.669062+00:00 | 2026-03-08T18:59:32.428991+00:00 |
 | MC-457 | DONE | 3 | Standardize smoke diagnostics and usage docs for daily operator workflows | Emit actionable failure diagnostics (scenario, service, correlation IDs) and document local/CI execution with expected runtime. | 2026-03-08T18:59:32.509795+00:00 | 2026-03-08T19:00:14.958371+00:00 |
 
-### MC-379 — Document rollout controls, rollback playbook, and operations runbook (IN_PROGRESS)
+### MC-379 — Document rollout controls, rollback playbook, and operations runbook (DONE)
 
 - **Intent:** Enable safe staged adoption with clear failure response and rollback guidance.
-- **Status:** IN_PROGRESS
+- **Status:** DONE
 - **Priority:** 13
 - **Created:** 2026-03-07T13:51:08.957215+00:00
-- **Updated:** 2026-03-08T19:37:59.439062+00:00
+- **Updated:** 2026-03-09T08:01:54.727969+00:00
 - **Started:** 2026-03-08T19:37:59.439050+00:00
-- **Completed:** —
+- **Completed:** 2026-03-09T08:01:54.727969+00:00
 
 **Opis US (DB):**
 
@@ -494,8 +497,8 @@ Acceptance Criteria:
 | Task | Status | Pri | Tytuł | Objective | Started | Completed |
 |---|---|---:|---|---|---|---|
 | MC-458 | DONE | 1 | Define rollout controls and staged enablement matrix for orchestration runtime | Document capability-level feature gates, default states, and per-environment rollout plan with explicit owner checkpoints. | 2026-03-08T19:38:14.369553+00:00 | 2026-03-08T19:49:11.979784+00:00 |
-| MC-459 | IN_PROGRESS | 2 | Author rollback/fallback playbook and validate local rehearsal procedure | Provide deterministic rollback triggers, execution commands, and post-rollback verification checklist proven on local runtime. | 2026-03-08T19:49:12.404322+00:00 | — |
-| MC-460 | TODO | 3 | Publish operations runbook for queue congestion dead-letter replay watchdog incidents and release readiness | Deliver operator runbook and handoff checklist that a non-implementing engineer can execute end-to-end. | — | — |
+| MC-459 | DONE | 2 | Author rollback/fallback playbook and validate local rehearsal procedure | Provide deterministic rollback triggers, execution commands, and post-rollback verification checklist proven on local runtime. | 2026-03-08T19:49:12.404322+00:00 | 2026-03-09T08:01:52.716560+00:00 |
+| MC-460 | DONE | 3 | Publish operations runbook for queue congestion dead-letter replay watchdog incidents and release readiness | Deliver operator runbook and handoff checklist that a non-implementing engineer can execute end-to-end. | 2026-03-09T08:01:52.716560+00:00 | 2026-03-09T08:01:53.725574+00:00 |
 
 ### MC-415 — Bootstrap deterministic local Docker runtime (api/web/worker/redis/sqlite + Dapr) (DONE)
 
@@ -563,31 +566,22 @@ Acceptance Criteria:
 | MC-447 | DONE | 1 | Build run timeline page with data-fetch layer and resilient loading/empty/error UX | Create orchestration timeline route that loads runs/timeline/attempts and handles operator states cleanly. | 2026-03-08T17:18:19.455382+00:00 | 2026-03-08T17:22:39.383014+00:00 |
 | MC-448 | DONE | 3 | Add tests and walkthrough doc for failure triage using timeline UX | Cover filtering/marker behavior in tests and document a failure triage walkthrough for operators. | 2026-03-08T17:25:06.202555+00:00 | 2026-03-08T17:28:05.694604+00:00 |
 
-## 7) Co jeszcze zostało (realny gap do zamknięcia)
+## 7) Status domknięcia i gotowość do rolloutu
 
-Otwarte rzeczy są skoncentrowane w **MC-379** (rollout/rollback/runbook):
+Wszystkie US-y podpięte pod MC-367 są oznaczone jako **DONE**.
 
-- **US MC-379**: `IN_PROGRESS`
-- **MC-458**: DONE (rollout controls + staged matrix)
-- **MC-459**: IN_PROGRESS (rollback/fallback playbook + local rehearsal)
-- **MC-460**: TODO (operations runbook + release readiness handoff)
+- **MC-379**: DONE
+- **MC-458/MC-459/MC-460**: DONE
+- Runbook: `docs/MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md` gotowy do użycia operatorskiego.
 
-Bez domknięcia MC-459/MC-460 system jest technicznie bogaty, ale operacyjnie jeszcze niezamknięty.
+## 8) Aktualny runtime risk (z sesji operacyjnej)
 
-## 8) Aktualny problem „nie działa” (kontekst operacyjny z tej sesji)
+Mimo domknięcia warstwy planistyczno-dokumentacyjnej, runtime może nadal wymagać naprawy startu API (venv/service wiring). To trzeba zweryfikować przed właściwym rolloutem.
 
-W tej chwili symptom jest zgodny z Twoim opisem:
+## 9) Co dalej (plan rollout execution)
 
-- `mc` nie może gadać z API (`TransportError: fetch failed`),
-- `mission-control-api.service` jest w pętli restartów (`status=203/EXEC`),
-- web na `:3100` działa, ale backend endpointy orchestration/planning padają (500/404 wg ścieżki).
-
-To oznacza, że sama implementacja MC-367 jest szeroka, ale runtime integracyjny po refactorze wymaga naprawy uruchomienia API + env/venv pathing.
-
-## 9) Co dalej (proponowana kolejność domknięcia)
-
-1. Naprawić start API (service unit + interpreter/venv + dependencies).
-2. Potwierdzić health (`/healthz`) i połączenie `mc` -> API.
-3. Odpalić smoke (`orchestration-smoke.py`) i potwierdzić scenariusze fault-path.
-4. Dokończyć MC-459/MC-460 i formalnie zamknąć MC-379/MC-367.
-5. Przejść staged enablement matrix przed kolejnym rolloutem.
+1. Przywrócić stabilny start API (`mission-control-api.service`) i health checks.
+2. Potwierdzić `mc` -> API (`health`, `project list`, `epic list`).
+3. Odpalić smoke orchestration (`--skip-up`, potem full).
+4. Przejść staged enablement matrix z MC-379 (Stage 0 → 2 co najmniej).
+5. Udokumentować wynik rolloutu + ewentualny fallback level.
