@@ -2,6 +2,7 @@
 -- Generated from canonical SQLite schema baseline.
 -- Intent: bootstrap empty PostgreSQL instance with current table/index surface.
 -- Note: query dialect adaptations are handled in later migration phases.
+-- TODO(MC-367, phase follow-up): migrate TEXT timestamps to TIMESTAMPTZ and INTEGER flags to BOOLEAN.
 
 
 CREATE TABLE IF NOT EXISTS imports (

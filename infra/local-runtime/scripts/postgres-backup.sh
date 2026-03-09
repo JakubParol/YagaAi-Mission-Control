@@ -24,6 +24,7 @@ set +a
 PGUSER="${MC_POSTGRES_USER:-mission_control}"
 PGDB="${MC_POSTGRES_DB:-mission_control}"
 
-docker compose --env-file .env exec -T postgres pg_dump -U "$PGUSER" -d "$PGDB" > "$BACKUP_PATH"
+docker compose --env-file .env exec -T postgres \
+  pg_dump --clean --if-exists --no-owner --no-privileges -U "$PGUSER" -d "$PGDB" > "$BACKUP_PATH"
 
 echo "PostgreSQL backup created: $BACKUP_PATH"

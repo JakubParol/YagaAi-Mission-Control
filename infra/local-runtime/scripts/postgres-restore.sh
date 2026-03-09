@@ -29,7 +29,8 @@ set +a
 PGUSER="${MC_POSTGRES_USER:-mission_control}"
 PGDB="${MC_POSTGRES_DB:-mission_control}"
 
-# Recreate schema from dump for deterministic restore
-cat "$BACKUP_FILE" | docker compose --env-file .env exec -T postgres psql -U "$PGUSER" -d "$PGDB"
+# Backup dumps are created with --clean/--if-exists so restore can be rerun safely.
+docker compose --env-file .env exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U "$PGUSER" -d "$PGDB" < "$BACKUP_FILE"
 
 echo "PostgreSQL restore completed from: $BACKUP_FILE"

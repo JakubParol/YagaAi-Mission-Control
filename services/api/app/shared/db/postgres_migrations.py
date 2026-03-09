@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import psycopg
+from psycopg.abc import QueryNoTemplate
 
 _BOOTSTRAP_VERSION = "20260309_pg_bootstrap_001"
 
@@ -26,7 +28,7 @@ def migrate_postgres_or_raise(dsn: str) -> None:
     try:
         with psycopg.connect(dsn) as conn:
             with conn.cursor() as cur:
-                cur.execute(schema_sql)
+                cur.execute(cast(QueryNoTemplate, schema_sql))
                 cur.execute(
                     """
                     INSERT INTO schema_migrations(version, description)

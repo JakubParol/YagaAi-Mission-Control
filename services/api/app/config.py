@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     db_path: str = ""
     postgres_dsn: str = ""
     db_engine: str = "sqlite"
+    postgres_pool_max_size: int = 10
     openclaw_config_path: str = str(Path.home() / ".openclaw" / "openclaw.json")
     langfuse_host: str = ""
     langfuse_public_key: str = ""
@@ -76,7 +77,13 @@ class Settings(BaseSettings):
             raise ValueError(msg)
 
         if self.db_engine == "postgres" and not self.postgres_dsn:
-            msg = "MC_API_POSTGRES_DSN or MC_POSTGRES_DSN must be set when MC_API_DB_ENGINE=postgres"
+            msg = (
+                "MC_API_POSTGRES_DSN or MC_POSTGRES_DSN must be set when MC_API_DB_ENGINE=postgres"
+            )
+            raise ValueError(msg)
+
+        if self.postgres_pool_max_size < 1:
+            msg = "MC_API_POSTGRES_POOL_MAX_SIZE must be >= 1"
             raise ValueError(msg)
 
         return self

@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import psycopg
+from psycopg.abc import Query, QueryNoTemplate
+
+logger = logging.getLogger(__name__)
+
+_SQLITE_REMAINDER_PATTERNS: dict[str, str] = {
+    "INSERT OR REPLACE": "INSERT OR REPLACE",
+    "INSERT OR IGNORE": "INSERT OR IGNORE",
+    "JULIANDAY(": "julianday(...)",
+    "DATETIME('NOW'": "datetime('now', ...)",
+    "PRAGMA ": "PRAGMA",
+}
+_LOGGED_TRANSLATION_WARNINGS: set[str] = set()
 
 
 @dataclass
@@ -115,6 +128,111 @@ class AsyncPgCompatConnection:
         await self._conn.rollback()
 
     @staticmethod
+    def _replace_unquoted_qmarks(query: str) -> str:
+        """Translate sqlite qmark placeholders while preserving quoted/comment text."""
+        out: list[str] = []
+        in_single_quote = False
+        in_double_quote = False
+        in_line_comment = False
+        in_block_comment = False
+        idx = 0
+
+        while idx < len(query):
+            char = query[idx]
+            nxt = query[idx + 1] if idx + 1 < len(query) else ""
+
+            if in_line_comment:
+                out.append(char)
+                if char == "\n":
+                    in_line_comment = False
+                idx += 1
+                continue
+
+            if in_block_comment:
+                out.append(char)
+                if char == "*" and nxt == "/":
+                    out.append(nxt)
+                    idx += 2
+                    in_block_comment = False
+                    continue
+                idx += 1
+                continue
+
+            if in_single_quote:
+                out.append(char)
+                if char == "'" and nxt == "'":
+                    out.append(nxt)
+                    idx += 2
+                    continue
+                if char == "'":
+                    in_single_quote = False
+                idx += 1
+                continue
+
+            if in_double_quote:
+                out.append(char)
+                if char == '"' and nxt == '"':
+                    out.append(nxt)
+                    idx += 2
+                    continue
+                if char == '"':
+                    in_double_quote = False
+                idx += 1
+                continue
+
+            if char == "-" and nxt == "-":
+                out.extend((char, nxt))
+                idx += 2
+                in_line_comment = True
+                continue
+
+            if char == "/" and nxt == "*":
+                out.extend((char, nxt))
+                idx += 2
+                in_block_comment = True
+                continue
+
+            if char == "'":
+                out.append(char)
+                idx += 1
+                in_single_quote = True
+                continue
+
+            if char == '"':
+                out.append(char)
+                idx += 1
+                in_double_quote = True
+                continue
+
+            if char == "?":
+                out.append("%s")
+                idx += 1
+                continue
+
+            out.append(char)
+            idx += 1
+
+        return "".join(out)
+
+    @staticmethod
+    def _warn_if_sqlite_constructs_remain(query: str) -> None:
+        upper = query.upper()
+        remaining = [
+            name for pattern, name in _SQLITE_REMAINDER_PATTERNS.items() if pattern in upper
+        ]
+        if not remaining:
+            return
+
+        signature = upper.strip()
+        if signature in _LOGGED_TRANSLATION_WARNINGS:
+            return
+        _LOGGED_TRANSLATION_WARNINGS.add(signature)
+        logger.warning(
+            "SQLite-to-Postgres translation may be incomplete; remaining constructs: %s",
+            ", ".join(sorted(remaining)),
+        )
+
+    @staticmethod
     def _translate_query(query: str) -> str:
         q = query.strip()
         upper = q.upper()
@@ -194,15 +312,30 @@ class AsyncPgCompatConnection:
             )
 
         # ensure postgres can infer NULL-optional filter types from sqlite style
-        q = q.replace("(? IS NULL OR r.run_id = ?)", "(CAST(? AS text) IS NULL OR r.run_id = CAST(? AS text))")
-        q = q.replace("(? IS NULL OR r.status = ?)", "(CAST(? AS text) IS NULL OR r.status = CAST(? AS text))")
-        q = q.replace("(? IS NULL OR t.run_id = ?)", "(CAST(? AS text) IS NULL OR t.run_id = CAST(? AS text))")
-        q = q.replace("(? IS NULL OR t.event_type = ?)", "(CAST(? AS text) IS NULL OR t.event_type = CAST(? AS text))")
-        q = q.replace("(? IS NULL OR t.occurred_at >= ?)", "(CAST(? AS text) IS NULL OR t.occurred_at >= CAST(? AS text))")
-        q = q.replace("(? IS NULL OR t.occurred_at <= ?)", "(CAST(? AS text) IS NULL OR t.occurred_at <= CAST(? AS text))")
+        q = q.replace(
+            "(? IS NULL OR r.run_id = ?)", "(CAST(? AS text) IS NULL OR r.run_id = CAST(? AS text))"
+        )
+        q = q.replace(
+            "(? IS NULL OR r.status = ?)", "(CAST(? AS text) IS NULL OR r.status = CAST(? AS text))"
+        )
+        q = q.replace(
+            "(? IS NULL OR t.run_id = ?)", "(CAST(? AS text) IS NULL OR t.run_id = CAST(? AS text))"
+        )
+        q = q.replace(
+            "(? IS NULL OR t.event_type = ?)",
+            "(CAST(? AS text) IS NULL OR t.event_type = CAST(? AS text))",
+        )
+        q = q.replace(
+            "(? IS NULL OR t.occurred_at >= ?)",
+            "(CAST(? AS text) IS NULL OR t.occurred_at >= CAST(? AS text))",
+        )
+        q = q.replace(
+            "(? IS NULL OR t.occurred_at <= ?)",
+            "(CAST(? AS text) IS NULL OR t.occurred_at <= CAST(? AS text))",
+        )
 
-        # sqlite '?' params -> psycopg '%s'
-        q = q.replace("?", "%s")
+        q = AsyncPgCompatConnection._replace_unquoted_qmarks(q)
+        AsyncPgCompatConnection._warn_if_sqlite_constructs_remain(q)
         return q
 
     @staticmethod
@@ -233,12 +366,12 @@ class AsyncPgCompatConnection:
         stripped = translated.strip().upper()
         if stripped.startswith("INSERT INTO IMPORTS") and "RETURNING" not in stripped:
             translated = translated.rstrip().rstrip(";") + " RETURNING id"
-            await cur.execute(translated, params)
+            await cur.execute(cast(QueryNoTemplate, translated), params)
             row = await cur.fetchone()
             if row is not None:
                 lastrowid = int(row[0])
         else:
-            await cur.execute(translated, params)
+            await cur.execute(cast(QueryNoTemplate, translated), params)
 
         return AsyncPgCompatCursor(cur, lastrowid=lastrowid)
 
@@ -248,5 +381,5 @@ class AsyncPgCompatConnection:
             return _NullCursor()
         cur = self._conn.cursor()
         params = [self._sanitize_params(p) for p in seq_of_params]
-        await cur.executemany(translated, params)
+        await cur.executemany(cast(Query, translated), params)
         return AsyncPgCompatCursor(cur)
