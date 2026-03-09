@@ -142,6 +142,51 @@ def test_delete_label_not_found(client):
     assert resp.status_code == 404
 
 
+# ── Update ───────────────────────────────────────────────────────────────
+
+
+def test_update_label_name_and_color(client):
+    create_resp = client.post(PREFIX, json={"name": "todo", "project_id": "p1"})
+    label_id = create_resp.json()["data"]["id"]
+
+    resp = client.patch(f"{PREFIX}/{label_id}", json={"name": "in-progress", "color": "#22c55e"})
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["id"] == label_id
+    assert data["name"] == "in-progress"
+    assert data["color"] == "#22c55e"
+    assert data["project_id"] == "p1"
+
+
+def test_update_label_not_found(client):
+    resp = client.patch(f"{PREFIX}/nonexistent", json={"name": "missing"})
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_update_label_duplicate_name_conflict(client):
+    first = client.post(PREFIX, json={"name": "backend", "project_id": "p1"})
+    second = client.post(PREFIX, json={"name": "frontend", "project_id": "p1"})
+    first_id = first.json()["data"]["id"]
+    second_id = second.json()["data"]["id"]
+
+    resp = client.patch(f"{PREFIX}/{second_id}", json={"name": "backend"})
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "CONFLICT"
+
+    unchanged = client.get(f"{PREFIX}/{first_id}")
+    assert unchanged.status_code == 200
+    assert unchanged.json()["data"]["name"] == "backend"
+
+
+def test_update_label_empty_name_validation(client):
+    create_resp = client.post(PREFIX, json={"name": "validated"})
+    label_id = create_resp.json()["data"]["id"]
+
+    resp = client.patch(f"{PREFIX}/{label_id}", json={"name": ""})
+    assert resp.status_code == 422
+
+
 # ── project_key resolver ─────────────────────────────────────────────────
 
 

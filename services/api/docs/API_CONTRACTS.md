@@ -916,6 +916,24 @@ Query: `project_id`, `project_key` (use `project_id=null` for global only), `lim
 
 `project_key` — same behavior as stories (see above).
 
+#### `PATCH /v1/planning/labels/{id}` — Update label
+
+Patch fields:
+
+```jsonc
+{
+  "name": "backend",      // optional, 1..100 chars
+  "color": "#22c55e"      // optional, max 20 chars
+}
+```
+
+Returns `200`.
+
+Errors:
+- `404 NOT_FOUND` when label does not exist
+- `409 CONFLICT` when new name already exists in the same scope
+- `422 UNPROCESSABLE_ENTITY` when payload validation fails (e.g. empty name)
+
 #### `DELETE /v1/planning/labels/{id}` — Delete label
 
 Hard delete. Removes from all story/task associations. Returns `204`.

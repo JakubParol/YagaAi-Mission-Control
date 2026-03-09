@@ -1055,6 +1055,24 @@ class SqliteLabelRepository(LabelRepository):
         await self._db.commit()
         return label
 
+    async def update(self, label_id: str, data: dict[str, Any]) -> Label | None:
+        sets: list[str] = []
+        params: list[Any] = []
+
+        for field in ("name", "color"):
+            if field not in data:
+                continue
+            sets.append(f"{field} = ?")
+            params.append(data[field])
+
+        if not sets:
+            return await self.get_by_id(label_id)
+
+        params.append(label_id)
+        await self._db.execute(_build_update_query("labels", sets), params)
+        await self._db.commit()
+        return await self.get_by_id(label_id)
+
     async def delete(self, label_id: str) -> bool:
         cursor = await self._db.execute("DELETE FROM labels WHERE id = ?", [label_id])
         await self._db.commit()

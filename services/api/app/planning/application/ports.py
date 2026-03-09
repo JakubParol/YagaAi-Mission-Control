@@ -161,6 +161,9 @@ class LabelRepository(ABC):
     async def create(self, label: Label) -> Label: ...
 
     @abstractmethod
+    async def update(self, label_id: str, data: dict[str, Any]) -> Label | None: ...
+
+    @abstractmethod
     async def delete(self, label_id: str) -> bool: ...
 
 

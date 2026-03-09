@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getMockPlanningSettingsViewModel } from "@/lib/planning/settings";
+import { SettingsLabelTaxonomyCard } from "./settings-label-taxonomy-card";
 
 export const metadata: Metadata = {
   title: "Planning Settings",
@@ -245,45 +246,7 @@ export default function PlanningSettingsPage() {
           </CardFooter>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Label taxonomy</CardTitle>
-            <CardDescription>
-              Labels from <code>labels</code>, <code>story_labels</code>, and{" "}
-              <code>task_labels</code>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-xs">
-            {settings.label_taxonomy.labels.map((label) => (
-              <div
-                key={label.id}
-                className="flex items-center justify-between gap-2 rounded-md border border-border/60 p-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold truncate">{label.name}</p>
-                  <p className="text-muted-foreground">
-                    {label.project_id ? "project-scoped" : "global"} | story_labels:{" "}
-                    {label.story_count} | task_labels: {label.task_count}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-3.5 w-3.5 rounded-full border border-border/60"
-                    style={{ backgroundColor: label.color ?? "transparent" }}
-                    aria-label={`Color ${label.color ?? "none"}`}
-                  />
-                  <Badge variant="outline">unique per scope</Badge>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-          <CardFooter className="justify-between border-t">
-            <Badge variant="outline">Coming soon</Badge>
-            <Button disabled size="sm" variant="outline">
-              Manage labels
-            </Button>
-          </CardFooter>
-        </Card>
+        <SettingsLabelTaxonomyCard />
 
         <Card>
           <CardHeader>

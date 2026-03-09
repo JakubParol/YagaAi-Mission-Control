@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 
-from app.planning.api.schemas import LabelCreate, LabelResponse
+from app.planning.api.schemas import LabelCreate, LabelResponse, LabelUpdate
 from app.planning.application.label_service import LabelService
 from app.planning.dependencies import get_label_service, resolve_project_key
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
@@ -45,6 +45,17 @@ async def get_label(
     service: LabelService = Depends(get_label_service),
 ) -> Envelope[LabelResponse]:
     label = await service.get_label(label_id)
+    return Envelope(data=LabelResponse(**label.__dict__))
+
+
+@router.patch("/{label_id}")
+async def update_label(
+    label_id: str,
+    body: LabelUpdate,
+    service: LabelService = Depends(get_label_service),
+) -> Envelope[LabelResponse]:
+    data = body.model_dump(exclude_unset=True)
+    label = await service.update_label(label_id, data)
     return Envelope(data=LabelResponse(**label.__dict__))
 
 
