@@ -137,6 +137,95 @@ Observed result:
 
 Note: smoke default is `http://127.0.0.1:5001`; this environment exposes API on port `5101` (`MC_API_PORT=5101`), so `--api-base` was required.
 
+## Operations runbook (MC-460)
+
+### Baseline diagnostics
+
+Use API-first checks (no dependency on `mc` CLI):
+
+```bash
+API_BASE=http://127.0.0.1:${MC_API_PORT:-5001}
+curl -sS "${API_BASE}/healthz"
+curl -sS "${API_BASE}/healthz/dapr"
+curl -sS "${API_BASE}/v1/orchestration/metrics"
+curl -sS "${API_BASE}/v1/orchestration/runs?limit=20"
+curl -sS "${API_BASE}/v1/orchestration/timeline?limit=50"
+```
+
+For container triage:
+```bash
+docker compose -f infra/local-runtime/docker-compose.yml --env-file infra/local-runtime/.env ps
+docker compose -f infra/local-runtime/docker-compose.yml --env-file infra/local-runtime/.env logs api worker dapr-api dapr-worker --tail=200
+```
+
+### Scenario A: queue congestion
+
+1. Confirm congestion from metrics (`queue_pending`, `queue_oldest_pending_age_seconds`).
+2. Verify Redis/API/worker/Dapr health.
+3. If worker path unhealthy, restart only worker + sidecar first.
+4. If congestion persists, move to fallback level L2 (disable ingest) and drain queue.
+5. Re-enable ingest only after pending age trends down and no new dead-letter spikes.
+
+### Scenario B: dead-letter replay
+
+1. Identify affected run:
+```bash
+curl -sS "${API_BASE}/v1/orchestration/runs/<run_id>/attempts?limit=20"
+```
+2. Confirm failed attempt (`status=FAILED`, `dead_lettered_at` set).
+3. Capture failure context (`outbox_event_id`, `correlation_id`, error message).
+4. Submit replay command with new `run_id` and causal link:
+```bash
+curl -sS -X POST "${API_BASE}/v1/orchestration/commands" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command_type":"orchestration.run.submit",
+    "schema_version":"1.0",
+    "payload":{"run_id":"<original-run-id>-replay-<timestamp>"},
+    "metadata":{
+      "producer":"operations-runbook",
+      "correlation_id":"<new-or-linked-correlation-id>",
+      "causation_id":"<dead-letter-outbox-event-id>",
+      "occurred_at":"<iso8601>"
+    }
+  }'
+```
+5. Verify replay run transitions from `PENDING` and does not dead-letter again.
+
+### Scenario C: watchdog incidents
+
+1. Filter timeline on watchdog events:
+```bash
+curl -sS "${API_BASE}/v1/orchestration/timeline?event_type=orchestration.watchdog.action&limit=50"
+```
+2. Inspect run state (`watchdog_state`, `watchdog_attempt`, heartbeat fields).
+3. Trigger one controlled sweep for deterministic decision capture:
+```bash
+curl -sS -X POST "${API_BASE}/v1/orchestration/watchdog/sweep" \
+  -H "Content-Type: application/json" \
+  -d '{"watchdog_instance":"ops-manual","evaluated_at":"<iso8601>"}'
+```
+4. If repeated quarantine/fail continues without service recovery, set fallback L1 (watchdog OFF), stabilize ingest, then re-enable watchdog after root-cause fix.
+
+### Recovery completion criteria
+
+- No active incident alerts in queue/dead-letter/watchdog signals.
+- Last replayed run reaches terminal success or accepted business fallback state.
+- Capability flags returned to target rollout stage.
+- Incident notes include timeline IDs, correlation IDs, and remediation timestamps.
+
+## Release-readiness handoff checklist
+
+This checklist is designed for an engineer who did not implement the feature.
+
+1. Verify capability flags for target stage (`Commands`, `Dapr ingest`, `Watchdog`).
+2. Run smoke suite against target API base and confirm `suite.result=PASS`.
+3. Validate metrics endpoint is reachable and values are plausible.
+4. Execute one read-only timeline drill (`/v1/orchestration/timeline`) and confirm watchdog/dead-letter visibility.
+5. Execute one rollback simulation (at least L1) and revert to target stage.
+6. Confirm backup/restore scripts run and latest verified backup exists.
+7. Record release sign-off with operator name, timestamp, and rollback level tested.
+
 ## Navigation
 
 - ↑ [docs/INDEX.md](./INDEX.md)
