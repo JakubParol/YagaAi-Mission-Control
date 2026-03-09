@@ -46,6 +46,25 @@ class LabelService:
         )
         return await self._repo.create(label)
 
+    async def update_label(self, label_id: str, data: dict[str, str | None]) -> Label:
+        existing = await self._repo.get_by_id(label_id)
+        if not existing:
+            raise NotFoundError(f"Label {label_id} not found")
+
+        next_name = data.get("name")
+        if (
+            next_name is not None
+            and next_name != existing.name
+            and await self._repo.name_exists(next_name, existing.project_id)
+        ):
+            scope = f"project {existing.project_id}" if existing.project_id else "global scope"
+            raise ConflictError(f"Label '{next_name}' already exists in {scope}")
+
+        updated = await self._repo.update(label_id, data)
+        if not updated:
+            raise NotFoundError(f"Label {label_id} not found")
+        return updated
+
     async def delete_label(self, label_id: str) -> None:
         existing = await self._repo.get_by_id(label_id)
         if not existing:

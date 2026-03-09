@@ -265,6 +265,11 @@ class LabelCreate(BaseModel):
     color: str | None = Field(None, max_length=20)
 
 
+class LabelUpdate(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=100)
+    color: str | None = Field(None, max_length=20)
+
+
 class LabelResponse(BaseModel):
     id: str
     project_id: str | None
