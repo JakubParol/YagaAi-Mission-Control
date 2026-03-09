@@ -179,24 +179,48 @@ def _watchdog_sweep(base_url: str, *, evaluated_at: str) -> dict[str, Any]:
 
 def _cleanup_fixtures(compose_file: Path, runtime_dir: Path, *, run_ids: list[str], correlations: list[str]) -> None:
     cleanup_py = f"""
-import sqlite3
+import os
 
 run_ids = {json.dumps(run_ids)}
 correlations = {json.dumps(correlations)}
-conn = sqlite3.connect('/runtime/sqlite/mission-control.db')
-try:
-    conn.execute('PRAGMA foreign_keys = ON')
-    for run_id in run_ids:
-        conn.execute('DELETE FROM orchestration_run_steps WHERE run_id = ?', (run_id,))
-        conn.execute('DELETE FROM orchestration_run_timeline WHERE run_id = ?', (run_id,))
-        conn.execute('DELETE FROM orchestration_runs WHERE run_id = ?', (run_id,))
-    for correlation_id in correlations:
-        conn.execute('DELETE FROM orchestration_processed_messages WHERE correlation_id = ?', (correlation_id,))
-        conn.execute('DELETE FROM orchestration_outbox WHERE correlation_id = ?', (correlation_id,))
-        conn.execute('DELETE FROM orchestration_commands WHERE correlation_id = ?', (correlation_id,))
-    conn.commit()
-finally:
-    conn.close()
+
+engine = os.environ.get('MC_API_DB_ENGINE', 'sqlite').lower()
+
+if engine == 'postgres':
+    import psycopg
+
+    dsn = os.environ.get('MC_API_POSTGRES_DSN') or os.environ.get('MC_POSTGRES_DSN')
+    if not dsn:
+        raise RuntimeError('postgres engine enabled but DSN not set')
+
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            for run_id in run_ids:
+                cur.execute('DELETE FROM orchestration_run_steps WHERE run_id = %s', (run_id,))
+                cur.execute('DELETE FROM orchestration_run_timeline WHERE run_id = %s', (run_id,))
+                cur.execute('DELETE FROM orchestration_runs WHERE run_id = %s', (run_id,))
+            for correlation_id in correlations:
+                cur.execute('DELETE FROM orchestration_processed_messages WHERE correlation_id = %s', (correlation_id,))
+                cur.execute('DELETE FROM orchestration_outbox WHERE correlation_id = %s', (correlation_id,))
+                cur.execute('DELETE FROM orchestration_commands WHERE correlation_id = %s', (correlation_id,))
+        conn.commit()
+else:
+    import sqlite3
+
+    conn = sqlite3.connect('/runtime/sqlite/mission-control.db')
+    try:
+        conn.execute('PRAGMA foreign_keys = ON')
+        for run_id in run_ids:
+            conn.execute('DELETE FROM orchestration_run_steps WHERE run_id = ?', (run_id,))
+            conn.execute('DELETE FROM orchestration_run_timeline WHERE run_id = ?', (run_id,))
+            conn.execute('DELETE FROM orchestration_runs WHERE run_id = ?', (run_id,))
+        for correlation_id in correlations:
+            conn.execute('DELETE FROM orchestration_processed_messages WHERE correlation_id = ?', (correlation_id,))
+            conn.execute('DELETE FROM orchestration_outbox WHERE correlation_id = ?', (correlation_id,))
+            conn.execute('DELETE FROM orchestration_commands WHERE correlation_id = ?', (correlation_id,))
+        conn.commit()
+    finally:
+        conn.close()
 """.strip()
     _run_command(
         [
@@ -209,8 +233,9 @@ finally:
             "exec",
             "-T",
             "api",
-            "python",
-            "-",
+            "/bin/sh",
+            "-lc",
+            "cd /workspace/services/api && poetry run python -",
         ],
         cwd=runtime_dir,
         input_text=cleanup_py,
@@ -240,15 +265,27 @@ def _record_processing_failure(
 import asyncio
 import json
 
-import aiosqlite
-
 from app.config import settings
 from app.orchestration.application.delivery_service import DeliveryService
 from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
+from app.shared.db.pg_compat import AsyncPgCompatConnection
 
 payload = {json.dumps(payload)}
 
 async def main() -> None:
+    if settings.db_engine == 'postgres':
+        db = await AsyncPgCompatConnection.connect(settings.postgres_dsn)
+        try:
+            repo = SqliteOrchestrationRepository(db)
+            service = DeliveryService(repo=repo)
+            result = await service.record_processing_failure(**payload)
+            print(json.dumps(result, separators=(",", ":"), sort_keys=True))
+        finally:
+            await db.close()
+        return
+
+    import aiosqlite
+
     db = await aiosqlite.connect(settings.db_path)
     try:
         repo = SqliteOrchestrationRepository(db)

@@ -1,4 +1,5 @@
-import aiosqlite
+from typing import Any
+
 from fastapi import Depends
 
 from app.config import settings
@@ -10,13 +11,13 @@ from app.shared.api.deps import get_db
 
 
 async def get_metrics_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> MetricsService:
     return MetricsService(SqliteLangfuseRepository(db))
 
 
 async def get_import_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> ImportService:
     repo = SqliteLangfuseRepository(db)
     client = HttpLangfuseClient(

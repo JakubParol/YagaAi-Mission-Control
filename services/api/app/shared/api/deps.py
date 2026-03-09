@@ -1,9 +1,11 @@
 import sqlite3
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import aiosqlite
 
 from app.config import settings
+from app.shared.db.pg_compat import AsyncPgCompatConnection
 
 
 async def _ensure_backlog_runtime_guard(db: aiosqlite.Connection) -> None:
@@ -47,7 +49,14 @@ async def _ensure_backlog_runtime_guard(db: aiosqlite.Connection) -> None:
         raise
 
 
-async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
+async def get_db() -> AsyncGenerator[Any, None]:
+    if settings.db_engine == "postgres":
+        async with await AsyncPgCompatConnection.connect(settings.postgres_dsn) as db:
+            # SQLite-specific guard (index repair + duplicate active sprint fix)
+            # is intentionally skipped for PostgreSQL to avoid per-request DDL churn.
+            yield db
+        return
+
     async with aiosqlite.connect(settings.db_path) as db:
         db.row_factory = sqlite3.Row
         await db.execute("PRAGMA foreign_keys = ON")
