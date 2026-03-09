@@ -57,9 +57,11 @@ Tasks:
 1. Introduce/extend migration runner to support Postgres dialect.
 2. Apply all migrations to empty Postgres DB.
 3. Validate critical constraints/indexes/foreign keys.
+4. Add automated schema parity check (SQLite baseline vs Postgres bootstrap).
 
 Exit criteria:
 - Empty Postgres instance reproduces expected schema with no manual SQL fixes.
+- Parity check reports `status=ok` (tables/indexes/columns) before data migration starts.
 
 ### Phase 3 — Data migration from SQLite
 
@@ -128,7 +130,8 @@ Mitigation: strict phased gates, no opportunistic refactors during migration.
 ## Deliverables checklist
 
 - [ ] Compose includes healthy Postgres service
-- [ ] Postgres schema migration path implemented
+- [x] Postgres schema migration path implemented
+- [x] Schema parity check script implemented (`services/api/scripts/schema_parity_check.py`)
 - [ ] SQLite -> Postgres data migration script/tooling
 - [ ] Cutover config defaults to Postgres
 - [ ] Smoke + failure-path suite green on Postgres
