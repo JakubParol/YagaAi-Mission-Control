@@ -142,7 +142,7 @@ async function fetchTimeline(params: {
   if (params.status) query.set("status", params.status);
   if (params.occurredAfter) query.set("occurred_after", params.occurredAfter);
   if (params.occurredBefore) query.set("occurred_before", params.occurredBefore);
-  query.set("limit", "200");
+  query.set("limit", "100");
 
   const response = await fetch(apiUrl(`/v1/orchestration/timeline?${query.toString()}`));
   if (!response.ok) {
