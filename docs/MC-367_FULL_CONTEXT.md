@@ -576,12 +576,47 @@ Wszystkie US-y podpięte pod MC-367 są oznaczone jako **DONE**.
 
 ## 8) Aktualny runtime risk (z sesji operacyjnej)
 
-Mimo domknięcia warstwy planistyczno-dokumentacyjnej, runtime może nadal wymagać naprawy startu API (venv/service wiring). To trzeba zweryfikować przed właściwym rolloutem.
+Warstwa aplikacyjna jest uruchomiona w lokalnym Docker runtime i health-checki API/Web działają, ale aktualny model persistence oparty o SQLite file-volume utrudnia operacje typu „server DB” (zdalne narzędzia, bezpośredni podgląd live jak w SSMS).
 
-## 9) Co dalej (plan rollout execution)
+## 9) Decyzja architektoniczna (nowa)
 
-1. Przywrócić stabilny start API (`mission-control-api.service`) i health checks.
-2. Potwierdzić `mc` -> API (`health`, `project list`, `epic list`).
-3. Odpalić smoke orchestration (`--skip-up`, potem full).
-4. Przejść staged enablement matrix z MC-379 (Stage 0 → 2 co najmniej).
-5. Udokumentować wynik rolloutu + ewentualny fallback level.
+**Decyzja:** przechodzimy z lokalnego SQLite na **lokalny PostgreSQL w Dockerze** jako docelową bazę dla runtime development/ops.
+
+**Powód:**
+- lepsza współbieżność i model serwerowy,
+- łatwiejsze podpinanie narzędzi GUI i operacje DBA,
+- spójność z produkcyjnym stylem pracy (host/port, role, backupy, migration discipline),
+- redukcja „file-level lock/debug” charakterystycznych dla SQLite.
+
+## 10) Plan migracji SQLite -> PostgreSQL (fazy)
+
+### Faza A — bootstrap Postgresa lokalnie (Docker)
+- dodać service `postgres` do `infra/local-runtime/docker-compose.yml`,
+- zdefiniować `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, volume danych i healthcheck,
+- dopiąć API/Web do connection stringa Postgres (bez usuwania SQLite na tym etapie).
+
+### Faza B — schemat + migracje
+- wprowadzić oficjalny tor migracji schematu dla Postgresa,
+- uruchomić pełne odtworzenie schematu w pustej instancji,
+- potwierdzić zgodność kontraktów API i query pathów.
+
+### Faza C — migracja danych
+- eksport danych z SQLite,
+- transformacja typów/kluczy/czasów pod Postgresa,
+- import do Postgresa + walidacja rekordów (count + losowe kontrole integralności).
+
+### Faza D — cutover lokalnego runtime
+- przełączenie runtime domyślnie na Postgresa,
+- testy smoke + failure-path (retry/dead-letter/watchdog) na nowej bazie,
+- aktualizacja runbooków operatorskich i backup/restore pod Postgresa.
+
+### Faza E — deprecacja SQLite w local runtime
+- oznaczyć SQLite jako legacy fallback (krótki okres),
+- po stabilizacji usunąć z default compose path.
+
+## 11) Co dalej (plan execution)
+
+1. Zamknąć rollout bieżącej wersji runtime (MC-379 runbook).
+2. Otworzyć i zaplanować dedykowany epic migracyjny: SQLite -> PostgreSQL local docker.
+3. Wykonać Fazy A–E z quality gates po każdej fazie.
+4. Dopiero po stabilizacji rozważyć managed Postgresa (Neon/Supabase/RDS) jako kolejny krok.
