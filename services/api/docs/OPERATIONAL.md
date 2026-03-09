@@ -69,6 +69,22 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 - Dapr ingress (`POST /v1/orchestration/dapr/events`) propagates `correlation_id` and `causation_id` into worker state-machine timeline writes.
 - Fallback behavior: when `data.causation_id` is absent, CloudEvent `traceparent` is used as `causation_id`.
 
+### Rollout controls (MC-379)
+
+Orchestration capability gates are controlled by env flags:
+
+- `MC_API_ORCHESTRATION_COMMANDS_ENABLED` (default `true`)
+- `MC_API_ORCHESTRATION_DAPR_INGEST_ENABLED` (default `true`)
+- `MC_API_ORCHESTRATION_WATCHDOG_ENABLED` (default `true`)
+
+Gate behavior:
+
+- commands gate OFF: `/v1/orchestration/commands` returns `503`
+- Dapr ingest gate OFF:
+  - `/dapr/subscribe` returns no subscriptions
+  - `/v1/orchestration/dapr/events` returns `status=IGNORED`
+- watchdog gate OFF: `/v1/orchestration/watchdog/sweep` returns `503`
+
 ---
 
 ## 4) Audit Hooks (Planning Module)

@@ -35,6 +35,8 @@ def _extract_causation_id(cloud_event: dict[str, Any], data: dict[str, Any]) -> 
 
 @router.get("/dapr/subscribe")
 async def dapr_subscribe() -> list[dict[str, Any]]:
+    if not settings.orchestration_dapr_ingest_enabled:
+        return []
     return [
         {
             "pubsubname": _PUBSUB_NAME,
@@ -63,6 +65,21 @@ async def handle_dapr_orchestration_event(
     cloud_event: dict[str, Any],
     worker_state_service: WorkerStateMachineService = Depends(get_worker_state_machine_service),
 ) -> dict[str, str]:
+    if not settings.orchestration_dapr_ingest_enabled:
+        log_event(
+            logger,
+            level=logging.WARNING,
+            event="orchestration.dapr.event_ignored",
+            reason="ORCHESTRATION_DAPR_INGEST_DISABLED",
+        )
+        return {
+            "status": "IGNORED",
+            "reason": "ORCHESTRATION_DAPR_INGEST_DISABLED",
+            "run_id": str(cloud_event.get("run_id") or "unknown-run"),
+            "occurred_at": datetime.now(tz=UTC).isoformat(),
+            "transition_decision": "IGNORED",
+        }
+
     data = cloud_event.get("data")
     if not isinstance(data, dict):
         data = cloud_event

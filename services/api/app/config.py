@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     orchestration_watchdog_stale_lease_seconds: int = 90
     orchestration_watchdog_heartbeat_grace_seconds: int = 90
     orchestration_watchdog_default_timeout_seconds: int = 900
+    orchestration_commands_enabled: bool = True
+    orchestration_dapr_ingest_enabled: bool = True
+    orchestration_watchdog_enabled: bool = True
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 
