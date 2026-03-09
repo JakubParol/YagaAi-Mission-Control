@@ -1,4 +1,5 @@
-import aiosqlite
+from typing import Any
+
 from fastapi import Depends, Query
 
 from app.config import settings
@@ -26,7 +27,7 @@ from app.shared.api.errors import NotFoundError
 
 
 async def get_project_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> ProjectService:
     return ProjectService(
         project_repo=SqliteProjectRepository(db),
@@ -35,7 +36,7 @@ async def get_project_service(
 
 
 async def get_agent_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> AgentService:
     return AgentService(
         repo=SqliteAgentRepository(db),
@@ -44,25 +45,25 @@ async def get_agent_service(
 
 
 async def get_label_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> LabelService:
     return LabelService(SqliteLabelRepository(db))
 
 
 async def get_epic_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> EpicService:
     return EpicService(SqliteEpicRepository(db))
 
 
 async def get_story_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> StoryService:
     return StoryService(SqliteStoryRepository(db))
 
 
 async def get_task_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> TaskService:
     return TaskService(
         task_repo=SqliteTaskRepository(db),
@@ -70,13 +71,13 @@ async def get_task_service(
 
 
 async def get_backlog_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> BacklogService:
     return BacklogService(SqliteBacklogRepository(db))
 
 
 async def get_epic_overview_action_service(
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> EpicOverviewActionService:
     return EpicOverviewActionService(
         epic_service=EpicService(SqliteEpicRepository(db)),
@@ -89,7 +90,7 @@ async def get_epic_overview_action_service(
 async def resolve_project_key(
     project_id: str | None = Query(None),
     project_key: str | None = Query(None),
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> str | None:
     """Resolve project_key to project_id. project_key takes precedence."""
     if project_key is not None:
@@ -104,7 +105,7 @@ async def resolve_project_key(
 async def resolve_epic_key(
     epic_id: str | None = Query(None),
     epic_key: str | None = Query(None),
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> str | None:
     """Resolve epic_key to epic_id. epic_key takes precedence."""
     if epic_key is not None:
@@ -119,7 +120,7 @@ async def resolve_epic_key(
 async def resolve_story_key(
     story_id: str | None = Query(None),
     story_key: str | None = Query(None),
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Any = Depends(get_db),
 ) -> str | None:
     """Resolve story_key to story_id. story_key takes precedence."""
     if story_key is not None:

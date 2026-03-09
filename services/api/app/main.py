@@ -1,5 +1,7 @@
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -11,17 +13,32 @@ from app.observability.api.router import router as observability_router
 from app.orchestration.api.dapr_router import router as orchestration_dapr_router
 from app.orchestration.api.router import router as orchestration_router
 from app.planning.api.router import router as planning_router
+from app.shared.api.deps import close_postgres_pool, init_postgres_pool
 from app.shared.api.errors import AppError, app_error_handler, generic_error_handler
 from app.shared.api.health import router as health_router
-from app.shared.db import migrate_sqlite_or_raise
+from app.shared.db import migrate_postgres_or_raise, migrate_sqlite_or_raise
 from app.shared.logging import configure_logging, log_event
 
-migrate_sqlite_or_raise(settings.db_path)
+if settings.db_engine == "postgres":
+    migrate_postgres_or_raise(settings.postgres_dsn)
+else:
+    migrate_sqlite_or_raise(settings.db_path)
+
 configure_logging(level=settings.log_level)
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    await init_postgres_pool()
+    try:
+        yield
+    finally:
+        await close_postgres_pool()
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -52,3 +52,6 @@ apps/cli/dist/
 
 # agent plans
 .plans/
+
+# local runtime backups
+infra/local-runtime/backups/

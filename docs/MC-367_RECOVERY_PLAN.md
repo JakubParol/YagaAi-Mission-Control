@@ -198,12 +198,24 @@ To jest aktualny, domknięty playbook dla:
 - incident operations (queue/dead-letter/watchdog),
 - release-readiness handoff.
 
-## 8) Definition of Recovered
+## 8) Kierunek po recovery: migracja na PostgreSQL (lokalny Docker)
+
+Po ustabilizowaniu bieżącego runtime i rolloutu, kolejny zaplanowany kierunek to migracja persistence z SQLite na Postgresa.
+
+Zakres high-level:
+
+1. Dodać lokalny serwis Postgres do compose z trwałym wolumenem.
+2. Przełączyć connection path API/Web na Postgresa.
+3. Odtworzyć schema migrations pod Postgresa i zweryfikować kompatybilność.
+4. Przenieść dane z SQLite (export/transform/import + walidacja).
+5. Potwierdzić smoke/failure-path na Postgresie i zaktualizować runbook backup/restore.
+
+## 9) Definition of Recovered
 
 System uznajemy za odzyskany, gdy wszystkie punkty są spełnione:
 
-1. `mission-control-api.service` = `active (running)` bez restart-loop.
-2. `GET /healthz` na `127.0.0.1:5001` zwraca sukces.
-3. `mc health`, `mc project list`, `mc epic list` działają.
-4. Smoke orchestration przechodzi minimum w wariancie `--skip-up`.
-5. Web i API działają razem (brak 500 na ścieżkach API po stronie web).
+1. API health (`/healthz`) działa stabilnie na aktywnym runtime path.
+2. `mc health`, `mc project list`, `mc epic list` działają.
+3. Smoke orchestration przechodzi minimum w wariancie `--skip-up`.
+4. Web i API działają razem (brak 500 na ścieżkach API po stronie web).
+5. Runbook MC-379 jest aktualny i gotowy do użycia w rollback/recovery.

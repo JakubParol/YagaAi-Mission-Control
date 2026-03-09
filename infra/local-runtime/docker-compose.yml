@@ -1,18 +1,6 @@
 name: mission-control-local
 
 services:
-  sqlite:
-    image: alpine:3.22
-    command: ["/bin/sh", "-c", "mkdir -p /data && touch /data/mission-control.db && tail -f /dev/null"]
-    volumes:
-      - sqlite-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /data/mission-control.db"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 2s
-
   redis:
     image: redis:7.4-alpine
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -22,14 +10,30 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${MC_POSTGRES_DB:-mission_control}
+      POSTGRES_USER: ${MC_POSTGRES_USER:-mission_control}
+      POSTGRES_PASSWORD: ${MC_POSTGRES_PASSWORD:-mission_control_dev}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${MC_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MC_POSTGRES_USER:-mission_control} -d ${MC_POSTGRES_DB:-mission_control}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   api:
     image: python:3.12-slim
     working_dir: /workspace/services/api
     env_file:
       - .env
     environment:
-      MC_API_DB_PATH: /runtime/sqlite/mission-control.db
-      MC_DB_PATH: /runtime/sqlite/mission-control.db
+      MC_API_DB_ENGINE: postgres
+      MC_API_POSTGRES_DSN: postgresql://${MC_POSTGRES_USER:-mission_control}:${MC_POSTGRES_PASSWORD:-mission_control_dev}@postgres:5432/${MC_POSTGRES_DB:-mission_control}
       MC_API_CORS_ORIGINS: '["http://localhost:3000","http://localhost:3100"]'
     command:
       - /bin/sh
@@ -40,13 +44,12 @@ services:
         poetry run uvicorn app.main:app --host 0.0.0.0 --port 5001
     volumes:
       - ../../:/workspace
-      - sqlite-data:/runtime/sqlite
     ports:
       - "${MC_API_PORT:-5001}:5001"
     depends_on:
-      sqlite:
-        condition: service_healthy
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/healthz', timeout=2)\""]
@@ -61,8 +64,8 @@ services:
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_URL: http://api:5001
-      MC_DB_PATH: /runtime/sqlite/mission-control.db
+      NEXT_PUBLIC_API_URL: /api
+      API_URL: http://api:5001
       PORT: 3000
     command:
       - /bin/sh
@@ -72,7 +75,6 @@ services:
         npm run dev -- --hostname 0.0.0.0 --port 3000
     volumes:
       - ../../:/workspace
-      - sqlite-data:/runtime/sqlite
     ports:
       - "${MC_WEB_PORT:-3000}:3000"
     depends_on:
@@ -196,4 +198,4 @@ services:
       - ${MC_DAPR_COMPONENTS_PATH:-./dapr/components}:/components:ro
 
 volumes:
-  sqlite-data:
+  postgres-data:
