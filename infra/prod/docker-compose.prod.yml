@@ -1,0 +1,203 @@
+name: mission-control-prod
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MC_POSTGRES_DB}
+      POSTGRES_USER: ${MC_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${MC_POSTGRES_PASSWORD}
+    volumes:
+      - mission-control-prod-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${MC_PROD_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MC_POSTGRES_USER} -d ${MC_POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    image: mission-control/api:${MC_IMAGE_TAG:-latest}
+    build:
+      context: ../../services/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${MC_PROD_ENV_FILE:-/etc/mission-control/prod.env}
+    environment:
+      MC_API_DB_ENGINE: ${MC_API_DB_ENGINE:-postgres}
+      MC_API_POSTGRES_DSN: ${MC_API_POSTGRES_DSN}
+      MC_API_CORS_ORIGINS: ${MC_API_CORS_ORIGINS}
+      MC_API_ORCHESTRATION_COMMANDS_ENABLED: ${MC_API_ORCHESTRATION_COMMANDS_ENABLED:-true}
+      MC_API_ORCHESTRATION_DAPR_INGEST_ENABLED: ${MC_API_ORCHESTRATION_DAPR_INGEST_ENABLED:-true}
+      MC_API_ORCHESTRATION_WATCHDOG_ENABLED: ${MC_API_ORCHESTRATION_WATCHDOG_ENABLED:-true}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+    ports:
+      - "${MC_PROD_API_PORT:-5100}:${MC_API_INTERNAL_PORT:-5100}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5100/healthz', timeout=2)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  web:
+    image: mission-control/web:${MC_IMAGE_TAG:-latest}
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+      args:
+        API_URL: ${API_URL:-http://api:5100}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+    restart: unless-stopped
+    env_file:
+      - ${MC_PROD_ENV_FILE:-/etc/mission-control/prod.env}
+    environment:
+      API_URL: ${API_URL:-http://api:5100}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+      PORT: ${MC_WEB_INTERNAL_PORT:-3000}
+      NODE_ENV: production
+    ports:
+      - "${MC_PROD_WEB_PORT:-3100}:${MC_WEB_INTERNAL_PORT:-3000}"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  worker:
+    image: mission-control/worker:${MC_IMAGE_TAG:-latest}
+    build:
+      context: ../local-runtime/worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ${MC_PROD_ENV_FILE:-/etc/mission-control/prod.env}
+    environment:
+      MC_WORKER_API_HEALTH_URL: http://api:5100/healthz
+      MC_WORKER_REDIS_HOST: redis
+      MC_WORKER_REDIS_PORT: 6379
+      MC_WORKER_DAPR_HTTP_URL: http://127.0.0.1:3520
+      MC_WORKER_APP_PORT: ${MC_WORKER_INTERNAL_PORT:-8000}
+      MC_WORKER_PUBLISH_INTERVAL_SECONDS: ${MC_WORKER_PUBLISH_INTERVAL_SECONDS:-15}
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)\" && python -c \"import urllib.request; urllib.request.urlopen('http://api:5100/healthz', timeout=2)\" && python -c \"import socket; s=socket.create_connection(('redis',6379),2); s.close()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  dapr-placement:
+    image: daprio/dapr:${MC_DAPR_VERSION:-1.14.4}
+    restart: unless-stopped
+    command: ["./placement", "--port", "50006"]
+
+  dapr-api:
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
+    restart: unless-stopped
+    network_mode: service:api
+    depends_on:
+      api:
+        condition: service_healthy
+      dapr-placement:
+        condition: service_started
+    command:
+      - ./daprd
+      - --app-id
+      - mission-control-api
+      - --app-port
+      - "5100"
+      - --dapr-http-port
+      - "3500"
+      - --dapr-grpc-port
+      - "50001"
+      - --placement-host-address
+      - dapr-placement:50006
+      - --resources-path
+      - /components
+    volumes:
+      - ../local-runtime/dapr/components:/components:ro
+
+  dapr-web:
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
+    restart: unless-stopped
+    network_mode: service:web
+    depends_on:
+      web:
+        condition: service_healthy
+      dapr-placement:
+        condition: service_started
+    command:
+      - ./daprd
+      - --app-id
+      - mission-control-web
+      - --app-port
+      - "3000"
+      - --dapr-http-port
+      - "3510"
+      - --dapr-grpc-port
+      - "50011"
+      - --placement-host-address
+      - dapr-placement:50006
+      - --resources-path
+      - /components
+    volumes:
+      - ../local-runtime/dapr/components:/components:ro
+
+  dapr-worker:
+    image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
+    restart: unless-stopped
+    network_mode: service:worker
+    depends_on:
+      worker:
+        condition: service_healthy
+      dapr-placement:
+        condition: service_started
+    command:
+      - ./daprd
+      - --app-id
+      - mission-control-worker
+      - --app-port
+      - "8000"
+      - --dapr-http-port
+      - "3520"
+      - --dapr-grpc-port
+      - "50021"
+      - --placement-host-address
+      - dapr-placement:50006
+      - --resources-path
+      - /components
+    volumes:
+      - ../local-runtime/dapr/components:/components:ro
+
+volumes:
+  mission-control-prod-postgres-data:
+    name: ${MC_PROD_POSTGRES_VOLUME_NAME:-mission-control-prod_postgres-data}
