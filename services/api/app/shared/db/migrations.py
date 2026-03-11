@@ -393,5 +393,5 @@ def migrate_sqlite_or_raise(db_path: str) -> None:
     except sqlite3.DatabaseError as exc:
         raise RuntimeError(
             "SQLite database is not readable (possibly corrupt). "
-            "Restore from backup using infra/local-runtime/scripts/sqlite-restore.sh"
+            "Restore from a valid backup and re-run migrations."
         ) from exc

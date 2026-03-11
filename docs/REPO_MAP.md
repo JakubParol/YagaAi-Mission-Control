@@ -8,9 +8,9 @@ Overview of all projects and components in this monorepo.
 
 | Project | Path | Type | Description |
 |---|---|---|---|
-| **Web** | `apps/web/` | Next.js 15 | Dashboard UI — LLM costs, planning views |
-| **CLI** | `apps/cli/` | Planned | Command-line interface for Mission Control |
-| **API** | `services/api/` | FastAPI (Python) | REST API — planning, observability, and orchestration modules |
+| **Web** | `apps/web/` | Next.js 15 | Dashboard UI — planning + orchestration observability |
+| **CLI** | `apps/cli/` | TypeScript | Command-line interface (`mc`) over API contracts |
+| **API** | `services/api/` | FastAPI (Python) | REST API — planning, observability, orchestration |
 
 ---
 
@@ -22,11 +22,9 @@ The Next.js application serving the Mission Control dashboard.
 |---|---|
 | Entry point | `apps/web/src/app/` (App Router) |
 | Domain types | `apps/web/src/lib/types.ts` |
-| Langfuse import | `apps/web/src/lib/langfuse-import/` — imports LLM cost data from Langfuse |
-| Planning schema | `apps/web/src/lib/planning/` — v1 DB schema, types, repository |
-| API routes | `apps/web/src/app/api/` — Next.js API routes (dashboard data) |
-| Database | `data/mission-control.db` (SQLite, shared) |
-| Config | `apps/web/.env.local` — `MC_DB_PATH`, `NEXT_PUBLIC_API_URL`, `LANGFUSE_*` |
+| Planning schema/client | `apps/web/src/lib/planning/` |
+| API routes | `apps/web/src/app/api/` |
+| Config | `apps/web/.env.local` (`NEXT_PUBLIC_API_URL`, `API_URL`) |
 | AGENTS.md | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
 
 ---
@@ -39,9 +37,8 @@ TypeScript CLI (`mc`) built with Commander.js. Mirrors API resources as command 
 |---|---|
 | Entry point | `apps/cli/src/index.ts` |
 | Binary | `mc` (via `dist/index.js`) |
-| Tech | TypeScript, Commander.js, native fetch |
-| Config | Env vars `MC_API_BASE_URL`, `MC_ACTOR_ID`, `MC_ACTOR_TYPE`, `MC_OUTPUT`, `MC_TIMEOUT_SECONDS` |
-| Lint | `apps/cli/scripts/lint.sh` (ESLint + TypeScript type-check) |
+| Config | `MC_API_BASE_URL`, `MC_ACTOR_ID`, `MC_ACTOR_TYPE`, `MC_OUTPUT`, `MC_TIMEOUT_SECONDS` |
+| Lint | `apps/cli/scripts/lint.sh` |
 | AGENTS.md | [`apps/cli/AGENTS.md`](../apps/cli/AGENTS.md) |
 | Docs | [`apps/cli/docs/INDEX.md`](../apps/cli/docs/INDEX.md) |
 
@@ -55,26 +52,37 @@ FastAPI REST service with three domain modules:
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
 | **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
-| **orchestration** | `/v1/orchestration` | Versioned command ingestion and transactional event outbox |
+| **orchestration** | `/v1/orchestration` | Command intake, timeline read model, watchdog, runtime metrics |
 
 | Item | Detail |
 |---|---|
 | Entry point | `services/api/app/main.py` |
-| Architecture | Package-by-feature, Clean Architecture layers per module |
-| Config | `services/api/app/config.py` — `MC_API_*` env vars |
+| Architecture | Package-by-feature, clean-ish layered boundaries per module |
+| Config | `services/api/app/config.py` (`MC_API_*`) |
 | AGENTS.md | [`services/api/AGENTS.md`](../services/api/AGENTS.md) |
 | Docs | [`services/api/docs/INDEX.md`](../services/api/docs/INDEX.md) |
 
 ---
 
-## Shared
+## Runtime / Infra
 
 | Path | Purpose |
 |---|---|
-| `docs/` | Shared documentation (entity model, workflow logic, this file) |
-| `data/` | SQLite database (gitignored) |
-| `infra/` | Deployment configs (`mission-control.service`, `deploy.sh`) |
-| `infra/local-runtime/` | Deterministic local Docker runtime (api/web/worker/redis/sqlite + Dapr sidecars) |
+| `infra/dev/docker-compose.dev.yml` | DEV dependencies/runtime split (host API/Web + dockerized postgres/redis/worker+dapr) |
+| `infra/prod/docker-compose.prod.yml` | Full PROD container stack |
+| `infra/systemd/mission-control-prod.service` | Systemd unit for PROD docker-compose stack |
+| `infra/local-runtime/` | Deterministic local Docker runtime (api/web/worker/redis/postgres + Dapr sidecars) |
+| `infra/runbook.md` | Operator runbook for DEV/PROD workflows |
+| `infra/deploy.sh`, `infra/rollback.sh` | Deployment and rollback scripts |
+
+---
+
+## Persistence
+
+| Environment | Persistence |
+|---|---|
+| Local runtime / DEV / PROD | PostgreSQL |
+| API compatibility layer | SQLite migration utilities kept in code for backward compatibility paths |
 
 ---
 
@@ -82,7 +90,7 @@ FastAPI REST service with three domain modules:
 
 | System | Purpose | How accessed |
 |---|---|---|
-| Langfuse | LLM observability (costs, traces) | HTTP API → imported to local SQLite |
+| Langfuse | LLM observability (costs, traces) | HTTP API ingestion |
 
 ---
 
@@ -91,26 +99,3 @@ FastAPI REST service with three domain modules:
 - ↑ [Docs Index](./INDEX.md)
 - ↑ [README.md](../README.md)
 - ↑ [AGENTS.md](../AGENTS.md)
-
-## MC-98 — Backlog Jira-like list rows (minimal)
-
-Defines the minimal rendering contract for backlog rows in the web planning backlog experience.
-
-| Item | Detail |
-|---|---|
-| Scope | Minimal Jira-like list row presentation for backlog stories |
-| Route | `/planning/backlog` |
-| Primary page | `apps/web/src/app/planning/backlog/page.tsx` |
-| Story detail dialog | `apps/web/src/components/planning/story-detail-dialog.tsx` |
-
-## MC-206 — Planning settings mocked scaffold (v1)
-
-Defines the initial settings experience for Planning with schema-aligned mocked data and an adapter boundary for future API integration.
-
-| Item | Detail |
-|---|---|
-| Scope | Mocked settings sections for project/backlog/workflow/assignment/labels/audit |
-| Route | `/planning/settings` |
-| Primary page | `apps/web/src/app/planning/settings/page.tsx` |
-| Mock fixtures + adapter | `apps/web/src/lib/planning/settings/` |
-| Persistence behavior | UI-only placeholders; actions labeled `Coming soon` |

@@ -1,19 +1,19 @@
 # Mission Control
 
-Management platform for AI agent workflows. Combines a web dashboard with a REST API powering three domain modules: **planning** (work management), **observability** (LLM costs), and **orchestration** (versioned command intake + transactional outbox).
+Management platform for AI agent workflows. Combines a web dashboard with a REST API powering three domain modules: **planning** (work management), **observability** (LLM costs), and **orchestration** (event-driven runtime).
 
 ## Repository Structure
 
-```
+```text
 mission-control/
 ├── apps/
 │   ├── web/                    # Next.js dashboard
-│   └── cli/                    # CLI (planned)
+│   └── cli/                    # TypeScript CLI (mc)
 ├── services/
 │   └── api/                    # FastAPI REST API (Python)
-├── infra/                      # Deployment configs (systemd, scripts)
+├── infra/                      # Runtime/deployment configs (dev/prod/local-runtime)
 │   └── local-runtime/          # Deterministic local Docker runtime + Dapr bootstrap
-├── data/                       # SQLite database (gitignored)
+├── data/                       # Legacy local artifacts (not runtime source of truth)
 └── docs/                       # Shared documentation
 ```
 
@@ -25,60 +25,56 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 |---|---|
 | Frontend | Next.js 15 (App Router), TypeScript (strict), Tailwind CSS v4, shadcn/ui |
 | API | FastAPI, Python 3.12, pydantic, async |
-| CLI | Planned |
-| Database | SQLite (shared `data/mission-control.db`) |
+| CLI | TypeScript, Commander.js |
+| Database | PostgreSQL (Docker local/prod), SQLite compatibility paths in API |
 | External | Langfuse (LLM cost tracking) |
 
-## Getting Started
+## Getting Started (DEV, host-first)
 
-### Frontend (Next.js)
+1) Start local dependencies:
 
 ```bash
-cd apps/web
-npm install
-
-# Configure
-cp .env.example .env.local
-# Ensure local DB path:
-# MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
-# Ensure local API URL:
-# NEXT_PUBLIC_API_URL=http://localhost:5000
-
-npm run dev
+cd /home/kuba/repos/mission-control
+docker compose -f infra/dev/docker-compose.dev.yml up -d postgres redis
 ```
 
-Runs at [http://localhost:3000](http://localhost:3000).
-
-### API (FastAPI)
+2) Run API on host:
 
 ```bash
 cd services/api
-poetry install
+MC_API_DB_ENGINE=postgres \
+MC_API_POSTGRES_DSN='postgresql://mission_control:mission_control_dev@127.0.0.1:5432/mission_control' \
 poetry run uvicorn app.main:app --reload --port 5000
 ```
 
-See [services/api/README.md](./services/api/README.md) for details.
-
-## Deployment
-
-### Build frontend for production
+3) Run web on host:
 
 ```bash
 cd apps/web
-npm run build
-npm start -- -p 3100
+API_URL=http://127.0.0.1:5000 NEXT_PUBLIC_API_URL=/api npm run dev -- --port 3000
 ```
 
-### Systemd service
+## Deployment (PROD, full containers)
+
+Systemd unit:
 
 ```bash
-sudo cp infra/mission-control.service /etc/systemd/system/
+sudo cp infra/systemd/mission-control-prod.service /etc/systemd/system/mission-control-prod.service
 sudo systemctl daemon-reload
-sudo systemctl enable mission-control
-sudo systemctl start mission-control
+sudo systemctl enable mission-control-prod.service
 ```
 
-Runs on port **3100**, restarts on failure.
+Deploy/update:
+
+```bash
+./infra/deploy.sh
+```
+
+Rollback:
+
+```bash
+./infra/rollback.sh <image-tag>
+```
 
 ## Links
 
@@ -86,3 +82,4 @@ Runs on port **3100**, restarts on failure.
 - [docs/INDEX.md](./docs/INDEX.md) — Documentation index
 - [docs/REPO_MAP.md](./docs/REPO_MAP.md) — Repository map
 - [services/api/docs/INDEX.md](./services/api/docs/INDEX.md) — API documentation
+- [infra/runbook.md](./infra/runbook.md) — DEV/PROD runtime operations
