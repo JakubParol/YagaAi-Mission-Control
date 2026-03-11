@@ -19,7 +19,10 @@ Fixtures:
 - _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
 """
 
+import json
 import sqlite3
+
+import pytest
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -438,6 +441,39 @@ def test_update_task_invalid_status(client) -> None:
     assert resp.status_code == 422
 
 
+def test_update_task_invalid_assignee(client) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+    resp = client.patch(f"/v1/planning/tasks/{task_id}", json={"current_assignee_agent_id": "nope"})
+    assert resp.status_code == 400
+    assert resp.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_update_task_same_assignee_is_noop_for_events(client, _setup_test_db) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+    first = client.patch(f"/v1/planning/tasks/{task_id}", json={"current_assignee_agent_id": "a1"})
+    assert first.status_code == 200
+    second = client.patch(f"/v1/planning/tasks/{task_id}", json={"current_assignee_agent_id": "a1"})
+    assert second.status_code == 200
+
+    conn = sqlite3.connect(_setup_test_db)
+    count = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM activity_log
+        WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
+        """,
+        (task_id,),
+    ).fetchone()[0]
+    conn.close()
+    assert count == 1
+
+
 # ── Delete ────────────────────────────────────────────────────────────────
 
 
@@ -500,6 +536,38 @@ def test_assign_agent(client) -> None:
     assert task_resp.json()["data"]["current_assignee_agent_id"] == "a1"
 
 
+def test_assign_agent_emits_activity_event(client, _setup_test_db) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    resp = client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a1"})
+    assert resp.status_code == 201
+
+    conn = sqlite3.connect(_setup_test_db)
+    row = conn.execute(
+        """
+        SELECT metadata_json
+        FROM activity_log
+        WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (task_id,),
+    ).fetchone()
+    conn.close()
+
+    assert row is not None
+    payload = json.loads(row[0])
+    assert payload["work_item_key"] == "P1-1"
+    assert payload["assignee_agent"] == {"id": "a1"}
+    assert payload["previous_assignee"] is None
+    assert payload["correlation_id"]
+    assert payload["causation_id"] == task_id
+    assert payload["timestamp"]
+
+
 def test_assign_agent_replaces_previous(client) -> None:
     task_id = client.post(
         "/v1/planning/tasks",
@@ -519,6 +587,35 @@ def test_assign_agent_replaces_previous(client) -> None:
     closed = [a for a in data["assignments"] if a["agent_id"] == "a1"]
     assert len(closed) == 1
     assert closed[0]["unassigned_at"] is not None
+
+
+def test_assign_agent_event_reassign_includes_previous_assignee(client, _setup_test_db) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+    first = client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a1"})
+    assert first.status_code == 201
+    second = client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a2"})
+    assert second.status_code == 201
+
+    conn = sqlite3.connect(_setup_test_db)
+    row = conn.execute(
+        """
+        SELECT metadata_json
+        FROM activity_log
+        WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (task_id,),
+    ).fetchone()
+    conn.close()
+
+    assert row is not None
+    payload = json.loads(row[0])
+    assert payload["assignee_agent"] == {"id": "a2"}
+    assert payload["previous_assignee"] == {"id": "a1"}
 
 
 def test_assign_same_agent_twice_conflict(client) -> None:
@@ -559,6 +656,25 @@ def test_unassign_agent(client) -> None:
 
     task_resp = client.get(f"/v1/planning/tasks/{task_id}")
     assert task_resp.json()["data"]["current_assignee_agent_id"] is None
+
+
+def test_assign_agent_rolls_back_without_activity_log_table(client, _setup_test_db) -> None:
+    task_id = client.post(
+        "/v1/planning/tasks",
+        json={"title": "T", "task_type": "TASK", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    conn = sqlite3.connect(_setup_test_db)
+    conn.execute("DROP TABLE activity_log")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(sqlite3.OperationalError):
+        client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a1"})
+
+    task = client.get(f"/v1/planning/tasks/{task_id}").json()["data"]
+    assert task["current_assignee_agent_id"] is None
+    assert task["assignments"] == []
 
 
 def test_unassign_agent_not_assigned(client) -> None:

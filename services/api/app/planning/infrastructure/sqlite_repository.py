@@ -104,6 +104,68 @@ def _build_update_query(table: str, sets: list[str]) -> str:
     return "UPDATE " + table + " SET " + ", ".join(sets) + " WHERE id = ?"
 
 
+def _assignment_payload(agent_id: str | None) -> dict[str, str] | None:
+    if agent_id is None:
+        return None
+    return {"id": agent_id}
+
+
+async def _insert_assignment_event(
+    db: aiosqlite.Connection,
+    *,
+    actor_id: str | None,
+    entity_type: str,
+    entity_id: str,
+    work_item_key: str | None,
+    new_assignee_agent_id: str | None,
+    previous_assignee_agent_id: str | None,
+    occurred_at: str,
+    correlation_id: str,
+    causation_id: str,
+) -> None:
+    await db.execute(
+        """
+        INSERT INTO activity_log (
+          id, event_name, actor_id, actor_type,
+          entity_type, entity_id, scope_json, metadata_json,
+          occurred_at, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            str(uuid4()),
+            "planning.assignment.changed",
+            actor_id,
+            "system",
+            entity_type,
+            entity_id,
+            json.dumps(
+                {
+                    "work_item_key": work_item_key,
+                    "correlation_id": correlation_id,
+                    "causation_id": causation_id,
+                },
+                separators=(",", ":"),
+                sort_keys=True,
+            ),
+            json.dumps(
+                {
+                    "work_item_key": work_item_key,
+                    "assignee_agent": _assignment_payload(new_assignee_agent_id),
+                    "previous_assignee": _assignment_payload(previous_assignee_agent_id),
+                    "correlation_id": correlation_id,
+                    "causation_id": causation_id,
+                    "timestamp": occurred_at,
+                },
+                separators=(",", ":"),
+                sort_keys=True,
+            ),
+            occurred_at,
+            occurred_at,
+        ],
+    )
+
+
 def _parse_sort_mapped(raw: str, allowed: dict[str, str], default_sql: str) -> str:
     clauses: list[str] = []
     for part in raw.split(","):
@@ -824,6 +886,74 @@ class SqliteStoryRepository(StoryRepository):
         params.append(story_id)
         await self._db.execute(_build_update_query("stories", sets), params)
         await self._db.commit()
+        return await self.get_by_id(story_id)
+
+    async def update_assignee_with_event(
+        self,
+        *,
+        story_id: str,
+        data: dict[str, Any],
+        new_assignee_agent_id: str | None,
+        previous_assignee_agent_id: str | None,
+        actor_id: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> Story | None:
+        allowed = {
+            "title",
+            "intent",
+            "description",
+            "story_type",
+            "status",
+            "epic_id",
+            "is_blocked",
+            "blocked_reason",
+            "priority",
+            "current_assignee_agent_id",
+            "metadata_json",
+            "updated_by",
+            "updated_at",
+            "started_at",
+            "completed_at",
+        }
+        sets = []
+        params: list[Any] = []
+        for k, v in data.items():
+            if k in allowed:
+                sets.append(k + " = ?")
+                if k == "is_blocked":
+                    params.append(1 if v else 0)
+                else:
+                    params.append(v)
+
+        if not sets:
+            return await self.get_by_id(story_id)
+
+        row = await _fetch_one(self._db, "SELECT key FROM stories WHERE id = ?", [story_id])
+        if row is None:
+            return None
+
+        try:
+            await self._db.execute("BEGIN")
+            params.append(story_id)
+            await self._db.execute(_build_update_query("stories", sets), params)
+            await _insert_assignment_event(
+                self._db,
+                actor_id=actor_id,
+                entity_type="story",
+                entity_id=story_id,
+                work_item_key=row["key"],
+                new_assignee_agent_id=new_assignee_agent_id,
+                previous_assignee_agent_id=previous_assignee_agent_id,
+                occurred_at=occurred_at,
+                correlation_id=correlation_id,
+                causation_id=causation_id,
+            )
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise
         return await self.get_by_id(story_id)
 
     async def delete(self, story_id: str) -> bool:
@@ -1871,6 +2001,75 @@ class SqliteTaskRepository(TaskRepository):
         await self._db.commit()
         return await self.get_by_id(task_id)
 
+    async def update_assignee_with_event(
+        self,
+        *,
+        task_id: str,
+        data: dict[str, Any],
+        new_assignee_agent_id: str | None,
+        previous_assignee_agent_id: str | None,
+        actor_id: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> Task | None:
+        allowed = {
+            "title",
+            "objective",
+            "task_type",
+            "status",
+            "story_id",
+            "is_blocked",
+            "blocked_reason",
+            "priority",
+            "estimate_points",
+            "due_at",
+            "current_assignee_agent_id",
+            "metadata_json",
+            "updated_by",
+            "updated_at",
+            "started_at",
+            "completed_at",
+        }
+        sets = []
+        params: list[Any] = []
+        for k, v in data.items():
+            if k in allowed:
+                sets.append(k + " = ?")
+                if k == "is_blocked":
+                    params.append(1 if v else 0)
+                else:
+                    params.append(v)
+
+        if not sets:
+            return await self.get_by_id(task_id)
+
+        row = await _fetch_one(self._db, "SELECT key FROM tasks WHERE id = ?", [task_id])
+        if row is None:
+            return None
+
+        try:
+            await self._db.execute("BEGIN")
+            params.append(task_id)
+            await self._db.execute(_build_update_query("tasks", sets), params)
+            await _insert_assignment_event(
+                self._db,
+                actor_id=actor_id,
+                entity_type="task",
+                entity_id=task_id,
+                work_item_key=row["key"],
+                new_assignee_agent_id=new_assignee_agent_id,
+                previous_assignee_agent_id=previous_assignee_agent_id,
+                occurred_at=occurred_at,
+                correlation_id=correlation_id,
+                causation_id=causation_id,
+            )
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise
+        return await self.get_by_id(task_id)
+
     async def delete(self, task_id: str) -> bool:
         cursor = await self._db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
         await self._db.commit()
@@ -1978,4 +2177,115 @@ class SqliteTaskRepository(TaskRepository):
             [unassigned_at, task_id],
         )
         await self._db.commit()
+        return (cursor.rowcount or 0) > 0
+
+    async def assign_agent_with_event(
+        self,
+        *,
+        task_id: str,
+        agent_id: str,
+        previous_assignee_agent_id: str | None,
+        assigned_by: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> TaskAssignment:
+        row = await _fetch_one(self._db, "SELECT key FROM tasks WHERE id = ?", [task_id])
+        if row is None:
+            raise ValidationError(f"Task {task_id} not found")
+
+        assignment = TaskAssignment(
+            id=str(uuid4()),
+            task_id=task_id,
+            agent_id=agent_id,
+            assigned_at=occurred_at,
+            unassigned_at=None,
+            assigned_by=assigned_by,
+            reason=None,
+        )
+        try:
+            await self._db.execute("BEGIN")
+            if previous_assignee_agent_id is not None:
+                await self._db.execute(
+                    """UPDATE task_assignments
+                       SET unassigned_at = ?
+                       WHERE task_id = ? AND unassigned_at IS NULL""",
+                    [occurred_at, task_id],
+                )
+            await self._db.execute(
+                """INSERT INTO task_assignments (id, task_id, agent_id, assigned_at,
+                   unassigned_at, assigned_by, reason)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                [
+                    assignment.id,
+                    assignment.task_id,
+                    assignment.agent_id,
+                    assignment.assigned_at,
+                    assignment.unassigned_at,
+                    assignment.assigned_by,
+                    assignment.reason,
+                ],
+            )
+            await self._db.execute(
+                "UPDATE tasks SET current_assignee_agent_id = ?, updated_at = ? WHERE id = ?",
+                [agent_id, occurred_at, task_id],
+            )
+            await _insert_assignment_event(
+                self._db,
+                actor_id=assigned_by,
+                entity_type="task",
+                entity_id=task_id,
+                work_item_key=row["key"],
+                new_assignee_agent_id=agent_id,
+                previous_assignee_agent_id=previous_assignee_agent_id,
+                occurred_at=occurred_at,
+                correlation_id=correlation_id,
+                causation_id=causation_id,
+            )
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise
+        return assignment
+
+    async def unassign_agent_with_event(
+        self,
+        *,
+        task_id: str,
+        previous_assignee_agent_id: str,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> bool:
+        row = await _fetch_one(self._db, "SELECT key FROM tasks WHERE id = ?", [task_id])
+        if row is None:
+            return False
+        try:
+            await self._db.execute("BEGIN")
+            cursor = await self._db.execute(
+                """UPDATE task_assignments
+                   SET unassigned_at = ?
+                   WHERE task_id = ? AND unassigned_at IS NULL""",
+                [occurred_at, task_id],
+            )
+            await self._db.execute(
+                "UPDATE tasks SET current_assignee_agent_id = NULL, updated_at = ? WHERE id = ?",
+                [occurred_at, task_id],
+            )
+            await _insert_assignment_event(
+                self._db,
+                actor_id=None,
+                entity_type="task",
+                entity_id=task_id,
+                work_item_key=row["key"],
+                new_assignee_agent_id=None,
+                previous_assignee_agent_id=previous_assignee_agent_id,
+                occurred_at=occurred_at,
+                correlation_id=correlation_id,
+                causation_id=causation_id,
+            )
+            await self._db.commit()
+        except Exception:
+            await self._db.rollback()
+            raise
         return (cursor.rowcount or 0) > 0

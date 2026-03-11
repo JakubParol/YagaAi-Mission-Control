@@ -153,16 +153,35 @@ class TaskService:
                     f"Task project {existing.project_id} conflicts with story {data['story_id']} "
                     f"project {story_project_id}"
                 )
+        if "current_assignee_agent_id" in data and data["current_assignee_agent_id"] is not None:
+            if not await self._task_repo.agent_exists(data["current_assignee_agent_id"]):
+                raise ValidationError(f"Agent {data['current_assignee_agent_id']} does not exist")
 
         if blocked_reason_in_payload and blocked_reason is not None and not next_is_blocked:
             raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
         if not next_is_blocked:
             data["blocked_reason"] = None
 
+        assignee_changed = (
+            "current_assignee_agent_id" in data
+            and data["current_assignee_agent_id"] != existing.current_assignee_agent_id
+        )
         data["updated_by"] = actor
         data["updated_at"] = now
 
-        updated = await self._task_repo.update(task_id, data)
+        if assignee_changed:
+            updated = await self._task_repo.update_assignee_with_event(
+                task_id=task_id,
+                data=data,
+                new_assignee_agent_id=data["current_assignee_agent_id"],
+                previous_assignee_agent_id=existing.current_assignee_agent_id,
+                actor_id=actor,
+                occurred_at=now,
+                correlation_id=new_uuid(),
+                causation_id=task_id,
+            )
+        else:
+            updated = await self._task_repo.update(task_id, data)
         if not updated:
             raise NotFoundError(f"Task {task_id} not found")
 
@@ -211,25 +230,16 @@ class TaskService:
         if active:
             if active.agent_id == agent_id:
                 raise ConflictError(f"Agent {agent_id} is already assigned to task {task_id}")
-            now = utc_now()
-            await self._task_repo.close_assignment(task_id, now)
-
         now = utc_now()
-        assignment = TaskAssignment(
-            id=new_uuid(),
+        return await self._task_repo.assign_agent_with_event(
             task_id=task_id,
             agent_id=agent_id,
-            assigned_at=now,
-            unassigned_at=None,
+            previous_assignee_agent_id=active.agent_id if active else None,
             assigned_by=assigned_by,
-            reason=None,
+            occurred_at=now,
+            correlation_id=new_uuid(),
+            causation_id=task_id,
         )
-        created = await self._task_repo.create_assignment(assignment)
-
-        await self._task_repo.update(
-            task_id, {"current_assignee_agent_id": agent_id, "updated_at": utc_now()}
-        )
-        return created
 
     async def unassign_agent(self, task_id: str, agent_id: str) -> None:
         task = await self._task_repo.get_by_id(task_id)
@@ -240,8 +250,10 @@ class TaskService:
         if not active or active.agent_id != agent_id:
             raise NotFoundError(f"Agent {agent_id} is not actively assigned to task {task_id}")
 
-        now = utc_now()
-        await self._task_repo.close_assignment(task_id, now)
-        await self._task_repo.update(
-            task_id, {"current_assignee_agent_id": None, "updated_at": utc_now()}
+        await self._task_repo.unassign_agent_with_event(
+            task_id=task_id,
+            previous_assignee_agent_id=agent_id,
+            occurred_at=utc_now(),
+            correlation_id=new_uuid(),
+            causation_id=task_id,
         )

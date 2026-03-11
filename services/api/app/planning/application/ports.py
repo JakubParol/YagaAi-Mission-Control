@@ -194,6 +194,20 @@ class StoryRepository(ABC):
     async def update(self, story_id: str, data: dict[str, Any]) -> Story | None: ...
 
     @abstractmethod
+    async def update_assignee_with_event(
+        self,
+        *,
+        story_id: str,
+        data: dict[str, Any],
+        new_assignee_agent_id: str | None,
+        previous_assignee_agent_id: str | None,
+        actor_id: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> Story | None: ...
+
+    @abstractmethod
     async def delete(self, story_id: str) -> bool: ...
 
     @abstractmethod
@@ -374,6 +388,20 @@ class TaskRepository(ABC):
     async def update(self, task_id: str, data: dict[str, Any]) -> Task | None: ...
 
     @abstractmethod
+    async def update_assignee_with_event(
+        self,
+        *,
+        task_id: str,
+        data: dict[str, Any],
+        new_assignee_agent_id: str | None,
+        previous_assignee_agent_id: str | None,
+        actor_id: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> Task | None: ...
+
+    @abstractmethod
     async def delete(self, task_id: str) -> bool: ...
 
     @abstractmethod
@@ -411,6 +439,30 @@ class TaskRepository(ABC):
 
     @abstractmethod
     async def close_assignment(self, task_id: str, unassigned_at: str) -> bool: ...
+
+    @abstractmethod
+    async def assign_agent_with_event(
+        self,
+        *,
+        task_id: str,
+        agent_id: str,
+        previous_assignee_agent_id: str | None,
+        assigned_by: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> TaskAssignment: ...
+
+    @abstractmethod
+    async def unassign_agent_with_event(
+        self,
+        *,
+        task_id: str,
+        previous_assignee_agent_id: str,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> bool: ...
 
     @abstractmethod
     async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]: ...

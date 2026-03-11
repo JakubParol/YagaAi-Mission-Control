@@ -128,10 +128,26 @@ class StoryService:
             if not await self._story_repo.agent_exists(data["current_assignee_agent_id"]):
                 raise ValidationError(f"Agent {data['current_assignee_agent_id']} does not exist")
 
+        assignee_changed = (
+            "current_assignee_agent_id" in data
+            and data["current_assignee_agent_id"] != existing.current_assignee_agent_id
+        )
         data["updated_by"] = actor
         data["updated_at"] = utc_now()
 
-        updated = await self._story_repo.update(story_id, data)
+        if assignee_changed:
+            updated = await self._story_repo.update_assignee_with_event(
+                story_id=story_id,
+                data=data,
+                new_assignee_agent_id=data["current_assignee_agent_id"],
+                previous_assignee_agent_id=existing.current_assignee_agent_id,
+                actor_id=actor,
+                occurred_at=data["updated_at"],
+                correlation_id=new_uuid(),
+                causation_id=story_id,
+            )
+        else:
+            updated = await self._story_repo.update(story_id, data)
         if not updated:
             raise NotFoundError(f"Story {story_id} not found")
         return updated
