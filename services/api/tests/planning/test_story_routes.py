@@ -16,7 +16,10 @@ Fixtures:
 - _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
 """
 
+import json
 import sqlite3
+
+import pytest
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -369,6 +372,87 @@ def test_update_story_current_assignee(client) -> None:
     )
     assert unassign_resp.status_code == 200
     assert unassign_resp.json()["data"]["current_assignee_agent_id"] is None
+
+
+def test_update_story_assignee_emits_activity_event(client, _setup_test_db) -> None:
+    story_id = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    resp = client.patch(
+        f"/v1/planning/stories/{story_id}", json={"current_assignee_agent_id": "a1"}
+    )
+    assert resp.status_code == 200
+
+    conn = sqlite3.connect(_setup_test_db)
+    row = conn.execute(
+        """
+        SELECT metadata_json
+        FROM activity_log
+        WHERE entity_type = 'story' AND entity_id = ? AND event_name = 'planning.assignment.changed'
+        """,
+        (story_id,),
+    ).fetchone()
+    conn.close()
+
+    assert row is not None
+    payload = json.loads(row[0])
+    assert payload["work_item_key"] == "P1-1"
+    assert payload["assignee_agent"] == {"id": "a1"}
+    assert payload["previous_assignee"] is None
+    assert payload["correlation_id"]
+    assert payload["causation_id"] == story_id
+    assert payload["timestamp"]
+
+
+def test_update_story_same_assignee_is_noop_for_events(client, _setup_test_db) -> None:
+    story_id = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    ).json()["data"]["id"]
+    first = client.patch(
+        f"/v1/planning/stories/{story_id}", json={"current_assignee_agent_id": "a1"}
+    )
+    assert first.status_code == 200
+    second = client.patch(
+        f"/v1/planning/stories/{story_id}",
+        json={"current_assignee_agent_id": "a1", "title": "Still assigned"},
+    )
+    assert second.status_code == 200
+
+    conn = sqlite3.connect(_setup_test_db)
+    count = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM activity_log
+        WHERE entity_type = 'story' AND entity_id = ? AND event_name = 'planning.assignment.changed'
+        """,
+        (story_id,),
+    ).fetchone()[0]
+    conn.close()
+
+    assert count == 1
+
+
+def test_update_story_assignee_rolls_back_without_activity_log_table(
+    client, _setup_test_db
+) -> None:
+    story_id = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    conn = sqlite3.connect(_setup_test_db)
+    conn.execute("DROP TABLE activity_log")
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(sqlite3.OperationalError):
+        client.patch(f"/v1/planning/stories/{story_id}", json={"current_assignee_agent_id": "a1"})
+
+    story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
+    assert story["current_assignee_agent_id"] is None
 
 
 def test_update_story_status_done_sets_completed_at(client) -> None:
