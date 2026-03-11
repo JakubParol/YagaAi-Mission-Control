@@ -543,6 +543,7 @@ class TaskUpdate(BaseModel):
     priority: int | None = None
     estimate_points: float | None = None
     due_at: str | None = None
+    current_assignee_agent_id: str | None = None
 
 
 class TaskResponse(BaseModel):
