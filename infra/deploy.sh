@@ -30,6 +30,17 @@ curl -fsS http://127.0.0.1:5100/healthz >/dev/null
 curl -fsS -I http://127.0.0.1:3100 >/dev/null
 
 echo "[INFO] Smoke checks passed"
+echo "[INFO] Runtime status (docker compose ps):"
+MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" ps
+
+echo "[INFO] API /healthz response:"
+curl -fsS http://127.0.0.1:5100/healthz
+echo
+
+echo "[INFO] WEB headers:"
+curl -fsS -I http://127.0.0.1:3100
+echo
+
 echo "[OK] Deploy complete"
 echo "      web: http://127.0.0.1:3100"
 echo "      api: http://127.0.0.1:5100"
