@@ -58,7 +58,7 @@ class FakeApiClient {
 }
 
 const TEST_CONFIG: RuntimeConfig = {
-  apiBaseUrl: "http://127.0.0.1:8080",
+  apiBaseUrl: "http://127.0.0.1:5000",
   output: "json",
   timeoutMs: 30_000,
 };

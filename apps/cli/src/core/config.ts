@@ -20,7 +20,7 @@ export interface RuntimeConfig {
   timeoutMs: number;
 }
 
-const DEFAULT_API_BASE = "http://127.0.0.1:8080";
+const DEFAULT_API_BASE = "http://127.0.0.1:5000";
 const DEFAULT_OUTPUT: OutputMode = "table";
 const DEFAULT_TIMEOUT_SECONDS = 30;
 

@@ -42,7 +42,7 @@ cp .env.example .env.local
 # Ensure local DB path:
 # MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
 # Ensure local API URL:
-# NEXT_PUBLIC_API_URL=http://localhost:8080
+# NEXT_PUBLIC_API_URL=http://localhost:5000
 
 npm run dev
 ```
@@ -54,7 +54,7 @@ Runs at [http://localhost:3000](http://localhost:3000).
 ```bash
 cd services/api
 poetry install
-poetry run uvicorn app.main:app --reload --port 8080
+poetry run uvicorn app.main:app --reload --port 5000
 ```
 
 See [services/api/README.md](./services/api/README.md) for details.

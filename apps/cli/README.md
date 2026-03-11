@@ -49,7 +49,7 @@ mc project list
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MC_API_BASE_URL` | `http://127.0.0.1:8080` | API base URL |
+| `MC_API_BASE_URL` | `http://127.0.0.1:5000` | API base URL |
 | `MC_ACTOR_ID` | — | Actor identity header |
 | `MC_ACTOR_TYPE` | `user` | Actor type header |
 | `MC_OUTPUT` | `table` | Output mode: `table` or `json` |

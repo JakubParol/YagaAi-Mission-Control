@@ -1,68 +1,37 @@
 #!/usr/bin/env bash
-# Mission Control — deploy after merge to main
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+COMPOSE_FILE="$REPO_ROOT/infra/prod/docker-compose.prod.yml"
+PROD_ENV="/etc/mission-control/prod.env"
+PROJECT_NAME="mission-control-prod"
+
+if [[ ! -f "$PROD_ENV" ]]; then
+  echo "[ERROR] Missing $PROD_ENV"
+  echo "Create it from $REPO_ROOT/infra/env/prod.env.example"
+  exit 1
+fi
+
 cd "$REPO_ROOT"
 
-echo "Switching to main and pulling..."
-git checkout main
-git pull origin main
+CURRENT_SHA="$(git rev-parse --short HEAD)"
+PREVIOUS_SHA="$(git rev-parse --short HEAD~1 2>/dev/null || echo "$CURRENT_SHA")"
 
-# --- API ---
-echo "Installing API dependencies..."
-cd services/api
+echo "[INFO] Deploying commit $CURRENT_SHA"
 
-# Heal stale/broken virtualenvs (e.g. python symlink points to removed interpreter)
-if [ -d ".venv" ]; then
-  if [ ! -x ".venv/bin/python" ] || ! .venv/bin/python -V >/dev/null 2>&1; then
-    BROKEN_SUFFIX="$(date +%Y%m%d%H%M%S)"
-    echo "Detected broken API virtualenv; rotating .venv -> .venv.broken.${BROKEN_SUFFIX}"
-    mv .venv ".venv.broken.${BROKEN_SUFFIX}" || rm -rf .venv
-  fi
-fi
+echo "[INFO] Building production images..."
+DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" build
 
-poetry install --only main --no-interaction
-cd ../..
+echo "[INFO] Starting/updating production stack..."
+MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait
 
-# --- Web ---
-echo "Loading env for build (NEXT_PUBLIC_API_URL)..."
-set -a
-source /home/kuba/mission-control/mission-control.env
-set +a
+echo "[INFO] Running smoke checks..."
+curl -fsS http://127.0.0.1:5100/healthz >/dev/null
+curl -fsS -I http://127.0.0.1:3100 >/dev/null
 
-cd apps/web
-
-echo "Cleaning .next..."
-if ! rm -rf .next 2>/dev/null; then
-  echo "Standard cleanup failed (likely root-owned artifacts); retrying with sudo..."
-  sudo rm -rf .next
-fi
-
-echo "Building..."
-npm run build
-
-cd ../..
-
-# --- CLI ---
-echo "Installing CLI dependencies..."
-cd apps/cli
-npm ci --include=dev
-
-echo "Building CLI..."
-npm run build
-cd ../..
-
-echo "Installing global mc command..."
-sudo tee /usr/local/bin/mc >/dev/null <<EOF
-#!/usr/bin/env bash
-exec node "$REPO_ROOT/apps/cli/dist/index.js" "\$@"
-EOF
-sudo chmod 755 /usr/local/bin/mc
-
-# --- Services ---
-echo "Restarting services..."
-sudo systemctl restart mission-control-api
-sudo systemctl restart mission-control
-
-echo "Deployed! Web: http://localhost:3100 | API: http://localhost:5001"
+echo "[INFO] Smoke checks passed"
+echo "[OK] Deploy complete"
+echo "      web: http://127.0.0.1:3100"
+echo "      api: http://127.0.0.1:5100"
+echo "      image_tag: $CURRENT_SHA"
+echo "      previous_sha: $PREVIOUS_SHA"

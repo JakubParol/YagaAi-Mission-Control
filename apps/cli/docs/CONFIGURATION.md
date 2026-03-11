@@ -12,7 +12,7 @@ Configuration model for Mission Control CLI.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `MC_API_BASE_URL` | no | `http://127.0.0.1:8080` | Base URL for Mission Control API |
+| `MC_API_BASE_URL` | no | `http://127.0.0.1:5000` | Base URL for Mission Control API |
 | `MC_ACTOR_ID` | no | — | Actor identity value sent in headers |
 | `MC_ACTOR_TYPE` | no | `user` | Actor type sent in headers |
 | `MC_OUTPUT` | no | `table` | Output mode: `table` or `json` |

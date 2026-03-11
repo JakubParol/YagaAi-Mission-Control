@@ -12,7 +12,7 @@ poetry install
 cp .env.example .env.local
 # set MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
 
-poetry run uvicorn app.main:app --reload --port 8080
+poetry run uvicorn app.main:app --reload --port 5000
 ```
 
 Health endpoint: `GET /healthz`
