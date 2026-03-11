@@ -455,7 +455,7 @@ Response `meta` includes story progress counters when the task belongs to a stor
 
 #### `PATCH /v1/planning/tasks/{id}` — Update task
 
-Updatable: `story_id`, `title`, `objective`, `task_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `metadata_json`.
+Updatable: `story_id`, `title`, `objective`, `task_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `current_assignee_agent_id`, `metadata_json`.
 
 Side effects:
 - Status change to `DONE` auto-closes active assignment.
@@ -469,6 +469,21 @@ Validation/conflict semantics:
 - `409 CONFLICT` when changing `story_id` to a story in a different project
 
 Update response `meta` includes story progress counters when the task belongs to a story.
+
+#### Assignment change event ledger
+
+Story/task assignee changes persist a durable planning event in `activity_log`:
+- `event_name`: `planning.assignment.changed`
+- `entity_type`: `story` or `task`
+- `metadata_json` payload contract:
+  - `work_item_key`
+  - `assignee_agent` (`{"id": "<agent_id>"}` or `null`)
+  - `previous_assignee` (`{"id": "<agent_id>"}` or `null`)
+  - `correlation_id`
+  - `causation_id`
+  - `timestamp`
+
+No event is emitted when assignee value is unchanged (semantic no-op). Event persistence is transactional with the source assignee state change.
 
 #### `DELETE /v1/planning/tasks/{id}` — Delete task
 
