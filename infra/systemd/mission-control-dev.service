@@ -10,7 +10,7 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/kuba/repos/mission-control/infra/dev
 ExecStartPre=/usr/bin/bash -lc 'test -f /home/kuba/repos/mission-control/infra/dev/.env || cp /home/kuba/repos/mission-control/infra/dev/.env.example /home/kuba/repos/mission-control/infra/dev/.env'
-ExecStart=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/dev/docker-compose.yml --env-file /home/kuba/repos/mission-control/infra/dev/.env up -d --remove-orphans
+ExecStart=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/dev/docker-compose.yml --env-file /home/kuba/repos/mission-control/infra/dev/.env up -d --remove-orphans --wait
 ExecStop=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/dev/docker-compose.yml --env-file /home/kuba/repos/mission-control/infra/dev/.env down --remove-orphans
 TimeoutStartSec=0
 
