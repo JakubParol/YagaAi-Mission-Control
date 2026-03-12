@@ -30,7 +30,8 @@
       "module": "uvicorn",
       "args": ["app.main:app", "--reload", "--host", "0.0.0.0", "--port", "5001"],
       "env": {
-        "MC_API_ENV": "dev"
+        "MC_API_ENV": "dev",
+        "MC_API_CORS_ORIGINS": "[\"http://localhost:3000\",\"http://127.0.0.1:3000\",\"http://localhost:3100\",\"http://localhost:3001\",\"http://127.0.0.1:3001\",\"http://100.106.117.41:3001\"]"
       },
       "console": "integratedTerminal"
     }
