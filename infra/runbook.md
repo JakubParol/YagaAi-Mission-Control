@@ -33,6 +33,22 @@ cd /home/kuba/repos/mission-control
 ./infra/dev/down.sh
 ```
 
+### Autostart DEV po restarcie VM (systemd)
+
+```bash
+sudo cp /home/kuba/repos/mission-control/infra/systemd/mission-control-dev.service /etc/systemd/system/mission-control-dev.service
+sudo systemctl daemon-reload
+sudo systemctl enable mission-control-dev.service
+sudo systemctl start mission-control-dev.service
+```
+
+Weryfikacja:
+
+```bash
+systemctl is-enabled mission-control-dev.service
+systemctl is-active mission-control-dev.service
+```
+
 ### Reset DEV runtime data (destructive)
 
 ```bash

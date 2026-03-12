@@ -1,0 +1,18 @@
+[Unit]
+Description=Mission Control DEV (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/home/kuba/repos/mission-control/infra/dev/docker-compose.yml
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/kuba/repos/mission-control/infra/dev
+ExecStartPre=/usr/bin/bash -lc 'test -f /home/kuba/repos/mission-control/infra/dev/.env || cp /home/kuba/repos/mission-control/infra/dev/.env.example /home/kuba/repos/mission-control/infra/dev/.env'
+ExecStart=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/dev/docker-compose.yml --env-file /home/kuba/repos/mission-control/infra/dev/.env up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/dev/docker-compose.yml --env-file /home/kuba/repos/mission-control/infra/dev/.env down --remove-orphans
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
