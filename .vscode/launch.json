@@ -7,7 +7,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/apps/web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3001"],
       "env": {
         "NODE_OPTIONS": "--inspect"
       },
@@ -24,8 +24,9 @@
       "type": "debugpy",
       "request": "launch",
       "cwd": "${workspaceFolder}/services/api",
+      "python": "${workspaceFolder}/services/api/.venv/bin/python",
       "module": "uvicorn",
-      "args": ["app.main:app", "--reload", "--port", "5001"],
+      "args": ["app.main:app", "--reload", "--host", "127.0.0.1", "--port", "5001"],
       "env": {
         "MC_API_ENV": "dev"
       },
