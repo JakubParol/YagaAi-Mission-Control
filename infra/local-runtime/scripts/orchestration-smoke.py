@@ -607,7 +607,7 @@ def _run_scenarios(base_url: str, compose_file: Path, runtime_dir: Path) -> tupl
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mission Control orchestration smoke suite")
-    parser.add_argument("--api-base", default="http://127.0.0.1:5001", help="API base URL")
+    parser.add_argument("--api-base", default="http://127.0.0.1:5000", help="API base URL")
     parser.add_argument(
         "--runtime-dir",
         default=str(Path(__file__).resolve().parents[1]),

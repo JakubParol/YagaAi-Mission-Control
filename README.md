@@ -29,29 +29,23 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 | Database | PostgreSQL (Docker local/prod), SQLite compatibility paths in API |
 | External | Langfuse (LLM cost tracking) |
 
-## Getting Started (DEV, host-first)
-
-1) Start local dependencies:
+## Getting Started (DEV, containerized local-runtime)
 
 ```bash
 cd /home/kuba/repos/mission-control
-docker compose -f infra/dev/docker-compose.dev.yml up -d postgres redis
+./infra/local-runtime/up.sh
 ```
 
-2) Run API on host:
+Default host ports:
+
+- Web DEV: `3000`
+- API DEV: `5000`
+- Postgres DEV: `55432`
+
+Stop runtime:
 
 ```bash
-cd services/api
-MC_API_DB_ENGINE=postgres \
-MC_API_POSTGRES_DSN='postgresql://mission_control:mission_control_dev@127.0.0.1:5432/mission_control' \
-poetry run uvicorn app.main:app --reload --port 5000
-```
-
-3) Run web on host:
-
-```bash
-cd apps/web
-API_URL=http://127.0.0.1:5000 NEXT_PUBLIC_API_URL=/api npm run dev -- --port 3000
+./infra/local-runtime/down.sh
 ```
 
 ## Deployment (PROD, full containers)

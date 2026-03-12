@@ -6,8 +6,8 @@ Deterministic local stack for Mission Control orchestration runtime.
 
 - `postgres` (primary persistent DB service)
 - `redis`
-- `api` (FastAPI on `:5001`)
-- `web` (Next.js on `:3000`)
+- `api` (FastAPI on host `:5000`, container `:5100`)
+- `web` (Next.js on host `:3000`)
 - `worker` (HTTP worker that publishes orchestration heartbeats via Dapr pub/sub and receives API acknowledgements via Dapr service invocation)
 - `dapr-placement`
 - Dapr sidecars: `dapr-api`, `dapr-web`, `dapr-worker`
@@ -30,7 +30,7 @@ Postgres is the default local persistence path.
 
 - container: `postgres` (`postgres:16-alpine`)
 - volume: `postgres-data`
-- host port: `${MC_POSTGRES_PORT}` (default `5432`)
+- host port: `${MC_POSTGRES_PORT}` (recommended `55432` to avoid collision with PROD `5432`)
 - DB credentials via `.env`:
   - `MC_POSTGRES_DB`
   - `MC_POSTGRES_USER`
@@ -79,7 +79,7 @@ Run against an already running stack:
 CI-style (runtime booted separately, non-default API host):
 
 ```bash
-./infra/local-runtime/scripts/orchestration-smoke.py --skip-up --api-base http://127.0.0.1:5101
+./infra/local-runtime/scripts/orchestration-smoke.py --skip-up --api-base http://127.0.0.1:5000
 ```
 
 ## PostgreSQL backup/restore
@@ -125,5 +125,5 @@ CI-style (runtime booted separately, non-default API host):
 
 1. `docker compose -f infra/local-runtime/docker-compose.yml logs dapr-placement dapr-api dapr-web dapr-worker --tail=200`
 2. Confirm component files are mounted under `/components`.
-3. Check sidecar app binding ports (`--app-port`) match app services.
+3. Check sidecar app binding ports (`--app-port`) match app container ports (API 5100, Web 3000, Worker 8000).
 4. Run `./infra/local-runtime/up.sh` and verify no `Dapr metadata missing components` error is reported.

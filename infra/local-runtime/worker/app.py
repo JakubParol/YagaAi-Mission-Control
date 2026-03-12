@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-API_HEALTH_URL = os.environ.get("MC_WORKER_API_HEALTH_URL", "http://api:5001/healthz")
+API_HEALTH_URL = os.environ.get("MC_WORKER_API_HEALTH_URL", "http://api:5100/healthz")
 REDIS_HOST = os.environ.get("MC_WORKER_REDIS_HOST", "redis")
 REDIS_PORT = int(os.environ.get("MC_WORKER_REDIS_PORT", "6379"))
 WORKER_APP_PORT = int(os.environ.get("MC_WORKER_APP_PORT", "8000"))

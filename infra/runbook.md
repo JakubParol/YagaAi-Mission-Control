@@ -2,47 +2,47 @@
 
 ## Ports
 
-- DEV (host):
+- DEV (containers, local-runtime):
   - web: `3000`
   - api: `5000`
+  - postgres: `55432`
 - PROD (containers):
   - web: `3100`
   - api: `5100`
+  - postgres: `5432`
 
 ## ENV files
 
 - PROD runtime env (outside repo): `/etc/mission-control/prod.env`
   - bootstrap from: `infra/env/prod.env.example`
-- DEV sample env: `infra/env/dev.env.example`
+- DEV runtime env: `infra/local-runtime/.env` (template: `.env.example`)
 
-## DEV workflow (host-first)
+## DEV workflow (containerized local-runtime)
 
-### Start dependencies in docker
+### Start full DEV runtime
 
 ```bash
 cd /home/kuba/repos/mission-control
-# recommended helper (host-run API/Web; default dev postgres port 55432 to avoid clashes with prod 5432)
-MC_DEV_POSTGRES_PORT=55432 ./infra/dev/up-host-deps.sh
-
-# equivalent raw compose command
-MC_DEV_POSTGRES_PORT=55432 docker compose -f infra/dev/docker-compose.dev.yml up -d postgres redis worker dapr-placement dapr-worker
+./infra/local-runtime/up.sh
 ```
 
-### Run API hostowo
+### Stop DEV runtime
 
 ```bash
-cd /home/kuba/repos/mission-control/services/api
-MC_API_DB_ENGINE=postgres \
-MC_API_POSTGRES_DSN='postgresql://mission_control:mission_control_dev@127.0.0.1:55432/mission_control' \
-poetry run uvicorn app.main:app --reload --port 5000
+cd /home/kuba/repos/mission-control
+./infra/local-runtime/down.sh
 ```
 
-### Run WEB hostowo
+### Reset DEV runtime data (destructive)
 
 ```bash
-cd /home/kuba/repos/mission-control/apps/web
-API_URL=http://127.0.0.1:5000 NEXT_PUBLIC_API_URL=/api npm run dev -- --port 3000
+cd /home/kuba/repos/mission-control
+./infra/local-runtime/reset.sh
 ```
+
+### Optional host debugging (manual)
+
+If you want to debug API/Web outside containers, run host processes on different ports (e.g. `5001` / `3001`) to avoid collisions with DEV container ports.
 
 ## PROD workflow (full containers)
 
@@ -73,13 +73,6 @@ sudo systemctl stop mission-control-prod.service
 sudo systemctl status mission-control-prod.service --no-pager
 
 docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env ps
-```
-
-### DEV deps stop
-
-```bash
-cd /home/kuba/repos/mission-control
-MC_DEV_POSTGRES_PORT=55432 ./infra/dev/down-host-deps.sh
 ```
 
 ### Rollback

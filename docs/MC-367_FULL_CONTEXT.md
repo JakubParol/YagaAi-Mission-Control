@@ -181,8 +181,8 @@ _No tasks linked._
 
 Mission Control now runs with **two separated environments** plus local runtime:
 
-- **DEV**: `infra/dev/docker-compose.dev.yml` + `infra/env/dev.env.example`
-  - Host-run API/Web, dockerized postgres/redis/worker+dapr.
+- **DEV**: `infra/local-runtime/docker-compose.yml` + `infra/local-runtime/.env(.example)`
+  - Full containerized dev runtime (api/web/worker/redis/postgres + Dapr sidecars).
 - **PROD**: `infra/prod/docker-compose.prod.yml` + `/etc/mission-control/prod.env` (from `infra/env/prod.env.example`)
   - Full container stack, managed by `infra/systemd/mission-control-prod.service`.
 - **Local runtime**: `infra/local-runtime/docker-compose.yml` + `infra/local-runtime/.env(.example)`
