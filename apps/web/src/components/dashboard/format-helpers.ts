@@ -22,14 +22,18 @@ export function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
+const DASHBOARD_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "UTC",
+  timeZoneName: "short",
+});
+
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return DASHBOARD_DATE_FORMATTER.format(new Date(iso));
 }
 
 export function toDateStr(d: Date): string {
