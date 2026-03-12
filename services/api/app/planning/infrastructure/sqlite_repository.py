@@ -164,31 +164,56 @@ async def _insert_activity_log_event(
     except Exception as exc:
         if not _is_missing_activity_log_column_error(exc):
             raise
-        event_data_json = json.dumps(
-            {"scope": scope, "metadata": metadata, "occurred_at": occurred_at},
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        await db.execute(
-            """
-            INSERT INTO activity_log (
-              id, event_name, actor_id, actor_type,
-              entity_type, entity_id, message, event_data_json, created_at
+        try:
+            await db.execute(
+                """
+                INSERT INTO activity_log (
+                  id, event_name, actor_id, actor_type,
+                  entity_type, entity_id, metadata_json,
+                  occurred_at, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    event_id,
+                    event_name,
+                    actor_id,
+                    actor_type,
+                    entity_type,
+                    entity_id,
+                    metadata_json,
+                    occurred_at,
+                    occurred_at,
+                ],
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                event_id,
-                event_name,
-                actor_id,
-                actor_type or "system",
-                entity_type,
-                entity_id,
-                event_name,
-                event_data_json,
-                occurred_at,
-            ],
-        )
+        except Exception as exc2:
+            if not _is_missing_activity_log_column_error(exc2):
+                raise
+            event_data_json = json.dumps(
+                {"scope": scope, "metadata": metadata, "occurred_at": occurred_at},
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            await db.execute(
+                """
+                INSERT INTO activity_log (
+                  id, event_name, actor_id, actor_type,
+                  entity_type, entity_id, message, event_data_json, created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    event_id,
+                    event_name,
+                    actor_id,
+                    actor_type or "system",
+                    entity_type,
+                    entity_id,
+                    event_name,
+                    event_data_json,
+                    occurred_at,
+                ],
+            )
 
 
 async def _insert_assignment_event(

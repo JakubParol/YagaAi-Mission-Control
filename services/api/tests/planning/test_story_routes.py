@@ -467,6 +467,62 @@ def test_update_story_assignee_handles_activity_log_without_scope_json(
     assert payload["metadata"]["timestamp"]
 
 
+def test_update_story_assignee_handles_activity_log_with_only_scope_json_missing(
+    client, _setup_test_db
+) -> None:
+    story_id = client.post(
+        "/v1/planning/stories",
+        json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
+    ).json()["data"]["id"]
+
+    conn = sqlite3.connect(_setup_test_db)
+    conn.executescript(
+        """
+        ALTER TABLE activity_log RENAME TO activity_log_old;
+        CREATE TABLE activity_log (
+          id TEXT PRIMARY KEY,
+          event_name TEXT NOT NULL,
+          actor_id TEXT,
+          actor_type TEXT,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          metadata_json TEXT,
+          occurred_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        DROP TABLE activity_log_old;
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.patch(
+        f"/v1/planning/stories/{story_id}", json={"current_assignee_agent_id": "a1"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["current_assignee_agent_id"] == "a1"
+
+    conn = sqlite3.connect(_setup_test_db)
+    row = conn.execute(
+        """
+        SELECT metadata_json
+        FROM activity_log
+        WHERE entity_type = 'story' AND entity_id = ? AND event_name = 'planning.assignment.changed'
+        """,
+        (story_id,),
+    ).fetchone()
+    conn.close()
+
+    assert row is not None
+    payload = json.loads(row[0])
+    assert payload["work_item_key"] == "P1-1"
+    assert payload["assignee_agent"] == {"id": "a1"}
+    assert payload["previous_assignee"] is None
+    assert payload["causation_id"] == story_id
+    assert payload["correlation_id"]
+    assert payload["timestamp"]
+
+
 def test_update_story_same_assignee_is_noop_for_events(client, _setup_test_db) -> None:
     story_id = client.post(
         "/v1/planning/stories",
