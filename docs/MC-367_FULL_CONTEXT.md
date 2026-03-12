@@ -199,6 +199,7 @@ Removed obsolete infra artifacts that were stale after PostgreSQL/container migr
 - `infra/mission-control.service`
 - `infra/mission-control-api.service`
 
+These removals are complete in repo history; this section is retained as historical cleanup record.
 Documentation and references were updated accordingly (README, REPO_MAP, runtime notes).
 
 ## 7) Notes

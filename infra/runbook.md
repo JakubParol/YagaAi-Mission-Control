@@ -21,7 +21,11 @@
 
 ```bash
 cd /home/kuba/repos/mission-control
-docker compose -f infra/dev/docker-compose.dev.yml up -d postgres redis
+# recommended helper (host-run API/Web; default dev postgres port 55432 to avoid clashes with prod 5432)
+MC_DEV_POSTGRES_PORT=55432 ./infra/dev/up-host-deps.sh
+
+# equivalent raw compose command
+MC_DEV_POSTGRES_PORT=55432 docker compose -f infra/dev/docker-compose.dev.yml up -d postgres redis worker dapr-placement dapr-worker
 ```
 
 ### Run API hostowo
@@ -29,7 +33,7 @@ docker compose -f infra/dev/docker-compose.dev.yml up -d postgres redis
 ```bash
 cd /home/kuba/repos/mission-control/services/api
 MC_API_DB_ENGINE=postgres \
-MC_API_POSTGRES_DSN='postgresql://mission_control:mission_control_dev@127.0.0.1:5432/mission_control' \
+MC_API_POSTGRES_DSN='postgresql://mission_control:mission_control_dev@127.0.0.1:55432/mission_control' \
 poetry run uvicorn app.main:app --reload --port 5000
 ```
 
@@ -69,6 +73,13 @@ sudo systemctl stop mission-control-prod.service
 sudo systemctl status mission-control-prod.service --no-pager
 
 docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env ps
+```
+
+### DEV deps stop
+
+```bash
+cd /home/kuba/repos/mission-control
+MC_DEV_POSTGRES_PORT=55432 ./infra/dev/down-host-deps.sh
 ```
 
 ### Rollback
