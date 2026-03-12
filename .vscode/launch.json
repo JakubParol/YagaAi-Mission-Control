@@ -25,7 +25,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}/services/api",
       "module": "uvicorn",
-      "args": ["app.main:app", "--reload", "--port", "8080"],
+      "args": ["app.main:app", "--reload", "--port", "5001"],
       "env": {
         "MC_API_ENV": "dev"
       },
