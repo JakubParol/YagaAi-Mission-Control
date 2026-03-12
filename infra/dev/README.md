@@ -58,8 +58,12 @@ Override strategy:
 ## Lifecycle
 
 ```bash
-./infra/dev/down.sh   # stop runtime, preserve state
-./infra/dev/reset.sh  # stop runtime and remove volumes (fresh state)
+./infra/dev/down.sh         # stop runtime, preserve state
+./infra/dev/reset.sh        # stop runtime and remove volumes (fresh state)
+./infra/dev/rebuild-api.sh  # rebuild + recreate API (+ dapr-api)
+./infra/dev/rebuild-web.sh  # recreate WEB (+ dapr-web), useful after dependency changes
+./infra/dev/rebuild-worker.sh # recreate Worker (+ dapr-worker)
+./infra/dev/rebuild-all.sh  # rebuild/recreate full DEV stack
 ```
 
 ## Orchestration smoke suite
