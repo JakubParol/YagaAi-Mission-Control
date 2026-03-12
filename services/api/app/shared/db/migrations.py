@@ -372,7 +372,7 @@ def migrate_sqlite_or_raise(db_path: str) -> None:
                 raise RuntimeError(
                     "SQLite integrity check failed. "
                     f"quick_check={details}. "
-                    "Run backup/restore workflow in infra/local-runtime/scripts."
+                    "Run backup/restore workflow in infra/dev/scripts."
                 )
 
             _create_migration_ledger(db)

@@ -54,4 +54,4 @@ apps/cli/dist/
 .plans/
 
 # local runtime backups
-infra/local-runtime/backups/
+infra/dev/backups/

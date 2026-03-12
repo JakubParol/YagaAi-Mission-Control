@@ -11,8 +11,8 @@ mission-control/
 │   └── cli/                    # TypeScript CLI (mc)
 ├── services/
 │   └── api/                    # FastAPI REST API (Python)
-├── infra/                      # Runtime/deployment configs (dev/prod/local-runtime)
-│   └── local-runtime/          # Deterministic local Docker runtime + Dapr bootstrap
+├── infra/                      # Runtime/deployment configs (dev/prod)
+│   └── dev/                    # Deterministic DEV Docker runtime + Dapr bootstrap
 ├── data/                       # Legacy local artifacts (not runtime source of truth)
 └── docs/                       # Shared documentation
 ```
@@ -29,11 +29,11 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 | Database | PostgreSQL (Docker local/prod), SQLite compatibility paths in API |
 | External | Langfuse (LLM cost tracking) |
 
-## Getting Started (DEV, containerized local-runtime)
+## Getting Started (DEV, containerized runtime)
 
 ```bash
 cd /home/kuba/repos/mission-control
-./infra/local-runtime/up.sh
+./infra/dev/up.sh
 ```
 
 Default host ports:
@@ -45,7 +45,7 @@ Default host ports:
 Stop runtime:
 
 ```bash
-./infra/local-runtime/down.sh
+./infra/dev/down.sh
 ```
 
 ## Deployment (PROD, full containers)

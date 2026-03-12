@@ -38,7 +38,7 @@ Exit criteria:
 ### Phase 1 — Bootstrap PostgreSQL in local runtime
 
 Tasks:
-1. Add `postgres` service to `infra/local-runtime/docker-compose.yml`.
+1. Add `postgres` service to `infra/dev/docker-compose.yml`.
 2. Define env vars in `.env.example` and `.env`:
    - `MC_POSTGRES_HOST`
    - `MC_POSTGRES_PORT`
@@ -97,7 +97,7 @@ Exit criteria:
 
 Tasks:
 1. Update:
-   - `infra/local-runtime/README.md`
+   - `infra/dev/README.md`
    - `docs/MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md`
    - backup/restore procedures for Postgres.
 2. Add rollback path (Postgres -> SQLite fallback during grace period).

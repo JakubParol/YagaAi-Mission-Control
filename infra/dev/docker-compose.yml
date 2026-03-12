@@ -113,7 +113,7 @@ services:
       - /bin/sh
       - -lc
       - |
-        python /workspace/infra/local-runtime/worker/app.py
+        python /workspace/infra/dev/worker/app.py
     volumes:
       - ../../:/workspace
     depends_on:

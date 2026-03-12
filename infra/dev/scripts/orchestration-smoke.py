@@ -611,12 +611,12 @@ def main() -> int:
     parser.add_argument(
         "--runtime-dir",
         default=str(Path(__file__).resolve().parents[1]),
-        help="Path to infra/local-runtime",
+        help="Path to infra/dev",
     )
     parser.add_argument(
         "--skip-up",
         action="store_true",
-        help="Do not call infra/local-runtime/up.sh before executing scenarios",
+        help="Do not call infra/dev/up.sh before executing scenarios",
     )
     args = parser.parse_args()
 

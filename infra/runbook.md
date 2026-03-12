@@ -2,7 +2,7 @@
 
 ## Ports
 
-- DEV (containers, local-runtime):
+- DEV (containers, dev runtime):
   - web: `3000`
   - api: `5000`
   - postgres: `55432`
@@ -15,29 +15,29 @@
 
 - PROD runtime env (outside repo): `/etc/mission-control/prod.env`
   - bootstrap from: `infra/env/prod.env.example`
-- DEV runtime env: `infra/local-runtime/.env` (template: `.env.example`)
+- DEV runtime env: `infra/dev/.env` (template: `.env.example`)
 
-## DEV workflow (containerized local-runtime)
+## DEV workflow (containerized dev runtime)
 
 ### Start full DEV runtime
 
 ```bash
 cd /home/kuba/repos/mission-control
-./infra/local-runtime/up.sh
+./infra/dev/up.sh
 ```
 
 ### Stop DEV runtime
 
 ```bash
 cd /home/kuba/repos/mission-control
-./infra/local-runtime/down.sh
+./infra/dev/down.sh
 ```
 
 ### Reset DEV runtime data (destructive)
 
 ```bash
 cd /home/kuba/repos/mission-control
-./infra/local-runtime/reset.sh
+./infra/dev/reset.sh
 ```
 
 ### Optional host debugging (manual)

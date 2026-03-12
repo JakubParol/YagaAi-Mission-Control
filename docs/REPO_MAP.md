@@ -68,7 +68,7 @@ FastAPI REST service with three domain modules:
 
 | Path | Purpose |
 |---|---|
-| `infra/local-runtime/` | DEV full container runtime (api/web/worker/redis/postgres + Dapr sidecars) |
+| `infra/dev/` | DEV full container runtime (api/web/worker/redis/postgres + Dapr sidecars) |
 | `infra/prod/docker-compose.prod.yml` | Full PROD container stack |
 | `infra/systemd/mission-control-prod.service` | Systemd unit for PROD docker-compose stack |
 | `infra/runbook.md` | Operator runbook for DEV/PROD workflows |

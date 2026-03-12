@@ -143,7 +143,7 @@ Deliver a deterministic local-first orchestration runtime for Mission Control us
 
 | Task | Status | Priority | Title | Objective |
 |---|---|---:|---|---|
-| MC-455 | DONE | 1 | Implement deterministic orchestration smoke harness for local-runtime and CI | Add executable smoke entrypoint that runs end-to-end orchestration scenarios with stable setup and teardown semantics. |
+| MC-455 | DONE | 1 | Implement deterministic orchestration smoke harness for dev runtime and CI | Add executable smoke entrypoint that runs end-to-end orchestration scenarios with stable setup and teardown semantics. |
 | MC-456 | DONE | 2 | Add failure-path scenarios covering retry, dead-letter, and watchdog timeout recovery | Extend smoke suite with at least three deterministic fault scenarios validating critical orchestration resilience paths. |
 | MC-457 | DONE | 3 | Standardize smoke diagnostics and usage docs for daily operator workflows | Emit actionable failure diagnostics (scenario, service, correlation IDs) and document local/CI execution with expected runtime. |
 
@@ -181,11 +181,11 @@ _No tasks linked._
 
 Mission Control now runs with **two separated environments** plus local runtime:
 
-- **DEV**: `infra/local-runtime/docker-compose.yml` + `infra/local-runtime/.env(.example)`
+- **DEV**: `infra/dev/docker-compose.yml` + `infra/dev/.env(.example)`
   - Full containerized dev runtime (api/web/worker/redis/postgres + Dapr sidecars).
 - **PROD**: `infra/prod/docker-compose.prod.yml` + `/etc/mission-control/prod.env` (from `infra/env/prod.env.example`)
   - Full container stack, managed by `infra/systemd/mission-control-prod.service`.
-- **Local runtime**: `infra/local-runtime/docker-compose.yml` + `infra/local-runtime/.env(.example)`
+- **Local runtime**: `infra/dev/docker-compose.yml` + `infra/dev/.env(.example)`
   - Deterministic stack for end-to-end orchestration smoke scenarios.
 
 Database defaults in runtime configs are PostgreSQL (`MC_API_DB_ENGINE=postgres`, `MC_API_POSTGRES_DSN=...`).
@@ -194,8 +194,8 @@ Database defaults in runtime configs are PostgreSQL (`MC_API_DB_ENGINE=postgres`
 
 Removed obsolete infra artifacts that were stale after PostgreSQL/container migration:
 
-- `infra/local-runtime/scripts/sqlite-backup.sh`
-- `infra/local-runtime/scripts/sqlite-restore.sh`
+- `infra/dev/scripts/sqlite-backup.sh`
+- `infra/dev/scripts/sqlite-restore.sh`
 - `infra/mission-control.service`
 - `infra/mission-control-api.service`
 

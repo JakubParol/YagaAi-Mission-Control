@@ -91,7 +91,7 @@ services:
   worker:
     image: mission-control/worker:${MC_IMAGE_TAG:-latest}
     build:
-      context: ../local-runtime/worker
+      context: ../dev/worker
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
@@ -144,7 +144,7 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ../local-runtime/dapr/components:/components:ro
+      - ../dev/dapr/components:/components:ro
 
   dapr-web:
     image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
@@ -170,7 +170,7 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ../local-runtime/dapr/components:/components:ro
+      - ../dev/dapr/components:/components:ro
 
   dapr-worker:
     image: daprio/daprd:${MC_DAPR_VERSION:-1.14.4}
@@ -196,7 +196,7 @@ services:
       - --resources-path
       - /components
     volumes:
-      - ../local-runtime/dapr/components:/components:ro
+      - ../dev/dapr/components:/components:ro
 
 volumes:
   mission-control-prod-postgres-data:

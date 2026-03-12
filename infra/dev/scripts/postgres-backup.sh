@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-RUNTIME_DIR="$ROOT_DIR/infra/local-runtime"
+RUNTIME_DIR="$ROOT_DIR/infra/dev"
 BACKUP_DIR="$RUNTIME_DIR/backups"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_PATH="$BACKUP_DIR/mission-control-postgres-${TIMESTAMP}.sql"
@@ -12,7 +12,7 @@ mkdir -p "$BACKUP_DIR"
 cd "$RUNTIME_DIR"
 
 if ! docker compose --env-file .env ps --status running postgres >/dev/null 2>&1; then
-  echo "postgres service is not running. Start runtime with ./infra/local-runtime/up.sh" >&2
+  echo "postgres service is not running. Start runtime with ./infra/dev/up.sh" >&2
   exit 1
 fi
 

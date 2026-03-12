@@ -1291,7 +1291,7 @@ Contract guarantees:
 
 #### `GET /v1/orchestration/metrics` — Get orchestration health metrics
 
-Returns local-runtime diagnostics for queue health and failure paths.
+Returns DEV runtime diagnostics for queue health and failure paths.
 
 Response `200`:
 ```jsonc

@@ -13,12 +13,12 @@ if [ ! -f "$BACKUP_FILE" ]; then
 fi
 
 ROOT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-RUNTIME_DIR="$ROOT_DIR/infra/local-runtime"
+RUNTIME_DIR="$ROOT_DIR/infra/dev"
 
 cd "$RUNTIME_DIR"
 
 if ! docker compose --env-file .env ps --status running postgres >/dev/null 2>&1; then
-  echo "postgres service is not running. Start runtime with ./infra/local-runtime/up.sh" >&2
+  echo "postgres service is not running. Start runtime with ./infra/dev/up.sh" >&2
   exit 1
 fi
 

@@ -26,7 +26,7 @@ Runtime bind policy (host): localhost-only for app endpoints, exposed externally
 
 ---
 
-## Development (local-runtime stack)
+## Development (dev stack)
 
 Target model:
 

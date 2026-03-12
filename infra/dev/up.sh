@@ -2,12 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-RUNTIME_DIR="$ROOT_DIR/infra/local-runtime"
+RUNTIME_DIR="$ROOT_DIR/infra/dev"
 EXPECTED_DAPR_COMPONENTS=("local-pubsub" "local-statestore" "local-secretstore")
 
 if [ ! -f "$RUNTIME_DIR/.env" ]; then
   cp "$RUNTIME_DIR/.env.example" "$RUNTIME_DIR/.env"
-  echo "Created infra/local-runtime/.env from template"
+  echo "Created infra/dev/.env from template"
 fi
 
 cd "$RUNTIME_DIR"

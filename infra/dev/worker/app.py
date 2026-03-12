@@ -72,7 +72,7 @@ def _publish_orchestration_event() -> None:
         "correlation_id": str(uuid.uuid4()),
         "occurred_at": _iso_now(),
         "type": "orchestration.run.submit.accepted",
-        "payload": {"source": "local-runtime-worker", "status": "heartbeat"},
+        "payload": {"source": "dev-runtime-worker", "status": "heartbeat"},
     }
 
     _post_json(f"{DAPR_HTTP_URL}/v1.0/publish/{PUBSUB_NAME}/{PUBSUB_TOPIC}", event)
