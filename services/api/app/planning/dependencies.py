@@ -12,15 +12,15 @@ from app.planning.application.project_service import ProjectService
 from app.planning.application.story_service import StoryService
 from app.planning.application.task_service import TaskService
 from app.planning.infrastructure.openclaw_source import FileOpenClawAgentSource
-from app.planning.infrastructure.sqlite_repository import (
-    SqliteActivityLogRepository,
-    SqliteAgentRepository,
-    SqliteBacklogRepository,
-    SqliteEpicRepository,
-    SqliteLabelRepository,
-    SqliteProjectRepository,
-    SqliteStoryRepository,
-    SqliteTaskRepository,
+from app.planning.infrastructure.repository import (
+    DbActivityLogRepository,
+    DbAgentRepository,
+    DbBacklogRepository,
+    DbEpicRepository,
+    DbLabelRepository,
+    DbProjectRepository,
+    DbStoryRepository,
+    DbTaskRepository,
 )
 from app.shared.api.deps import get_db
 from app.shared.api.errors import NotFoundError
@@ -30,8 +30,8 @@ async def get_project_service(
     db: Any = Depends(get_db),
 ) -> ProjectService:
     return ProjectService(
-        project_repo=SqliteProjectRepository(db),
-        backlog_repo=SqliteBacklogRepository(db),
+        project_repo=DbProjectRepository(db),
+        backlog_repo=DbBacklogRepository(db),
     )
 
 
@@ -39,7 +39,7 @@ async def get_agent_service(
     db: Any = Depends(get_db),
 ) -> AgentService:
     return AgentService(
-        repo=SqliteAgentRepository(db),
+        repo=DbAgentRepository(db),
         openclaw_source=FileOpenClawAgentSource(settings.openclaw_config_path),
     )
 
@@ -47,43 +47,43 @@ async def get_agent_service(
 async def get_label_service(
     db: Any = Depends(get_db),
 ) -> LabelService:
-    return LabelService(SqliteLabelRepository(db))
+    return LabelService(DbLabelRepository(db))
 
 
 async def get_epic_service(
     db: Any = Depends(get_db),
 ) -> EpicService:
-    return EpicService(SqliteEpicRepository(db))
+    return EpicService(DbEpicRepository(db))
 
 
 async def get_story_service(
     db: Any = Depends(get_db),
 ) -> StoryService:
-    return StoryService(SqliteStoryRepository(db))
+    return StoryService(DbStoryRepository(db))
 
 
 async def get_task_service(
     db: Any = Depends(get_db),
 ) -> TaskService:
     return TaskService(
-        task_repo=SqliteTaskRepository(db),
+        task_repo=DbTaskRepository(db),
     )
 
 
 async def get_backlog_service(
     db: Any = Depends(get_db),
 ) -> BacklogService:
-    return BacklogService(SqliteBacklogRepository(db))
+    return BacklogService(DbBacklogRepository(db))
 
 
 async def get_epic_overview_action_service(
     db: Any = Depends(get_db),
 ) -> EpicOverviewActionService:
     return EpicOverviewActionService(
-        epic_service=EpicService(SqliteEpicRepository(db)),
-        story_service=StoryService(SqliteStoryRepository(db)),
-        backlog_service=BacklogService(SqliteBacklogRepository(db)),
-        activity_log_repo=SqliteActivityLogRepository(db),
+        epic_service=EpicService(DbEpicRepository(db)),
+        story_service=StoryService(DbStoryRepository(db)),
+        backlog_service=BacklogService(DbBacklogRepository(db)),
+        activity_log_repo=DbActivityLogRepository(db),
     )
 
 
@@ -94,7 +94,7 @@ async def resolve_project_key(
 ) -> str | None:
     """Resolve project_key to project_id. project_key takes precedence."""
     if project_key is not None:
-        repo = SqliteProjectRepository(db)
+        repo = DbProjectRepository(db)
         project = await repo.get_by_key(project_key)
         if project is None:
             raise NotFoundError(f"Project with key '{project_key}' not found")
@@ -109,7 +109,7 @@ async def resolve_epic_key(
 ) -> str | None:
     """Resolve epic_key to epic_id. epic_key takes precedence."""
     if epic_key is not None:
-        repo = SqliteEpicRepository(db)
+        repo = DbEpicRepository(db)
         epic = await repo.get_by_key(epic_key)
         if epic is None:
             raise NotFoundError(f"Epic with key '{epic_key}' not found")
@@ -124,7 +124,7 @@ async def resolve_story_key(
 ) -> str | None:
     """Resolve story_key to story_id. story_key takes precedence."""
     if story_key is not None:
-        repo = SqliteStoryRepository(db)
+        repo = DbStoryRepository(db)
         story = await repo.get_by_key(story_key)
         if story is None:
             raise NotFoundError(f"Story with key '{story_key}' not found")

@@ -209,14 +209,20 @@ def _setup_test_db(tmp_path, monkeypatch):
 
         CREATE TABLE activity_log (
           id TEXT PRIMARY KEY,
-          event_name TEXT NOT NULL,
-          actor_id TEXT,
-          actor_type TEXT,
+          project_id TEXT,
           entity_type TEXT NOT NULL,
           entity_id TEXT NOT NULL,
-          scope_json TEXT,
-          metadata_json TEXT,
-          occurred_at TEXT NOT NULL,
+          epic_id TEXT,
+          story_id TEXT,
+          task_id TEXT,
+          backlog_id TEXT,
+          actor_type TEXT NOT NULL,
+          actor_id TEXT,
+          session_id TEXT,
+          run_id TEXT,
+          event_name TEXT NOT NULL,
+          message TEXT,
+          event_data_json TEXT,
           created_at TEXT NOT NULL
         );
 
@@ -224,7 +230,7 @@ def _setup_test_db(tmp_path, monkeypatch):
           ON task_assignments(task_id) WHERE unassigned_at IS NULL;
 
         CREATE INDEX IF NOT EXISTS idx_activity_log_entity
-          ON activity_log(entity_type, entity_id, occurred_at);
+          ON activity_log(entity_type, entity_id, created_at);
 
         CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
           ON projects(is_default) WHERE is_default = 1;
@@ -284,6 +290,7 @@ def _setup_test_db(tmp_path, monkeypatch):
     from app.config import settings
 
     monkeypatch.setattr(settings, "db_path", db_path)
+    monkeypatch.setattr(settings, "db_engine", "sqlite")
     return db_path
 
 

@@ -2,8 +2,6 @@ import json
 from typing import Any
 from uuid import uuid4
 
-import aiosqlite
-
 from app.planning.application.ports import (
     ActivityLogRepository,
     AgentRepository,
@@ -36,6 +34,9 @@ from app.planning.domain.models import (
 )
 from app.shared.api.errors import ValidationError
 from app.shared.utils import utc_now
+
+DbConnection = Any
+DbRow = Any
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -110,21 +111,8 @@ def _assignment_payload(agent_id: str | None) -> dict[str, str] | None:
     return {"id": agent_id}
 
 
-def _is_missing_activity_log_column_error(exc: Exception) -> bool:
-    message = str(exc).lower()
-    has_missing_column_marker = (
-        "undefinedcolumn" in message
-        or "does not exist" in message
-        or "no such column" in message
-        or "has no column named" in message
-    )
-    if not has_missing_column_marker:
-        return False
-    return "scope_json" in message or "metadata_json" in message or "occurred_at" in message
-
-
 async def _insert_activity_log_event(
-    db: aiosqlite.Connection,
+    db: DbConnection,
     *,
     event_id: str,
     event_name: str,
@@ -136,88 +124,35 @@ async def _insert_activity_log_event(
     metadata: dict[str, Any] | None,
     occurred_at: str,
 ) -> None:
-    scope_json = json.dumps(scope) if scope is not None else None
-    metadata_json = json.dumps(metadata) if metadata is not None else None
-    try:
-        await db.execute(
-            """
-            INSERT INTO activity_log (
-              id, event_name, actor_id, actor_type,
-              entity_type, entity_id, scope_json, metadata_json,
-              occurred_at, created_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                event_id,
-                event_name,
-                actor_id,
-                actor_type,
-                entity_type,
-                entity_id,
-                scope_json,
-                metadata_json,
-                occurred_at,
-                occurred_at,
-            ],
+    event_data_json = json.dumps(
+        {"metadata": metadata, "occurred_at": occurred_at, "scope": scope},
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    await db.execute(
+        """
+        INSERT INTO activity_log (
+          id, event_name, actor_id, actor_type,
+          entity_type, entity_id, message, event_data_json, created_at
         )
-    except Exception as exc:
-        if not _is_missing_activity_log_column_error(exc):
-            raise
-        try:
-            await db.execute(
-                """
-                INSERT INTO activity_log (
-                  id, event_name, actor_id, actor_type,
-                  entity_type, entity_id, metadata_json,
-                  occurred_at, created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    event_id,
-                    event_name,
-                    actor_id,
-                    actor_type,
-                    entity_type,
-                    entity_id,
-                    metadata_json,
-                    occurred_at,
-                    occurred_at,
-                ],
-            )
-        except Exception as exc2:
-            if not _is_missing_activity_log_column_error(exc2):
-                raise
-            event_data_json = json.dumps(
-                {"scope": scope, "metadata": metadata, "occurred_at": occurred_at},
-                separators=(",", ":"),
-                sort_keys=True,
-            )
-            await db.execute(
-                """
-                INSERT INTO activity_log (
-                  id, event_name, actor_id, actor_type,
-                  entity_type, entity_id, message, event_data_json, created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    event_id,
-                    event_name,
-                    actor_id,
-                    actor_type or "system",
-                    entity_type,
-                    entity_id,
-                    event_name,
-                    event_data_json,
-                    occurred_at,
-                ],
-            )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            event_id,
+            event_name,
+            actor_id,
+            actor_type or "system",
+            entity_type,
+            entity_id,
+            event_name,
+            event_data_json,
+            occurred_at,
+        ],
+    )
 
 
 async def _insert_assignment_event(
-    db: aiosqlite.Connection,
+    db: DbConnection,
     *,
     actor_id: str | None,
     entity_type: str,
@@ -275,7 +210,7 @@ def _parse_sort_mapped(raw: str, allowed: dict[str, str], default_sql: str) -> s
     return ", ".join(clauses) if clauses else default_sql
 
 
-def _row_to_project(row: aiosqlite.Row) -> Project:
+def _row_to_project(row: DbRow) -> Project:
     return Project(
         id=row["id"],
         key=row["key"],
@@ -291,7 +226,7 @@ def _row_to_project(row: aiosqlite.Row) -> Project:
     )
 
 
-def _row_to_epic(row: aiosqlite.Row) -> Epic:
+def _row_to_epic(row: DbRow) -> Epic:
     return Epic(
         id=row["id"],
         project_id=row["project_id"],
@@ -313,7 +248,7 @@ def _row_to_epic(row: aiosqlite.Row) -> Epic:
     )
 
 
-def _row_to_epic_overview(row: aiosqlite.Row) -> EpicOverview:
+def _row_to_epic_overview(row: DbRow) -> EpicOverview:
     return EpicOverview(
         epic_key=row["epic_key"],
         title=row["title"],
@@ -330,7 +265,7 @@ def _row_to_epic_overview(row: aiosqlite.Row) -> EpicOverview:
     )
 
 
-def _row_to_story(row: aiosqlite.Row) -> Story:
+def _row_to_story(row: DbRow) -> Story:
     current_assignee_agent_id = (
         row["current_assignee_agent_id"] if "current_assignee_agent_id" in row.keys() else None
     )
@@ -358,7 +293,7 @@ def _row_to_story(row: aiosqlite.Row) -> Story:
     )
 
 
-def _row_to_agent(row: aiosqlite.Row) -> Agent:
+def _row_to_agent(row: DbRow) -> Agent:
     avatar = row["avatar"] if "avatar" in row.keys() else None
     last_name = row["last_name"] if "last_name" in row.keys() else None
     initials = row["initials"] if "initials" in row.keys() else None
@@ -380,7 +315,7 @@ def _row_to_agent(row: aiosqlite.Row) -> Agent:
     )
 
 
-def _row_to_label(row: aiosqlite.Row) -> Label:
+def _row_to_label(row: DbRow) -> Label:
     return Label(
         id=row["id"],
         project_id=row["project_id"],
@@ -390,7 +325,7 @@ def _row_to_label(row: aiosqlite.Row) -> Label:
     )
 
 
-def _row_to_backlog(row: aiosqlite.Row) -> Backlog:
+def _row_to_backlog(row: DbRow) -> Backlog:
     return Backlog(
         id=row["id"],
         project_id=row["project_id"],
@@ -410,7 +345,7 @@ def _row_to_backlog(row: aiosqlite.Row) -> Backlog:
     )
 
 
-def _row_to_task(row: aiosqlite.Row) -> Task:
+def _row_to_task(row: DbRow) -> Task:
     return Task(
         id=row["id"],
         project_id=row["project_id"],
@@ -436,7 +371,7 @@ def _row_to_task(row: aiosqlite.Row) -> Task:
     )
 
 
-def _row_to_assignment(row: aiosqlite.Row) -> TaskAssignment:
+def _row_to_assignment(row: DbRow) -> TaskAssignment:
     return TaskAssignment(
         id=row["id"],
         task_id=row["task_id"],
@@ -448,29 +383,29 @@ def _row_to_assignment(row: aiosqlite.Row) -> TaskAssignment:
     )
 
 
-async def _fetch_count(db: aiosqlite.Connection, sql: str, params: list[Any]) -> int:
+async def _fetch_count(db: DbConnection, sql: str, params: list[Any]) -> int:
     cursor = await db.execute(sql, params)
     row = await cursor.fetchone()
     return row[0] if row else 0
 
 
-async def _fetch_one(db: aiosqlite.Connection, sql: str, params: list[Any]) -> aiosqlite.Row | None:
+async def _fetch_one(db: DbConnection, sql: str, params: list[Any]) -> DbRow | None:
     cursor = await db.execute(sql, params)
     return await cursor.fetchone()
 
 
-async def _fetch_all(db: aiosqlite.Connection, sql: str, params: list[Any]) -> list[aiosqlite.Row]:
+async def _fetch_all(db: DbConnection, sql: str, params: list[Any]) -> list[DbRow]:
     cursor = await db.execute(sql, params)
     return list(await cursor.fetchall())
 
 
-async def _exists(db: aiosqlite.Connection, sql: str, params: list[Any]) -> bool:
+async def _exists(db: DbConnection, sql: str, params: list[Any]) -> bool:
     cursor = await db.execute(sql, params)
     row = await cursor.fetchone()
     return row is not None
 
 
-async def _allocate_next_key(db: aiosqlite.Connection, project_id: str) -> str:
+async def _allocate_next_key(db: DbConnection, project_id: str) -> str:
     """Allocate the next sequential key for a project.
 
     Reads the project key prefix and increments the shared counter atomically
@@ -500,7 +435,7 @@ async def _allocate_next_key(db: aiosqlite.Connection, project_id: str) -> str:
     return f"{project_key}-{next_num}"
 
 
-async def _project_exists(db: aiosqlite.Connection, project_id: str) -> bool:
+async def _project_exists(db: DbConnection, project_id: str) -> bool:
     return await _exists(db, "SELECT 1 FROM projects WHERE id = ?", [project_id])
 
 
@@ -509,8 +444,8 @@ async def _project_exists(db: aiosqlite.Connection, project_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-class SqliteProjectRepository(ProjectRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbProjectRepository(ProjectRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def _unset_default_projects(self, *, except_project_id: str | None = None) -> None:
@@ -630,8 +565,8 @@ class SqliteProjectRepository(ProjectRepository):
 # ---------------------------------------------------------------------------
 
 
-class SqliteEpicRepository(EpicRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbEpicRepository(EpicRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def list_all(
@@ -860,8 +795,8 @@ class SqliteEpicRepository(EpicRepository):
 # ---------------------------------------------------------------------------
 
 
-class SqliteStoryRepository(StoryRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbStoryRepository(StoryRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def list_all(
@@ -1100,8 +1035,8 @@ class SqliteStoryRepository(StoryRepository):
 # ---------------------------------------------------------------------------
 
 
-class SqliteAgentRepository(AgentRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbAgentRepository(AgentRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def list_all(
@@ -1220,8 +1155,8 @@ class SqliteAgentRepository(AgentRepository):
 # ---------------------------------------------------------------------------
 
 
-class SqliteLabelRepository(LabelRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbLabelRepository(LabelRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def list_all(
@@ -1302,8 +1237,8 @@ class SqliteLabelRepository(LabelRepository):
 # ---------------------------------------------------------------------------
 
 
-class SqliteBacklogRepository(BacklogRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbBacklogRepository(BacklogRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def list_all(
@@ -1919,8 +1854,8 @@ class SqliteBacklogRepository(BacklogRepository):
 # ---------------------------------------------------------------------------
 
 
-class SqliteActivityLogRepository(ActivityLogRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbActivityLogRepository(ActivityLogRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def log_event(
@@ -1951,8 +1886,8 @@ class SqliteActivityLogRepository(ActivityLogRepository):
         await self._db.commit()
 
 
-class SqliteTaskRepository(TaskRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+class DbTaskRepository(TaskRepository):
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def list_all(

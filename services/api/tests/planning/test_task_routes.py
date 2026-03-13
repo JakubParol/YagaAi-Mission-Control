@@ -548,7 +548,7 @@ def test_assign_agent_emits_activity_event(client, _setup_test_db) -> None:
     conn = sqlite3.connect(_setup_test_db)
     row = conn.execute(
         """
-        SELECT metadata_json
+        SELECT event_data_json
         FROM activity_log
         WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
         ORDER BY created_at DESC
@@ -560,12 +560,12 @@ def test_assign_agent_emits_activity_event(client, _setup_test_db) -> None:
 
     assert row is not None
     payload = json.loads(row[0])
-    assert payload["work_item_key"] == "P1-1"
-    assert payload["assignee_agent"] == {"id": "a1"}
-    assert payload["previous_assignee"] is None
-    assert payload["correlation_id"]
-    assert payload["causation_id"] == task_id
-    assert payload["timestamp"]
+    assert payload["metadata"]["work_item_key"] == "P1-1"
+    assert payload["metadata"]["assignee_agent"] == {"id": "a1"}
+    assert payload["metadata"]["previous_assignee"] is None
+    assert payload["metadata"]["correlation_id"]
+    assert payload["metadata"]["causation_id"] == task_id
+    assert payload["metadata"]["timestamp"]
 
 
 def test_assign_agent_replaces_previous(client) -> None:
@@ -602,7 +602,7 @@ def test_assign_agent_event_reassign_includes_previous_assignee(client, _setup_t
     conn = sqlite3.connect(_setup_test_db)
     row = conn.execute(
         """
-        SELECT metadata_json
+        SELECT event_data_json
         FROM activity_log
         WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
         ORDER BY created_at DESC
@@ -614,8 +614,8 @@ def test_assign_agent_event_reassign_includes_previous_assignee(client, _setup_t
 
     assert row is not None
     payload = json.loads(row[0])
-    assert payload["assignee_agent"] == {"id": "a2"}
-    assert payload["previous_assignee"] == {"id": "a1"}
+    assert payload["metadata"]["assignee_agent"] == {"id": "a2"}
+    assert payload["metadata"]["previous_assignee"] == {"id": "a1"}
 
 
 def test_assign_same_agent_twice_conflict(client) -> None:
