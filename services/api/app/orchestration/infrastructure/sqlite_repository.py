@@ -17,12 +17,13 @@ from app.orchestration.domain.models import (
     TimelineEntryReadModel,
     TransitionDecision,
 )
+from app.shared.db.adapter import SqlTextSession
 
 DbConnection: TypeAlias = Any
 
 
-class SqliteOrchestrationRepository(OrchestrationRepository):
-    def __init__(self, db: DbConnection) -> None:
+class DbOrchestrationRepository(OrchestrationRepository):
+    def __init__(self, db: SqlTextSession | Any) -> None:
         self._db = db
 
     async def create_command_with_outbox(
@@ -683,12 +684,13 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             status_value,
             status_value,
         )
+
         count_cursor = await self._db.execute(
             """
             SELECT COUNT(*)
             FROM orchestration_runs r
-            WHERE (? IS NULL OR r.run_id = ?)
-              AND (? IS NULL OR r.status = ?)
+            WHERE (CAST(? AS TEXT) IS NULL OR r.run_id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR r.status = ?)
             """,
             condition_params,
         )
@@ -722,8 +724,8 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
               r.created_at,
               r.updated_at
             FROM orchestration_runs r
-            WHERE (? IS NULL OR r.run_id = ?)
-              AND (? IS NULL OR r.status = ?)
+            WHERE (CAST(? AS TEXT) IS NULL OR r.run_id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR r.status = ?)
             ORDER BY r.updated_at DESC, r.run_id DESC
             LIMIT ? OFFSET ?
             """,
@@ -787,16 +789,17 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             occurred_before,
             occurred_before,
         )
+
         count_cursor = await self._db.execute(
             """
             SELECT COUNT(*)
             FROM orchestration_run_timeline t
             INNER JOIN orchestration_runs r ON r.run_id = t.run_id
-            WHERE (? IS NULL OR t.run_id = ?)
-              AND (? IS NULL OR r.status = ?)
-              AND (? IS NULL OR t.event_type = ?)
-              AND (? IS NULL OR t.occurred_at >= ?)
-              AND (? IS NULL OR t.occurred_at <= ?)
+            WHERE (CAST(? AS TEXT) IS NULL OR t.run_id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR r.status = ?)
+              AND (CAST(? AS TEXT) IS NULL OR t.event_type = ?)
+              AND (CAST(? AS TEXT) IS NULL OR t.occurred_at >= ?)
+              AND (CAST(? AS TEXT) IS NULL OR t.occurred_at <= ?)
             """,
             condition_params,
         )
@@ -823,11 +826,11 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
               t.created_at
             FROM orchestration_run_timeline t
             INNER JOIN orchestration_runs r ON r.run_id = t.run_id
-            WHERE (? IS NULL OR t.run_id = ?)
-              AND (? IS NULL OR r.status = ?)
-              AND (? IS NULL OR t.event_type = ?)
-              AND (? IS NULL OR t.occurred_at >= ?)
-              AND (? IS NULL OR t.occurred_at <= ?)
+            WHERE (CAST(? AS TEXT) IS NULL OR t.run_id = ?)
+              AND (CAST(? AS TEXT) IS NULL OR r.status = ?)
+              AND (CAST(? AS TEXT) IS NULL OR t.event_type = ?)
+              AND (CAST(? AS TEXT) IS NULL OR t.occurred_at >= ?)
+              AND (CAST(? AS TEXT) IS NULL OR t.occurred_at <= ?)
             ORDER BY t.occurred_at DESC, t.id DESC
             LIMIT ? OFFSET ?
             """,
@@ -994,3 +997,6 @@ class SqliteOrchestrationRepository(OrchestrationRepository):
             watchdog_interventions=watchdog_interventions,
             run_latencies_ms=run_latencies_ms,
         )
+
+
+SqliteOrchestrationRepository = DbOrchestrationRepository

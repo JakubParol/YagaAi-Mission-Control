@@ -14,15 +14,15 @@ fi
 
 cd "$REPO_ROOT"
 
-CURRENT_SHA="$(git rev-parse --short HEAD)"
-PREVIOUS_SHA="$(git rev-parse --short HEAD~1 2>/dev/null || echo "$CURRENT_SHA")"
+CURRENT_SHA="$(git -c safe.directory="$REPO_ROOT" rev-parse --short HEAD)"
+PREVIOUS_SHA="$(git -c safe.directory="$REPO_ROOT" rev-parse --short HEAD~1 2>/dev/null || echo "$CURRENT_SHA")"
 
 echo "[INFO] Deploying commit $CURRENT_SHA"
 
 echo "[INFO] Building production images..."
 DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" build
 
-MC_IMAGE_TAG="$CURRENT_SHA" "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$COMPOSE_FILE" "$PROD_ENV"
+MC_IMAGE_TAG="$CURRENT_SHA" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$COMPOSE_FILE" "$PROD_ENV"
 
 echo "[INFO] Starting/updating production stack..."
 MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait

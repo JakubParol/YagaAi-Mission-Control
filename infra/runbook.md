@@ -17,6 +17,28 @@
   - bootstrap from: `infra/env/prod.env.example`
 - DEV runtime env: `infra/dev/.env` (template: `.env.example`)
 
+## Fresh Ubuntu bootstrap
+
+```bash
+cd /home/kuba/repos/mission-control
+bash ./install.sh
+```
+
+What it does:
+
+- installs Docker + Compose and Node.js when missing
+- creates `infra/dev/.env` and `/etc/mission-control/prod.env` when missing
+- builds and installs a global `mc` wrapper in `/usr/local/bin/mc`
+- configures `mc` to target PROD by default via `MC_API_BASE_URL=http://127.0.0.1:5100`
+- installs and enables `mission-control-dev.service` and `mission-control-prod.service`
+- brings up both DEV and PROD stacks once during bootstrap
+
+For DEV CLI calls after bootstrap, override the target explicitly:
+
+```bash
+mc --api-base http://127.0.0.1:5000 health
+```
+
 ## DEV workflow (containerized dev runtime)
 
 ### Start full DEV runtime
@@ -35,12 +57,16 @@ cd /home/kuba/repos/mission-control
 
 ### Autostart DEV po restarcie VM (systemd)
 
+Preferred path on fresh machines: `bash ./install.sh`
+
 ```bash
 sudo cp /home/kuba/repos/mission-control/infra/systemd/mission-control-dev.service /etc/systemd/system/mission-control-dev.service
 sudo systemctl daemon-reload
 sudo systemctl enable mission-control-dev.service
 sudo systemctl start mission-control-dev.service
 ```
+
+The checked-in unit file is a path-specific example. If your repo is not under `/home/kuba/repos/mission-control`, adjust paths or use `install.sh`, which renders the unit from the current repo location.
 
 Weryfikacja:
 
@@ -73,6 +99,8 @@ If you want to debug API/Web outside containers, run host processes on different
 
 ### One-time systemd install
 
+Preferred path on fresh machines: `bash ./install.sh`
+
 ```bash
 sudo mkdir -p /etc/mission-control
 sudo cp /home/kuba/repos/mission-control/infra/env/prod.env.example /etc/mission-control/prod.env
@@ -82,6 +110,8 @@ sudo cp /home/kuba/repos/mission-control/infra/systemd/mission-control-prod.serv
 sudo systemctl daemon-reload
 sudo systemctl enable mission-control-prod.service
 ```
+
+The checked-in unit file is a path-specific example. If your repo is not under `/home/kuba/repos/mission-control`, adjust paths or use `install.sh`, which renders the unit from the current repo location.
 
 ### Deploy
 

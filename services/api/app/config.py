@@ -2,10 +2,11 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load local env files into os.environ so both MC_API_* (pydantic prefix) and
-# shared vars (LANGFUSE_*, OPENCLAW_CONFIG_PATH, MC_POSTGRES_DSN) are available.
+# shared vars (LANGFUSE_*, OPENCLAW_CONFIG_PATH) are available.
 #
 # Precedence:
 # 1) Process env (e.g. systemd EnvironmentFile in production)
@@ -21,8 +22,9 @@ class Settings(BaseSettings):
     env: str = "dev"
     log_level: str = "INFO"
 
-    postgres_dsn: str = ""
-    postgres_pool_max_size: int = 10
+    database_url: str = ""
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
     openclaw_config_path: str = str(Path.home() / ".openclaw" / "openclaw.json")
     langfuse_host: str = ""
     langfuse_public_key: str = ""
@@ -45,10 +47,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 
-    def model_post_init(self, __context: object) -> None:
-        if not self.postgres_dsn:
-            self.postgres_dsn = os.environ.get("MC_POSTGRES_DSN", "")
-
+    @model_validator(mode="after")
+    def resolve_shared_env_vars(self) -> "Settings":
         if not self.openclaw_config_path:
             self.openclaw_config_path = os.environ.get(
                 "OPENCLAW_CONFIG_PATH", str(Path.home() / ".openclaw" / "openclaw.json")
@@ -60,13 +60,23 @@ class Settings(BaseSettings):
         if not self.langfuse_secret_key:
             self.langfuse_secret_key = os.environ.get("LANGFUSE_SECRET_KEY", "")
 
-        if not self.postgres_dsn:
-            msg = "MC_API_POSTGRES_DSN or MC_POSTGRES_DSN must be set"
+        if not self.database_url:
+            msg = "MC_API_DATABASE_URL must be set"
             raise ValueError(msg)
 
-        if self.postgres_pool_max_size < 1:
-            msg = "MC_API_POSTGRES_POOL_MAX_SIZE must be >= 1"
+        if not self.database_url.startswith("postgresql+psycopg://"):
+            msg = "MC_API_DATABASE_URL must use the postgresql+psycopg scheme"
             raise ValueError(msg)
+
+        if self.db_pool_size < 1:
+            msg = "MC_API_DB_POOL_SIZE must be >= 1"
+            raise ValueError(msg)
+
+        if self.db_max_overflow < 0:
+            msg = "MC_API_DB_MAX_OVERFLOW must be >= 0"
+            raise ValueError(msg)
+
+        return self
 
 
 settings = Settings()

@@ -9,8 +9,8 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/home/kuba/repos/mission-control
 EnvironmentFile=/etc/mission-control/prod.env
-ExecStartPre=/usr/bin/bash -lc '/home/kuba/repos/mission-control/infra/scripts/run-api-migrations.sh /home/kuba/repos/mission-control/infra/prod/docker-compose.prod.yml /etc/mission-control/prod.env'
-ExecStart=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env up -d --remove-orphans
+ExecStartPre=/usr/bin/bash -lc '/usr/bin/bash /home/kuba/repos/mission-control/infra/scripts/run-api-migrations.sh /home/kuba/repos/mission-control/infra/prod/docker-compose.prod.yml /etc/mission-control/prod.env'
+ExecStart=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env up -d --remove-orphans --wait
 ExecStop=/usr/bin/docker compose -f /home/kuba/repos/mission-control/infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env down
 TimeoutStartSec=0
 

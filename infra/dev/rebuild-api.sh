@@ -14,7 +14,7 @@ cd "$RUNTIME_DIR"
 echo "Building API image..."
 docker compose --env-file .env build api
 
-"$ROOT_DIR/infra/scripts/run-api-migrations.sh" "$RUNTIME_DIR/docker-compose.yml" "$RUNTIME_DIR/.env"
+bash "$ROOT_DIR/infra/scripts/run-api-migrations.sh" "$RUNTIME_DIR/docker-compose.yml" "$RUNTIME_DIR/.env"
 
 echo "Rebuilding API (+ dapr-api sidecar)..."
 docker compose --env-file .env up -d --force-recreate api dapr-api --wait

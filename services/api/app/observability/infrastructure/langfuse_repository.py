@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Any, TypeAlias
 
 from app.observability.application.ports import LangfuseRepositoryPort
 from app.observability.domain.models import (
@@ -8,13 +7,11 @@ from app.observability.domain.models import (
     LangfuseRequest,
     PaginatedRequests,
 )
-
-DbConnection: TypeAlias = Any
-DbRow: TypeAlias = Any
+from app.shared.db.adapter import DbRow, SqlTextSession
 
 
-class SqliteLangfuseRepository(LangfuseRepositoryPort):
-    def __init__(self, db: DbConnection) -> None:
+class DbLangfuseRepository(LangfuseRepositoryPort):
+    def __init__(self, db: SqlTextSession) -> None:
         self._db = db
 
     async def get_last_successful_import(self) -> ImportRecord | None:
@@ -29,13 +26,17 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
     ) -> ImportRecord:
         started_at = datetime.now(timezone.utc).isoformat()
         cursor = await self._db.execute(
-            "INSERT INTO imports (started_at, mode, from_timestamp, to_timestamp, status) "
-            "VALUES (?, ?, ?, ?, 'running')",
-            (started_at, mode, from_timestamp, to_timestamp),
+            """
+            INSERT INTO imports (started_at, mode, from_timestamp, to_timestamp, status)
+            VALUES (?, ?, ?, ?, 'running')
+            RETURNING id
+            """,
+            [started_at, mode, from_timestamp, to_timestamp],
         )
+        row = await cursor.fetchone()
         await self._db.commit()
         return ImportRecord(
-            id=cursor.lastrowid or 0,
+            id=int(row["id"]) if row else 0,
             started_at=started_at,
             finished_at=None,
             mode=mode,
@@ -50,7 +51,7 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
         finished_at = datetime.now(timezone.utc).isoformat()
         await self._db.execute(
             "UPDATE imports SET finished_at = ?, status = ?, error_message = ? WHERE id = ?",
-            (finished_at, status, error_message, import_id),
+            [finished_at, status, error_message, import_id],
         )
         await self._db.commit()
 
@@ -95,7 +96,7 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
         cursor = await self._db.execute(
             "SELECT * FROM langfuse_daily_metrics "
             "WHERE date >= ? AND date <= ? ORDER BY date ASC, model ASC",
-            (from_date, to_date),
+            [from_date, to_date],
         )
         rows = await cursor.fetchall()
         return [_row_to_daily_metric(r) for r in rows]
@@ -114,7 +115,7 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
             "WHERE started_at >= ? AND started_at < ? AND model IS NOT NULL "
             "GROUP BY date, model "
             "ORDER BY date ASC, total_cost DESC",
-            (from_ts, to_ts),
+            [from_ts, to_ts],
         )
         rows = await cursor.fetchall()
         return [_row_to_daily_metric(r) for r in rows]
@@ -182,10 +183,10 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
         )
         count_q = "SELECT COUNT(*) as count FROM langfuse_requests" + where
 
-        cursor = await self._db.execute(select_q, (*params, limit, offset))
+        cursor = await self._db.execute(select_q, [*params, limit, offset])
         rows = await cursor.fetchall()
 
-        count_row = await (await self._db.execute(count_q, tuple(params))).fetchone()
+        count_row = await (await self._db.execute(count_q, list(params))).fetchone()
 
         return PaginatedRequests(
             data=[_row_to_langfuse_request(r) for r in rows],

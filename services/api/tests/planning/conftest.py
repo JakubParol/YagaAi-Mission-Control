@@ -1,240 +1,15 @@
-"""
-Shared fixtures for planning module integration tests.
-
-Provides a temporary file-backed test database with the full planning schema and
-seed data, plus a FastAPI TestClient wired via dependency overrides.
-
-Fixtures:
-- _setup_test_db (autouse) - creates a temp DB with schema + seed data
-- client - FastAPI TestClient instance
-
-Seed data:
-- 2 projects (p1, p2) with counters
-- 3 backlogs (b1, b2 project-scoped + bg global)
-- 4 stories (s1, s2 in p1; sp2 in p2; sg global)
-- 4 tasks (t1, t2 in p1; tp2 in p2; tg global)
-- 2 agents (a1, a2)
-"""
-
-import sqlite3
-
 import pytest
+
+from tests.support.postgres_compat import run_script
 
 TS = "2026-01-01T00:00:00Z"
 
 
 @pytest.fixture(autouse=True)
-def _setup_test_db(tmp_path, monkeypatch):
-    db_path = str(tmp_path / "planning.db")
-    conn = sqlite3.connect(db_path)
-    conn.executescript("""
-        PRAGMA foreign_keys = ON;
-
-        CREATE TABLE projects (
-          id TEXT PRIMARY KEY,
-          key TEXT NOT NULL UNIQUE,
-          name TEXT NOT NULL,
-          description TEXT,
-          status TEXT NOT NULL,
-          is_default INTEGER NOT NULL DEFAULT 0,
-          repo_root TEXT,
-          created_by TEXT,
-          updated_by TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-
-        CREATE TABLE project_counters (
-          project_id TEXT PRIMARY KEY,
-          next_number INTEGER NOT NULL DEFAULT 1,
-          updated_at TEXT NOT NULL
-        );
-
-        CREATE TABLE epics (
-          id TEXT PRIMARY KEY,
-          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-          key TEXT NOT NULL,
-          title TEXT NOT NULL,
-          description TEXT,
-          status TEXT NOT NULL DEFAULT 'TODO',
-          status_mode TEXT NOT NULL DEFAULT 'MANUAL',
-          status_override TEXT,
-          status_override_set_at TEXT,
-          is_blocked INTEGER NOT NULL DEFAULT 0,
-          blocked_reason TEXT,
-          priority INTEGER,
-          metadata_json TEXT,
-          created_by TEXT,
-          updated_by TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          UNIQUE(project_id, key)
-        );
-
-        CREATE TABLE stories (
-          id TEXT PRIMARY KEY,
-          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          epic_id TEXT REFERENCES epics(id) ON DELETE SET NULL,
-          key TEXT,
-          title TEXT NOT NULL,
-          intent TEXT,
-          description TEXT,
-          story_type TEXT NOT NULL,
-          status TEXT NOT NULL,
-          is_blocked INTEGER NOT NULL DEFAULT 0,
-          blocked_reason TEXT,
-          priority INTEGER,
-          current_assignee_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
-          metadata_json TEXT,
-          created_by TEXT,
-          updated_by TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          started_at TEXT,
-          completed_at TEXT
-        );
-
-        CREATE TABLE tasks (
-          id TEXT PRIMARY KEY,
-          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          story_id TEXT REFERENCES stories(id) ON DELETE SET NULL,
-          key TEXT,
-          title TEXT NOT NULL,
-          objective TEXT,
-          task_type TEXT NOT NULL,
-          status TEXT NOT NULL,
-          is_blocked INTEGER NOT NULL DEFAULT 0,
-          blocked_reason TEXT,
-          priority INTEGER,
-          estimate_points REAL,
-          due_at TEXT,
-          current_assignee_agent_id TEXT,
-          metadata_json TEXT,
-          created_by TEXT,
-          updated_by TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          started_at TEXT,
-          completed_at TEXT
-        );
-
-        CREATE TABLE backlogs (
-          id TEXT PRIMARY KEY,
-          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          name TEXT NOT NULL,
-          kind TEXT NOT NULL,
-          status TEXT NOT NULL,
-          display_order INTEGER NOT NULL DEFAULT 1000,
-          is_default INTEGER NOT NULL DEFAULT 0,
-          goal TEXT,
-          start_date TEXT,
-          end_date TEXT,
-          metadata_json TEXT,
-          created_by TEXT,
-          updated_by TEXT,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
-
-        CREATE TABLE backlog_stories (
-          backlog_id TEXT NOT NULL REFERENCES backlogs(id) ON DELETE CASCADE,
-          story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-          position INTEGER NOT NULL,
-          added_at TEXT NOT NULL,
-          PRIMARY KEY (backlog_id, story_id),
-          UNIQUE(story_id)
-        );
-
-        CREATE TABLE backlog_tasks (
-          backlog_id TEXT NOT NULL REFERENCES backlogs(id) ON DELETE CASCADE,
-          task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          position INTEGER NOT NULL,
-          added_at TEXT NOT NULL,
-          PRIMARY KEY (backlog_id, task_id),
-          UNIQUE(task_id)
-        );
-
-        CREATE TABLE labels (
-          id         TEXT PRIMARY KEY,
-          project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-          name       TEXT NOT NULL,
-          color      TEXT,
-          created_at TEXT NOT NULL
-        );
-
-        CREATE TABLE story_labels (
-          story_id TEXT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
-          label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
-          added_at TEXT NOT NULL,
-          PRIMARY KEY (story_id, label_id)
-        );
-
-        CREATE TABLE task_labels (
-          task_id  TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
-          added_at TEXT NOT NULL,
-          PRIMARY KEY (task_id, label_id)
-        );
-
-        CREATE TABLE agents (
-          id             TEXT PRIMARY KEY,
-          openclaw_key   TEXT NOT NULL UNIQUE,
-          name           TEXT NOT NULL,
-          last_name      TEXT,
-          initials       TEXT,
-          role           TEXT,
-          worker_type    TEXT,
-          avatar         TEXT,
-          is_active      INTEGER NOT NULL DEFAULT 1,
-          source         TEXT NOT NULL DEFAULT 'manual',
-          metadata_json  TEXT,
-          last_synced_at TEXT,
-          created_at     TEXT NOT NULL,
-          updated_at     TEXT NOT NULL
-        );
-
-        CREATE TABLE task_assignments (
-          id            TEXT PRIMARY KEY,
-          task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-          agent_id      TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-          assigned_at   TEXT NOT NULL,
-          unassigned_at TEXT,
-          assigned_by   TEXT,
-          reason        TEXT
-        );
-
-        CREATE TABLE activity_log (
-          id TEXT PRIMARY KEY,
-          event_name TEXT NOT NULL,
-          actor_id TEXT,
-          actor_type TEXT,
-          entity_type TEXT NOT NULL,
-          entity_id TEXT NOT NULL,
-          scope_json TEXT,
-          metadata_json TEXT,
-          occurred_at TEXT NOT NULL,
-          created_at TEXT NOT NULL
-        );
-
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_assignments_active
-          ON task_assignments(task_id) WHERE unassigned_at IS NULL;
-
-        CREATE INDEX IF NOT EXISTS idx_activity_log_entity
-          ON activity_log(entity_type, entity_id, occurred_at);
-
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_one_default
-          ON projects(is_default) WHERE is_default = 1;
-
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_default_per_project
-          ON backlogs(project_id)
-          WHERE project_id IS NOT NULL AND is_default = 1;
-
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_active_sprint_per_project
-          ON backlogs(project_id)
-          WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE';
-        """)
-
-    conn.executescript(f"""
+def _setup_test_db(database_url: str):
+    run_script(
+        database_url,
+        f"""
         INSERT INTO projects (id, key, name, description, status, created_at, updated_at)
         VALUES
           ('p1', 'P1', 'Project 1', NULL, 'ACTIVE', '{TS}', '{TS}'),
@@ -274,20 +49,15 @@ def _setup_test_db(tmp_path, monkeypatch):
             'https://cdn.example.com/agent-1.png', 1, 'manual', '{TS}', '{TS}'
           ),
           ('a2', 'agent-2', 'Agent', 'Beta', NULL, 'reviewer', NULL, 1, 'manual', '{TS}', '{TS}');
-        """)
-    conn.close()
-
-    return db_path
+        """,
+    )
+    return database_url
 
 
 @pytest.fixture()
-def client(_setup_test_db, monkeypatch):
+def client():
     from fastapi.testclient import TestClient
 
     from app.main import app
-    from tests.support.runtime import override_test_db
 
-    override_test_db(app, monkeypatch, _setup_test_db)
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+    return TestClient(app)

@@ -31,6 +31,21 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 
 ## Getting Started (DEV, containerized runtime)
 
+Fresh Ubuntu VM bootstrap:
+
+```bash
+cd /home/kuba/repos/mission-control
+bash ./install.sh
+```
+
+This installs Docker + Node.js when missing, builds the global `mc` CLI wrapper,
+creates DEV/PROD env files, installs systemd units, and brings up both stacks.
+
+After install, bare `mc` targets the PROD API on `http://127.0.0.1:5100` by default.
+Use `--api-base http://127.0.0.1:5000` when you want to hit DEV explicitly.
+
+Manual DEV runtime:
+
 ```bash
 cd /home/kuba/repos/mission-control
 ./infra/dev/up.sh
@@ -50,6 +65,8 @@ Stop runtime:
 
 ## Deployment (PROD, full containers)
 
+Preferred on fresh Ubuntu hosts: `bash ./install.sh`
+
 Systemd unit:
 
 ```bash
@@ -57,6 +74,8 @@ sudo cp infra/systemd/mission-control-prod.service /etc/systemd/system/mission-c
 sudo systemctl daemon-reload
 sudo systemctl enable mission-control-prod.service
 ```
+
+The checked-in unit file is a path-specific example for `/home/kuba/...`. If you install manually instead of using `install.sh`, adjust repo paths before enabling it.
 
 Deploy/update:
 
