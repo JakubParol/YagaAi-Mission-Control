@@ -82,7 +82,7 @@ async def _call_project_resolver(
     from app.planning.dependencies import resolve_project_key
 
     mock_db = AsyncMock()
-    with patch("app.planning.dependencies.SqliteProjectRepository") as mock_repo_cls:
+    with patch("app.planning.dependencies.DbProjectRepository") as mock_repo_cls:
         repo_instance = AsyncMock()
         mock_repo_cls.return_value = repo_instance
 
@@ -141,7 +141,7 @@ async def _call_epic_resolver(
     from app.planning.dependencies import resolve_epic_key
 
     mock_db = AsyncMock()
-    with patch("app.planning.dependencies.SqliteEpicRepository") as mock_repo_cls:
+    with patch("app.planning.dependencies.DbEpicRepository") as mock_repo_cls:
         repo_instance = AsyncMock()
         mock_repo_cls.return_value = repo_instance
 
@@ -194,7 +194,7 @@ async def _call_story_resolver(
     from app.planning.dependencies import resolve_story_key
 
     mock_db = AsyncMock()
-    with patch("app.planning.dependencies.SqliteStoryRepository") as mock_repo_cls:
+    with patch("app.planning.dependencies.DbStoryRepository") as mock_repo_cls:
         repo_instance = AsyncMock()
         mock_repo_cls.return_value = repo_instance
 

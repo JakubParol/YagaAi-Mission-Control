@@ -6,7 +6,7 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load local env files into os.environ so both MC_API_* (pydantic prefix) and
-# shared vars (MC_DB_PATH, LANGFUSE_*) are available.
+# shared vars (LANGFUSE_*, OPENCLAW_CONFIG_PATH) are available.
 #
 # Precedence:
 # 1) Process env (e.g. systemd EnvironmentFile in production)
@@ -22,10 +22,9 @@ class Settings(BaseSettings):
     env: str = "dev"
     log_level: str = "INFO"
 
-    db_path: str = ""
-    postgres_dsn: str = ""
-    db_engine: str = "sqlite"
-    postgres_pool_max_size: int = 10
+    database_url: str = ""
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
     openclaw_config_path: str = str(Path.home() / ".openclaw" / "openclaw.json")
     langfuse_host: str = ""
     langfuse_public_key: str = ""
@@ -50,13 +49,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def resolve_shared_env_vars(self) -> "Settings":
-        if not self.db_path:
-            self.db_path = os.environ.get("MC_DB_PATH", "")
-
-        if not self.postgres_dsn:
-            self.postgres_dsn = os.environ.get("MC_POSTGRES_DSN", "")
-
-        self.db_engine = (self.db_engine or os.environ.get("MC_DB_ENGINE", "sqlite")).lower()
         if not self.openclaw_config_path:
             self.openclaw_config_path = os.environ.get(
                 "OPENCLAW_CONFIG_PATH", str(Path.home() / ".openclaw" / "openclaw.json")
@@ -68,22 +60,20 @@ class Settings(BaseSettings):
         if not self.langfuse_secret_key:
             self.langfuse_secret_key = os.environ.get("LANGFUSE_SECRET_KEY", "")
 
-        if self.db_engine not in {"sqlite", "postgres"}:
-            msg = "MC_API_DB_ENGINE must be one of: sqlite, postgres"
+        if not self.database_url:
+            msg = "MC_API_DATABASE_URL must be set"
             raise ValueError(msg)
 
-        if self.db_engine == "sqlite" and not self.db_path:
-            msg = "MC_API_DB_PATH or MC_DB_PATH must be set when MC_API_DB_ENGINE=sqlite"
+        if not self.database_url.startswith("postgresql+psycopg://"):
+            msg = "MC_API_DATABASE_URL must use the postgresql+psycopg scheme"
             raise ValueError(msg)
 
-        if self.db_engine == "postgres" and not self.postgres_dsn:
-            msg = (
-                "MC_API_POSTGRES_DSN or MC_POSTGRES_DSN must be set when MC_API_DB_ENGINE=postgres"
-            )
+        if self.db_pool_size < 1:
+            msg = "MC_API_DB_POOL_SIZE must be >= 1"
             raise ValueError(msg)
 
-        if self.postgres_pool_max_size < 1:
-            msg = "MC_API_POSTGRES_POOL_MAX_SIZE must be >= 1"
+        if self.db_max_overflow < 0:
+            msg = "MC_API_DB_MAX_OVERFLOW must be >= 0"
             raise ValueError(msg)
 
         return self

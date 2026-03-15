@@ -1,6 +1,30 @@
 import sqlite3
 
 
+def _seed_command(conn: sqlite3.Connection, *, command_id: str, correlation_id: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO orchestration_commands(
+          id, command_type, schema_version, occurred_at, producer, correlation_id,
+          causation_id, payload_json, status, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            command_id,
+            "orchestration.run.submit",
+            "1.0",
+            "2026-03-08T10:00:00Z",
+            "mc-cli",
+            correlation_id,
+            None,
+            "{}",
+            "ACCEPTED",
+            "2026-03-08T10:00:00Z",
+        ),
+    )
+
+
 def _seed_run(conn: sqlite3.Connection, *, run_id: str, status: str, correlation_id: str) -> None:
     conn.execute(
         """
@@ -192,6 +216,7 @@ def test_timeline_endpoint_supports_filters_and_deterministic_pagination(
 def test_run_attempts_endpoint_returns_attempts_and_not_found(client, db_path: str) -> None:
     conn = sqlite3.connect(db_path)
     _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
+    _seed_command(conn, command_id="cmd-1", correlation_id="corr-1")
     conn.execute(
         """
         INSERT INTO orchestration_outbox(
@@ -245,6 +270,8 @@ def test_orchestration_metrics_endpoint_returns_queue_and_latency_metrics(
     client, db_path: str
 ) -> None:
     conn = sqlite3.connect(db_path)
+    _seed_command(conn, command_id="cmd-metrics-1", correlation_id="corr-metrics-1")
+    _seed_command(conn, command_id="cmd-metrics-2", correlation_id="corr-metrics-2")
     conn.execute(
         """
         INSERT INTO orchestration_runs(
