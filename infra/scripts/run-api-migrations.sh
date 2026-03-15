@@ -24,6 +24,6 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres --wait
 
 echo "[INFO] Running API database migrations..."
 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" run --rm --no-deps api \
-  python -c "from app.config import settings; from app.shared.db import migrate_postgres_or_raise; migrate_postgres_or_raise(settings.postgres_dsn)"
+  alembic upgrade head
 
 echo "[INFO] API migrations completed"
