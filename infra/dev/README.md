@@ -36,7 +36,7 @@ Postgres is the default local persistence path.
   - `MC_POSTGRES_USER`
   - `MC_POSTGRES_PASSWORD`
 
-API uses `MC_API_POSTGRES_DSN=postgresql://<user>:<pass>@postgres:5432/<db>`.
+API uses `MC_API_POSTGRES_DSN=postgresql+psycopg://<user>:<pass>@postgres:5432/<db>`.
 
 ## Dapr component versioning and overrides
 

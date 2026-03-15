@@ -172,7 +172,7 @@ class Settings(BaseSettings):
     app_name: str = "mission-control-api"
     env: str = "dev"                    # dev | staging | prod
     log_level: str = "INFO"
-    postgres_dsn: str = "postgresql://mission_control:mission_control_dev@127.0.0.1:55432/mission_control"
+    postgres_dsn: str = "postgresql+psycopg://mission_control:mission_control_dev@127.0.0.1:55432/mission_control"
     allowed_origins: list[str] = ["*"]
 
     # Observability module
