@@ -1,6 +1,6 @@
 # Mission Control API (`services/api`)
 
-FastAPI REST service for Mission Control — planning, observability, and orchestration modules.
+FastAPI REST service for Mission Control - planning, observability, and orchestration modules.
 
 ## Run locally
 
@@ -10,7 +10,7 @@ poetry install
 
 # Optional local override (recommended)
 cp .env.example .env.local
-# set MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
+# set MC_API_POSTGRES_DSN=postgresql://mission_control:mission_control_dev@127.0.0.1:55432/mission_control
 
 poetry run uvicorn app.main:app --reload --port 5000
 ```
@@ -19,28 +19,28 @@ Health endpoint: `GET /healthz`
 
 ## Structure
 
-```
+```text
 app/
-├── main.py                  # FastAPI app factory
-├── config.py                # pydantic-settings (MC_API_* env vars)
-├── shared/                  # Cross-module: health, envelope, errors, deps
-│   └── api/
-│       └── health.py
-├── planning/                # /v1/planning — work management
-│   ├── api/                 # Routers + schemas
-│   ├── application/         # Services + ports (ABCs)
-│   ├── domain/              # Models, enums, invariants
-│   └── infrastructure/      # Repository implementations
-├── observability/           # /v1/observability — LLM costs, requests, Langfuse import
-│   ├── api/
-│   ├── application/
-│   ├── domain/
-│   └── infrastructure/
-└── orchestration/           # /v1/orchestration — command ingestion + outbox
-    ├── api/
-    ├── application/
-    ├── domain/
-    └── infrastructure/
+|-- main.py                  # FastAPI app factory
+|-- config.py                # pydantic-settings (MC_API_* env vars)
+|-- shared/                  # Cross-module: health, envelope, errors, deps
+|   `-- api/
+|       `-- health.py
+|-- planning/                # /v1/planning - work management
+|   |-- api/                 # Routers + schemas
+|   |-- application/         # Services + ports (ABCs)
+|   |-- domain/              # Models, enums, invariants
+|   `-- infrastructure/      # Repository implementations
+|-- observability/           # /v1/observability - LLM costs, requests, Langfuse import
+|   |-- api/
+|   |-- application/
+|   |-- domain/
+|   `-- infrastructure/
+`-- orchestration/           # /v1/orchestration - command ingestion + outbox
+    |-- api/
+    |-- application/
+    |-- domain/
+    `-- infrastructure/
 ```
 
 ## Tests
@@ -58,6 +58,6 @@ poetry run pytest
 
 ## Links
 
-- [AGENTS.md](./AGENTS.md) — AI agent context and rules
-- [docs/INDEX.md](./docs/INDEX.md) — API documentation
+- [AGENTS.md](./AGENTS.md) - AI agent context and rules
+- [docs/INDEX.md](./docs/INDEX.md) - API documentation
 - [Root README](../../README.md)

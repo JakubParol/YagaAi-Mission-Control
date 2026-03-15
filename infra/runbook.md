@@ -56,6 +56,15 @@ cd /home/kuba/repos/mission-control
 ./infra/dev/reset.sh
 ```
 
+### Rebuild API in DEV with migrations
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/dev/rebuild-api.sh
+```
+
+This rebuilds the API image, runs PostgreSQL migrations, and then recreates `api` + `dapr-api`.
+
 ### Optional host debugging (manual)
 
 If you want to debug API/Web outside containers, run host processes on different ports (e.g. `5001` / `3001`) to avoid collisions with DEV container ports.
@@ -81,6 +90,8 @@ cd /home/kuba/repos/mission-control
 ./infra/deploy.sh
 ```
 
+`infra/deploy.sh` builds the production images, runs API PostgreSQL migrations, and only then recreates the PROD stack.
+
 ### Start/stop/status
 
 ```bash
@@ -90,6 +101,8 @@ sudo systemctl status mission-control-prod.service --no-pager
 
 docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env ps
 ```
+
+`mission-control-prod.service` also runs API migrations in `ExecStartPre`, so service starts after reboot use the same migration gate.
 
 ### Rollback
 

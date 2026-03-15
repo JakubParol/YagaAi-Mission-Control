@@ -36,10 +36,7 @@ Postgres is the default local persistence path.
   - `MC_POSTGRES_USER`
   - `MC_POSTGRES_PASSWORD`
 
-API uses:
-
-- `MC_API_DB_ENGINE=postgres`
-- `MC_API_POSTGRES_DSN=postgresql://<user>:<pass>@postgres:5432/<db>`
+API uses `MC_API_POSTGRES_DSN=postgresql://<user>:<pass>@postgres:5432/<db>`.
 
 ## Dapr component versioning and overrides
 
@@ -60,10 +57,10 @@ Override strategy:
 ```bash
 ./infra/dev/down.sh         # stop runtime, preserve state
 ./infra/dev/reset.sh        # stop runtime and remove volumes (fresh state)
-./infra/dev/rebuild-api.sh  # rebuild + recreate API (+ dapr-api)
+./infra/dev/rebuild-api.sh  # rebuild API, run migrations, recreate API (+ dapr-api)
 ./infra/dev/rebuild-web.sh  # recreate WEB (+ dapr-web), useful after dependency changes
 ./infra/dev/rebuild-worker.sh # recreate Worker (+ dapr-worker)
-./infra/dev/rebuild-all.sh  # rebuild/recreate full DEV stack
+./infra/dev/rebuild-all.sh  # rebuild app images, run migrations, recreate full DEV stack
 ```
 
 ## Orchestration smoke suite

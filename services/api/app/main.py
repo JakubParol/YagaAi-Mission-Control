@@ -16,13 +16,13 @@ from app.planning.api.router import router as planning_router
 from app.shared.api.deps import close_postgres_pool, init_postgres_pool
 from app.shared.api.errors import AppError, app_error_handler, generic_error_handler
 from app.shared.api.health import router as health_router
-from app.shared.db import migrate_postgres_or_raise, migrate_sqlite_or_raise
+from app.shared.db import migrate_postgres_or_raise
 from app.shared.logging import configure_logging, log_event
 
-if settings.db_engine == "postgres":
+
+def bootstrap_postgres_storage() -> None:
     migrate_postgres_or_raise(settings.postgres_dsn)
-else:
-    migrate_sqlite_or_raise(settings.db_path)
+
 
 configure_logging(level=settings.log_level)
 
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    bootstrap_postgres_storage()
     await init_postgres_pool()
     try:
         yield

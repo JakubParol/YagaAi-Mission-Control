@@ -46,7 +46,6 @@ def _setup_fake_postgres(monkeypatch: pytest.MonkeyPatch) -> _FakePool:
     _FakeCompatDb.instances.clear()
     _FakeCompatDb.fail_commit = False
     _FakeCompatDb.fail_rollback = False
-    monkeypatch.setattr(deps.settings, "db_engine", "postgres")
     monkeypatch.setattr(deps, "_postgres_pool", pool)
     monkeypatch.setattr(deps, "AsyncPgCompatConnection", _FakeCompatDb)
     return pool

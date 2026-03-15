@@ -1,4 +1,4 @@
-# AGENTS.md — Mission Control
+# AGENTS.md - Mission Control
 
 ## What This Is
 
@@ -6,7 +6,7 @@ Mission Control is a monorepo for managing AI agent workflows. It contains a web
 
 ## Scope
 
-- **In scope:** Dashboard UI, REST API (planning + observability + orchestration modules), CLI, SQLite persistence, Langfuse integration
+- **In scope:** Dashboard UI, REST API (planning + observability + orchestration modules), CLI, PostgreSQL persistence, Langfuse integration
 - **Out of scope:** Authentication enforcement (v2), real-time WebSocket events (v2), multi-tenancy (v2)
 
 ## Required Reading (Mandatory)
@@ -16,7 +16,7 @@ Before making any changes, read **all** of the following:
 1. This file
 2. [Workspace coding standards](/home/kuba/.openclaw/standards/coding-standards.md)
 3. [Workspace documentation standard](/home/kuba/.openclaw/standards/documentation.md)
-4. [docs/INDEX.md](./docs/INDEX.md) — documentation index (includes mandatory link to Repo Map)
+4. [docs/INDEX.md](./docs/INDEX.md) - documentation index (includes mandatory link to Repo Map)
 
 ## Drill-Down Rule
 
@@ -33,7 +33,7 @@ Use [docs/REPO_MAP.md](./docs/REPO_MAP.md) to find project paths and their entry
 
 At the start of every session, **report which documents you read** before proceeding. Format:
 
-```
+```text
 Read on startup:
 - /AGENTS.md
 - standards/coding-standards.md
@@ -48,10 +48,10 @@ If you then drill into a project, report that too.
 
 | Layer | Tech |
 |---|---|
-| Frontend | Next.js 15, TypeScript, Tailwind CSS v4, shadcn/ui |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS v4, shadcn/ui |
 | API | FastAPI, Python 3.12, async, pydantic |
 | CLI | TypeScript, Commander.js |
-| Database | SQLite (aiosqlite for API, better-sqlite3 for frontend) |
+| Database | PostgreSQL |
 | External | Langfuse (LLM observability) |
 
 ## Rules
@@ -63,18 +63,18 @@ If you then drill into a project, report that too.
 
 # Planning Operations
 
-When the user asks you to work with planning entities (projects, epics, stories, tasks, backlogs, agents, labels, etc.) — creating, updating, querying, or reviewing them:
+When the user asks you to work with planning entities (projects, epics, stories, tasks, backlogs, agents, labels, etc.) - creating, updating, querying, or reviewing them:
 
 1. **Use `mc` CLI only.** Do NOT use direct SQL queries or raw API calls. The CLI handles key generation, UUIDs, validation, and all business logic. The `mc` command is deployed and available in PATH.
 2. **Discover commands with `--help`.** Use `mc --help`, `mc story --help`, `mc story create --help`, etc. to learn available commands, options, and required fields.
-4. **Use `--output json`** when you need to parse responses programmatically. Default is table output for human reading.
-5. **Common patterns:**
+3. **Use `--output json`** when you need to parse responses programmatically. Default is table output for human reading.
+4. **Common patterns:**
    - List: `mc story list --project-key MC --sort priority`
    - Get: `mc story get --key MC-47 --output json`
    - Create: `mc story create --json '{"title":"...","story_type":"USER_STORY","project_id":"..."}'`
    - Update: `mc task update --id <uuid> --set status=IN_PROGRESS`
    - Filter: `--key`, `--project-id`, `--story-id`, `--status`, `--sort`
-6. **Default User Story placement policy (mandatory unless user says otherwise):**
+5. **Default User Story placement policy (mandatory unless user says otherwise):**
    - A newly created User Story must have an epic assigned.
    - A newly created User Story must have labels assigned.
    - A newly created User Story must be attached to the project product backlog.
@@ -96,14 +96,14 @@ When asked to deliver (or even just to code something) a US/task/bug end-to-end,
 ## Autonomous Mode
 
 If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one-shot executor inside an automated pipeline. In this mode:
-- **IGNORE "Task Workflow"** — the pipeline manages the workflow
-- **IGNORE "Planning Operations"** — do NOT call `mc` CLI
-- **IGNORE "Startup Report"** — do NOT report what you read
+- **IGNORE "Task Workflow"** - the pipeline manages the workflow
+- **IGNORE "Planning Operations"** - do NOT call `mc` CLI
+- **IGNORE "Startup Report"** - do NOT report what you read
 - Focus ONLY on the specific task described in your prompt
 - Read project docs for context (drill-down is still useful), but do NOT execute any workflow steps beyond what your prompt asks
 
 ## Navigation
 
-- → [README.md](./README.md)
-- → [docs/INDEX.md](./docs/INDEX.md)
-- → [docs/REPO_MAP.md](./docs/REPO_MAP.md)
+- [README.md](./README.md)
+- [docs/INDEX.md](./docs/INDEX.md)
+- [docs/REPO_MAP.md](./docs/REPO_MAP.md)

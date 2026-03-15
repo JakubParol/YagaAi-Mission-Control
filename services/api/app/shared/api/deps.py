@@ -1,11 +1,9 @@
 import asyncio
 import logging
-import sqlite3
 from collections.abc import AsyncGenerator
 from contextlib import suppress
 from typing import Any
 
-import aiosqlite
 import psycopg
 from psycopg.pq import TransactionStatus
 
@@ -84,9 +82,6 @@ _postgres_pool: _AsyncPgConnectionPool | None = None
 
 
 async def init_postgres_pool() -> None:
-    if settings.db_engine != "postgres":
-        return
-
     global _postgres_pool
     if _postgres_pool is not None:
         return
@@ -115,78 +110,27 @@ def _require_postgres_pool() -> _AsyncPgConnectionPool:
     return _postgres_pool
 
 
-async def _ensure_backlog_runtime_guard(db: aiosqlite.Connection) -> None:
-    """Repair duplicate active sprints and recreate key indexes if drift occurs at runtime."""
-    try:
-        await db.execute("""
-            WITH ranked AS (
-              SELECT
-                id,
-                ROW_NUMBER() OVER (
-                  PARTITION BY project_id
-                  ORDER BY display_order ASC, created_at ASC, id ASC
-                ) AS rn
-              FROM backlogs
-              WHERE project_id IS NOT NULL
-                AND kind = 'SPRINT'
-                AND UPPER(status) = 'ACTIVE'
-            )
-            UPDATE backlogs
-            SET status = 'OPEN'
-            WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
-            """)
-        await db.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_active_sprint_per_project
-              ON backlogs(project_id)
-              WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'
-            """)
-        await db.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_default_per_project
-              ON backlogs(project_id)
-              WHERE project_id IS NOT NULL AND is_default = 1
-            """)
-        await db.execute("""
-            CREATE INDEX IF NOT EXISTS idx_backlogs_project_display_order
-              ON backlogs(project_id, display_order)
-            """)
-        await db.commit()
-    except sqlite3.OperationalError as exc:
-        if "no such table" in str(exc).lower():
-            return
-        raise
-
-
 async def get_db() -> AsyncGenerator[Any, None]:
-    if settings.db_engine == "postgres":
-        if _postgres_pool is None:
-            await init_postgres_pool()
-        pool = _require_postgres_pool()
-        conn = await pool.acquire()
-        db = AsyncPgCompatConnection(conn)
-        discard_conn = False
+    if _postgres_pool is None:
+        await init_postgres_pool()
+    pool = _require_postgres_pool()
+    conn = await pool.acquire()
+    db = AsyncPgCompatConnection(conn)
+    discard_conn = False
 
-        # SQLite-specific guard (index repair + duplicate active sprint fix)
-        # is intentionally skipped for PostgreSQL to avoid per-request DDL churn.
-        try:
-            yield db
-        except Exception:
-            try:
-                await db.rollback()
-            except Exception:
-                discard_conn = True
-            raise
-        else:
-            try:
-                await db.commit()
-            except Exception:
-                discard_conn = True
-                raise
-        finally:
-            await pool.release(conn, discard=discard_conn)
-        return
-
-    async with aiosqlite.connect(settings.db_path) as db:
-        db.row_factory = sqlite3.Row
-        await db.execute("PRAGMA foreign_keys = ON")
-        await _ensure_backlog_runtime_guard(db)
+    try:
         yield db
+    except Exception:
+        try:
+            await db.rollback()
+        except Exception:
+            discard_conn = True
+        raise
+    else:
+        try:
+            await db.commit()
+        except Exception:
+            discard_conn = True
+            raise
+    finally:
+        await pool.release(conn, discard=discard_conn)

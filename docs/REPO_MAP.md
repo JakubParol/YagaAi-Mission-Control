@@ -1,4 +1,4 @@
-# Repository Map — Mission Control
+# Repository Map - Mission Control
 
 Overview of all projects and components in this monorepo.
 
@@ -8,9 +8,9 @@ Overview of all projects and components in this monorepo.
 
 | Project | Path | Type | Description |
 |---|---|---|---|
-| **Web** | `apps/web/` | Next.js 15 | Dashboard UI — planning + orchestration observability |
+| **Web** | `apps/web/` | Next.js 16 | Dashboard UI - planning + orchestration observability |
 | **CLI** | `apps/cli/` | TypeScript | Command-line interface (`mc`) over API contracts |
-| **API** | `services/api/` | FastAPI (Python) | REST API — planning, observability, orchestration |
+| **API** | `services/api/` | FastAPI (Python) | REST API - planning, observability, orchestration |
 
 ---
 
@@ -22,7 +22,7 @@ The Next.js application serving the Mission Control dashboard.
 |---|---|
 | Entry point | `apps/web/src/app/` (App Router) |
 | Domain types | `apps/web/src/lib/types.ts` |
-| Planning schema/client | `apps/web/src/lib/planning/` |
+| Planning/client types | `apps/web/src/lib/planning/`, `apps/web/src/lib/api-client.ts` |
 | API routes | `apps/web/src/app/api/` |
 | Config | `apps/web/.env.local` (`NEXT_PUBLIC_API_URL`, `API_URL`) |
 | AGENTS.md | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
@@ -81,7 +81,6 @@ FastAPI REST service with three domain modules:
 | Environment | Persistence |
 |---|---|
 | Local runtime / DEV / PROD | PostgreSQL |
-| API compatibility layer | SQLite migration utilities kept in code for backward compatibility paths |
 
 ---
 
@@ -95,6 +94,6 @@ FastAPI REST service with three domain modules:
 
 ## Navigation
 
-- ↑ [Docs Index](./INDEX.md)
-- ↑ [README.md](../README.md)
-- ↑ [AGENTS.md](../AGENTS.md)
+- [Docs Index](./INDEX.md)
+- [README.md](../README.md)
+- [AGENTS.md](../AGENTS.md)

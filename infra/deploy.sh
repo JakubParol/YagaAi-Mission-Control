@@ -22,6 +22,8 @@ echo "[INFO] Deploying commit $CURRENT_SHA"
 echo "[INFO] Building production images..."
 DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" build
 
+MC_IMAGE_TAG="$CURRENT_SHA" "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$COMPOSE_FILE" "$PROD_ENV"
+
 echo "[INFO] Starting/updating production stack..."
 MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait
 

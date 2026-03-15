@@ -119,7 +119,7 @@ async def test_worker_state_machine_rejects_illegal_transition_without_state_cor
             SELECT decision, reason_code
             FROM orchestration_run_timeline
             WHERE run_id = ?
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT 1
             """,
             ("run-2",),

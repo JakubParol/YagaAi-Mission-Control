@@ -6,17 +6,17 @@
 
 ## Overview
 
-This document defines the test strategy for the Services API. The goal is to validate all HTTP endpoints, business rules, and data integrity through integration tests against a real SQLite database (in-memory, per-test), ensuring behavior matches the [Entity Model v1](../../../docs/ENTITY_MODEL_V1.md) and [Workflow Logic v1](../../../docs/WORKFLOW_LOGIC_V1.md).
+This document defines the test strategy for the Services API. The goal is to validate all HTTP endpoints, business rules, and data integrity for the PostgreSQL-backed API runtime, ensuring behavior matches the [Entity Model v1](../../../docs/ENTITY_MODEL_V1.md) and [Workflow Logic v1](../../../docs/WORKFLOW_LOGIC_V1.md).
 
 ## Test Pyramid
 
 | Level | Scope | Tools | Status |
 |-------|-------|-------|--------|
-| **Integration** | API endpoints + DB | FastAPI TestClient, pytest, SQLite (tmp) | Active — 225 tests |
+| **Integration** | API endpoints + DB | FastAPI TestClient, pytest, repository/DB fixtures | Active |
 | **Unit** | Domain models, pure services | pytest | Future — as domain layer grows |
 | **E2E** | Full flow (API → DB → response) | httpx / pytest | Future — for critical paths |
 
-Current focus is integration tests because the API layer is thin (routes → service → repository → SQLite) and integration tests cover the full stack per request.
+Current focus is integration tests because the API layer is thin (routes → service → repository) and integration tests cover the full stack per request.
 
 ## Test Structure
 
@@ -45,10 +45,10 @@ services/api/tests/
 
 Each module has its own `conftest.py` with an **autouse** fixture that:
 
-1. Creates a temporary SQLite database (`tmp_path`)
+1. Creates isolated database fixtures for the target module
 2. Runs the full schema DDL (mirrors production tables)
 3. Inserts seed data for realistic test scenarios
-4. Patches `app.config.settings.db_path` via `monkeypatch`
+4. Wires FastAPI routes to the test database through dependency overrides
 
 This ensures complete test isolation — every test function gets a fresh database.
 
@@ -103,13 +103,13 @@ Pyright type-checks both `app/` and `tests/` directories.
 ### Arrange-Act-Assert
 
 All tests follow a consistent pattern:
-1. **Arrange** — create entities via API calls (POST), or insert directly via SQLite for cross-cutting data (labels)
+1. **Arrange** — create entities via API calls (POST), or insert directly through test fixtures for cross-cutting data
 2. **Act** — call the endpoint under test
 3. **Assert** — verify status code, response body structure, and side effects
 
 ### Direct DB Access
 
-When testing side effects that require data not yet exposed via API (e.g., labels before label CRUD exists), tests access SQLite directly via the `_setup_test_db` fixture return value.
+When testing side effects that require data not yet exposed via API, tests may seed storage directly through the fixture-owned database setup.
 
 ### Response Envelope
 

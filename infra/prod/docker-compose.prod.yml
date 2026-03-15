@@ -37,7 +37,6 @@ services:
     env_file:
       - ${MC_PROD_ENV_FILE:-/etc/mission-control/prod.env}
     environment:
-      MC_API_DB_ENGINE: ${MC_API_DB_ENGINE:-postgres}
       MC_API_POSTGRES_DSN: ${MC_API_POSTGRES_DSN}
       MC_API_CORS_ORIGINS: ${MC_API_CORS_ORIGINS}
       MC_API_ORCHESTRATION_COMMANDS_ENABLED: ${MC_API_ORCHESTRATION_COMMANDS_ENABLED:-true}

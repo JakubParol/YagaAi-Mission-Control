@@ -6,15 +6,15 @@ Management platform for AI agent workflows. Combines a web dashboard with a REST
 
 ```text
 mission-control/
-├── apps/
-│   ├── web/                    # Next.js dashboard
-│   └── cli/                    # TypeScript CLI (mc)
-├── services/
-│   └── api/                    # FastAPI REST API (Python)
-├── infra/                      # Runtime/deployment configs (dev/prod)
-│   └── dev/                    # Deterministic DEV Docker runtime + Dapr bootstrap
-├── data/                       # Legacy local artifacts (not runtime source of truth)
-└── docs/                       # Shared documentation
+|-- apps/
+|   |-- web/                    # Next.js dashboard
+|   `-- cli/                    # TypeScript CLI (mc)
+|-- services/
+|   `-- api/                    # FastAPI REST API (Python)
+|-- infra/                      # Runtime/deployment configs (dev/prod)
+|   `-- dev/                    # Deterministic DEV Docker runtime + Dapr bootstrap
+|-- data/                       # Local artifacts not used as runtime source of truth
+`-- docs/                       # Shared documentation
 ```
 
 See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
@@ -23,10 +23,10 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 
 | Layer | Tech |
 |---|---|
-| Frontend | Next.js 15 (App Router), TypeScript (strict), Tailwind CSS v4, shadcn/ui |
+| Frontend | Next.js 16 (App Router), TypeScript (strict), Tailwind CSS v4, shadcn/ui |
 | API | FastAPI, Python 3.12, pydantic, async |
 | CLI | TypeScript, Commander.js |
-| Database | PostgreSQL (Docker local/prod), SQLite compatibility paths in API |
+| Database | PostgreSQL (Docker local/dev/prod) |
 | External | Langfuse (LLM cost tracking) |
 
 ## Getting Started (DEV, containerized runtime)
@@ -64,6 +64,8 @@ Deploy/update:
 ./infra/deploy.sh
 ```
 
+`infra/deploy.sh` runs API PostgreSQL migrations before recreating the production stack.
+
 Rollback:
 
 ```bash
@@ -72,8 +74,8 @@ Rollback:
 
 ## Links
 
-- [AGENTS.md](./AGENTS.md) — AI agent context and rules
-- [docs/INDEX.md](./docs/INDEX.md) — Documentation index
-- [docs/REPO_MAP.md](./docs/REPO_MAP.md) — Repository map
-- [services/api/docs/INDEX.md](./services/api/docs/INDEX.md) — API documentation
-- [infra/runbook.md](./infra/runbook.md) — DEV/PROD runtime operations
+- [AGENTS.md](./AGENTS.md) - AI agent context and rules
+- [docs/INDEX.md](./docs/INDEX.md) - Documentation index
+- [docs/REPO_MAP.md](./docs/REPO_MAP.md) - Repository map
+- [services/api/docs/INDEX.md](./services/api/docs/INDEX.md) - API documentation
+- [infra/runbook.md](./infra/runbook.md) - DEV/PROD runtime operations

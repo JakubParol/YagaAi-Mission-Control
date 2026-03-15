@@ -999,7 +999,7 @@ LLM cost tracking, request browsing, and Langfuse data import.
 ### Conventions
 
 - Observability endpoints are mostly read-only (GET), except for the import trigger (POST).
-- Cost/request data originates from Langfuse and is cached locally in SQLite.
+- Cost/request data originates from Langfuse and is persisted in Mission Control PostgreSQL storage.
 
 ---
 

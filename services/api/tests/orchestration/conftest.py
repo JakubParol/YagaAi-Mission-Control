@@ -1,13 +1,10 @@
-import os
 import sqlite3
 
 import pytest
 
-os.environ["MC_API_DB_PATH"] = ""
-
 
 @pytest.fixture()
-def db_path(tmp_path, monkeypatch):
+def db_path(tmp_path):
     path = str(tmp_path / "orchestration.db")
     conn = sqlite3.connect(path)
     conn.executescript("""
@@ -111,18 +108,17 @@ def db_path(tmp_path, monkeypatch):
         );
         """)
     conn.close()
-
-    from app.config import settings
-
-    monkeypatch.setattr(settings, "db_path", path)
     return path
 
 
 @pytest.fixture()
-def client(request):
-    _ = request.getfixturevalue("db_path")
+def client(db_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.main import app
+    from tests.support.runtime import override_test_db
 
-    return TestClient(app)
+    override_test_db(app, monkeypatch, db_path)
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()

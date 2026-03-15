@@ -1,13 +1,12 @@
 """
 Shared fixtures for planning module integration tests.
 
-Provides an in-memory SQLite database with the full planning schema and seed data,
-plus a FastAPI TestClient wired to use that database.
+Provides a temporary file-backed test database with the full planning schema and
+seed data, plus a FastAPI TestClient wired via dependency overrides.
 
 Fixtures:
-- _setup_test_db (autouse) — creates temp SQLite DB with schema + seed data,
-  patches app.config.settings.db_path
-- client — FastAPI TestClient instance
+- _setup_test_db (autouse) - creates a temp DB with schema + seed data
+- client - FastAPI TestClient instance
 
 Seed data:
 - 2 projects (p1, p2) with counters
@@ -17,12 +16,9 @@ Seed data:
 - 2 agents (a1, a2)
 """
 
-import os
 import sqlite3
 
 import pytest
-
-os.environ["MC_API_DB_PATH"] = ""
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -281,16 +277,17 @@ def _setup_test_db(tmp_path, monkeypatch):
         """)
     conn.close()
 
-    from app.config import settings
-
-    monkeypatch.setattr(settings, "db_path", db_path)
     return db_path
 
 
 @pytest.fixture()
-def client():
+def client(_setup_test_db, monkeypatch):
     from fastapi.testclient import TestClient
 
     from app.main import app
+    from tests.support.runtime import override_test_db
 
-    return TestClient(app)
+    override_test_db(app, monkeypatch, _setup_test_db)
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()

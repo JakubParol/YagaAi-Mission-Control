@@ -551,7 +551,7 @@ def test_assign_agent_emits_activity_event(client, _setup_test_db) -> None:
         SELECT metadata_json
         FROM activity_log
         WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT 1
         """,
         (task_id,),
@@ -605,7 +605,7 @@ def test_assign_agent_event_reassign_includes_previous_assignee(client, _setup_t
         SELECT metadata_json
         FROM activity_log
         WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, id DESC
         LIMIT 1
         """,
         (task_id,),

@@ -35,7 +35,10 @@ def migrate_postgres_or_raise(dsn: str) -> None:
                     VALUES (%s, %s)
                     ON CONFLICT (version) DO NOTHING
                     """,
-                    (_BOOTSTRAP_VERSION, "bootstrap PostgreSQL schema from sqlite baseline"),
+                    (
+                        _BOOTSTRAP_VERSION,
+                        "bootstrap PostgreSQL schema from current compatibility baseline",
+                    ),
                 )
             conn.commit()
     except psycopg.Error as exc:

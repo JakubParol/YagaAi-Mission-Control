@@ -33,7 +33,7 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 ### Optimistic Concurrency (v1)
 
 - No explicit version/ETag fields in v1 entities.
-- SQLite serializes writes at the DB level — low risk of lost updates at expected scale.
+- PostgreSQL is the only supported runtime database for v1 local and production deployments.
 - Unique constraints (e.g. one active assignment per task, story in max one backlog) catch conflicts → `409 CONFLICT`.
 
 ### v2 Plan
@@ -124,7 +124,7 @@ Implementation:
 | Cursor-based pagination | Offset-based is sufficient for v1 scale | v2 |
 | Rate limiting | Internal service, low traffic | v2 |
 | Idempotency key enforcement | Header reserved, not enforced | v2 |
-| Optimistic locking (ETag/version) | SQLite serialization sufficient for v1 | v2 |
+| Optimistic locking (ETag/version) | PostgreSQL transactional semantics sufficient for v1 | v2 |
 | Comments & attachments endpoints | Lower priority, entities exist in DB | v1.1 |
 | Agents sync | `POST /v1/planning/agents/sync` upserts/deactivates by OpenClaw config; manual agents remain untouched | v1.1 |
 | Prometheus exporter / scraping | JSON/API metrics are sufficient for local runtime v1 | v2 |

@@ -476,8 +476,7 @@ def test_update_story_assignee_handles_activity_log_with_only_scope_json_missing
     ).json()["data"]["id"]
 
     conn = sqlite3.connect(_setup_test_db)
-    conn.executescript(
-        """
+    conn.executescript("""
         ALTER TABLE activity_log RENAME TO activity_log_old;
         CREATE TABLE activity_log (
           id TEXT PRIMARY KEY,
@@ -491,8 +490,7 @@ def test_update_story_assignee_handles_activity_log_with_only_scope_json_missing
           created_at TEXT NOT NULL
         );
         DROP TABLE activity_log_old;
-        """
-    )
+        """)
     conn.commit()
     conn.close()
 

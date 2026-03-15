@@ -1,6 +1,5 @@
 import json
-
-import aiosqlite
+from typing import Any, TypeAlias
 
 from app.orchestration.application.ports import OrchestrationRepository
 from app.orchestration.domain.models import (
@@ -19,9 +18,11 @@ from app.orchestration.domain.models import (
     TransitionDecision,
 )
 
+DbConnection: TypeAlias = Any
+
 
 class SqliteOrchestrationRepository(OrchestrationRepository):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def create_command_with_outbox(

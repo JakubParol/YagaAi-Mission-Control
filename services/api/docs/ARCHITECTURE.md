@@ -95,7 +95,7 @@ services/api/
 │       ├── domain/
 │       │   └── models.py
 │       └── infrastructure/
-│           └── sqlite_repository.py
+│           └── repository module
 │
 ├── tests/
 │   ├── planning/
@@ -172,7 +172,7 @@ class Settings(BaseSettings):
     app_name: str = "mission-control-api"
     env: str = "dev"                    # dev | staging | prod
     log_level: str = "INFO"
-    database_url: str = "sqlite+aiosqlite:///mc.db"
+    postgres_dsn: str = "postgresql://mission_control:mission_control_dev@127.0.0.1:55432/mission_control"
     allowed_origins: list[str] = ["*"]
 
     # Observability module

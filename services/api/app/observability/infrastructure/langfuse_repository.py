@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
-
-import aiosqlite
+from typing import Any, TypeAlias
 
 from app.observability.application.ports import LangfuseRepositoryPort
 from app.observability.domain.models import (
@@ -10,9 +9,12 @@ from app.observability.domain.models import (
     PaginatedRequests,
 )
 
+DbConnection: TypeAlias = Any
+DbRow: TypeAlias = Any
+
 
 class SqliteLangfuseRepository(LangfuseRepositoryPort):
-    def __init__(self, db: aiosqlite.Connection) -> None:
+    def __init__(self, db: DbConnection) -> None:
         self._db = db
 
     async def get_last_successful_import(self) -> ImportRecord | None:
@@ -191,7 +193,7 @@ class SqliteLangfuseRepository(LangfuseRepositoryPort):
         )
 
 
-def _row_to_import(row: aiosqlite.Row) -> ImportRecord:
+def _row_to_import(row: DbRow) -> ImportRecord:
     return ImportRecord(
         id=row["id"],
         started_at=row["started_at"],
@@ -204,7 +206,7 @@ def _row_to_import(row: aiosqlite.Row) -> ImportRecord:
     )
 
 
-def _row_to_daily_metric(row: aiosqlite.Row) -> DailyMetric:
+def _row_to_daily_metric(row: DbRow) -> DailyMetric:
     return DailyMetric(
         date=row["date"],
         model=row["model"],
@@ -216,7 +218,7 @@ def _row_to_daily_metric(row: aiosqlite.Row) -> DailyMetric:
     )
 
 
-def _row_to_langfuse_request(row: aiosqlite.Row) -> LangfuseRequest:
+def _row_to_langfuse_request(row: DbRow) -> LangfuseRequest:
     return LangfuseRequest(
         id=row["id"],
         trace_id=row["trace_id"],

@@ -11,7 +11,12 @@ fi
 
 cd "$RUNTIME_DIR"
 
+echo "Building application images..."
+docker compose --env-file .env build api web worker
+
+"$ROOT_DIR/infra/scripts/run-api-migrations.sh" "$RUNTIME_DIR/docker-compose.yml" "$RUNTIME_DIR/.env"
+
 echo "Rebuilding/recreating full DEV stack (api, web, worker + sidecars)..."
-docker compose --env-file .env up -d --build --force-recreate --wait
+docker compose --env-file .env up -d --force-recreate --wait
 
 docker compose --env-file .env ps
