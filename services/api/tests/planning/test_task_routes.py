@@ -23,6 +23,7 @@ import json
 import sqlite3
 
 import pytest
+from sqlalchemy.exc import ProgrammingError
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -669,7 +670,7 @@ def test_assign_agent_rolls_back_without_activity_log_table(client, _setup_test_
     conn.commit()
     conn.close()
 
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(ProgrammingError):
         client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a1"})
 
     task = client.get(f"/v1/planning/tasks/{task_id}").json()["data"]

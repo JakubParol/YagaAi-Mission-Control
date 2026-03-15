@@ -10,7 +10,9 @@ poetry install
 
 # Optional local override (recommended)
 cp .env.example .env.local
-# set MC_DB_PATH=/home/kuba/repos/mission-control/data/mission-control.db
+# set MC_API_DATABASE_URL=postgresql+psycopg://mission_control:mission_control_dev@127.0.0.1:5432/mission_control
+
+poetry run alembic upgrade head
 
 poetry run uvicorn app.main:app --reload --port 5000
 ```

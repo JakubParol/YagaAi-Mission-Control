@@ -20,6 +20,7 @@ import json
 import sqlite3
 
 import pytest
+from sqlalchemy.exc import ProgrammingError
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -448,7 +449,7 @@ def test_update_story_assignee_rolls_back_without_activity_log_table(
     conn.commit()
     conn.close()
 
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(ProgrammingError):
         client.patch(f"/v1/planning/stories/{story_id}", json={"current_assignee_agent_id": "a1"})
 
     story = client.get(f"/v1/planning/stories/{story_id}").json()["data"]
