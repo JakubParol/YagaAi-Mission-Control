@@ -123,6 +123,11 @@ PY
   else
     echo "[INFO] Reusing existing $PROD_ENV_FILE"
   fi
+
+  if $SUDO grep -q '^MC_API_POSTGRES_DSN=postgresql://' "$PROD_ENV_FILE"; then
+    $SUDO sed -i 's#^MC_API_POSTGRES_DSN=postgresql://#MC_API_POSTGRES_DSN=postgresql+psycopg://#' "$PROD_ENV_FILE"
+    echo "[INFO] Migrated MC_API_POSTGRES_DSN in $PROD_ENV_FILE to postgresql+psycopg://"
+  fi
 }
 
 build_global_cli() {
