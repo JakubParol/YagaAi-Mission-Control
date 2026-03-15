@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     env: str = "dev"
     log_level: str = "INFO"
 
-    database_url: str = ""
+    postgres_dsn: str = ""
     db_pool_size: int = 10
     db_max_overflow: int = 20
     openclaw_config_path: str = str(Path.home() / ".openclaw" / "openclaw.json")
@@ -60,12 +60,12 @@ class Settings(BaseSettings):
         if not self.langfuse_secret_key:
             self.langfuse_secret_key = os.environ.get("LANGFUSE_SECRET_KEY", "")
 
-        if not self.database_url:
-            msg = "MC_API_DATABASE_URL must be set"
+        if not self.postgres_dsn:
+            msg = "MC_API_POSTGRES_DSN must be set"
             raise ValueError(msg)
 
-        if not self.database_url.startswith("postgresql+psycopg://"):
-            msg = "MC_API_DATABASE_URL must use the postgresql+psycopg scheme"
+        if not self.postgres_dsn.startswith("postgresql+psycopg://"):
+            msg = "MC_API_POSTGRES_DSN must use the postgresql+psycopg scheme"
             raise ValueError(msg)
 
         if self.db_pool_size < 1:
