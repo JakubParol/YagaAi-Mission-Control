@@ -9,31 +9,31 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import settings
 
-_engine: AsyncEngine | None = None
-_session_factory: async_sessionmaker[AsyncSession] | None = None
+_ENGINE: AsyncEngine | None = None
+_SESSION_FACTORY: async_sessionmaker[AsyncSession] | None = None
 
 
 def get_async_engine() -> AsyncEngine:
-    global _engine
-    if _engine is None:
-        _engine = create_async_engine(
+    global _ENGINE  # pylint: disable=global-statement
+    if _ENGINE is None:
+        _ENGINE = create_async_engine(
             settings.postgres_dsn,
             pool_pre_ping=True,
             pool_size=settings.db_pool_size,
             max_overflow=settings.db_max_overflow,
         )
-    return _engine
+    return _ENGINE
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    global _session_factory
-    if _session_factory is None:
-        _session_factory = async_sessionmaker(
+    global _SESSION_FACTORY  # pylint: disable=global-statement
+    if _SESSION_FACTORY is None:
+        _SESSION_FACTORY = async_sessionmaker(
             get_async_engine(),
             expire_on_commit=False,
             autoflush=False,
         )
-    return _session_factory
+    return _SESSION_FACTORY
 
 
 async def init_db_engine() -> None:
@@ -41,16 +41,17 @@ async def init_db_engine() -> None:
 
 
 async def close_db_engine() -> None:
-    global _engine, _session_factory
-    if _engine is None:
+    global _ENGINE, _SESSION_FACTORY  # pylint: disable=global-statement
+    if _ENGINE is None:
         return
-    await _engine.dispose()
-    _engine = None
-    _session_factory = None
+    await _ENGINE.dispose()
+    _ENGINE = None
+    _SESSION_FACTORY = None
 
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:
-    async with get_session_factory()() as session:
+    factory = get_session_factory()
+    async with factory() as session:
         try:
             yield session
         except Exception:

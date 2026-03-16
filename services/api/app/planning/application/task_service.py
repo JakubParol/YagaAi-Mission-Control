@@ -118,49 +118,12 @@ class TaskService:
             raise NotFoundError(f"Task {task_id} not found")
 
         now = utc_now()
-        next_is_blocked = data.get("is_blocked", existing.is_blocked)
-        blocked_reason_in_payload = "blocked_reason" in data
-        blocked_reason = data.get("blocked_reason", existing.blocked_reason)
 
         if "status" in data:
-            new_status = data["status"]
-            valid = {s.value for s in ItemStatus}
-            if new_status not in valid:
-                raise ValidationError(
-                    f"Invalid task status '{new_status}'. Allowed: {', '.join(sorted(valid))}"
-                )
+            await self._apply_status_transition(task_id, data, existing, now)
 
-            if new_status == ItemStatus.DONE and next_is_blocked:
-                raise BusinessRuleError("Blocked task cannot be moved to DONE")
-
-            if new_status == ItemStatus.DONE:
-                data["completed_at"] = now
-                await self._task_repo.close_assignment(task_id, now)
-            elif existing.status == ItemStatus.DONE:
-                data["completed_at"] = None
-
-            if new_status == ItemStatus.IN_PROGRESS and existing.started_at is None:
-                data["started_at"] = now
-
-        if "story_id" in data and data["story_id"] is not None:
-            story_exists, story_project_id = await self._task_repo.get_story_project_id(
-                data["story_id"]
-            )
-            if not story_exists:
-                raise ValidationError(f"Story {data['story_id']} does not exist")
-            if existing.project_id != story_project_id:
-                raise ConflictError(
-                    f"Task project {existing.project_id} conflicts with story {data['story_id']} "
-                    f"project {story_project_id}"
-                )
-        if "current_assignee_agent_id" in data and data["current_assignee_agent_id"] is not None:
-            if not await self._task_repo.agent_exists(data["current_assignee_agent_id"]):
-                raise ValidationError(f"Agent {data['current_assignee_agent_id']} does not exist")
-
-        if blocked_reason_in_payload and blocked_reason is not None and not next_is_blocked:
-            raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
-        if not next_is_blocked:
-            data["blocked_reason"] = None
+        await self._validate_references(data, existing)
+        self._validate_blocked_reason(data, existing)
 
         assignee_changed = (
             "current_assignee_agent_id" in data
@@ -186,6 +149,55 @@ class TaskService:
             raise NotFoundError(f"Task {task_id} not found")
 
         return updated
+
+    async def _apply_status_transition(
+        self, task_id: str, data: dict[str, Any], existing: Task, now: str
+    ) -> None:
+        new_status = data["status"]
+        valid = {s.value for s in ItemStatus}
+        if new_status not in valid:
+            raise ValidationError(
+                f"Invalid task status '{new_status}'. Allowed: {', '.join(sorted(valid))}"
+            )
+
+        next_is_blocked = data.get("is_blocked", existing.is_blocked)
+        if new_status == ItemStatus.DONE and next_is_blocked:
+            raise BusinessRuleError("Blocked task cannot be moved to DONE")
+
+        if new_status == ItemStatus.DONE:
+            data["completed_at"] = now
+            await self._task_repo.close_assignment(task_id, now)
+        elif existing.status == ItemStatus.DONE:
+            data["completed_at"] = None
+
+        if new_status == ItemStatus.IN_PROGRESS and existing.started_at is None:
+            data["started_at"] = now
+
+    async def _validate_references(self, data: dict[str, Any], existing: Task) -> None:
+        if "story_id" in data and data["story_id"] is not None:
+            story_exists, story_project_id = await self._task_repo.get_story_project_id(
+                data["story_id"]
+            )
+            if not story_exists:
+                raise ValidationError(f"Story {data['story_id']} does not exist")
+            if existing.project_id != story_project_id:
+                raise ConflictError(
+                    f"Task project {existing.project_id} conflicts with story {data['story_id']} "
+                    f"project {story_project_id}"
+                )
+        if "current_assignee_agent_id" in data and data["current_assignee_agent_id"] is not None:
+            if not await self._task_repo.agent_exists(data["current_assignee_agent_id"]):
+                raise ValidationError(f"Agent {data['current_assignee_agent_id']} does not exist")
+
+    def _validate_blocked_reason(self, data: dict[str, Any], existing: Task) -> None:
+        next_is_blocked = data.get("is_blocked", existing.is_blocked)
+        blocked_reason_in_payload = "blocked_reason" in data
+        blocked_reason = data.get("blocked_reason", existing.blocked_reason)
+
+        if blocked_reason_in_payload and blocked_reason is not None and not next_is_blocked:
+            raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
+        if not next_is_blocked:
+            data["blocked_reason"] = None
 
     async def get_story_progress(self, story_id: str | None) -> dict[str, int]:
         if not story_id:
