@@ -211,6 +211,15 @@ cd /home/kuba/repos/mission-control
 ./infra/dev/scripts/postgres-restore.sh ~/mission-control-prod.sql
 ```
 
+### One-command local migration on the new VM
+
+If the dump file is already present on the new VM, you can run the full flow (PROD restore → deploy/migrations → DEV refresh) with:
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/migrate-prod-to-dev.sh ~/mission-control-prod.sql
+```
+
 ## Troubleshooting quick checks
 
 ```bash
