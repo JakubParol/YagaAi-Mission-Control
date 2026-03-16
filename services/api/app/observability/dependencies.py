@@ -4,22 +4,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.observability.application.import_service import ImportService
 from app.observability.application.metrics_service import MetricsService
-from app.observability.infrastructure.langfuse_client import HttpLangfuseClient
-from app.observability.infrastructure.langfuse_repository import DbLangfuseRepository
+from app.observability.infrastructure.repositories.langfuse import DbLangfuseRepository
+from app.observability.infrastructure.sources.langfuse import HttpLangfuseClient
 from app.shared.api.deps import get_db
-from app.shared.db.adapter import SqlTextSession
 
 
 async def get_metrics_service(
     db: AsyncSession = Depends(get_db),
 ) -> MetricsService:
-    return MetricsService(DbLangfuseRepository(SqlTextSession(db)))
+    return MetricsService(DbLangfuseRepository(db))
 
 
 async def get_import_service(
     db: AsyncSession = Depends(get_db),
 ) -> ImportService:
-    repo = DbLangfuseRepository(SqlTextSession(db))
+    repo = DbLangfuseRepository(db)
     client = HttpLangfuseClient(
         host=settings.langfuse_host,
         public_key=settings.langfuse_public_key,
