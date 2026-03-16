@@ -13,7 +13,7 @@ echo "  cd $ROOT_DIR/services/api && ./scripts/run-dev.sh"
 echo
 
 echo "Start WEB in second terminal:"
-echo "  cd $ROOT_DIR/apps/web && npm run dev"
+echo "  cd $ROOT_DIR/apps/web && ./scripts/run-dev.sh"
 echo
 
 echo "Expected local ports:"

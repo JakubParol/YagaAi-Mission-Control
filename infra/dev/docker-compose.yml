@@ -36,7 +36,7 @@ services:
       - .env
     environment:
       MC_API_POSTGRES_DSN: postgresql+psycopg://${MC_POSTGRES_USER:-mission_control}:${MC_POSTGRES_PASSWORD:-mission_control_dev}@postgres:5432/${MC_POSTGRES_DB:-mission_control}
-      MC_API_CORS_ORIGINS: '["http://localhost:3000","http://localhost:3100"]'
+      MC_API_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:3100","http://127.0.0.1:3100","http://localhost:3001","http://127.0.0.1:3001"]'
     command:
       - /bin/sh
       - -lc

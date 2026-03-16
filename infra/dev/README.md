@@ -54,6 +54,13 @@ Override strategy:
 
 ## Lifecycle
 
+For a quick reminder of the local manual flow, run:
+
+```bash
+./infra/dev/local-dev.sh
+```
+
+
 ```bash
 ./infra/dev/down.sh         # stop runtime, preserve state
 ./infra/dev/reset.sh        # stop runtime and remove volumes (fresh state)
@@ -125,6 +132,10 @@ CI-style (runtime booted separately, non-default API host):
 ### Dapr sidecar issues
 
 1. `docker compose -f infra/dev/docker-compose.yml logs dapr-placement dapr-api dapr-web dapr-worker --tail=200`
+2. Confirm component files are mounted under `/components`.
+3. Check sidecar app binding ports (`--app-port`) match app container ports (API 5100, Web 3000, Worker 8000).
+4. Run `./infra/dev/up.sh` and verify no `Dapr metadata missing components` error is reported.
+dapr-web dapr-worker --tail=200`
 2. Confirm component files are mounted under `/components`.
 3. Check sidecar app binding ports (`--app-port`) match app container ports (API 5100, Web 3000, Worker 8000).
 4. Run `./infra/dev/up.sh` and verify no `Dapr metadata missing components` error is reported.

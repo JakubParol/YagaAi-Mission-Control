@@ -227,6 +227,14 @@ Workflow goal:
 - containerized DEV stays online on `3000/5000`
 - containerized PROD stays online on `3100/5100`
 - local VS Code development runs in parallel on `3001/5001`
+- local DEV must never require stopping always-on DEV/PROD
+
+Source of truth:
+
+- local manual web: `apps/web/scripts/run-dev.sh`
+- local manual api: `services/api/scripts/run-dev.sh`
+- always-on DEV containers: `infra/dev/docker-compose.yml`
+- always-on PROD containers: `infra/prod/docker-compose.prod.yml`
 
 Start local API:
 
