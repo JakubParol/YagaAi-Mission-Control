@@ -21,6 +21,16 @@ PUBSUB_TOPIC = os.environ.get("MC_WORKER_DAPR_TOPIC", "orchestration.events")
 STATESTORE_NAME = os.environ.get("MC_WORKER_DAPR_STATESTORE", "local-statestore")
 PUBLISH_INTERVAL_SECONDS = int(os.environ.get("MC_WORKER_PUBLISH_INTERVAL_SECONDS", "15"))
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+SYNTHETIC_EVENTS_ENABLED = _env_flag("MC_WORKER_SYNTHETIC_EVENTS_ENABLED", False)
+
 _state_lock = threading.Lock()
 _latest_ack: dict[str, Any] | None = None
 _latest_publish: dict[str, Any] | None = None
@@ -132,6 +142,8 @@ class WorkerHandler(BaseHTTPRequestHandler):
                 "api_health_url": API_HEALTH_URL,
                 "redis": f"{REDIS_HOST}:{REDIS_PORT}",
                 "dapr_http_url": DAPR_HTTP_URL,
+                "synthetic_events_enabled": SYNTHETIC_EVENTS_ENABLED,
+                "publish_interval_seconds": PUBLISH_INTERVAL_SECONDS,
                 "latest_publish": _latest_publish,
                 "latest_ack": _latest_ack,
                 "last_error": _last_error,
@@ -164,8 +176,21 @@ class WorkerHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    publisher = threading.Thread(target=_publisher_loop, daemon=True)
-    publisher.start()
+    if SYNTHETIC_EVENTS_ENABLED:
+        publisher = threading.Thread(target=_publisher_loop, daemon=True)
+        publisher.start()
+        _log(
+            "INFO",
+            "worker.synthetic_publisher.enabled",
+            interval_seconds=PUBLISH_INTERVAL_SECONDS,
+        )
+    else:
+        _log(
+            "INFO",
+            "worker.synthetic_publisher.disabled",
+            reason="MC_WORKER_SYNTHETIC_EVENTS_ENABLED=false",
+        )
+
     server = ThreadingHTTPServer(("0.0.0.0", WORKER_APP_PORT), WorkerHandler)
     _log("INFO", "worker.http.started", bind=f"0.0.0.0:{WORKER_APP_PORT}")
     server.serve_forever()
