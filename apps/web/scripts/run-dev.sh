@@ -16,6 +16,6 @@ fi
 
 DEV_PORT="${PORT:-3001}"
 export API_URL="${API_URL:-http://127.0.0.1:5001}"
-export NEXT_DIST_DIR="${NEXT_DIST_DIR:-.next-vscode}"
+export NEXT_DIST_DIR="${NEXT_DIST_DIR:-.next-local}"
 
 exec ./node_modules/.bin/next dev --hostname "$DEV_HOST" --port "$DEV_PORT" "$@"
