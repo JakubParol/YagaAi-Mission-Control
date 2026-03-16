@@ -2,49 +2,239 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-COMPOSE_FILE="$REPO_ROOT/infra/prod/docker-compose.prod.yml"
+PROD_COMPOSE_FILE="$REPO_ROOT/infra/prod/docker-compose.prod.yml"
 PROD_ENV="/etc/mission-control/prod.env"
-PROJECT_NAME="mission-control-prod"
+PROD_PROJECT_NAME="mission-control-prod"
+DEV_COMPOSE_FILE="$REPO_ROOT/infra/dev/docker-compose.yml"
+DEV_ENV="$REPO_ROOT/infra/dev/.env"
+DEV_ENV_EXAMPLE="$REPO_ROOT/infra/dev/.env.example"
+DEV_PROJECT_NAME="mission-control-local"
 
-if [[ ! -f "$PROD_ENV" ]]; then
-  echo "[ERROR] Missing $PROD_ENV"
-  echo "Create it from $REPO_ROOT/infra/env/prod.env.example"
-  exit 1
-fi
+log_info() {
+  echo "[INFO] $*"
+}
 
-cd "$REPO_ROOT"
+log_ok() {
+  echo "[OK] $*"
+}
 
-CURRENT_SHA="$(git -c safe.directory="$REPO_ROOT" rev-parse --short HEAD)"
-PREVIOUS_SHA="$(git -c safe.directory="$REPO_ROOT" rev-parse --short HEAD~1 2>/dev/null || echo "$CURRENT_SHA")"
+log_error() {
+  echo "[ERROR] $*" >&2
+}
 
-echo "[INFO] Deploying commit $CURRENT_SHA"
+current_sha() {
+  git -c safe.directory="$REPO_ROOT" rev-parse --short HEAD
+}
 
-echo "[INFO] Building production images..."
-DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" build
+previous_sha() {
+  git -c safe.directory="$REPO_ROOT" rev-parse --short HEAD~1 2>/dev/null || current_sha
+}
 
-MC_IMAGE_TAG="$CURRENT_SHA" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$COMPOSE_FILE" "$PROD_ENV"
+ensure_prod_env() {
+  if [[ ! -f "$PROD_ENV" ]]; then
+    log_error "Missing $PROD_ENV"
+    echo "Create it from $REPO_ROOT/infra/env/prod.env.example" >&2
+    exit 1
+  fi
+}
 
-echo "[INFO] Starting/updating production stack..."
-MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait
+ensure_dev_env() {
+  if [[ -f "$DEV_ENV" ]]; then
+    return 0
+  fi
 
-echo "[INFO] Running smoke checks..."
-curl -fsS http://127.0.0.1:5100/healthz >/dev/null
-curl -fsS -I http://127.0.0.1:3100 >/dev/null
+  cp "$DEV_ENV_EXAMPLE" "$DEV_ENV"
+  log_info "Created infra/dev/.env from template"
+}
 
-echo "[INFO] Smoke checks passed"
-echo "[INFO] Runtime status (docker compose ps):"
-MC_IMAGE_TAG="$CURRENT_SHA" docker compose -f "$COMPOSE_FILE" --env-file "$PROD_ENV" ps
+smoke_check() {
+  local api_url="$1"
+  local web_url="$2"
 
-echo "[INFO] API /healthz response:"
-curl -fsS http://127.0.0.1:5100/healthz
-echo
+  log_info "Running smoke checks..."
+  curl -fsS "$api_url" >/dev/null
+  curl -fsS -I "$web_url" >/dev/null
+  log_info "Smoke checks passed"
+}
 
-echo "[INFO] WEB headers:"
-curl -fsS -I http://127.0.0.1:3100
-echo
+show_runtime_status() {
+  local compose_file="$1"
+  local env_file="$2"
+  local image_tag="$3"
 
-echo "[OK] Deploy complete"
-echo "      web: http://127.0.0.1:3100"
-echo "      api: http://127.0.0.1:5100"
-echo "      image_tag: $CURRENT_SHA"
-echo "      previous_sha: $PREVIOUS_SHA"
+  log_info "Runtime status (docker compose ps):"
+  MC_IMAGE_TAG="$image_tag" docker compose -f "$compose_file" --env-file "$env_file" ps
+}
+
+deploy_prod() {
+  local current_sha previous_sha
+
+  ensure_prod_env
+  cd "$REPO_ROOT"
+
+  current_sha="$(current_sha)"
+  previous_sha="$(previous_sha)"
+
+  log_info "Deploying PROD commit $current_sha"
+  log_info "Building production images..."
+  DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV" build
+
+  MC_IMAGE_TAG="$current_sha" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$PROD_COMPOSE_FILE" "$PROD_ENV"
+
+  log_info "Starting/updating production stack..."
+  MC_IMAGE_TAG="$current_sha" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait
+
+  smoke_check "http://127.0.0.1:5100/healthz" "http://127.0.0.1:3100"
+  show_runtime_status "$PROD_COMPOSE_FILE" "$PROD_ENV" "$current_sha"
+
+  log_info "API /healthz response:"
+  curl -fsS http://127.0.0.1:5100/healthz
+  echo
+
+  log_info "WEB headers:"
+  curl -fsS -I http://127.0.0.1:3100
+  echo
+
+  log_ok "PROD deploy complete"
+  echo "      project: $PROD_PROJECT_NAME"
+  echo "      web: http://127.0.0.1:3100"
+  echo "      api: http://127.0.0.1:5100"
+  echo "      image_tag: $current_sha"
+  echo "      previous_sha: $previous_sha"
+}
+
+deploy_dev() {
+  local current_sha previous_sha
+
+  ensure_dev_env
+  cd "$REPO_ROOT"
+
+  current_sha="$(current_sha)"
+  previous_sha="$(previous_sha)"
+
+  log_info "Deploying DEV commit $current_sha"
+  log_info "Building DEV API image..."
+  DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" build api
+
+  MC_IMAGE_TAG="$current_sha" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$DEV_COMPOSE_FILE" "$DEV_ENV"
+
+  log_info "Starting/updating DEV stack..."
+  MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" up -d --remove-orphans --wait
+
+  smoke_check "http://127.0.0.1:5000/healthz" "http://127.0.0.1:3000"
+  show_runtime_status "$DEV_COMPOSE_FILE" "$DEV_ENV" "$current_sha"
+
+  log_info "API /healthz response:"
+  curl -fsS http://127.0.0.1:5000/healthz
+  echo
+
+  log_info "WEB headers:"
+  curl -fsS -I http://127.0.0.1:3000
+  echo
+
+  log_ok "DEV deploy complete"
+  echo "      project: $DEV_PROJECT_NAME"
+  echo "      web: http://127.0.0.1:3000"
+  echo "      api: http://127.0.0.1:5000"
+  echo "      image_tag: $current_sha"
+  echo "      previous_sha: $previous_sha"
+}
+
+confirm_or_exit() {
+  local env_name="$1"
+
+  if command -v whiptail >/dev/null 2>&1; then
+    if ! whiptail \
+      --title "Mission Control Deploy" \
+      --yesno "Run ${env_name} deploy now?" \
+      10 60; then
+      log_info "Cancelled"
+      exit 0
+    fi
+    return 0
+  fi
+
+  read -r -p "Run ${env_name} deploy now? [y/N] " answer
+  case "$answer" in
+    y|Y|yes|YES) return 0 ;;
+    *)
+      log_info "Cancelled"
+      exit 0
+      ;;
+  esac
+}
+
+show_menu() {
+  local choice
+
+  if command -v whiptail >/dev/null 2>&1; then
+    choice="$(
+      whiptail \
+        --title "Mission Control Deploy" \
+        --menu "Choose deployment target" \
+        16 72 3 \
+        "1" "Deploy Dev   (container runtime on 3000 / 5000)" \
+        "2" "Deploy Prod  (container runtime on 3100 / 5100)" \
+        "q" "Quit" \
+        3>&1 1>&2 2>&3
+    )"
+  else
+    clear
+    echo "Mission Control Deploy"
+    echo "======================="
+    echo "1) Deploy Dev"
+    echo "2) Deploy Prod"
+    echo "q) Quit"
+    read -r -p "> " choice
+  fi
+
+  case "$choice" in
+    1)
+      confirm_or_exit "DEV"
+      deploy_dev
+      ;;
+    2)
+      confirm_or_exit "PROD"
+      deploy_prod
+      ;;
+    q|Q|"")
+      log_info "Bye"
+      ;;
+    *)
+      log_error "Unknown option: $choice"
+      exit 1
+      ;;
+  esac
+}
+
+print_usage() {
+  cat <<EOF
+Usage: $0 [dev|prod|menu]
+
+Without arguments, opens an interactive deploy menu.
+EOF
+}
+
+main() {
+  case "${1:-menu}" in
+    dev)
+      deploy_dev
+      ;;
+    prod)
+      deploy_prod
+      ;;
+    menu)
+      show_menu
+      ;;
+    -h|--help|help)
+      print_usage
+      ;;
+    *)
+      log_error "Unknown command: $1"
+      print_usage
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"

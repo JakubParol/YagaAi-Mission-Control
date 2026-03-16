@@ -22,7 +22,7 @@ echo "[INFO] Restoring dump into PROD PostgreSQL..."
 ./infra/prod/postgres-restore.sh "$BACKUP_FILE"
 
 echo "[INFO] Running PROD deploy (migrations + stack bring-up)..."
-./infra/deploy.sh
+./infra/deploy.sh prod
 
 echo "[INFO] Refreshing DEV PostgreSQL from the same dump..."
 ./infra/dev/scripts/postgres-restore.sh "$BACKUP_FILE"
