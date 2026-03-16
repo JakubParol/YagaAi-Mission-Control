@@ -13,17 +13,20 @@ Before working on any layer, read this entire file **and** the stack-specific st
 
 ## Quality Gate (MANDATORY — read first)
 
-Before every commit, run from the project root:
+Applies to **code projects** (`apps/web`, `apps/cli`, `services/api`). Does not apply to root-level docs, infra scripts, or config-only changes.
+
+Before every commit that touches a code project, run from that project's root:
 
 ```bash
 ./scripts/lint.sh --fix   # auto-fix what it can
 ./scripts/lint.sh          # verify zero warnings, zero errors
+./scripts/test.sh          # run tests — all must pass
 ```
 
 - **Zero-warnings policy.** Every warning is a bug. Fix at source.
 - **No suppression hacks.** Do not use `# noqa`, `# type: ignore`, `eslint-disable`, `@ts-ignore`, blanket lint config weakening, or any other mechanism to hide issues.
 - **Fix like a senior.** Understand the root cause, fix it properly. No workarounds, no duct tape.
-- **If `scripts/lint.sh` does not exist** in the project you're working on — **STOP and report BLOCKER.** Do not proceed without a quality gate.
+- **If `scripts/lint.sh` does not exist** in a code project you're modifying — **STOP and report BLOCKER.** Do not proceed without a quality gate.
 
 ---
 
