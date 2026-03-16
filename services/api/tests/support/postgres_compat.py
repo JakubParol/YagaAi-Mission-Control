@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from collections.abc import Iterator
 from typing import Any, cast
 
 import psycopg
@@ -17,7 +16,8 @@ from app.shared.db.adapter import DbCursor, SqlTextSession, _translate_sqlite_da
 from app.shared.db.metadata import metadata
 
 _SQLITE_MASTER_PATTERN = re.compile(
-    r"SELECT\s+name\s+FROM\s+sqlite_master\s+WHERE\s+type\s*=\s*'index'\s+AND\s+name\s*=\s*'([^']+)'",
+    r"SELECT\s+name\s+FROM\s+sqlite_master\s+WHERE\s+type\s*=\s*'index'"
+    r"\s+AND\s+name\s*=\s*'([^']+)'",
     re.IGNORECASE,
 )
 
@@ -39,7 +39,9 @@ def _map_db_error(error: psycopg.Error) -> sqlite3.Error:
     return sqlite3.OperationalError(str(error))
 
 
-def _replace_unquoted_qmarks(query: str) -> str:
+def _replace_unquoted_qmarks(  # pylint: disable=too-many-branches,too-many-statements
+    query: str,
+) -> str:
     out: list[str] = []
     in_single_quote = False
     in_double_quote = False
@@ -125,7 +127,9 @@ def _replace_unquoted_qmarks(query: str) -> str:
     return "".join(out)
 
 
-def split_sql_script(script: str) -> list[str]:
+def split_sql_script(  # pylint: disable=too-many-branches,too-many-statements
+    script: str,
+) -> list[str]:
     statements: list[str] = []
     current: list[str] = []
     in_single_quote = False
@@ -222,7 +226,7 @@ class SyncCompatCursor:
             self._cursor.close()
 
 
-class SyncCompatConnection:
+class SyncCompatConnection:  # pylint: disable=no-member
     def __init__(self, database_url: str) -> None:
         self._conn = psycopg.connect(_sync_database_url(database_url), row_factory=tuple_row)
 
