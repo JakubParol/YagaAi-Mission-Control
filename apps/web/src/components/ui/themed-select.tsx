@@ -41,6 +41,12 @@ interface ThemedSelectProps {
   onValueChange: (value: string) => void;
 }
 
+export function stopThemedSelectEventPropagation(
+  event: Pick<React.SyntheticEvent, "stopPropagation">,
+): void {
+  event.stopPropagation();
+}
+
 export function findFirstEnabledOptionIndex(options: readonly ThemedSelectOption[]): number {
   return options.findIndex((option) => !option.disabled);
 }
@@ -250,6 +256,8 @@ export function ThemedSelect({
       <PopoverContent
         align={align}
         sideOffset={6}
+        onClick={stopThemedSelectEventPropagation}
+        onPointerDown={stopThemedSelectEventPropagation}
         className={cn(
           "w-[var(--radix-popover-trigger-width)] p-1.5",
           "border-border/70 bg-popover/95 backdrop-blur-sm",
@@ -291,7 +299,11 @@ export function ThemedSelect({
                       if (disabledOption) return;
                       setHighlightedIndex(index);
                     }}
-                    onClick={() => selectOption(option)}
+                    onPointerDown={stopThemedSelectEventPropagation}
+                    onClick={(event) => {
+                      stopThemedSelectEventPropagation(event);
+                      selectOption(option);
+                    }}
                   >
                     <span className="min-w-0 grow truncate">
                       {renderOption ? renderOption(option, optionState) : option.label}

@@ -10,6 +10,7 @@ import {
   getHighlightIndexForKey,
   getNextEnabledOptionIndex,
   resolveInitialHighlightIndex,
+  stopThemedSelectEventPropagation,
   type ThemedSelectOption,
 } from "./themed-select.js";
 
@@ -68,4 +69,16 @@ test("getHighlightIndexForKey supports arrow/home/end keyboard navigation", () =
   assert.equal(getHighlightIndexForKey(OPTIONS, 2, "ArrowUp"), 0);
   assert.equal(getHighlightIndexForKey(OPTIONS, 2, "Home"), 0);
   assert.equal(getHighlightIndexForKey(OPTIONS, 0, "End"), 2);
+});
+
+test("stopThemedSelectEventPropagation prevents parent click handlers from seeing select interactions", () => {
+  let stopped = false;
+
+  stopThemedSelectEventPropagation({
+    stopPropagation() {
+      stopped = true;
+    },
+  });
+
+  assert.equal(stopped, true);
 });
