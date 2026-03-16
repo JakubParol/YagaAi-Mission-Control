@@ -31,10 +31,9 @@ See [docs/REPO_MAP.md](./docs/REPO_MAP.md) for detailed project descriptions.
 
 ## Getting Started (DEV, containerized runtime)
 
-Fresh Ubuntu VM bootstrap:
+Fresh Ubuntu VM bootstrap (run from repo root):
 
 ```bash
-cd /home/kuba/repos/mission-control
 bash ./install.sh
 ```
 
@@ -47,7 +46,6 @@ Use `--api-base http://127.0.0.1:5000` when you want to hit DEV explicitly.
 Manual DEV runtime:
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/up.sh
 ```
 
@@ -75,7 +73,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable mission-control-prod.service
 ```
 
-The checked-in unit file is a path-specific example for `/home/kuba/...`. If you install manually instead of using `install.sh`, adjust repo paths before enabling it.
+The checked-in unit file contains hardcoded paths. If you install manually instead of using `install.sh`, adjust repo paths in the unit file before enabling it.
 
 Deploy/update:
 
