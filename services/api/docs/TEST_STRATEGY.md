@@ -1,148 +1,118 @@
 # Test Strategy — Services API
 
-**Status:** v1.0
-**Date:** 2026-02-28
-**Scope:** `services/api/` — FastAPI backend for planning + observability modules
+**Status:** Active
+**Scope:** `services/api`
 
-## Overview
+---
 
-This document defines the test strategy for the Services API. The goal is to validate all HTTP endpoints, business rules, and data integrity for the PostgreSQL-backed API runtime, ensuring behavior matches the [Entity Model v1](../../../docs/ENTITY_MODEL_V1.md) and [Workflow Logic v1](../../../docs/WORKFLOW_LOGIC_V1.md).
+## 1) Purpose
 
-## Test Pyramid
+The API test suite is intended to protect:
+- HTTP contracts
+- planning business rules
+- orchestration runtime behavior at service/API level
+- observability import/read flows
+- integration between routing, application services, repositories, and DB compatibility layers
 
-| Level | Scope | Tools | Status |
-|-------|-------|-------|--------|
-| **Integration** | API endpoints + DB | FastAPI TestClient, pytest, repository/DB fixtures | Active |
-| **Unit** | Domain models, pure services | pytest | Future — as domain layer grows |
-| **E2E** | Full flow (API → DB → response) | httpx / pytest | Future — for critical paths |
+The suite is intentionally integration-heavy because the application is thin at the edge and most bugs show up at route/service/repository boundaries.
 
-Current focus is integration tests because the API layer is thin (routes → service → repository) and integration tests cover the full stack per request.
+---
 
-## Test Structure
+## 2) Current test layout
 
-```
+```text
 services/api/tests/
-├── conftest.py                          # (empty / future shared fixtures)
-├── test_health.py                       # GET /healthz smoke test
+├── conftest.py
+├── test_health.py
 ├── planning/
-│   ├── conftest.py                      # Schema + seed data + TestClient
-│   ├── test_project_routes.py           # Projects CRUD + business rules (24 tests)
-│   ├── test_agent_routes.py             # Agents CRUD + filtering (22 tests)
-│   ├── test_label_routes.py             # Labels CRUD + duplicate detection (15 tests)
-│   ├── test_backlog_routes.py           # Backlogs CRUD + business rules (25 tests)
-│   ├── test_epic_routes.py              # Epics CRUD (24 tests)
-│   ├── test_story_routes.py             # Stories CRUD + labels (35 tests)
-│   ├── test_task_routes.py              # Tasks CRUD + assignments + labels + derivation (46 tests)
-│   └── test_backlog_items_routes.py     # Backlog item management + reorder (28 tests)
-└── observability/
-    ├── conftest.py                      # Langfuse schema + TestClient
-    └── test_observability_routes.py     # Costs, requests, models, imports (5 tests)
+├── observability/
+├── orchestration/
+└── support/
 ```
 
-## Fixtures and Test Data
+### Planning coverage
 
-### Database Setup
+Planning tests cover CRUD and lifecycle behavior for:
+- projects
+- agents
+- labels
+- epics
+- stories
+- tasks
+- backlogs
+- backlog items
+- active sprint and sprint lifecycle flows
+- key resolution and epic overview actions
 
-Each module has its own `conftest.py` with an **autouse** fixture that:
+### Observability coverage
 
-1. Creates isolated database fixtures for the target module
-2. Runs the full schema DDL (mirrors production tables)
-3. Inserts seed data for realistic test scenarios
-4. Wires FastAPI routes to the test database through dependency overrides
+Observability tests cover:
+- cost summary endpoints
+- request listing/model listing
+- import status and import-trigger flows
 
-This ensures complete test isolation — every test function gets a fresh database.
+### Orchestration coverage
 
-### Planning Seed Data
+Orchestration tests cover:
+- command acceptance routes
+- Dapr bridge routes
+- run/timeline read model routes
+- delivery service behavior
+- worker state machine behavior
+- watchdog routes and service logic
+- consumer recovery and stream-contract helpers
 
-| Entity | IDs | Notes |
-|--------|-----|-------|
-| Projects | p1, p2 | Both ACTIVE, with counters starting at 1 |
-| Backlogs | b1, b2 (p1), bg (global) | BACKLOG + SPRINT kinds |
-| Stories | s1, s2 (p1), sp2 (p2), sg (global) | All TODO, MANUAL mode |
-| Tasks | t1, t2 (p1), tp2 (p2), tg (global) | All TODO |
-| Agents | a1, a2 | developer + reviewer roles |
+---
 
-### Observability Seed Data
+## 3) Test style
 
-Empty tables (imports, langfuse_daily_metrics, langfuse_requests) — tests verify empty-state responses.
+Current default style:
+- **integration-first** for route + service + repository flows
+- **targeted service tests** for orchestration behavior where route-only coverage is not enough
+- **support fixtures** for DB/runtime compatibility setup
 
-## Running Tests
+Typical assertions validate:
+- status code
+- response envelope shape
+- DB side effects
+- business rule enforcement
+- deterministic orchestration/read-model outputs
+
+---
+
+## 4) Running tests
 
 ```bash
 cd services/api
-
-# All tests
 poetry run pytest
+```
 
-# Verbose output
+Useful variants:
+
+```bash
 poetry run pytest -v
-
-# Single module
 poetry run pytest tests/planning/test_task_routes.py
-
-# Single test
-poetry run pytest tests/planning/test_task_routes.py::test_create_task_with_project
-
-# With coverage (requires pytest-cov)
+poetry run pytest tests/orchestration/test_command_routes.py
 poetry run pytest --cov=app --cov-report=term-missing
 ```
 
-## Linting
+---
 
-Tests are included in lint checks:
+## 5) Quality expectations
 
-```bash
-bash scripts/lint.sh          # full lint (includes test files)
-bash scripts/lint.sh --fix    # auto-fix formatting
-```
+When changing API behavior, the default expectation is:
+- update or add tests in the relevant module
+- keep route contracts stable unless intentionally changed
+- cover regression cases for bug fixes, especially in orchestration and planning lifecycle behavior
 
-Pyright type-checks both `app/` and `tests/` directories.
-
-## Test Patterns
-
-### Arrange-Act-Assert
-
-All tests follow a consistent pattern:
-1. **Arrange** — create entities via API calls (POST), or insert directly through test fixtures for cross-cutting data
-2. **Act** — call the endpoint under test
-3. **Assert** — verify status code, response body structure, and side effects
-
-### Direct DB Access
-
-When testing side effects that require data not yet exposed via API, tests may seed storage directly through the fixture-owned database setup.
-
-### Response Envelope
-
-All assertions follow the standard response envelope:
-- Success: `{"data": ..., "meta": ...}`
-- Error: `{"error": {"code": "...", "message": "..."}}`
-
-### Key Scenarios Covered
-
-- **Happy path** CRUD for every entity
-- **Validation** — empty titles (422), invalid statuses (422)
-- **Not found** — 404 on nonexistent IDs
-- **Conflict** — 409 on duplicates (labels, backlog membership, same-agent assignment)
-- **Business rules** — 400 on scope violations (cross-project backlog, global backlog rules)
-- **Side effects** — status derivation, completed_at/started_at lifecycle, assignment auto-close on DONE
-- **Cascade behavior** — ON DELETE SET NULL verified for epic→stories, story→tasks
-
-## Coverage Goals
-
-- **Current:** 225 integration tests across 10 test files, 92% code coverage
-- **Target:** Maintain full endpoint coverage; add unit tests as domain logic grows
-- **Gaps:** Observability module has minimal tests (empty-DB smoke tests only); Langfuse client/import service require external integration
-
-## Future Improvements
-
-1. ~~**pytest-cov integration**~~ — Done: `pytest-cov` added as dev dependency, baseline coverage 92%
-2. **Unit tests for domain logic** — as status derivation and workflow rules move to domain layer
-3. **Parametrized tests** — reduce boilerplate for similar CRUD patterns across entities
-4. **Factory fixtures** — extract entity creation helpers to reduce test verbosity
-5. **Load/performance tests** — for backlog reorder and bulk operations
+Areas that deserve extra care:
+- sprint lifecycle and backlog movement semantics
+- assignee change / event emission behavior
+- orchestration retry / watchdog / read-model correctness
+- Dapr bridge behavior and failure handling
 
 ## Navigation
 
-- ↑ [Documentation Index](./INDEX.md)
+- ↑ [Docs Index](./INDEX.md)
 - ↑ [README](../README.md)
 - ↑ [AGENTS](../AGENTS.md)

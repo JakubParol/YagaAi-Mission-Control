@@ -1381,4 +1381,4 @@ Failure mode:
 - ← [Architecture](./ARCHITECTURE.md)
 - → [Auth](./AUTH.md)
 - → [Status Transitions](./STATUS_TRANSITIONS.md)
-- → [Operational Notes](./OPERATIONAL.md)
+- → [Test Strategy](./TEST_STRATEGY.md)

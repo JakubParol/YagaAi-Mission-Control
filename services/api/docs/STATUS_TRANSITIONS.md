@@ -1,117 +1,101 @@
-# Status Transition Rules — Mission Control v1
+# Status Transition Rules — Mission Control API
 
-**Status:** Draft v1.1
-**Date:** 2026-02-27
-**Applies to:** `services/api` — **planning module** — aligned with [WORKFLOW_LOGIC_V1.md](../../../docs/WORKFLOW_LOGIC_V1.md)
+**Status:** Active
+**Applies to:** `services/api` — planning module
 
 ---
 
-## 1) Status Values
+## 1) Supported status sets
 
-| Entity | Allowed statuses |
+| Entity | Statuses |
 |---|---|
-| Task | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
-| Story | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
-| Epic | `TODO`, `IN_PROGRESS`, `DONE` |
-| Backlog | `ACTIVE`, `CLOSED` |
 | Project | `ACTIVE`, `ARCHIVED` |
-
-Backlog `status` is lifecycle-managed:
-- Generic `PATCH /backlogs/{id}` cannot change `status`.
-- Sprint activation path is explicit: `POST /backlogs/{id}/start` and `POST /backlogs/{id}/complete`.
-- If backlog `kind` transitions to `SPRINT`, status is forced to `CLOSED` and must be explicitly started.
-
----
-
-## 2) Task Status
-
-- **Permissive transitions in v1**: any status → any status is allowed.
-- No transition graph enforcement yet (deferred to v2).
-- On transition to `DONE`:
-  - `completed_at` is set automatically.
-  - Active assignment is auto-closed (`unassigned_at` set).
-- On transition away from `DONE`:
-  - `completed_at` is cleared.
-
-Validation: reject unknown status values (400).
+| Backlog | `OPEN`, `ACTIVE`, `CLOSED` |
+| Story | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
+| Task | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
+| Epic | `TODO`, `IN_PROGRESS`, `DONE` |
 
 ---
 
-## 3) Story Status
+## 2) Tasks
 
-Story status is always **manual** — set directly via PATCH. It is never derived from child tasks.
+Current task lifecycle behavior:
+- status is set explicitly
+- transition to `IN_PROGRESS` sets `started_at` on first start
+- transition to `DONE` sets `completed_at`
+- transition away from `DONE` clears `completed_at`
+- transition to `DONE` closes active assignment state
 
-No `status_mode`, `status_override`, or `status_override_set_at` fields exist on stories.
-
----
-
-## 4) Epic Status (Derived + Override)
-
-Same pattern as stories, one level up:
-
-| Condition | Behavior |
-|---|---|
-| Epic has **no stories** | Status is **manual**. |
-| Epic has **stories** | Status is **derived** from child stories. Override allowed. |
-
-Derivation:
-
-| Child story states | Derived epic status |
-|---|---|
-| All `TODO` | `TODO` |
-| All `DONE` | `DONE` |
-| Any mix | `IN_PROGRESS` |
-
-Override expires on next child story status change.
+Guardrails currently enforced:
+- blocked task cannot be moved to `DONE`
+- `blocked_reason` can only be set when `is_blocked = true`
+- clearing `is_blocked` clears `blocked_reason`
 
 ---
 
-## 5) Blocking (`is_blocked`)
+## 3) Stories
 
-- `is_blocked` is independent of status. A task can be `IN_PROGRESS` and blocked.
-- Set via PATCH on the entity itself. Optional `blocked_reason` text.
-- **Propagation (read-only, computed):**
-  - If any child task is blocked → parent story `is_blocked = true` (computed, not stored on parent).
-  - If any child story is blocked → parent epic `is_blocked = true` (computed).
-- Parent `is_blocked` cannot be manually overridden — it is always derived from children.
-- API response for stories/epics should include a computed `is_blocked` reflecting child state.
+Story status is currently **manual**.
+It is not derived from child tasks.
+
+Story write model also supports:
+- `is_blocked`
+- `blocked_reason`
+- assignee change tracking / assignment event emission
 
 ---
 
-## 6) Side Effects Summary
+## 4) Epics
+
+Epic status supports derived behavior from child stories.
+
+Current rule of thumb:
+- no child stories → epic can stay effectively manual
+- all child stories `TODO` → epic `TODO`
+- all child stories `DONE` → epic `DONE`
+- mixed child story states → epic `IN_PROGRESS`
+
+Epic records also support manual/blocking metadata on the entity itself, while overview/read models additionally surface child-story blockage signals.
+
+---
+
+## 5) Backlogs and sprints
+
+Backlog lifecycle is explicit:
+- generic backlog updates do **not** own sprint lifecycle transitions
+- sprint start uses `POST /backlogs/{id}/start`
+- sprint completion uses `POST /backlogs/{id}/complete`
+
+Important current behavior:
+- creating or converting a backlog to `SPRINT` puts it into `OPEN`
+- an active sprint uses `ACTIVE`
+- completed sprint uses `CLOSED`
+- only one active sprint is allowed per project
+- only project-scoped backlogs can become sprints
+- active sprint membership is managed through dedicated endpoints, not raw backlog patching
+
+---
+
+## 6) Side effects worth remembering
 
 | Trigger | Side effect |
 |---|---|
-| Task status → `DONE` | Close active assignment, set `completed_at` |
-| Task status away from `DONE` | Clear `completed_at` |
-| Task status change (any) | No side effects on parent story |
-| Story status change (any) | Re-derive parent epic status, clear epic override |
-| Story/task gets `project_id` set | Auto-generate `key`, remove from global backlog |
-| Project created | Auto-create default backlog |
-| Backlog deleted | Detach items (don't delete them) |
+| Task → `IN_PROGRESS` first time | sets `started_at` |
+| Task → `DONE` | sets `completed_at`, closes active assignment |
+| Task away from `DONE` | clears `completed_at` |
+| Story/task assignee change | writes durable assignment-change event ledger entry |
+| Sprint start | activates the sprint and establishes active-sprint context for the project |
+| Sprint complete | closes the sprint, but only when completion rules pass |
 
 ---
 
-## 7) Status History
+## 7) Scope of this document
 
-Every status change on epics, stories, and tasks is recorded in the corresponding `*_status_history` table:
-
-```jsonc
-{
-  "from_status": "TODO",    // null on creation
-  "to_status": "IN_PROGRESS",
-  "changed_by": "agent-abc",
-  "changed_at": "2026-02-27T...",
-  "note": "optional context"
-}
-```
-
-This is append-only and preserved even after entity deletion.
-
----
+This file intentionally captures only rules that are visible and important in the current API behavior.
+For endpoint payloads and response shapes, use [API Contracts](./API_CONTRACTS.md).
 
 ## Navigation
 
 - ↑ [Docs Index](./INDEX.md)
 - ← [Auth](./AUTH.md)
-- → [Operational Notes](./OPERATIONAL.md)
+- → [API Contracts](./API_CONTRACTS.md)

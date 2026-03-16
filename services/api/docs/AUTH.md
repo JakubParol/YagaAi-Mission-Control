@@ -1,51 +1,62 @@
-# Auth Approach — Mission Control v1
+# Auth Approach — Mission Control API
 
-**Status:** Draft v1.1
-**Date:** 2026-02-27
-**Applies to:** `services/api` — all modules (planning, observability)
+**Status:** Active v1 posture
+**Applies to:** `services/api` — planning, observability, orchestration
 
 ---
 
-## v1: No Auth (Internal Service)
+## 1) Current state
 
-In v1, the API runs as an internal service behind a private network boundary. No authentication or authorization is enforced.
+The API currently runs as an internal service. There is **no user-facing auth enforcement** in v1.
 
-### Caller Identity
+That means:
+- no bearer-token gate on normal API routes
+- no RBAC checks in the application layer yet
+- trust is currently derived from network/runtime placement
 
-Even without auth, we track **who** makes changes:
+This is intentional for the current internal deployment model.
 
-- Requests may include an `X-Actor-Id` header (agent key or human identifier).
-- Requests may include an `X-Actor-Type` header (`human` | `agent` | `system`).
-- These values propagate to `created_by`, `updated_by`, and `activity_log.actor_id` / `actor_type`.
-- If omitted, actor defaults to `system` / `null`.
+---
 
-This convention is cheap to implement and ensures audit trails are useful from day one.
+## 2) Actor identity headers
 
-### Future-Ready Headers
+Even without auth enforcement, write paths still track **who** initiated a change.
 
-Reserve these headers for future use (ignored in v1, no enforcement):
+Supported request headers:
 
 | Header | Purpose |
 |---|---|
-| `Authorization` | Bearer token (JWT or API key) |
-| `X-Tenant-Id` | Multi-tenancy isolation |
-| `X-Idempotency-Key` | Request deduplication (see [Operational](./OPERATIONAL.md)) |
+| `X-Actor-Id` | human / agent / system identifier |
+| `X-Actor-Type` | `human`, `agent`, or `system` |
+| `X-Request-Id` | request correlation / log tracing |
+
+These values are used for request logs and selected audit/activity records.
+If omitted, the system falls back to internal defaults.
 
 ---
 
-## v2+ Auth Plan (Sketch)
+## 3) Reserved future headers
 
-When auth is needed:
+The following are intentionally reserved for future enforcement/use, but are not the primary auth mechanism today:
 
-1. **API keys** for agent-to-API calls (simple, service-to-service).
-2. **JWT bearer tokens** for human users (issued by an external identity provider).
-3. **RBAC** with roles: `admin`, `member`, `agent`.
-4. FastAPI dependency `get_current_user()` in `shared/api/deps.py` — wire it to token validation.
-5. Permission checks happen in the application layer (services), not in routers.
-
-No auth code will be written in v1 beyond the actor-identity headers described above.
+| Header | Notes |
+|---|---|
+| `Authorization` | reserved for future bearer-token/API-key enforcement |
+| `X-Tenant-Id` | reserved for future multi-tenant isolation |
+| `X-Idempotency-Key` | reserved for future POST deduplication semantics |
 
 ---
+
+## 4) Expected direction
+
+When stricter auth becomes necessary, the likely order is:
+
+1. API keys for service-to-service calls
+2. bearer-token auth for human users
+3. application-layer permission checks / roles
+4. stronger per-route enforcement and audit rules
+
+That future work should extend this document rather than creating a second auth source of truth.
 
 ## Navigation
 
