@@ -15,7 +15,7 @@ from app.orchestration.domain.models import (
 )
 
 
-class OrchestrationRepository(ABC):
+class CommandRepository(ABC):
     @abstractmethod
     async def create_command_with_outbox(
         self,
@@ -48,58 +48,8 @@ class OrchestrationRepository(ABC):
         dead_letter_payload: dict[str, object],
     ) -> None: ...
 
-    @abstractmethod
-    async def get_consumer_offset(
-        self,
-        *,
-        stream_key: str,
-        consumer_group: str,
-        consumer_name: str,
-    ) -> str | None: ...
 
-    @abstractmethod
-    async def upsert_consumer_offset(
-        self,
-        *,
-        stream_key: str,
-        consumer_group: str,
-        consumer_name: str,
-        last_message_id: str,
-        updated_at: str,
-    ) -> None: ...
-
-    @abstractmethod
-    async def is_message_processed(
-        self,
-        *,
-        stream_key: str,
-        consumer_group: str,
-        message_id: str,
-    ) -> bool: ...
-
-    @abstractmethod
-    async def mark_message_processed(
-        self,
-        *,
-        stream_key: str,
-        consumer_group: str,
-        message_id: str,
-        correlation_id: str,
-        processed_at: str,
-    ) -> None: ...
-
-    @abstractmethod
-    async def mark_message_processed_and_checkpoint(
-        self,
-        *,
-        stream_key: str,
-        consumer_group: str,
-        consumer_name: str,
-        message_id: str,
-        correlation_id: str,
-        processed_at: str,
-    ) -> None: ...
-
+class RunRepository(ABC):
     @abstractmethod
     async def get_run(self, *, run_id: str) -> OrchestrationRun | None: ...
 
@@ -171,6 +121,62 @@ class OrchestrationRepository(ABC):
         clear_lease: bool,
     ) -> bool: ...
 
+
+class ConsumerRepository(ABC):
+    @abstractmethod
+    async def get_consumer_offset(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+    ) -> str | None: ...
+
+    @abstractmethod
+    async def upsert_consumer_offset(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        last_message_id: str,
+        updated_at: str,
+    ) -> None: ...
+
+    @abstractmethod
+    async def is_message_processed(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        message_id: str,
+    ) -> bool: ...
+
+    @abstractmethod
+    async def mark_message_processed(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None: ...
+
+    @abstractmethod
+    async def mark_message_processed_and_checkpoint(
+        self,
+        *,
+        stream_key: str,
+        consumer_group: str,
+        consumer_name: str,
+        message_id: str,
+        correlation_id: str,
+        processed_at: str,
+    ) -> None: ...
+
+
+class ReadModelRepository(ABC):
     @abstractmethod
     async def list_runs(
         self,

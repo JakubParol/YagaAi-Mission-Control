@@ -1,9 +1,9 @@
-from app.orchestration.application.ports import OrchestrationRepository
+from app.orchestration.application.ports import ConsumerRepository
 from app.shared.utils import utc_now
 
 
 class ConsumerRecoveryService:
-    def __init__(self, repo: OrchestrationRepository) -> None:
+    def __init__(self, repo: ConsumerRepository) -> None:
         self._repo = repo
 
     async def get_resume_offset(

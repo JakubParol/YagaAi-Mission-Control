@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from app.config import settings
-from app.orchestration.application.ports import OrchestrationRepository
+from app.orchestration.application.ports import CommandRepository
 from app.orchestration.domain.models import (
     MAX_SUPPORTED_SCHEMA_MINOR,
     MIN_SUPPORTED_SCHEMA_MINOR,
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class CommandService:
-    def __init__(self, repo: OrchestrationRepository) -> None:
+    def __init__(self, repo: CommandRepository) -> None:
         self._repo = repo
         self._default_max_attempts = settings.orchestration_retry_max_attempts
         self._base_backoff_seconds = settings.orchestration_retry_base_backoff_seconds

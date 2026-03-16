@@ -1,14 +1,14 @@
-import aiosqlite
 import pytest
 
 from app.orchestration.application.consumer_recovery_service import ConsumerRecoveryService
-from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
+from app.orchestration.infrastructure.repositories.consumer import DbConsumerRepository
+from app.shared.db.session import get_session_factory
 
 
 @pytest.mark.asyncio
 async def test_get_resume_offset_defaults_to_zero(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
+    async with get_session_factory()() as session:
+        repo = DbConsumerRepository(session)
         service = ConsumerRecoveryService(repo=repo)
         offset = await service.get_resume_offset(
             stream_key="mc:orchestration:events:topic:v1:p0",
@@ -20,8 +20,8 @@ async def test_get_resume_offset_defaults_to_zero(db_path: str) -> None:
 
 @pytest.mark.asyncio
 async def test_mark_processed_and_checkpoint_enables_idempotent_recovery(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
+    async with get_session_factory()() as session:
+        repo = DbConsumerRepository(session)
         service = ConsumerRecoveryService(repo=repo)
 
         await service.mark_processed_and_checkpoint(

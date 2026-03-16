@@ -3,7 +3,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
+from starlette import status as http_status
 
 from app.config import settings
 from app.orchestration.application.worker_state_machine_service import WorkerStateMachineService
@@ -54,7 +55,7 @@ async def dapr_healthz() -> dict[str, str]:
             response.raise_for_status()
         except httpx.HTTPError as error:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Dapr sidecar metadata unavailable: {error}",
             ) from error
     return {"status": "ok"}
@@ -154,7 +155,7 @@ async def handle_dapr_orchestration_event(
             save_state_response.raise_for_status()
         except httpx.HTTPError as error:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Failed to persist orchestration event in Dapr state store: {error}",
             ) from error
 
@@ -166,7 +167,7 @@ async def handle_dapr_orchestration_event(
             invoke_response.raise_for_status()
         except httpx.HTTPError as error:
             raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Failed to invoke worker acknowledgement endpoint via Dapr: {error}",
             ) from error
 
