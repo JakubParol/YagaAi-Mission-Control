@@ -36,7 +36,7 @@ async def _process(
 
 
 @pytest.mark.asyncio
-async def test_watchdog_detects_heartbeat_loss_and_schedules_retry(db_path: str) -> None:
+async def test_watchdog_detects_heartbeat_loss_and_schedules_retry() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)
@@ -73,7 +73,7 @@ async def test_watchdog_detects_heartbeat_loss_and_schedules_retry(db_path: str)
 
 
 @pytest.mark.asyncio
-async def test_watchdog_applies_quarantine_for_batch_second_violation(db_path: str) -> None:
+async def test_watchdog_applies_quarantine_for_batch_second_violation() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)
@@ -123,7 +123,7 @@ async def test_watchdog_applies_quarantine_for_batch_second_violation(db_path: s
 
 
 @pytest.mark.asyncio
-async def test_watchdog_fails_critical_run_on_timeout(db_path: str) -> None:
+async def test_watchdog_fails_critical_run_on_timeout() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)
@@ -158,7 +158,7 @@ async def test_watchdog_fails_critical_run_on_timeout(db_path: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_compare_and_set_run_lease_prevents_conflicting_mutation(db_path: str) -> None:
+async def test_compare_and_set_run_lease_prevents_conflicting_mutation() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)

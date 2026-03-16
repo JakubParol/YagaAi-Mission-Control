@@ -35,7 +35,7 @@ async def _process(
 
 
 @pytest.mark.asyncio
-async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str) -> None:
+async def test_worker_state_machine_happy_path_reaches_terminal_run() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)
@@ -97,9 +97,7 @@ async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str
 
 
 @pytest.mark.asyncio
-async def test_worker_state_machine_rejects_illegal_transition_without_state_corruption(
-    db_path: str,
-) -> None:
+async def test_worker_state_machine_rejects_illegal_transition_without_state_corruption() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)
@@ -140,7 +138,7 @@ async def test_worker_state_machine_rejects_illegal_transition_without_state_cor
 
 
 @pytest.mark.asyncio
-async def test_worker_state_machine_blocks_duplicate_terminal_outcome(db_path: str) -> None:
+async def test_worker_state_machine_blocks_duplicate_terminal_outcome() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)
@@ -187,7 +185,7 @@ async def test_worker_state_machine_blocks_duplicate_terminal_outcome(db_path: s
 
 
 @pytest.mark.asyncio
-async def test_worker_startup_reconciliation_records_only_in_flight_runs(db_path: str) -> None:
+async def test_worker_startup_reconciliation_records_only_in_flight_runs() -> None:
     async with get_session_factory()() as session:
         run_repo = DbRunRepository(session)
         consumer_repo = DbConsumerRepository(session)

@@ -6,7 +6,7 @@ from app.shared.db.session import get_session_factory
 
 
 @pytest.mark.asyncio
-async def test_get_resume_offset_defaults_to_zero(db_path: str) -> None:
+async def test_get_resume_offset_defaults_to_zero() -> None:
     async with get_session_factory()() as session:
         repo = DbConsumerRepository(session)
         service = ConsumerRecoveryService(repo=repo)
@@ -19,7 +19,7 @@ async def test_get_resume_offset_defaults_to_zero(db_path: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_mark_processed_and_checkpoint_enables_idempotent_recovery(db_path: str) -> None:
+async def test_mark_processed_and_checkpoint_enables_idempotent_recovery() -> None:
     async with get_session_factory()() as session:
         repo = DbConsumerRepository(session)
         service = ConsumerRecoveryService(repo=repo)
