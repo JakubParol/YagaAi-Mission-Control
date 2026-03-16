@@ -28,6 +28,30 @@ project-root/
 - Project-specific rules and constraints
 - Links to docs/INDEX.md and parent navigation
 
+Minimal structure every AGENTS.md must follow:
+
+```markdown
+# AGENTS.md — <Project Name>
+
+## What This Is
+<One paragraph description>
+
+## Scope
+- **In scope:** ...
+- **Out of scope:** ...
+
+## Required Reading (Mandatory)
+1. This file
+2. [docs/INDEX.md](./docs/INDEX.md)
+
+## Rules
+- ...
+
+## Navigation
+- [README.md](./README.md)
+- [docs/INDEX.md](./docs/INDEX.md)
+```
+
 ### docs/INDEX.md
 - Table listing every doc file in `docs/` with a brief description
 - Navigation links: up to README, AGENTS, and parent project if nested
@@ -57,6 +81,22 @@ Specific documentation files
 
 ---
 
+## File Naming
+
+- Use `UPPER_SNAKE_CASE` for permanent reference docs: `REPO_MAP.md`, `ENTITY_MODEL.md`
+- Append `_V1`, `_V2` when a doc describes a versioned design or contract: `API_CONTRACTS_V1.md`
+- Use `kebab-case` with a date suffix for time-bound records: `ui-audit-2026-03-04.md`
+- Shared standards live in `docs/standards/`
+- Stale or superseded docs move to `docs/_archive/` — do not delete, do not leave in the main index
+
+---
+
+## Language
+
+- All documentation is written in **English**
+
+---
+
 ## When to Create New Documentation
 
 **Do create docs when:**
@@ -79,5 +119,6 @@ Specific documentation files
 - Keep docs scannable: headers, bullets, tables. No walls of prose.
 - Lead with the most important information.
 - Include concrete examples where they help.
-- Date or version-stamp docs that may go stale.
+- Date-stamp time-bound docs using `YYYY-MM-DD` in the filename or frontmatter.
+- Version-stamp design docs with `_V1` suffix; increment on breaking changes, not minor edits.
 - Prefer updating existing docs over creating new ones.

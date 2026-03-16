@@ -57,41 +57,19 @@ If you then drill into a project, report that too.
 ## Rules
 
 - **Follow workspace standards.** [coding-standards.md](./docs/standards/coding-standards.md) and [documentation.md](./docs/standards/documentation.md) apply everywhere.
-- **Package by feature.** Group by domain concept, not by technical layer.
-- **Async-first.** API endpoints, DB access, and external IO are async.
-- **No cross-project imports.** Apps and services do not import from each other.
 
-# Planning Operations
+## Planning Operations
 
-When the user asks you to work with planning entities (projects, epics, stories, tasks, backlogs, agents, labels, etc.) - creating, updating, querying, or reviewing them:
+Use `mc` CLI for all planning entities (projects, epics, stories, tasks, backlogs, labels, agents). No direct DB or API mutations.
 
-1. **Use `mc` CLI only.** Do NOT use direct SQL queries or raw API calls. The CLI handles key generation, UUIDs, validation, and all business logic. The `mc` command is deployed and available in PATH.
-2. **Discover commands with `--help`.** Use `mc --help`, `mc story --help`, `mc story create --help`, etc. to learn available commands, options, and required fields.
-3. **Use `--output json`** when you need to parse responses programmatically. Default is table output for human reading.
-4. **Common patterns:**
-   - List: `mc story list --project-key MC --sort priority`
-   - Get: `mc story get --key MC-47 --output json`
-   - Create: `mc story create --json '{"title":"...","story_type":"USER_STORY","project_id":"..."}'`
-   - Update: `mc task update --id <uuid> --set status=IN_PROGRESS`
-   - Filter: `--key`, `--project-id`, `--story-id`, `--status`, `--sort`
-5. **Default User Story placement policy (mandatory unless user says otherwise):**
-   - A newly created User Story must have an epic assigned.
-   - A newly created User Story must have labels assigned.
-   - A newly created User Story must be attached to the project product backlog.
-   - If the user explicitly asks to add the story to a sprint, attach it to the project's active sprint instead of product backlog.
+Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skills/mc-cli-router/SKILL.md`
 
 ## Task Workflow
 
-Task delivery workflow is maintained in skill:
+When asked to deliver a US/task/bug end-to-end, use the delivery flow skill as the execution playbook:
 - `.agents/skills/mission-control-delivery-flow/SKILL.md`
 
-When asked to deliver (or even just to code something) a US/task/bug end-to-end, use that skill as the execution playbook.
-
-### Policy anchors (still mandatory)
-
-- Planning entities must be operated via `mc` CLI.
-- Quality bar stays strict (fix issues at source, no hiding warnings unless explicitly approved).
-- If workflow text differs between this file and the skill, **this AGENTS.md is source of truth**.
+Quality bar is strict: fix issues at source, no hiding warnings unless explicitly approved by user.
 
 ## Autonomous Mode
 
