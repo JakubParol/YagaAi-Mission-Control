@@ -1,35 +1,37 @@
 from typing import Any
+from typing import cast as type_cast
+
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import count
 
 from app.planning.application.ports import ProjectRepository
 from app.planning.domain.models import Project
 from app.planning.infrastructure.shared.mappers import _row_to_project
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _exists,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-    _parse_sort,
-)
+from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.tables import project_counters, projects
 from app.shared.utils import utc_now
 
-_SORT_ALLOWED_PROJECT = {"created_at", "updated_at", "name", "key"}
+_SORT_ALLOWED_PROJECT = {
+    "created_at": projects.c.created_at,
+    "updated_at": projects.c.updated_at,
+    "name": projects.c.name,
+    "key": projects.c.key,
+}
 
 
 class DbProjectRepository(ProjectRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def _unset_default_projects(self, *, except_project_id: str | None = None) -> None:
+        stmt = update(projects).where(projects.c.is_default == 1)
         if except_project_id:
-            await self._db.execute(
-                "UPDATE projects SET is_default = 0 WHERE is_default = 1 AND id != ?",
-                [except_project_id],
-            )
-            return
-        await self._db.execute("UPDATE projects SET is_default = 0 WHERE is_default = 1", [])
+            stmt = stmt.where(projects.c.id != except_project_id)
+        stmt = stmt.values(is_default=0)
+        await self._db.execute(stmt)
 
     async def list_all(
         self,
@@ -40,54 +42,66 @@ class DbProjectRepository(ProjectRepository):
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Project], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if key:
-            where_parts.append("key = ?")
-            params.append(key)
+            conditions.append(projects.c.key == key)
         if status:
-            where_parts.append("status = ?")
-            params.append(status)
+            conditions.append(projects.c.status == status)
 
-        order_sql = _parse_sort(sort, _SORT_ALLOWED_PROJECT)
-        count_q, select_q = _build_list_queries("projects", where_parts, order_sql)
+        order = parse_sort(sort, _SORT_ALLOWED_PROJECT)
+        if not order:
+            order = [projects.c.created_at.desc()]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(projects)
+        select_q = select(projects)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_project(r) for r in rows], total
 
     async def get_by_id(self, project_id: str) -> Project | None:
-        row = await _fetch_one(self._db, "SELECT * FROM projects WHERE id = ?", [project_id])
+        row = (
+            (await self._db.execute(select(projects).where(projects.c.id == project_id)))
+            .mappings()
+            .first()
+        )
         return _row_to_project(row) if row else None
 
     async def get_by_key(self, key: str) -> Project | None:
-        row = await _fetch_one(self._db, "SELECT * FROM projects WHERE key = ?", [key.upper()])
+        row = (
+            (await self._db.execute(select(projects).where(projects.c.key == key.upper())))
+            .mappings()
+            .first()
+        )
         return _row_to_project(row) if row else None
 
     async def key_exists(self, key: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM projects WHERE key = ?", [key.upper()])
+        row = (
+            await self._db.execute(select(projects.c.id).where(projects.c.key == key.upper()))
+        ).first()
+        return row is not None
 
     async def create(self, project: Project) -> Project:
         if project.is_default:
             await self._unset_default_projects()
         await self._db.execute(
-            """INSERT INTO projects (id, key, name, description, status, is_default, repo_root,
-               created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                project.id,
-                project.key,
-                project.name,
-                project.description,
-                project.status,
-                1 if project.is_default else 0,
-                project.repo_root,
-                project.created_by,
-                project.updated_by,
-                project.created_at,
-                project.updated_at,
-            ],
+            insert(projects).values(
+                id=project.id,
+                key=project.key,
+                name=project.name,
+                description=project.description,
+                status=project.status,
+                is_default=1 if project.is_default else 0,
+                repo_root=project.repo_root,
+                created_by=project.created_by,
+                updated_by=project.updated_by,
+                created_at=project.created_at,
+                updated_at=project.updated_at,
+            )
         )
         await self._db.commit()
         return project
@@ -102,33 +116,29 @@ class DbProjectRepository(ProjectRepository):
             "updated_by",
             "updated_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(project_id)
 
         if data.get("is_default") is True:
             await self._unset_default_projects(except_project_id=project_id)
 
-        params.append(project_id)
-        await self._db.execute(_build_update_query("projects", sets), params)
+        await self._db.execute(update(projects).where(projects.c.id == project_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(project_id)
 
     async def delete(self, project_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM projects WHERE id = ?", [project_id])
+        result = type_cast(
+            CursorResult,
+            await self._db.execute(delete(projects).where(projects.c.id == project_id)),
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def create_project_counter(self, project_id: str) -> None:
         await self._db.execute(
-            """INSERT OR IGNORE INTO project_counters (project_id, next_number, updated_at)
-               VALUES (?, 1, ?)""",
-            [project_id, utc_now()],
+            pg_insert(project_counters)
+            .values(project_id=project_id, next_number=1, updated_at=utc_now())
+            .on_conflict_do_nothing()
         )
         await self._db.commit()

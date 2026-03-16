@@ -21,29 +21,22 @@ from app.planning.infrastructure.repositories.tasks import DbTaskRepository
 from app.planning.infrastructure.sources.openclaw import FileOpenClawAgentSource
 from app.shared.api.deps import get_db
 from app.shared.api.errors import NotFoundError
-from app.shared.db.adapter import SqlTextSession
-
-
-def _planning_db(session: AsyncSession) -> SqlTextSession:
-    return SqlTextSession(session)
 
 
 async def get_project_service(
     db: AsyncSession = Depends(get_db),
 ) -> ProjectService:
-    planning_db = _planning_db(db)
     return ProjectService(
-        project_repo=DbProjectRepository(planning_db),
-        backlog_repo=DbBacklogRepository(planning_db),
+        project_repo=DbProjectRepository(db),
+        backlog_repo=DbBacklogRepository(db),
     )
 
 
 async def get_agent_service(
     db: AsyncSession = Depends(get_db),
 ) -> AgentService:
-    planning_db = _planning_db(db)
     return AgentService(
-        repo=DbAgentRepository(planning_db),
+        repo=DbAgentRepository(db),
         openclaw_source=FileOpenClawAgentSource(settings.openclaw_config_path),
     )
 
@@ -51,44 +44,43 @@ async def get_agent_service(
 async def get_label_service(
     db: AsyncSession = Depends(get_db),
 ) -> LabelService:
-    return LabelService(DbLabelRepository(_planning_db(db)))
+    return LabelService(DbLabelRepository(db))
 
 
 async def get_epic_service(
     db: AsyncSession = Depends(get_db),
 ) -> EpicService:
-    return EpicService(DbEpicRepository(_planning_db(db)))
+    return EpicService(DbEpicRepository(db))
 
 
 async def get_story_service(
     db: AsyncSession = Depends(get_db),
 ) -> StoryService:
-    return StoryService(DbStoryRepository(_planning_db(db)))
+    return StoryService(DbStoryRepository(db))
 
 
 async def get_task_service(
     db: AsyncSession = Depends(get_db),
 ) -> TaskService:
     return TaskService(
-        task_repo=DbTaskRepository(_planning_db(db)),
+        task_repo=DbTaskRepository(db),
     )
 
 
 async def get_backlog_service(
     db: AsyncSession = Depends(get_db),
 ) -> BacklogService:
-    return BacklogService(DbBacklogRepository(_planning_db(db)))
+    return BacklogService(DbBacklogRepository(db))
 
 
 async def get_epic_overview_action_service(
     db: AsyncSession = Depends(get_db),
 ) -> EpicOverviewActionService:
-    planning_db = _planning_db(db)
     return EpicOverviewActionService(
-        epic_service=EpicService(DbEpicRepository(planning_db)),
-        story_service=StoryService(DbStoryRepository(planning_db)),
-        backlog_service=BacklogService(DbBacklogRepository(planning_db)),
-        activity_log_repo=DbActivityLogRepository(planning_db),
+        epic_service=EpicService(DbEpicRepository(db)),
+        story_service=StoryService(DbStoryRepository(db)),
+        backlog_service=BacklogService(DbBacklogRepository(db)),
+        activity_log_repo=DbActivityLogRepository(db),
     )
 
 
@@ -99,7 +91,7 @@ async def resolve_project_key(
 ) -> str | None:
     """Resolve project_key to project_id. project_key takes precedence."""
     if project_key is not None:
-        repo = DbProjectRepository(_planning_db(db))
+        repo = DbProjectRepository(db)
         project = await repo.get_by_key(project_key)
         if project is None:
             raise NotFoundError(f"Project with key '{project_key}' not found")
@@ -114,7 +106,7 @@ async def resolve_epic_key(
 ) -> str | None:
     """Resolve epic_key to epic_id. epic_key takes precedence."""
     if epic_key is not None:
-        repo = DbEpicRepository(_planning_db(db))
+        repo = DbEpicRepository(db)
         epic = await repo.get_by_key(epic_key)
         if epic is None:
             raise NotFoundError(f"Epic with key '{epic_key}' not found")
@@ -129,7 +121,7 @@ async def resolve_story_key(
 ) -> str | None:
     """Resolve story_key to story_id. story_key takes precedence."""
     if story_key is not None:
-        repo = DbStoryRepository(_planning_db(db))
+        repo = DbStoryRepository(db)
         story = await repo.get_by_key(story_key)
         if story is None:
             raise NotFoundError(f"Story with key '{story_key}' not found")

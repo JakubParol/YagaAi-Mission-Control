@@ -1,3 +1,5 @@
+from sqlalchemy.engine import RowMapping
+
 from app.planning.domain.models import (
     Agent,
     AgentSource,
@@ -16,177 +18,176 @@ from app.planning.domain.models import (
     Task,
     TaskAssignment,
 )
-from app.planning.infrastructure.shared.sql import DbRow
 
 
-def _row_to_project(row: DbRow) -> Project:
+def _row_to_project(m: RowMapping) -> Project:
     return Project(
-        id=row["id"],
-        key=row["key"],
-        name=row["name"],
-        description=row["description"],
-        status=ProjectStatus(row["status"]),
-        is_default=bool(row["is_default"]),
-        repo_root=row["repo_root"],
-        created_by=row["created_by"],
-        updated_by=row["updated_by"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        id=m["id"],
+        key=m["key"],
+        name=m["name"],
+        description=m["description"],
+        status=ProjectStatus(m["status"]),
+        is_default=bool(m["is_default"]),
+        repo_root=m["repo_root"],
+        created_by=m["created_by"],
+        updated_by=m["updated_by"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
     )
 
 
-def _row_to_epic(row: DbRow) -> Epic:
+def _row_to_epic(m: RowMapping) -> Epic:
     return Epic(
-        id=row["id"],
-        project_id=row["project_id"],
-        key=row["key"],
-        title=row["title"],
-        description=row["description"],
-        status=EpicStatus(row["status"]),
-        status_mode=StatusMode(row["status_mode"]),
-        status_override=row["status_override"],
-        status_override_set_at=row["status_override_set_at"],
-        is_blocked=bool(row["is_blocked"]),
-        blocked_reason=row["blocked_reason"],
-        priority=row["priority"],
-        metadata_json=row["metadata_json"],
-        created_by=row["created_by"],
-        updated_by=row["updated_by"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        id=m["id"],
+        project_id=m["project_id"],
+        key=m["key"],
+        title=m["title"],
+        description=m["description"],
+        status=EpicStatus(m["status"]),
+        status_mode=StatusMode(m["status_mode"]),
+        status_override=m["status_override"],
+        status_override_set_at=m["status_override_set_at"],
+        is_blocked=bool(m["is_blocked"]),
+        blocked_reason=m["blocked_reason"],
+        priority=m["priority"],
+        metadata_json=m["metadata_json"],
+        created_by=m["created_by"],
+        updated_by=m["updated_by"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
     )
 
 
-def _row_to_epic_overview(row: DbRow) -> EpicOverview:
+def _row_to_epic_overview(m: RowMapping) -> EpicOverview:
     return EpicOverview(
-        epic_key=row["epic_key"],
-        title=row["title"],
-        status=EpicStatus(row["status"]),
-        progress_pct=float(row["progress_pct"]),
-        progress_trend_7d=float(row["progress_trend_7d"]),
-        stories_total=int(row["stories_total"]),
-        stories_done=int(row["stories_done"]),
-        stories_in_progress=int(row["stories_in_progress"]),
-        blocked_count=int(row["blocked_count"]),
-        stale_days=int(row["stale_days"]),
-        priority=row["priority"],
-        updated_at=row["updated_at"],
+        epic_key=m["epic_key"],
+        title=m["title"],
+        status=EpicStatus(m["status"]),
+        progress_pct=float(m["progress_pct"]),
+        progress_trend_7d=float(m["progress_trend_7d"]),
+        stories_total=int(m["stories_total"]),
+        stories_done=int(m["stories_done"]),
+        stories_in_progress=int(m["stories_in_progress"]),
+        blocked_count=int(m["blocked_count"]),
+        stale_days=int(m["stale_days"]),
+        priority=m["priority"],
+        updated_at=m["updated_at"],
     )
 
 
-def _row_to_story(row: DbRow) -> Story:
+def _row_to_story(m: RowMapping) -> Story:
     current_assignee_agent_id = (
-        row["current_assignee_agent_id"] if "current_assignee_agent_id" in row.keys() else None
+        m["current_assignee_agent_id"] if "current_assignee_agent_id" in m else None
     )
     return Story(
-        id=row["id"],
-        project_id=row["project_id"],
-        epic_id=row["epic_id"],
-        key=row["key"],
-        title=row["title"],
-        intent=row["intent"],
-        description=row["description"],
-        story_type=row["story_type"],
-        status=ItemStatus(row["status"]),
-        is_blocked=bool(row["is_blocked"]),
-        blocked_reason=row["blocked_reason"],
-        priority=row["priority"],
+        id=m["id"],
+        project_id=m["project_id"],
+        epic_id=m["epic_id"],
+        key=m["key"],
+        title=m["title"],
+        intent=m["intent"],
+        description=m["description"],
+        story_type=m["story_type"],
+        status=ItemStatus(m["status"]),
+        is_blocked=bool(m["is_blocked"]),
+        blocked_reason=m["blocked_reason"],
+        priority=m["priority"],
         current_assignee_agent_id=current_assignee_agent_id,
-        metadata_json=row["metadata_json"],
-        created_by=row["created_by"],
-        updated_by=row["updated_by"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        started_at=row["started_at"],
-        completed_at=row["completed_at"],
+        metadata_json=m["metadata_json"],
+        created_by=m["created_by"],
+        updated_by=m["updated_by"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
+        started_at=m["started_at"],
+        completed_at=m["completed_at"],
     )
 
 
-def _row_to_agent(row: DbRow) -> Agent:
-    avatar = row["avatar"] if "avatar" in row.keys() else None
-    last_name = row["last_name"] if "last_name" in row.keys() else None
-    initials = row["initials"] if "initials" in row.keys() else None
+def _row_to_agent(m: RowMapping) -> Agent:
+    avatar = m["avatar"] if "avatar" in m else None
+    last_name = m["last_name"] if "last_name" in m else None
+    initials = m["initials"] if "initials" in m else None
     return Agent(
-        id=row["id"],
-        openclaw_key=row["openclaw_key"],
-        name=row["name"],
+        id=m["id"],
+        openclaw_key=m["openclaw_key"],
+        name=m["name"],
         last_name=last_name,
         initials=initials,
-        role=row["role"],
-        worker_type=row["worker_type"],
+        role=m["role"],
+        worker_type=m["worker_type"],
         avatar=avatar,
-        is_active=bool(row["is_active"]),
-        source=AgentSource(row["source"]),
-        metadata_json=row["metadata_json"],
-        last_synced_at=row["last_synced_at"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        is_active=bool(m["is_active"]),
+        source=AgentSource(m["source"]),
+        metadata_json=m["metadata_json"],
+        last_synced_at=m["last_synced_at"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
     )
 
 
-def _row_to_label(row: DbRow) -> Label:
+def _row_to_label(m: RowMapping) -> Label:
     return Label(
-        id=row["id"],
-        project_id=row["project_id"],
-        name=row["name"],
-        color=row["color"],
-        created_at=row["created_at"],
+        id=m["id"],
+        project_id=m["project_id"],
+        name=m["name"],
+        color=m["color"],
+        created_at=m["created_at"],
     )
 
 
-def _row_to_backlog(row: DbRow) -> Backlog:
+def _row_to_backlog(m: RowMapping) -> Backlog:
     return Backlog(
-        id=row["id"],
-        project_id=row["project_id"],
-        name=row["name"],
-        kind=BacklogKind(row["kind"]),
-        status=BacklogStatus(row["status"]),
-        display_order=row["display_order"],
-        is_default=bool(row["is_default"]),
-        goal=row["goal"],
-        start_date=row["start_date"],
-        end_date=row["end_date"],
-        metadata_json=row["metadata_json"],
-        created_by=row["created_by"],
-        updated_by=row["updated_by"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        id=m["id"],
+        project_id=m["project_id"],
+        name=m["name"],
+        kind=BacklogKind(m["kind"]),
+        status=BacklogStatus(m["status"]),
+        display_order=m["display_order"],
+        is_default=bool(m["is_default"]),
+        goal=m["goal"],
+        start_date=m["start_date"],
+        end_date=m["end_date"],
+        metadata_json=m["metadata_json"],
+        created_by=m["created_by"],
+        updated_by=m["updated_by"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
     )
 
 
-def _row_to_task(row: DbRow) -> Task:
+def _row_to_task(m: RowMapping) -> Task:
     return Task(
-        id=row["id"],
-        project_id=row["project_id"],
-        story_id=row["story_id"],
-        key=row["key"],
-        title=row["title"],
-        objective=row["objective"],
-        task_type=row["task_type"],
-        status=ItemStatus(row["status"]),
-        is_blocked=bool(row["is_blocked"]),
-        blocked_reason=row["blocked_reason"],
-        priority=row["priority"],
-        estimate_points=row["estimate_points"],
-        due_at=row["due_at"],
-        current_assignee_agent_id=row["current_assignee_agent_id"],
-        metadata_json=row["metadata_json"],
-        created_by=row["created_by"],
-        updated_by=row["updated_by"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-        started_at=row["started_at"],
-        completed_at=row["completed_at"],
+        id=m["id"],
+        project_id=m["project_id"],
+        story_id=m["story_id"],
+        key=m["key"],
+        title=m["title"],
+        objective=m["objective"],
+        task_type=m["task_type"],
+        status=ItemStatus(m["status"]),
+        is_blocked=bool(m["is_blocked"]),
+        blocked_reason=m["blocked_reason"],
+        priority=m["priority"],
+        estimate_points=m["estimate_points"],
+        due_at=m["due_at"],
+        current_assignee_agent_id=m["current_assignee_agent_id"],
+        metadata_json=m["metadata_json"],
+        created_by=m["created_by"],
+        updated_by=m["updated_by"],
+        created_at=m["created_at"],
+        updated_at=m["updated_at"],
+        started_at=m["started_at"],
+        completed_at=m["completed_at"],
     )
 
 
-def _row_to_assignment(row: DbRow) -> TaskAssignment:
+def _row_to_assignment(m: RowMapping) -> TaskAssignment:
     return TaskAssignment(
-        id=row["id"],
-        task_id=row["task_id"],
-        agent_id=row["agent_id"],
-        assigned_at=row["assigned_at"],
-        unassigned_at=row["unassigned_at"],
-        assigned_by=row["assigned_by"],
-        reason=row["reason"],
+        id=m["id"],
+        task_id=m["task_id"],
+        agent_id=m["agent_id"],
+        assigned_at=m["assigned_at"],
+        unassigned_at=m["unassigned_at"],
+        assigned_by=m["assigned_by"],
+        reason=m["reason"],
     )

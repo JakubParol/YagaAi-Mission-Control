@@ -1,32 +1,61 @@
 from typing import Any
+from typing import cast as type_cast
+
+from sqlalchemy import (
+    TIMESTAMP,
+    ColumnElement,
+    Integer,
+    Interval,
+    Numeric,
+    case,
+    cast,
+    delete,
+    extract,
+    func,
+    insert,
+    literal_column,
+    select,
+    update,
+)
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import coalesce, count, current_timestamp
+from sqlalchemy.sql.functions import sum as sa_sum
 
 from app.planning.application.ports import EpicRepository
 from app.planning.domain.models import Epic, EpicOverview
-from app.planning.infrastructure.shared.keys import _allocate_next_key, _project_exists
 from app.planning.infrastructure.shared.mappers import _row_to_epic, _row_to_epic_overview
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-    _parse_sort,
-    _parse_sort_mapped,
+from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.tables import (
+    epics,
+    labels,
+    project_counters,
+    projects,
+    stories,
+    story_labels,
 )
+from app.shared.api.errors import ValidationError
+from app.shared.utils import utc_now
 
-_SORT_ALLOWED_EPIC = {"created_at", "updated_at", "title", "priority", "status"}
-_SORT_ALLOWED_EPIC_OVERVIEW = {
-    "priority": "priority",
-    "progress_pct": "progress_pct",
-    "progress_trend_7d": "progress_trend_7d",
-    "updated_at": "updated_at",
-    "blocked_count": "blocked_count",
+_SORT_ALLOWED_EPIC: dict[str, ColumnElement[Any]] = {
+    "created_at": epics.c.created_at,
+    "updated_at": epics.c.updated_at,
+    "title": epics.c.title,
+    "priority": epics.c.priority,
+    "status": epics.c.status,
+}
+
+_SORT_ALLOWED_EPIC_OVERVIEW: dict[str, ColumnElement[Any]] = {
+    "priority": literal_column("priority"),
+    "progress_pct": literal_column("progress_pct"),
+    "progress_trend_7d": literal_column("progress_trend_7d"),
+    "updated_at": literal_column("updated_at"),
+    "blocked_count": literal_column("blocked_count"),
 }
 
 
 class DbEpicRepository(EpicRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def list_all(
@@ -39,24 +68,27 @@ class DbEpicRepository(EpicRepository):
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Epic], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if key:
-            where_parts.append("key = ?")
-            params.append(key)
+            conditions.append(epics.c.key == key)
         if project_id:
-            where_parts.append("project_id = ?")
-            params.append(project_id)
+            conditions.append(epics.c.project_id == project_id)
         if status:
-            where_parts.append("status = ?")
-            params.append(status)
+            conditions.append(epics.c.status == status)
 
-        order_sql = _parse_sort(sort, _SORT_ALLOWED_EPIC)
-        count_q, select_q = _build_list_queries("epics", where_parts, order_sql)
+        order = parse_sort(sort, _SORT_ALLOWED_EPIC)
+        if not order:
+            order = [epics.c.created_at.desc()]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(epics)
+        select_q = select(epics)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_epic(r) for r in rows], total
 
     async def list_overview(
@@ -72,125 +104,173 @@ class DbEpicRepository(EpicRepository):
         offset: int = 0,
         sort: str = "-updated_at",
     ) -> tuple[list[EpicOverview], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
+        story_stats = (
+            select(
+                stories.c.epic_id.label("epic_id"),
+                count().label("stories_total"),
+                sa_sum(case((stories.c.status == "DONE", 1), else_=0)).label("stories_done"),
+                sa_sum(
+                    case(
+                        (
+                            (stories.c.status == "DONE")
+                            & stories.c.completed_at.isnot(None)
+                            & (
+                                cast(stories.c.completed_at, TIMESTAMP(timezone=True))
+                                >= current_timestamp()
+                                - cast(literal_column("'7 days'"), Interval())
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("stories_done_last_7d"),
+                sa_sum(case((stories.c.status == "IN_PROGRESS", 1), else_=0)).label(
+                    "stories_in_progress"
+                ),
+                sa_sum(case((stories.c.is_blocked == 1, 1), else_=0)).label("blocked_count"),
+            )
+            .where(stories.c.epic_id.isnot(None))
+            .group_by(stories.c.epic_id)
+            .subquery("ss")
+        )
 
+        progress_pct = case(
+            (coalesce(story_stats.c.stories_total, 0) == 0, 0.0),
+            else_=func.round(
+                cast(
+                    coalesce(story_stats.c.stories_done, 0) * 100.0 / story_stats.c.stories_total,
+                    Numeric,
+                ),
+                2,
+            ),
+        ).label("progress_pct")
+
+        progress_trend_7d = case(
+            (coalesce(story_stats.c.stories_total, 0) == 0, 0.0),
+            else_=func.round(
+                cast(
+                    coalesce(story_stats.c.stories_done_last_7d, 0)
+                    * 100.0
+                    / story_stats.c.stories_total,
+                    Numeric,
+                ),
+                2,
+            ),
+        ).label("progress_trend_7d")
+
+        stale_days = func.greatest(
+            0,
+            cast(
+                extract(
+                    "epoch",
+                    current_timestamp() - cast(epics.c.updated_at, TIMESTAMP(timezone=True)),
+                )
+                / 86400.0,
+                Integer(),
+            ),
+        ).label("stale_days")
+
+        base_q = select(
+            epics.c.key.label("epic_key"),
+            epics.c.title.label("title"),
+            epics.c.status.label("status"),
+            progress_pct,
+            progress_trend_7d,
+            coalesce(story_stats.c.stories_total, 0).label("stories_total"),
+            coalesce(story_stats.c.stories_done, 0).label("stories_done"),
+            coalesce(story_stats.c.stories_in_progress, 0).label("stories_in_progress"),
+            coalesce(story_stats.c.blocked_count, 0).label("blocked_count"),
+            stale_days,
+            epics.c.priority.label("priority"),
+            epics.c.updated_at.label("updated_at"),
+        ).select_from(epics.outerjoin(story_stats, story_stats.c.epic_id == epics.c.id))
+
+        conditions = []
         if project_id:
-            where_parts.append("e.project_id = ?")
-            params.append(project_id)
+            conditions.append(epics.c.project_id == project_id)
         if status:
-            where_parts.append("e.status = ?")
-            params.append(status)
+            conditions.append(epics.c.status == status)
         if owner:
-            where_parts.append(
-                "EXISTS (SELECT 1 FROM stories so "
-                "WHERE so.epic_id = e.id AND so.current_assignee_agent_id = ?)"
+            conditions.append(
+                select(literal_column("1"))
+                .select_from(stories)
+                .where(stories.c.epic_id == epics.c.id)
+                .where(stories.c.current_assignee_agent_id == owner)
+                .exists()
             )
-            params.append(owner)
         if label:
-            where_parts.append(
-                "EXISTS ("
-                "SELECT 1 "
-                "FROM stories sls "
-                "JOIN story_labels sl ON sl.story_id = sls.id "
-                "JOIN labels l ON l.id = sl.label_id "
-                "WHERE sls.epic_id = e.id AND lower(l.name) = lower(?)"
-                ")"
+            conditions.append(
+                select(literal_column("1"))
+                .select_from(
+                    stories.join(story_labels, story_labels.c.story_id == stories.c.id).join(
+                        labels, labels.c.id == story_labels.c.label_id
+                    )
+                )
+                .where(stories.c.epic_id == epics.c.id)
+                .where(func.lower(labels.c.name) == func.lower(label))
+                .exists()
             )
-            params.append(label)
         if text:
             like = "%" + text.strip() + "%"
-            where_parts.append("(e.title ILIKE ? OR e.key ILIKE ?)")
-            params.extend([like, like])
+            conditions.append(epics.c.title.ilike(like) | epics.c.key.ilike(like))
         if is_blocked is True:
-            where_parts.append("(e.is_blocked = 1 OR COALESCE(ss.blocked_count, 0) > 0)")
+            conditions.append(
+                (epics.c.is_blocked == 1) | (coalesce(story_stats.c.blocked_count, 0) > 0)
+            )
         if is_blocked is False:
-            where_parts.append("(e.is_blocked = 0 AND COALESCE(ss.blocked_count, 0) = 0)")
+            conditions.append(
+                (epics.c.is_blocked == 0) & (coalesce(story_stats.c.blocked_count, 0) == 0)
+            )
 
-        where_sql = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
-        base_sql = (
-            "SELECT "
-            "e.key AS epic_key, "
-            "e.title AS title, "
-            "e.status AS status, "
-            "CASE "
-            "  WHEN COALESCE(ss.stories_total, 0) = 0 THEN 0.0 "
-            "  ELSE ROUND(COALESCE(ss.stories_done, 0) * 100.0 / ss.stories_total, 2) "
-            "END AS progress_pct, "
-            "CASE "
-            "  WHEN COALESCE(ss.stories_total, 0) = 0 THEN 0.0 "
-            "  ELSE ROUND(COALESCE(ss.stories_done_last_7d, 0) * 100.0 / ss.stories_total, 2) "
-            "END AS progress_trend_7d, "
-            "COALESCE(ss.stories_total, 0) AS stories_total, "
-            "COALESCE(ss.stories_done, 0) AS stories_done, "
-            "COALESCE(ss.stories_in_progress, 0) AS stories_in_progress, "
-            "COALESCE(ss.blocked_count, 0) AS blocked_count, "
-            "CAST(GREATEST(0, julianday('now') - julianday(e.updated_at)) AS INTEGER) AS stale_days, "
-            "e.priority AS priority, "
-            "e.updated_at AS updated_at "
-            "FROM epics e "
-            "LEFT JOIN ("
-            "  SELECT "
-            "    s.epic_id AS epic_id, "
-            "    COUNT(*) AS stories_total, "
-            "    SUM(CASE WHEN s.status = 'DONE' THEN 1 ELSE 0 END) AS stories_done, "
-            "    SUM(CASE WHEN s.status = 'DONE' AND s.completed_at IS NOT NULL "
-            "             AND CAST(s.completed_at AS TIMESTAMPTZ) >= datetime('now', '-7 days') "
-            "        THEN 1 ELSE 0 END) AS stories_done_last_7d, "
-            "    SUM(CASE WHEN s.status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS stories_in_progress, "
-            "    SUM(CASE WHEN s.is_blocked = 1 THEN 1 ELSE 0 END) AS blocked_count "
-            "  FROM stories s "
-            "  WHERE s.epic_id IS NOT NULL "
-            "  GROUP BY s.epic_id"
-            ") ss ON ss.epic_id = e.id" + where_sql
-        )
+        for cond in conditions:
+            base_q = base_q.where(cond)
 
-        order_sql = _parse_sort_mapped(
-            sort,
-            _SORT_ALLOWED_EPIC_OVERVIEW,
-            "updated_at DESC, epic_key ASC",
-        )
-        count_q = "SELECT COUNT(*) FROM (" + base_sql + ") q"
-        select_q = base_sql + " ORDER BY " + order_sql + " LIMIT ? OFFSET ?"
+        order = parse_sort(sort, _SORT_ALLOWED_EPIC_OVERVIEW)
+        if not order:
+            order = [literal_column("updated_at").desc(), literal_column("epic_key").asc()]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(base_q.subquery())
+        select_q = base_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_epic_overview(r) for r in rows], total
 
     async def get_by_id(self, epic_id: str) -> Epic | None:
-        row = await _fetch_one(self._db, "SELECT * FROM epics WHERE id = ?", [epic_id])
+        row = (
+            (await self._db.execute(select(epics).where(epics.c.id == epic_id))).mappings().first()
+        )
         return _row_to_epic(row) if row else None
 
     async def get_by_key(self, key: str) -> Epic | None:
-        row = await _fetch_one(self._db, "SELECT * FROM epics WHERE key = ?", [key.upper()])
+        row = (
+            (await self._db.execute(select(epics).where(epics.c.key == key.upper())))
+            .mappings()
+            .first()
+        )
         return _row_to_epic(row) if row else None
 
     async def create(self, epic: Epic) -> Epic:
         await self._db.execute(
-            """INSERT INTO epics (id, project_id, key, title, description,
-               status, status_mode, status_override, status_override_set_at,
-               is_blocked, blocked_reason, priority, metadata_json,
-               created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                epic.id,
-                epic.project_id,
-                epic.key,
-                epic.title,
-                epic.description,
-                epic.status,
-                epic.status_mode,
-                epic.status_override,
-                epic.status_override_set_at,
-                1 if epic.is_blocked else 0,
-                epic.blocked_reason,
-                epic.priority,
-                epic.metadata_json,
-                epic.created_by,
-                epic.updated_by,
-                epic.created_at,
-                epic.updated_at,
-            ],
+            insert(epics).values(
+                id=epic.id,
+                project_id=epic.project_id,
+                key=epic.key,
+                title=epic.title,
+                description=epic.description,
+                status=epic.status,
+                status_mode=epic.status_mode,
+                status_override=epic.status_override,
+                status_override_set_at=epic.status_override_set_at,
+                is_blocked=1 if epic.is_blocked else 0,
+                blocked_reason=epic.blocked_reason,
+                priority=epic.priority,
+                metadata_json=epic.metadata_json,
+                created_by=epic.created_by,
+                updated_by=epic.updated_by,
+                created_at=epic.created_at,
+                updated_at=epic.updated_at,
+            )
         )
         await self._db.commit()
         return epic
@@ -210,38 +290,68 @@ class DbEpicRepository(EpicRepository):
             "updated_by",
             "updated_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                if k == "is_blocked":
-                    params.append(1 if v else 0)
-                else:
-                    params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(epic_id)
 
-        params.append(epic_id)
-        await self._db.execute(_build_update_query("epics", sets), params)
+        if "is_blocked" in values:
+            values["is_blocked"] = 1 if values["is_blocked"] else 0
+
+        await self._db.execute(update(epics).where(epics.c.id == epic_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(epic_id)
 
     async def delete(self, epic_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM epics WHERE id = ?", [epic_id])
+        result = type_cast(
+            CursorResult, await self._db.execute(delete(epics).where(epics.c.id == epic_id))
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def get_story_count(self, epic_id: str) -> int:
-        return await _fetch_count(
-            self._db,
-            "SELECT COUNT(*) FROM stories WHERE epic_id = ?",
-            [epic_id],
+        result = await self._db.execute(
+            select(count()).select_from(stories).where(stories.c.epic_id == epic_id)
         )
+        return result.scalar_one()
 
     async def allocate_key(self, project_id: str) -> str:
-        return await _allocate_next_key(self._db, project_id)
+        row = (
+            (await self._db.execute(select(projects.c.key).where(projects.c.id == project_id)))
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise ValidationError(f"Project {project_id} does not exist")
+        project_key = row["key"]
+
+        counter_row = (
+            (
+                await self._db.execute(
+                    select(project_counters.c.next_number).where(
+                        project_counters.c.project_id == project_id
+                    )
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not counter_row:
+            raise ValidationError(f"No counter found for project {project_id}")
+
+        next_num = counter_row["next_number"]
+        await self._db.execute(
+            update(project_counters)
+            .where(project_counters.c.project_id == project_id)
+            .values(
+                next_number=project_counters.c.next_number + 1,
+                updated_at=utc_now(),
+            )
+        )
+        await self._db.commit()
+        return f"{project_key}-{next_num}"
 
     async def project_exists(self, project_id: str) -> bool:
-        return await _project_exists(self._db, project_id)
+        row = (
+            await self._db.execute(select(projects.c.id).where(projects.c.id == project_id))
+        ).first()
+        return row is not None
