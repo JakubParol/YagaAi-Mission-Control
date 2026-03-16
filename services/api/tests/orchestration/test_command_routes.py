@@ -1,7 +1,7 @@
 import sqlite3
 
-import aiosqlite
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.orchestration.domain.models import (
     CommandEnvelope,
@@ -9,7 +9,8 @@ from app.orchestration.domain.models import (
     OutboxEventEnvelope,
     OutboxStatus,
 )
-from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
+from app.orchestration.infrastructure.repositories.command import DbCommandRepository
+from app.shared.db.session import get_session_factory
 
 
 def _valid_body(*, schema_version: str = "1.0") -> dict:
@@ -116,8 +117,8 @@ def test_submit_command_returns_503_when_capability_disabled(client, monkeypatch
 
 @pytest.mark.asyncio
 async def test_outbox_insert_failure_rolls_back_command_insert(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
+    async with get_session_factory()() as session:
+        repo = DbCommandRepository(session)
 
         command_one = CommandEnvelope(
             id="cmd-1",
@@ -172,7 +173,7 @@ async def test_outbox_insert_failure_rolls_back_command_insert(db_path: str) -> 
             created_at="2026-03-08T09:01:00Z",
         )
 
-        with pytest.raises(sqlite3.IntegrityError):
+        with pytest.raises(IntegrityError):
             await repo.create_command_with_outbox(command=command_two, outbox_event=outbox_two)
 
     conn = sqlite3.connect(db_path)

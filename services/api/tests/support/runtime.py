@@ -1,5 +1,5 @@
-from collections.abc import AsyncIterator
 import sqlite3
+from collections.abc import AsyncIterator
 
 import aiosqlite
 from pytest import MonkeyPatch

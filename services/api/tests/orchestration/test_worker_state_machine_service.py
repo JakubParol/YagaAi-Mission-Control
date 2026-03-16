@@ -1,8 +1,10 @@
-import aiosqlite
 import pytest
+from sqlalchemy import text
 
 from app.orchestration.application.worker_state_machine_service import WorkerStateMachineService
-from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
+from app.orchestration.infrastructure.repositories.consumer import DbConsumerRepository
+from app.orchestration.infrastructure.repositories.run import DbRunRepository
+from app.shared.db.session import get_session_factory
 
 _STREAM = "mc:orchestration:events:orchestration_run_submit_accepted:v1:p0"
 _GROUP = "orchestration-workers-v1"
@@ -33,10 +35,11 @@ async def _process(
 
 
 @pytest.mark.asyncio
-async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        service = WorkerStateMachineService(repo=repo)
+async def test_worker_state_machine_happy_path_reaches_terminal_run() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        service = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
 
         await _process(
             service,
@@ -73,13 +76,13 @@ async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str
             event_type="orchestration.run.succeeded",
         )
 
-        run = await repo.get_run(run_id="run-1")
-        step = await repo.get_step(run_id="run-1", step_id="step-1")
-        cursor = await db.execute(
-            "SELECT COUNT(1) FROM orchestration_run_timeline WHERE run_id = ?", ("run-1",)
+        run = await run_repo.get_run(run_id="run-1")
+        step = await run_repo.get_step(run_id="run-1", step_id="step-1")
+        result = await session.execute(
+            text("SELECT COUNT(1) FROM orchestration_run_timeline WHERE run_id = :rid"),
+            {"rid": "run-1"},
         )
-        timeline_row = await cursor.fetchone()
-        await cursor.close()
+        timeline_row = result.first()
         assert timeline_row is not None
         timeline_count = int(timeline_row[0])
 
@@ -94,12 +97,11 @@ async def test_worker_state_machine_happy_path_reaches_terminal_run(db_path: str
 
 
 @pytest.mark.asyncio
-async def test_worker_state_machine_rejects_illegal_transition_without_state_corruption(
-    db_path: str,
-) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        service = WorkerStateMachineService(repo=repo)
+async def test_worker_state_machine_rejects_illegal_transition_without_state_corruption() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        service = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
 
         await _process(
             service,
@@ -113,19 +115,18 @@ async def test_worker_state_machine_rejects_illegal_transition_without_state_cor
             run_id="run-2",
             event_type="orchestration.run.succeeded",
         )
-        run = await repo.get_run(run_id="run-2")
-        cursor = await db.execute(
-            """
+        run = await run_repo.get_run(run_id="run-2")
+        result = await session.execute(
+            text("""
             SELECT decision, reason_code
             FROM orchestration_run_timeline
-            WHERE run_id = ?
+            WHERE run_id = :rid
             ORDER BY created_at DESC, id DESC
             LIMIT 1
-            """,
-            ("run-2",),
+            """),
+            {"rid": "run-2"},
         )
-        timeline = await cursor.fetchone()
-        await cursor.close()
+        timeline = result.first()
 
     assert decision["decision"] == "REJECTED"
     assert decision["reason_code"] == "ILLEGAL_RUN_TRANSITION"
@@ -137,10 +138,11 @@ async def test_worker_state_machine_rejects_illegal_transition_without_state_cor
 
 
 @pytest.mark.asyncio
-async def test_worker_state_machine_blocks_duplicate_terminal_outcome(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        service = WorkerStateMachineService(repo=repo)
+async def test_worker_state_machine_blocks_duplicate_terminal_outcome() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        service = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
 
         await _process(
             service,
@@ -173,7 +175,7 @@ async def test_worker_state_machine_blocks_duplicate_terminal_outcome(db_path: s
             run_id="run-3",
             event_type="orchestration.run.failed",
         )
-        run = await repo.get_run(run_id="run-3")
+        run = await run_repo.get_run(run_id="run-3")
 
     assert duplicate_delivery["decision"] == "DUPLICATE"
     assert conflicting_terminal["decision"] == "REJECTED"
@@ -183,10 +185,11 @@ async def test_worker_state_machine_blocks_duplicate_terminal_outcome(db_path: s
 
 
 @pytest.mark.asyncio
-async def test_worker_startup_reconciliation_records_only_in_flight_runs(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        service = WorkerStateMachineService(repo=repo)
+async def test_worker_startup_reconciliation_records_only_in_flight_runs() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        service = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
 
         await _process(
             service,
@@ -217,14 +220,13 @@ async def test_worker_startup_reconciliation_records_only_in_flight_runs(db_path
             worker_instance="worker-a",
             occurred_at="2026-03-08T12:05:00Z",
         )
-        cursor = await db.execute("""
+        result = await session.execute(text("""
             SELECT run_id, event_type, reason_code
             FROM orchestration_run_timeline
             WHERE event_type = 'orchestration.run.reconciled'
             ORDER BY run_id
-            """)
-        rows = await cursor.fetchall()
-        await cursor.close()
+            """))
+        rows = result.all()
 
     assert reconciled == ["run-4"]
     assert rows == [("run-4", "orchestration.run.reconciled", "WORKER_STARTUP_RECONCILIATION")]

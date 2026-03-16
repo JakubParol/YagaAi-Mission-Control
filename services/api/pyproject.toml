@@ -98,7 +98,7 @@ max-branches = 15
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 include = ["app", "tests"]
-exclude = [".venv", ".venv.broken", "__pycache__", ".pytest_cache"]
+exclude = ["**/node_modules", "**/.*", "__pycache__", ".pytest_cache", ".venv", ".venv.broken"]
 reportMissingImports = true
 reportMissingTypeStubs = false
 
@@ -116,34 +116,38 @@ root_package = "app"
 [[tool.importlinter.contracts]]
 name = "Application cannot import from Infrastructure"
 type = "forbidden"
-source_modules = ["app.planning.application", "app.observability.application"]
-forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure"]
+source_modules = ["app.planning.application", "app.observability.application", "app.orchestration.application"]
+forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure", "app.orchestration.infrastructure"]
 
 [[tool.importlinter.contracts]]
 name = "Application cannot import from API"
 type = "forbidden"
-source_modules = ["app.planning.application", "app.observability.application"]
-forbidden_modules = ["app.planning.api", "app.observability.api"]
+source_modules = ["app.planning.application", "app.observability.application", "app.orchestration.application"]
+forbidden_modules = ["app.planning.api", "app.observability.api", "app.orchestration.api"]
 
 [[tool.importlinter.contracts]]
 name = "Domain cannot import from other layers"
 type = "forbidden"
-source_modules = ["app.planning.domain", "app.observability.domain"]
+source_modules = ["app.planning.domain", "app.observability.domain", "app.orchestration.domain"]
 forbidden_modules = [
     "app.planning.infrastructure",
     "app.planning.api",
     "app.observability.infrastructure",
     "app.observability.api",
+    "app.orchestration.infrastructure",
+    "app.orchestration.api",
     "app.shared",
 ]
 
 [[tool.importlinter.contracts]]
 name = "API routes cannot import Infrastructure directly"
 type = "forbidden"
-source_modules = ["app.planning.api", "app.observability.api"]
-forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure"]
+source_modules = ["app.planning.api", "app.observability.api", "app.orchestration.api"]
+forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure", "app.orchestration.infrastructure"]
 ignore_imports = [
-    "app.observability.dependencies -> app.observability.infrastructure.*",
+    "app.observability.dependencies -> app.observability.infrastructure.repositories.*",
+    "app.observability.dependencies -> app.observability.infrastructure.sources.*",
+    "app.orchestration.dependencies -> app.orchestration.infrastructure.repositories.*",
     "app.planning.dependencies -> app.planning.infrastructure.repositories.*",
     "app.planning.dependencies -> app.planning.infrastructure.repositories.backlogs.*",
     "app.planning.dependencies -> app.planning.infrastructure.sources.*",

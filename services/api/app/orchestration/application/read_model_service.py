@@ -1,7 +1,7 @@
 import math
 from datetime import UTC, datetime
 
-from app.orchestration.application.ports import OrchestrationRepository
+from app.orchestration.application.ports import ReadModelRepository
 from app.orchestration.domain.models import (
     OrchestrationHealthMetrics,
     RunAttemptReadModel,
@@ -13,7 +13,7 @@ from app.shared.api.errors import NotFoundError, ValidationError
 
 
 class RunReadModelService:
-    def __init__(self, repo: OrchestrationRepository) -> None:
+    def __init__(self, repo: ReadModelRepository) -> None:
         self._repo = repo
 
     async def list_runs(

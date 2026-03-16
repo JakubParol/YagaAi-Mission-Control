@@ -1,6 +1,7 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
+from starlette import status as http_status
 
 from app.config import settings
 from app.orchestration.api.schemas import (
@@ -38,7 +39,7 @@ def _ensure_capability_enabled(*, enabled: bool, capability: str) -> None:
     if enabled:
         return
     raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE,
         detail=f"Orchestration capability disabled: {capability}",
     )
 

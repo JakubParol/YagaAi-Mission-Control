@@ -161,7 +161,9 @@ def _translate_sqlite_datetime_functions(query: str) -> str:
     return _JULIANDAY_DIFF_RE.sub(replace_julianday_diff, translated)
 
 
-def _replace_unquoted_qmarks(query: str) -> tuple[str, list[str]]:
+def _replace_unquoted_qmarks(  # pylint: disable=too-many-branches,too-many-statements
+    query: str,
+) -> tuple[str, list[str]]:
     out: list[str] = []
     names: list[str] = []
     in_single_quote = False

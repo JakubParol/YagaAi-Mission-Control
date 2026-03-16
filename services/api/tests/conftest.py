@@ -1,3 +1,4 @@
+# pylint: disable=redefined-outer-name
 from __future__ import annotations
 
 import asyncio
@@ -12,23 +13,32 @@ os.environ.setdefault(
     "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/mission_control_test",
 )
 
-import aiosqlite
-import pytest
-from testcontainers.postgres import PostgresContainer
+# pylint: disable=wrong-import-position
+import aiosqlite  # noqa: E402
+import pytest  # noqa: E402
+from testcontainers.postgres import PostgresContainer  # noqa: E402
 
-from alembic import command
-from alembic.config import Config
-from app.config import settings
-from app.observability.infrastructure import tables as observability_tables  # noqa: F401
-from app.orchestration.infrastructure import tables as orchestration_tables  # noqa: F401
-from app.planning.infrastructure import tables as planning_tables  # noqa: F401
-from app.shared.db.metadata import metadata
-from app.shared.db.session import close_db_engine
-from tests.support.postgres_compat import (
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
+from app.config import settings  # noqa: E402
+from app.observability.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
+    tables as observability_tables,
+)
+from app.orchestration.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
+    tables as orchestration_tables,
+)
+from app.planning.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
+    tables as planning_tables,
+)
+from app.shared.db.metadata import metadata  # noqa: E402,F401  # pylint: disable=unused-import
+from app.shared.db.session import close_db_engine  # noqa: E402
+from tests.support.postgres_compat import (  # noqa: E402
     aiosqlite_connect,
     reset_database_schema,
     sqlite_connect,
 )
+
+# pylint: enable=wrong-import-position
 
 
 def _alembic_config(database_url: str) -> Config:
@@ -49,7 +59,9 @@ def database_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _configure_database(database_url: str) -> Iterator[None]:
+def _configure_database(
+    database_url: str,
+) -> Iterator[None]:
     settings.postgres_dsn = database_url
     yield
 
@@ -61,7 +73,9 @@ def _reset_database(database_url: str) -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _reset_engine_state(database_url: str) -> Iterator[None]:
+def _reset_engine_state(
+    database_url: str,
+) -> Iterator[None]:
     settings.postgres_dsn = database_url
     asyncio.run(close_db_engine())
     yield
@@ -69,7 +83,9 @@ def _reset_engine_state(database_url: str) -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _patch_sqlite_clients(database_url: str) -> Iterator[None]:
+def _patch_sqlite_clients(
+    database_url: str,
+) -> Iterator[None]:
     with (
         patch.object(
             sqlite3,

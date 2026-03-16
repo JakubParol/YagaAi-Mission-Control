@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.config import settings
-from app.orchestration.application.ports import OrchestrationRepository
+from app.orchestration.application.ports import CommandRepository
 from app.shared.api.errors import NotFoundError
 from app.shared.logging import log_event
 
@@ -20,7 +20,7 @@ def _to_iso8601(dt: datetime) -> str:
 
 
 class DeliveryService:
-    def __init__(self, repo: OrchestrationRepository) -> None:
+    def __init__(self, repo: CommandRepository) -> None:
         self._repo = repo
         self._base_backoff_seconds = settings.orchestration_retry_base_backoff_seconds
         self._max_backoff_seconds = settings.orchestration_retry_max_backoff_seconds

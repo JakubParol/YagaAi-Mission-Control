@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.config import settings
-from app.orchestration.application.ports import OrchestrationRepository
+from app.orchestration.application.ports import ConsumerRepository, RunRepository
 from app.orchestration.domain.models import (
     OrchestrationRun,
     OrchestrationStep,
@@ -55,8 +55,9 @@ _STEP_ALLOWED_TRANSITIONS: dict[StepStatus, set[StepStatus]] = {
 
 
 class WorkerStateMachineService:
-    def __init__(self, repo: OrchestrationRepository) -> None:
-        self._repo = repo
+    def __init__(self, run_repo: RunRepository, consumer_repo: ConsumerRepository) -> None:
+        self._run_repo = run_repo
+        self._consumer_repo = consumer_repo
         self._logger = logging.getLogger(__name__)
 
     async def process_message(
@@ -73,7 +74,7 @@ class WorkerStateMachineService:
         occurred_at: str,
         payload: dict[str, Any],
     ) -> dict[str, str]:
-        duplicate = await self._repo.is_message_processed(
+        duplicate = await self._consumer_repo.is_message_processed(
             stream_key=stream_key,
             consumer_group=consumer_group,
             message_id=message_id,
@@ -114,7 +115,7 @@ class WorkerStateMachineService:
             reason_code = "UNSUPPORTED_EVENT_TYPE"
             reason_message = f"Unsupported event type: {event_type}"
 
-        await self._repo.append_timeline_entry(
+        await self._run_repo.append_timeline_entry(
             entry=RunTimelineEntry(
                 id=new_uuid(),
                 run_id=run_id,
@@ -131,7 +132,7 @@ class WorkerStateMachineService:
                 created_at=utc_now(),
             )
         )
-        await self._repo.mark_message_processed_and_checkpoint(
+        await self._consumer_repo.mark_message_processed_and_checkpoint(
             stream_key=stream_key,
             consumer_group=consumer_group,
             consumer_name=consumer_name,
@@ -160,10 +161,10 @@ class WorkerStateMachineService:
         }
 
     async def reconcile_startup(self, *, worker_instance: str, occurred_at: str) -> list[str]:
-        in_flight_runs = await self._repo.list_in_flight_runs()
+        in_flight_runs = await self._run_repo.list_in_flight_runs()
         reconciled: list[str] = []
         for run in in_flight_runs:
-            await self._repo.append_timeline_entry(
+            await self._run_repo.append_timeline_entry(
                 entry=RunTimelineEntry(
                     id=new_uuid(),
                     run_id=run.run_id,
@@ -193,7 +194,7 @@ class WorkerStateMachineService:
         payload: dict[str, Any],
     ) -> tuple[TransitionDecision, str | None, str | None]:
         target_status = _RUN_EVENT_TO_STATUS[event_type]
-        run = await self._repo.get_run(run_id=run_id)
+        run = await self._run_repo.get_run(run_id=run_id)
 
         if run is None:
             if target_status != RunStatus.PENDING:
@@ -202,7 +203,7 @@ class WorkerStateMachineService:
                     "RUN_NOT_FOUND",
                     "Run must be created by orchestration.run.submit.accepted",
                 )
-            await self._repo.create_run(
+            await self._run_repo.create_run(
                 run=OrchestrationRun(
                     run_id=run_id,
                     status=RunStatus.PENDING,
@@ -230,7 +231,7 @@ class WorkerStateMachineService:
                 f"Cannot transition run from {run.status.value} to {target_status.value}",
             )
 
-        await self._repo.update_run_status(
+        await self._run_repo.update_run_status(
             run_id=run_id,
             status=target_status,
             current_step_id=run.current_step_id,
@@ -239,7 +240,7 @@ class WorkerStateMachineService:
             terminal_at=(occurred_at if target_status in _TERMINAL_RUN_STATUSES else None),
         )
         if target_status == RunStatus.RUNNING:
-            await self._repo.compare_and_set_run_lease(
+            await self._run_repo.compare_and_set_run_lease(
                 run_id=run_id,
                 expected_lease_token=run.lease_token,
                 lease_owner=self._extract_lease_owner(payload),
@@ -249,7 +250,7 @@ class WorkerStateMachineService:
                 updated_at=occurred_at,
             )
         if target_status in _TERMINAL_RUN_STATUSES:
-            await self._repo.compare_and_set_run_lease(
+            await self._run_repo.compare_and_set_run_lease(
                 run_id=run_id,
                 expected_lease_token=run.lease_token,
                 lease_owner=None,
@@ -275,7 +276,7 @@ class WorkerStateMachineService:
                 "Step transition requires payload.step_id",
             )
 
-        run = await self._repo.get_run(run_id=run_id)
+        run = await self._run_repo.get_run(run_id=run_id)
         if run is None or run.status != RunStatus.RUNNING:
             return (
                 TransitionDecision.REJECTED,
@@ -284,7 +285,7 @@ class WorkerStateMachineService:
             )
 
         target_status = _STEP_EVENT_TO_STATUS[event_type]
-        step = await self._repo.get_step(run_id=run_id, step_id=step_id)
+        step = await self._run_repo.get_step(run_id=run_id, step_id=step_id)
         if step is None:
             if target_status != StepStatus.RUNNING:
                 return (
@@ -292,7 +293,7 @@ class WorkerStateMachineService:
                     "STEP_NOT_FOUND",
                     "Step must be created by orchestration.step.started",
                 )
-            await self._repo.create_step(
+            await self._run_repo.create_step(
                 step=OrchestrationStep(
                     step_id=step_id,
                     run_id=run_id,
@@ -303,7 +304,7 @@ class WorkerStateMachineService:
                     terminal_at=None,
                 )
             )
-            await self._repo.update_run_status(
+            await self._run_repo.update_run_status(
                 run_id=run_id,
                 status=run.status,
                 current_step_id=step_id,
@@ -320,7 +321,7 @@ class WorkerStateMachineService:
                 f"Cannot transition step from {step.status.value} to {target_status.value}",
             )
 
-        await self._repo.update_step_status(
+        await self._run_repo.update_step_status(
             run_id=run_id,
             step_id=step_id,
             status=target_status,
@@ -331,7 +332,7 @@ class WorkerStateMachineService:
         next_step_id = run.current_step_id
         if next_step_id == step_id and target_status in _TERMINAL_STEP_STATUSES:
             next_step_id = None
-        await self._repo.update_run_status(
+        await self._run_repo.update_run_status(
             run_id=run_id,
             status=run.status,
             current_step_id=next_step_id,

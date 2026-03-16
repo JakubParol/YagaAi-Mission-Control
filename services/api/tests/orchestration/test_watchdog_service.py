@@ -1,10 +1,11 @@
-import aiosqlite
 import pytest
 
 from app.orchestration.application.watchdog_service import WatchdogService
 from app.orchestration.application.worker_state_machine_service import WorkerStateMachineService
 from app.orchestration.domain.models import RunStatus
-from app.orchestration.infrastructure.sqlite_repository import SqliteOrchestrationRepository
+from app.orchestration.infrastructure.repositories.consumer import DbConsumerRepository
+from app.orchestration.infrastructure.repositories.run import DbRunRepository
+from app.shared.db.session import get_session_factory
 
 _STREAM = "mc:orchestration:events:orchestration_run_submit_accepted:v1:p0"
 _GROUP = "orchestration-workers-v1"
@@ -35,11 +36,12 @@ async def _process(
 
 
 @pytest.mark.asyncio
-async def test_watchdog_detects_heartbeat_loss_and_schedules_retry(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        worker = WorkerStateMachineService(repo=repo)
-        watchdog = WatchdogService(repo=repo)
+async def test_watchdog_detects_heartbeat_loss_and_schedules_retry() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        worker = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
+        watchdog = WatchdogService(repo=run_repo)
 
         await _process(
             worker,
@@ -62,7 +64,7 @@ async def test_watchdog_detects_heartbeat_loss_and_schedules_retry(db_path: str)
             watchdog_instance="watchdog-a",
             evaluated_at="2026-03-08T12:05:00Z",
         )
-        run = await repo.get_run(run_id="run-watchdog-1")
+        run = await run_repo.get_run(run_id="run-watchdog-1")
 
     assert decisions and decisions[0]["action"] == "RETRY"
     assert run is not None
@@ -71,11 +73,12 @@ async def test_watchdog_detects_heartbeat_loss_and_schedules_retry(db_path: str)
 
 
 @pytest.mark.asyncio
-async def test_watchdog_applies_quarantine_for_batch_second_violation(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        worker = WorkerStateMachineService(repo=repo)
-        watchdog = WatchdogService(repo=repo)
+async def test_watchdog_applies_quarantine_for_batch_second_violation() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        worker = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
+        watchdog = WatchdogService(repo=run_repo)
 
         await _process(
             worker,
@@ -110,7 +113,7 @@ async def test_watchdog_applies_quarantine_for_batch_second_violation(db_path: s
             watchdog_instance="watchdog-a",
             evaluated_at="2026-03-08T12:10:00Z",
         )
-        run = await repo.get_run(run_id="run-watchdog-2")
+        run = await run_repo.get_run(run_id="run-watchdog-2")
 
     assert first_decision and first_decision[0]["action"] == "RETRY"
     assert second_decision and second_decision[0]["action"] == "QUARANTINE"
@@ -120,11 +123,12 @@ async def test_watchdog_applies_quarantine_for_batch_second_violation(db_path: s
 
 
 @pytest.mark.asyncio
-async def test_watchdog_fails_critical_run_on_timeout(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        worker = WorkerStateMachineService(repo=repo)
-        watchdog = WatchdogService(repo=repo)
+async def test_watchdog_fails_critical_run_on_timeout() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        worker = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
+        watchdog = WatchdogService(repo=run_repo)
 
         await _process(
             worker,
@@ -146,7 +150,7 @@ async def test_watchdog_fails_critical_run_on_timeout(db_path: str) -> None:
             watchdog_instance="watchdog-a",
             evaluated_at="2026-03-08T12:20:00Z",
         )
-        run = await repo.get_run(run_id="run-watchdog-3")
+        run = await run_repo.get_run(run_id="run-watchdog-3")
 
     assert decisions and decisions[0]["action"] == "FAIL"
     assert run is not None
@@ -154,10 +158,11 @@ async def test_watchdog_fails_critical_run_on_timeout(db_path: str) -> None:
 
 
 @pytest.mark.asyncio
-async def test_compare_and_set_run_lease_prevents_conflicting_mutation(db_path: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        repo = SqliteOrchestrationRepository(db)
-        worker = WorkerStateMachineService(repo=repo)
+async def test_compare_and_set_run_lease_prevents_conflicting_mutation() -> None:
+    async with get_session_factory()() as session:
+        run_repo = DbRunRepository(session)
+        consumer_repo = DbConsumerRepository(session)
+        worker = WorkerStateMachineService(run_repo=run_repo, consumer_repo=consumer_repo)
 
         await _process(
             worker,
@@ -176,7 +181,7 @@ async def test_compare_and_set_run_lease_prevents_conflicting_mutation(db_path: 
             occurred_at="2026-03-08T12:00:01Z",
         )
 
-        updated = await repo.compare_and_set_run_lease(
+        updated = await run_repo.compare_and_set_run_lease(
             run_id="run-watchdog-4",
             expected_lease_token="wrong-lease-token",
             lease_owner="worker-b",
@@ -185,7 +190,7 @@ async def test_compare_and_set_run_lease_prevents_conflicting_mutation(db_path: 
             timeout_at="2026-03-08T12:02:00Z",
             updated_at="2026-03-08T12:01:00Z",
         )
-        run = await repo.get_run(run_id="run-watchdog-4")
+        run = await run_repo.get_run(run_id="run-watchdog-4")
 
     assert updated is False
     assert run is not None

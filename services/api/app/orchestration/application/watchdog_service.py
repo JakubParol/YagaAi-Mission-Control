@@ -4,7 +4,7 @@ import logging
 from datetime import UTC, datetime
 
 from app.config import settings
-from app.orchestration.application.ports import OrchestrationRepository
+from app.orchestration.application.ports import RunRepository
 from app.orchestration.domain.models import (
     OrchestrationRun,
     RunStatus,
@@ -21,7 +21,7 @@ def _parse_iso8601(value: str) -> datetime:
 
 
 class WatchdogService:
-    def __init__(self, repo: OrchestrationRepository) -> None:
+    def __init__(self, repo: RunRepository) -> None:
         self._repo = repo
         self._logger = logging.getLogger(__name__)
 
