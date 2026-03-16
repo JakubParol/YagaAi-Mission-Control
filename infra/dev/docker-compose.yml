@@ -54,7 +54,7 @@ services:
         PY
         exec uvicorn app.main:app --host 0.0.0.0 --port 5100
     ports:
-      - "127.0.0.1:${MC_API_PORT:-5000}:5100"
+      - "${MC_API_PORT:-5000}:5100"
     depends_on:
       redis:
         condition: service_healthy

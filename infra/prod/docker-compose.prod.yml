@@ -76,7 +76,7 @@ services:
       PORT: ${MC_WEB_INTERNAL_PORT:-3000}
       NODE_ENV: production
     ports:
-      - "127.0.0.1:${MC_PROD_WEB_PORT:-3100}:${MC_WEB_INTERNAL_PORT:-3000}"
+      - "${MC_PROD_WEB_PORT:-3100}:${MC_WEB_INTERNAL_PORT:-3000}"
     depends_on:
       api:
         condition: service_healthy

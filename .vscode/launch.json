@@ -24,7 +24,7 @@
     },
     {
       "name": "API (FastAPI)",
-      "type": "debugpy",
+      "type": "python",
       "request": "launch",
       "cwd": "${workspaceFolder}/services/api",
       "python": "${workspaceFolder}/services/api/.venv/bin/python",
