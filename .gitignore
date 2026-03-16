@@ -15,6 +15,7 @@ coverage/
 .next/
 out/
 apps/web/.next-vscode/
+apps/web/.next-local/
 
 # production
 build/
@@ -54,5 +55,6 @@ apps/cli/dist/
 # agent plans
 .plans/
 
-# local runtime backups
-infra/dev/backups/
+# backups
+infra/prod/backups
+infra/dev/backups
