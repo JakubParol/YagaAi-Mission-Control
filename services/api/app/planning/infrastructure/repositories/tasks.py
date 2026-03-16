@@ -1,29 +1,43 @@
+import json
 from typing import Any
+from typing import cast as type_cast
 from uuid import uuid4
+
+from sqlalchemy import case, delete, insert, select, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import count
+from sqlalchemy.sql.functions import sum as sa_sum
 
 from app.planning.application.ports import TaskRepository
 from app.planning.domain.models import Task, TaskAssignment
-from app.planning.infrastructure.shared.events import _insert_assignment_event
-from app.planning.infrastructure.shared.keys import _allocate_next_key, _project_exists
 from app.planning.infrastructure.shared.mappers import _row_to_assignment, _row_to_task
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _exists,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-    _parse_sort,
+from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.tables import (
+    activity_log,
+    agents,
+    labels,
+    project_counters,
+    projects,
+    stories,
+    task_assignments,
+    task_labels,
+    tasks,
 )
 from app.shared.api.errors import ValidationError
 from app.shared.utils import utc_now
 
-_SORT_ALLOWED_TASK = {"created_at", "updated_at", "title", "priority", "status"}
+_SORT_ALLOWED_TASK = {
+    "created_at": tasks.c.created_at,
+    "updated_at": tasks.c.updated_at,
+    "title": tasks.c.title,
+    "priority": tasks.c.priority,
+    "status": tasks.c.status,
+}
 
 
 class DbTaskRepository(TaskRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def list_all(
@@ -39,74 +53,76 @@ class DbTaskRepository(TaskRepository):
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Task], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if key:
-            where_parts.append("key = ?")
-            params.append(key)
+            conditions.append(tasks.c.key == key)
         if project_id:
-            where_parts.append("project_id = ?")
-            params.append(project_id)
+            conditions.append(tasks.c.project_id == project_id)
         if story_id:
-            where_parts.append("story_id = ?")
-            params.append(story_id)
+            conditions.append(tasks.c.story_id == story_id)
         if epic_id:
-            where_parts.append("story_id IN (SELECT id FROM stories WHERE epic_id = ?)")
-            params.append(epic_id)
+            conditions.append(
+                tasks.c.story_id.in_(select(stories.c.id).where(stories.c.epic_id == epic_id))
+            )
         if status:
-            where_parts.append("status = ?")
-            params.append(status)
+            conditions.append(tasks.c.status == status)
         if assignee_id:
-            where_parts.append("current_assignee_agent_id = ?")
-            params.append(assignee_id)
+            conditions.append(tasks.c.current_assignee_agent_id == assignee_id)
 
-        order_sql = _parse_sort(sort, _SORT_ALLOWED_TASK)
-        count_q, select_q = _build_list_queries("tasks", where_parts, order_sql)
+        order = parse_sort(sort, _SORT_ALLOWED_TASK)
+        if not order:
+            order = [tasks.c.created_at.desc()]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(tasks)
+        select_q = select(tasks)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_task(r) for r in rows], total
 
     async def get_by_id(self, task_id: str) -> Task | None:
-        row = await _fetch_one(self._db, "SELECT * FROM tasks WHERE id = ?", [task_id])
+        row = (
+            (await self._db.execute(select(tasks).where(tasks.c.id == task_id))).mappings().first()
+        )
         return _row_to_task(row) if row else None
 
     async def get_by_key(self, key: str) -> Task | None:
-        row = await _fetch_one(self._db, "SELECT * FROM tasks WHERE key = ?", [key.upper()])
+        row = (
+            (await self._db.execute(select(tasks).where(tasks.c.key == key.upper())))
+            .mappings()
+            .first()
+        )
         return _row_to_task(row) if row else None
 
     async def create(self, task: Task) -> Task:
         await self._db.execute(
-            """INSERT INTO tasks (id, project_id, story_id, key, title, objective,
-               task_type, status, is_blocked, blocked_reason, priority,
-               estimate_points, due_at, current_assignee_agent_id,
-               metadata_json, created_by, updated_by, created_at, updated_at,
-               started_at, completed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                task.id,
-                task.project_id,
-                task.story_id,
-                task.key,
-                task.title,
-                task.objective,
-                task.task_type,
-                task.status,
-                1 if task.is_blocked else 0,
-                task.blocked_reason,
-                task.priority,
-                task.estimate_points,
-                task.due_at,
-                task.current_assignee_agent_id,
-                task.metadata_json,
-                task.created_by,
-                task.updated_by,
-                task.created_at,
-                task.updated_at,
-                task.started_at,
-                task.completed_at,
-            ],
+            insert(tasks).values(
+                id=task.id,
+                project_id=task.project_id,
+                story_id=task.story_id,
+                key=task.key,
+                title=task.title,
+                objective=task.objective,
+                task_type=task.task_type,
+                status=task.status,
+                is_blocked=1 if task.is_blocked else 0,
+                blocked_reason=task.blocked_reason,
+                priority=task.priority,
+                estimate_points=task.estimate_points,
+                due_at=task.due_at,
+                current_assignee_agent_id=task.current_assignee_agent_id,
+                metadata_json=task.metadata_json,
+                created_by=task.created_by,
+                updated_by=task.updated_by,
+                created_at=task.created_at,
+                updated_at=task.updated_at,
+                started_at=task.started_at,
+                completed_at=task.completed_at,
+            )
         )
         await self._db.commit()
         return task
@@ -130,21 +146,14 @@ class DbTaskRepository(TaskRepository):
             "started_at",
             "completed_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                if k == "is_blocked":
-                    params.append(1 if v else 0)
-                else:
-                    params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(task_id)
 
-        params.append(task_id)
-        await self._db.execute(_build_update_query("tasks", sets), params)
+        if "is_blocked" in values:
+            values["is_blocked"] = 1 if values["is_blocked"] else 0
+
+        await self._db.execute(update(tasks).where(tasks.c.id == task_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(task_id)
 
@@ -178,29 +187,24 @@ class DbTaskRepository(TaskRepository):
             "started_at",
             "completed_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                if k == "is_blocked":
-                    params.append(1 if v else 0)
-                else:
-                    params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(task_id)
 
-        row = await _fetch_one(self._db, "SELECT key FROM tasks WHERE id = ?", [task_id])
+        if "is_blocked" in values:
+            values["is_blocked"] = 1 if values["is_blocked"] else 0
+
+        row = (
+            (await self._db.execute(select(tasks.c.key).where(tasks.c.id == task_id)))
+            .mappings()
+            .first()
+        )
         if row is None:
             return None
 
         try:
-            await self._db.execute("BEGIN")
-            params.append(task_id)
-            await self._db.execute(_build_update_query("tasks", sets), params)
-            await _insert_assignment_event(
-                self._db,
+            await self._db.execute(update(tasks).where(tasks.c.id == task_id).values(**values))
+            await self._insert_assignment_event(
                 actor_id=actor_id,
                 entity_type="task",
                 entity_id=task_id,
@@ -218,113 +222,174 @@ class DbTaskRepository(TaskRepository):
         return await self.get_by_id(task_id)
 
     async def delete(self, task_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM tasks WHERE id = ?", [task_id])
+        result = type_cast(
+            CursorResult, await self._db.execute(delete(tasks).where(tasks.c.id == task_id))
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def allocate_key(self, project_id: str) -> str:
-        return await _allocate_next_key(self._db, project_id)
+        row = (
+            (await self._db.execute(select(projects.c.key).where(projects.c.id == project_id)))
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise ValidationError(f"Project {project_id} does not exist")
+        project_key = row["key"]
+
+        counter_row = (
+            (
+                await self._db.execute(
+                    select(project_counters.c.next_number).where(
+                        project_counters.c.project_id == project_id
+                    )
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not counter_row:
+            raise ValidationError(f"No counter found for project {project_id}")
+
+        next_num = counter_row["next_number"]
+        await self._db.execute(
+            update(project_counters)
+            .where(project_counters.c.project_id == project_id)
+            .values(
+                next_number=project_counters.c.next_number + 1,
+                updated_at=utc_now(),
+            )
+        )
+        await self._db.commit()
+        return f"{project_key}-{next_num}"
 
     async def project_exists(self, project_id: str) -> bool:
-        return await _project_exists(self._db, project_id)
+        row = (
+            await self._db.execute(select(projects.c.id).where(projects.c.id == project_id))
+        ).first()
+        return row is not None
 
     async def story_exists(self, story_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM stories WHERE id = ?", [story_id])
+        row = (await self._db.execute(select(stories.c.id).where(stories.c.id == story_id))).first()
+        return row is not None
 
     async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]:
-        row = await _fetch_one(self._db, "SELECT project_id FROM stories WHERE id = ?", [story_id])
+        row = (
+            (await self._db.execute(select(stories.c.project_id).where(stories.c.id == story_id)))
+            .mappings()
+            .first()
+        )
         if not row:
             return False, None
         return True, row["project_id"]
 
     async def get_story_task_progress(self, story_id: str) -> tuple[int, int]:
-        row = await _fetch_one(
-            self._db,
-            """
-            SELECT
-              COUNT(*) AS task_count,
-              SUM(CASE WHEN status = 'DONE' THEN 1 ELSE 0 END) AS done_task_count
-            FROM tasks
-            WHERE story_id = ?
-            """,
-            [story_id],
+        result = await self._db.execute(
+            select(
+                count().label("task_count"),
+                sa_sum(case((tasks.c.status == "DONE", 1), else_=0)).label("done_task_count"),
+            ).where(tasks.c.story_id == story_id)
         )
+        row = result.mappings().first()
         if not row:
             return 0, 0
         return row["task_count"] or 0, row["done_task_count"] or 0
 
     async def agent_exists(self, agent_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM agents WHERE id = ?", [agent_id])
+        row = (await self._db.execute(select(agents.c.id).where(agents.c.id == agent_id))).first()
+        return row is not None
 
     async def label_exists(self, label_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM labels WHERE id = ?", [label_id])
+        row = (await self._db.execute(select(labels.c.id).where(labels.c.id == label_id))).first()
+        return row is not None
 
     async def label_attached(self, task_id: str, label_id: str) -> bool:
-        return await _exists(
-            self._db,
-            "SELECT 1 FROM task_labels WHERE task_id = ? AND label_id = ?",
-            [task_id, label_id],
-        )
+        row = (
+            await self._db.execute(
+                select(task_labels.c.task_id).where(
+                    (task_labels.c.task_id == task_id) & (task_labels.c.label_id == label_id)
+                )
+            )
+        ).first()
+        return row is not None
 
     async def attach_label(self, task_id: str, label_id: str) -> None:
         await self._db.execute(
-            """INSERT INTO task_labels (task_id, label_id, added_at)
-               VALUES (?, ?, ?)""",
-            [task_id, label_id, utc_now()],
+            insert(task_labels).values(task_id=task_id, label_id=label_id, added_at=utc_now())
         )
         await self._db.commit()
 
     async def detach_label(self, task_id: str, label_id: str) -> bool:
-        cursor = await self._db.execute(
-            "DELETE FROM task_labels WHERE task_id = ? AND label_id = ?",
-            [task_id, label_id],
+        result = type_cast(
+            CursorResult,
+            await self._db.execute(
+                delete(task_labels).where(
+                    (task_labels.c.task_id == task_id) & (task_labels.c.label_id == label_id)
+                )
+            ),
         )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def get_active_assignment(self, task_id: str) -> TaskAssignment | None:
-        row = await _fetch_one(
-            self._db,
-            "SELECT * FROM task_assignments WHERE task_id = ? AND unassigned_at IS NULL",
-            [task_id],
+        row = (
+            (
+                await self._db.execute(
+                    select(task_assignments).where(
+                        (task_assignments.c.task_id == task_id)
+                        & task_assignments.c.unassigned_at.is_(None)
+                    )
+                )
+            )
+            .mappings()
+            .first()
         )
         return _row_to_assignment(row) if row else None
 
     async def get_assignments(self, task_id: str) -> list[TaskAssignment]:
-        rows = await _fetch_all(
-            self._db,
-            "SELECT * FROM task_assignments WHERE task_id = ? ORDER BY assigned_at DESC",
-            [task_id],
+        rows = (
+            (
+                await self._db.execute(
+                    select(task_assignments)
+                    .where(task_assignments.c.task_id == task_id)
+                    .order_by(task_assignments.c.assigned_at.desc())
+                )
+            )
+            .mappings()
+            .all()
         )
         return [_row_to_assignment(r) for r in rows]
 
     async def create_assignment(self, assignment: TaskAssignment) -> TaskAssignment:
         await self._db.execute(
-            """INSERT INTO task_assignments (id, task_id, agent_id, assigned_at,
-               unassigned_at, assigned_by, reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            [
-                assignment.id,
-                assignment.task_id,
-                assignment.agent_id,
-                assignment.assigned_at,
-                assignment.unassigned_at,
-                assignment.assigned_by,
-                assignment.reason,
-            ],
+            insert(task_assignments).values(
+                id=assignment.id,
+                task_id=assignment.task_id,
+                agent_id=assignment.agent_id,
+                assigned_at=assignment.assigned_at,
+                unassigned_at=assignment.unassigned_at,
+                assigned_by=assignment.assigned_by,
+                reason=assignment.reason,
+            )
         )
         await self._db.commit()
         return assignment
 
     async def close_assignment(self, task_id: str, unassigned_at: str) -> bool:
-        cursor = await self._db.execute(
-            """UPDATE task_assignments
-               SET unassigned_at = ?
-               WHERE task_id = ? AND unassigned_at IS NULL""",
-            [unassigned_at, task_id],
+        result = type_cast(
+            CursorResult,
+            await self._db.execute(
+                update(task_assignments)
+                .where(
+                    (task_assignments.c.task_id == task_id)
+                    & task_assignments.c.unassigned_at.is_(None)
+                )
+                .values(unassigned_at=unassigned_at)
+            ),
         )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def assign_agent_with_event(
         self,
@@ -337,7 +402,11 @@ class DbTaskRepository(TaskRepository):
         correlation_id: str,
         causation_id: str,
     ) -> TaskAssignment:
-        row = await _fetch_one(self._db, "SELECT key FROM tasks WHERE id = ?", [task_id])
+        row = (
+            (await self._db.execute(select(tasks.c.key).where(tasks.c.id == task_id)))
+            .mappings()
+            .first()
+        )
         if row is None:
             raise ValidationError(f"Task {task_id} not found")
 
@@ -351,34 +420,35 @@ class DbTaskRepository(TaskRepository):
             reason=None,
         )
         try:
-            await self._db.execute("BEGIN")
             if previous_assignee_agent_id is not None:
                 await self._db.execute(
-                    """UPDATE task_assignments
-                       SET unassigned_at = ?
-                       WHERE task_id = ? AND unassigned_at IS NULL""",
-                    [occurred_at, task_id],
+                    update(task_assignments)
+                    .where(
+                        (task_assignments.c.task_id == task_id)
+                        & task_assignments.c.unassigned_at.is_(None)
+                    )
+                    .values(unassigned_at=occurred_at)
                 )
             await self._db.execute(
-                """INSERT INTO task_assignments (id, task_id, agent_id, assigned_at,
-                   unassigned_at, assigned_by, reason)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                [
-                    assignment.id,
-                    assignment.task_id,
-                    assignment.agent_id,
-                    assignment.assigned_at,
-                    assignment.unassigned_at,
-                    assignment.assigned_by,
-                    assignment.reason,
-                ],
+                insert(task_assignments).values(
+                    id=assignment.id,
+                    task_id=assignment.task_id,
+                    agent_id=assignment.agent_id,
+                    assigned_at=assignment.assigned_at,
+                    unassigned_at=assignment.unassigned_at,
+                    assigned_by=assignment.assigned_by,
+                    reason=assignment.reason,
+                )
             )
             await self._db.execute(
-                "UPDATE tasks SET current_assignee_agent_id = ?, updated_at = ? WHERE id = ?",
-                [agent_id, occurred_at, task_id],
+                update(tasks)
+                .where(tasks.c.id == task_id)
+                .values(
+                    current_assignee_agent_id=agent_id,
+                    updated_at=occurred_at,
+                )
             )
-            await _insert_assignment_event(
-                self._db,
+            await self._insert_assignment_event(
                 actor_id=assigned_by,
                 entity_type="task",
                 entity_id=task_id,
@@ -404,23 +474,34 @@ class DbTaskRepository(TaskRepository):
         correlation_id: str,
         causation_id: str,
     ) -> bool:
-        row = await _fetch_one(self._db, "SELECT key FROM tasks WHERE id = ?", [task_id])
+        row = (
+            (await self._db.execute(select(tasks.c.key).where(tasks.c.id == task_id)))
+            .mappings()
+            .first()
+        )
         if row is None:
             return False
         try:
-            await self._db.execute("BEGIN")
-            cursor = await self._db.execute(
-                """UPDATE task_assignments
-                   SET unassigned_at = ?
-                   WHERE task_id = ? AND unassigned_at IS NULL""",
-                [occurred_at, task_id],
+            result = type_cast(
+                CursorResult,
+                await self._db.execute(
+                    update(task_assignments)
+                    .where(
+                        (task_assignments.c.task_id == task_id)
+                        & task_assignments.c.unassigned_at.is_(None)
+                    )
+                    .values(unassigned_at=occurred_at)
+                ),
             )
             await self._db.execute(
-                "UPDATE tasks SET current_assignee_agent_id = NULL, updated_at = ? WHERE id = ?",
-                [occurred_at, task_id],
+                update(tasks)
+                .where(tasks.c.id == task_id)
+                .values(
+                    current_assignee_agent_id=None,
+                    updated_at=occurred_at,
+                )
             )
-            await _insert_assignment_event(
-                self._db,
+            await self._insert_assignment_event(
                 actor_id=None,
                 entity_type="task",
                 entity_id=task_id,
@@ -435,4 +516,51 @@ class DbTaskRepository(TaskRepository):
         except Exception:
             await self._db.rollback()
             raise
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
+
+    async def _insert_assignment_event(
+        self,
+        *,
+        actor_id: str | None,
+        entity_type: str,
+        entity_id: str,
+        work_item_key: str | None,
+        new_assignee_agent_id: str | None,
+        previous_assignee_agent_id: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> None:
+        new_payload = {"id": new_assignee_agent_id} if new_assignee_agent_id else None
+        prev_payload = {"id": previous_assignee_agent_id} if previous_assignee_agent_id else None
+        scope = {
+            "work_item_key": work_item_key,
+            "correlation_id": correlation_id,
+            "causation_id": causation_id,
+        }
+        metadata = {
+            "work_item_key": work_item_key,
+            "assignee_agent": new_payload,
+            "previous_assignee": prev_payload,
+            "correlation_id": correlation_id,
+            "causation_id": causation_id,
+            "timestamp": occurred_at,
+        }
+        event_data_json = json.dumps(
+            {"metadata": metadata, "occurred_at": occurred_at, "scope": scope},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        await self._db.execute(
+            insert(activity_log).values(
+                id=str(uuid4()),
+                event_name="planning.assignment.changed",
+                actor_id=actor_id,
+                actor_type="system",
+                entity_type=entity_type,
+                entity_id=entity_id,
+                message="planning.assignment.changed",
+                event_data_json=event_data_json,
+                created_at=occurred_at,
+            )
+        )

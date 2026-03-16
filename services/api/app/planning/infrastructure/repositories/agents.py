@@ -1,23 +1,27 @@
 from typing import Any
+from typing import cast as type_cast
+
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import count
 
 from app.planning.application.ports import AgentRepository
 from app.planning.domain.models import Agent
 from app.planning.infrastructure.shared.mappers import _row_to_agent
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-    _parse_sort,
-)
+from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.tables import agents
 
-_SORT_ALLOWED_AGENT = {"created_at", "updated_at", "name", "openclaw_key"}
+_SORT_ALLOWED_AGENT = {
+    "created_at": agents.c.created_at,
+    "updated_at": agents.c.updated_at,
+    "name": agents.c.name,
+    "openclaw_key": agents.c.openclaw_key,
+}
 
 
 class DbAgentRepository(AgentRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def list_all(
@@ -30,65 +34,77 @@ class DbAgentRepository(AgentRepository):
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Agent], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if openclaw_key:
-            where_parts.append("openclaw_key = ?")
-            params.append(openclaw_key)
+            conditions.append(agents.c.openclaw_key == openclaw_key)
         if is_active is not None:
-            where_parts.append("is_active = ?")
-            params.append(1 if is_active else 0)
+            conditions.append(agents.c.is_active == (1 if is_active else 0))
         if source:
-            where_parts.append("source = ?")
-            params.append(source)
+            conditions.append(agents.c.source == source)
 
-        order_sql = _parse_sort(sort, _SORT_ALLOWED_AGENT)
-        count_q, select_q = _build_list_queries("agents", where_parts, order_sql)
+        order = parse_sort(sort, _SORT_ALLOWED_AGENT)
+        if not order:
+            order = [agents.c.created_at.desc()]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(agents)
+        select_q = select(agents)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_agent(r) for r in rows], total
 
     async def get_by_id(self, agent_id: str) -> Agent | None:
-        row = await _fetch_one(self._db, "SELECT * FROM agents WHERE id = ?", [agent_id])
+        row = (
+            (await self._db.execute(select(agents).where(agents.c.id == agent_id)))
+            .mappings()
+            .first()
+        )
         return _row_to_agent(row) if row else None
 
     async def get_by_openclaw_key(self, openclaw_key: str) -> Agent | None:
-        row = await _fetch_one(
-            self._db, "SELECT * FROM agents WHERE openclaw_key = ?", [openclaw_key]
+        row = (
+            (await self._db.execute(select(agents).where(agents.c.openclaw_key == openclaw_key)))
+            .mappings()
+            .first()
         )
         return _row_to_agent(row) if row else None
 
     async def list_by_source(self, source: str) -> list[Agent]:
-        rows = await _fetch_all(
-            self._db,
-            "SELECT * FROM agents WHERE source = ? ORDER BY openclaw_key ASC",
-            [source],
+        rows = (
+            (
+                await self._db.execute(
+                    select(agents)
+                    .where(agents.c.source == source)
+                    .order_by(agents.c.openclaw_key.asc())
+                )
+            )
+            .mappings()
+            .all()
         )
         return [_row_to_agent(r) for r in rows]
 
     async def create(self, agent: Agent) -> Agent:
         await self._db.execute(
-            """INSERT INTO agents (id, openclaw_key, name, last_name, initials, role, worker_type,
-               avatar, is_active, source, metadata_json, last_synced_at, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                agent.id,
-                agent.openclaw_key,
-                agent.name,
-                agent.last_name,
-                agent.initials,
-                agent.role,
-                agent.worker_type,
-                agent.avatar,
-                1 if agent.is_active else 0,
-                agent.source,
-                agent.metadata_json,
-                agent.last_synced_at,
-                agent.created_at,
-                agent.updated_at,
-            ],
+            insert(agents).values(
+                id=agent.id,
+                openclaw_key=agent.openclaw_key,
+                name=agent.name,
+                last_name=agent.last_name,
+                initials=agent.initials,
+                role=agent.role,
+                worker_type=agent.worker_type,
+                avatar=agent.avatar,
+                is_active=1 if agent.is_active else 0,
+                source=agent.source,
+                metadata_json=agent.metadata_json,
+                last_synced_at=agent.last_synced_at,
+                created_at=agent.created_at,
+                updated_at=agent.updated_at,
+            )
         )
         await self._db.commit()
         return agent
@@ -107,25 +123,20 @@ class DbAgentRepository(AgentRepository):
             "last_synced_at",
             "updated_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                if k == "is_active":
-                    params.append(1 if v else 0)
-                else:
-                    params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(agent_id)
 
-        params.append(agent_id)
-        await self._db.execute(_build_update_query("agents", sets), params)
+        if "is_active" in values:
+            values["is_active"] = 1 if values["is_active"] else 0
+
+        await self._db.execute(update(agents).where(agents.c.id == agent_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(agent_id)
 
     async def delete(self, agent_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM agents WHERE id = ?", [agent_id])
+        result = type_cast(
+            CursorResult, await self._db.execute(delete(agents).where(agents.c.id == agent_id))
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0

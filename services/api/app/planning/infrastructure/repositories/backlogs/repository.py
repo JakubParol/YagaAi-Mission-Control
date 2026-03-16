@@ -1,107 +1,123 @@
 from typing import Any
+from typing import cast as type_cast
+
+from sqlalchemy import case, delete, insert, select, text, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import coalesce, count
+from sqlalchemy.sql.functions import max as sa_max
 
 from app.planning.application.ports import BacklogRepository
 from app.planning.domain.models import Backlog, BacklogStoryItem, BacklogTaskItem
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     add_story_item as _add_story_item,
 )
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     add_task_item as _add_task_item,
 )
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     list_task_items as _list_task_items,
 )
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     move_story_item as _move_story_item,
 )
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     remove_story_item as _remove_story_item,
 )
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     remove_task_item as _remove_task_item,
 )
-from app.planning.infrastructure.repositories.backlogs._membership_sql import (
+from app.planning.infrastructure.repositories.backlogs._membership import (
     reorder_items as _reorder_items,
 )
-from app.planning.infrastructure.repositories.backlogs._story_projection import (
+from app.planning.infrastructure.repositories.backlogs._projection import (
     get_backlog_story_rows,
 )
 from app.planning.infrastructure.shared.mappers import _row_to_backlog
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _exists,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-    _parse_sort,
+from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.tables import (
+    backlog_stories,
+    backlog_tasks,
+    backlogs,
 )
+from app.planning.infrastructure.tables import stories as stories_t
+from app.planning.infrastructure.tables import tasks as tasks_t
 
-_SORT_ALLOWED_BACKLOG = {"created_at", "updated_at", "name", "display_order"}
-_BACKLOG_PRIORITY_SQL = (
-    "CASE "
-    "WHEN kind = 'SPRINT' AND status = 'ACTIVE' THEN 0 "
-    "WHEN is_default = 1 THEN 2 "
-    "ELSE 1 "
-    "END"
-)
-_DEFAULT_BACKLOG_ORDER_SQL = (
-    _BACKLOG_PRIORITY_SQL + " ASC, display_order ASC, created_at ASC, id ASC"
+_SORT_ALLOWED_BACKLOG = {
+    "created_at": backlogs.c.created_at,
+    "updated_at": backlogs.c.updated_at,
+    "name": backlogs.c.name,
+    "display_order": backlogs.c.display_order,
+}
+
+_BACKLOG_PRIORITY_EXPR = case(
+    (
+        (backlogs.c.kind == "SPRINT") & (backlogs.c.status == "ACTIVE"),
+        0,
+    ),
+    (backlogs.c.is_default == 1, 2),
+    else_=1,
 )
 
 
 class DbBacklogRepository(BacklogRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def _repair_active_sprint_integrity(self) -> None:
-        duplicate_rows = await _fetch_all(
-            self._db,
-            """
-            SELECT project_id
-            FROM backlogs
-            WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'
-            GROUP BY project_id
-            HAVING COUNT(*) > 1
-            """,
-            [],
+        duplicate_q = (
+            select(backlogs.c.project_id)
+            .where(
+                backlogs.c.project_id.isnot(None)
+                & (backlogs.c.kind == "SPRINT")
+                & (backlogs.c.status == "ACTIVE")
+            )
+            .group_by(backlogs.c.project_id)
+            .having(count() > 1)
         )
+        duplicate_rows = (await self._db.execute(duplicate_q)).mappings().all()
 
-        for duplicate_row in duplicate_rows:
-            project_id = duplicate_row["project_id"]
-            keep_row = await _fetch_one(
-                self._db,
-                """
-                SELECT id
-                FROM backlogs
-                WHERE project_id = ? AND kind = 'SPRINT' AND status = 'ACTIVE'
-                ORDER BY display_order ASC, created_at ASC, id ASC
-                LIMIT 1
-                """,
-                [project_id],
+        for dup_row in duplicate_rows:
+            project_id = dup_row["project_id"]
+            keep_row = (
+                (
+                    await self._db.execute(
+                        select(backlogs.c.id)
+                        .where(
+                            (backlogs.c.project_id == project_id)
+                            & (backlogs.c.kind == "SPRINT")
+                            & (backlogs.c.status == "ACTIVE")
+                        )
+                        .order_by(
+                            backlogs.c.display_order.asc(),
+                            backlogs.c.created_at.asc(),
+                            backlogs.c.id.asc(),
+                        )
+                        .limit(1)
+                    )
+                )
+                .mappings()
+                .first()
             )
             if keep_row is None:
                 continue
             await self._db.execute(
-                """
-                UPDATE backlogs
-                SET status = 'OPEN'
-                WHERE project_id = ?
-                  AND kind = 'SPRINT'
-                  AND status = 'ACTIVE'
-                  AND id != ?
-                """,
-                [project_id, keep_row["id"]],
+                update(backlogs)
+                .where(
+                    (backlogs.c.project_id == project_id)
+                    & (backlogs.c.kind == "SPRINT")
+                    & (backlogs.c.status == "ACTIVE")
+                    & (backlogs.c.id != keep_row["id"])
+                )
+                .values(status="OPEN")
             )
 
         await self._db.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_active_sprint_per_project
-            ON backlogs (project_id)
-            WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'
-            """,
-            [],
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_backlogs_one_active_sprint_per_project "
+                "ON backlogs (project_id) "
+                "WHERE project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'"
+            )
         )
         await self._db.commit()
 
@@ -118,84 +134,77 @@ class DbBacklogRepository(BacklogRepository):
     ) -> tuple[list[Backlog], int]:
         await self._repair_active_sprint_integrity()
 
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if filter_global:
-            where_parts.append("project_id IS NULL")
+            conditions.append(backlogs.c.project_id.is_(None))
         elif project_id:
-            where_parts.append("project_id = ?")
-            params.append(project_id)
+            conditions.append(backlogs.c.project_id == project_id)
         if status:
-            where_parts.append("status = ?")
-            params.append(status)
+            conditions.append(backlogs.c.status == status)
         if kind:
-            where_parts.append("kind = ?")
-            params.append(kind)
+            conditions.append(backlogs.c.kind == kind)
 
         if sort and sort.strip():
-            order_sql = (
-                _BACKLOG_PRIORITY_SQL
-                + " ASC, "
-                + _parse_sort(sort, _SORT_ALLOWED_BACKLOG)
-                + ", id ASC"
-            )
+            user_order = parse_sort(sort, _SORT_ALLOWED_BACKLOG)
+            order = [_BACKLOG_PRIORITY_EXPR.asc(), *user_order, backlogs.c.id.asc()]
         else:
-            order_sql = _DEFAULT_BACKLOG_ORDER_SQL
-        count_q, select_q = _build_list_queries("backlogs", where_parts, order_sql)
+            order = [
+                _BACKLOG_PRIORITY_EXPR.asc(),
+                backlogs.c.display_order.asc(),
+                backlogs.c.created_at.asc(),
+                backlogs.c.id.asc(),
+            ]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(backlogs)
+        select_q = select(backlogs)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_backlog(r) for r in rows], total
 
     async def get_by_id(self, backlog_id: str) -> Backlog | None:
-        row = await _fetch_one(self._db, "SELECT * FROM backlogs WHERE id = ?", [backlog_id])
+        row = (
+            (await self._db.execute(select(backlogs).where(backlogs.c.id == backlog_id)))
+            .mappings()
+            .first()
+        )
         return _row_to_backlog(row) if row else None
 
     async def create(self, backlog: Backlog) -> Backlog:
         await self._db.execute(
-            """INSERT INTO backlogs (id, project_id, name, kind, status, display_order, is_default,
-               goal, start_date, end_date, metadata_json,
-               created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                backlog.id,
-                backlog.project_id,
-                backlog.name,
-                backlog.kind,
-                backlog.status,
-                backlog.display_order,
-                1 if backlog.is_default else 0,
-                backlog.goal,
-                backlog.start_date,
-                backlog.end_date,
-                backlog.metadata_json,
-                backlog.created_by,
-                backlog.updated_by,
-                backlog.created_at,
-                backlog.updated_at,
-            ],
+            insert(backlogs).values(
+                id=backlog.id,
+                project_id=backlog.project_id,
+                name=backlog.name,
+                kind=backlog.kind,
+                status=backlog.status,
+                display_order=backlog.display_order,
+                is_default=1 if backlog.is_default else 0,
+                goal=backlog.goal,
+                start_date=backlog.start_date,
+                end_date=backlog.end_date,
+                metadata_json=backlog.metadata_json,
+                created_by=backlog.created_by,
+                updated_by=backlog.updated_by,
+                created_at=backlog.created_at,
+                updated_at=backlog.updated_at,
+            )
         )
         await self._db.commit()
         return backlog
 
     async def next_display_order(self, project_id: str | None) -> int:
+        q = select(coalesce(sa_max(backlogs.c.display_order), 0))
         if project_id is None:
-            row = await _fetch_one(
-                self._db,
-                "SELECT COALESCE(MAX(display_order), 0) AS max_display_order "
-                "FROM backlogs WHERE project_id IS NULL",
-                [],
-            )
+            q = q.where(backlogs.c.project_id.is_(None))
         else:
-            row = await _fetch_one(
-                self._db,
-                "SELECT COALESCE(MAX(display_order), 0) AS max_display_order "
-                "FROM backlogs WHERE project_id = ?",
-                [project_id],
-            )
-        max_display_order = int(row["max_display_order"]) if row else 0
-        return max_display_order + 100
+            q = q.where(backlogs.c.project_id == project_id)
+        max_display_order = (await self._db.execute(q)).scalar_one()
+        return int(max_display_order) + 100
 
     async def update(self, backlog_id: str, data: dict[str, Any]) -> Backlog | None:
         allowed = {
@@ -210,88 +219,103 @@ class DbBacklogRepository(BacklogRepository):
             "updated_by",
             "updated_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(backlog_id)
 
-        params.append(backlog_id)
-        await self._db.execute(_build_update_query("backlogs", sets), params)
+        await self._db.execute(update(backlogs).where(backlogs.c.id == backlog_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(backlog_id)
 
     async def delete(self, backlog_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM backlogs WHERE id = ?", [backlog_id])
+        result = type_cast(
+            CursorResult,
+            await self._db.execute(delete(backlogs).where(backlogs.c.id == backlog_id)),
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def has_default(self, project_id: str | None) -> bool:
+        q = select(backlogs.c.id).where(backlogs.c.is_default == 1)
         if project_id:
-            return await _exists(
-                self._db,
-                "SELECT 1 FROM backlogs WHERE project_id = ? AND is_default = 1",
-                [project_id],
-            )
-        return await _exists(
-            self._db,
-            "SELECT 1 FROM backlogs WHERE project_id IS NULL AND is_default = 1",
-            [],
-        )
+            q = q.where(backlogs.c.project_id == project_id)
+        else:
+            q = q.where(backlogs.c.project_id.is_(None))
+        row = (await self._db.execute(q)).first()
+        return row is not None
 
     async def get_story_count(self, backlog_id: str) -> int:
-        return await _fetch_count(
-            self._db,
-            "SELECT COUNT(*) FROM backlog_stories WHERE backlog_id = ?",
-            [backlog_id],
+        result = await self._db.execute(
+            select(count())
+            .select_from(backlog_stories)
+            .where(backlog_stories.c.backlog_id == backlog_id)
         )
+        return result.scalar_one()
 
     async def get_task_count(self, backlog_id: str) -> int:
-        return await _fetch_count(
-            self._db,
-            "SELECT COUNT(*) FROM backlog_tasks WHERE backlog_id = ?",
-            [backlog_id],
+        result = await self._db.execute(
+            select(count())
+            .select_from(backlog_tasks)
+            .where(backlog_tasks.c.backlog_id == backlog_id)
         )
+        return result.scalar_one()
 
     async def get_story_project_id(self, story_id: str) -> tuple[bool, str | None]:
-        row = await _fetch_one(self._db, "SELECT project_id FROM stories WHERE id = ?", [story_id])
+        q = select(stories_t.c.project_id).where(stories_t.c.id == story_id)
+        row = (await self._db.execute(q)).mappings().first()
         if not row:
             return False, None
         return True, row["project_id"]
 
     async def get_task_project_id(self, task_id: str) -> tuple[bool, str | None]:
-        row = await _fetch_one(self._db, "SELECT project_id FROM tasks WHERE id = ?", [task_id])
+        row = (
+            (await self._db.execute(select(tasks_t.c.project_id).where(tasks_t.c.id == task_id)))
+            .mappings()
+            .first()
+        )
         if not row:
             return False, None
         return True, row["project_id"]
 
     async def story_backlog_id(self, story_id: str) -> str | None:
-        row = await _fetch_one(
-            self._db,
-            "SELECT backlog_id FROM backlog_stories WHERE story_id = ?",
-            [story_id],
+        row = (
+            (
+                await self._db.execute(
+                    select(backlog_stories.c.backlog_id).where(
+                        backlog_stories.c.story_id == story_id
+                    )
+                )
+            )
+            .mappings()
+            .first()
         )
         return row["backlog_id"] if row else None
 
     async def get_story_backlog_item(self, story_id: str) -> tuple[str | None, int | None]:
-        row = await _fetch_one(
-            self._db,
-            "SELECT backlog_id, position FROM backlog_stories WHERE story_id = ?",
-            [story_id],
+        row = (
+            (
+                await self._db.execute(
+                    select(backlog_stories.c.backlog_id, backlog_stories.c.position).where(
+                        backlog_stories.c.story_id == story_id
+                    )
+                )
+            )
+            .mappings()
+            .first()
         )
         if not row:
             return None, None
         return row["backlog_id"], row["position"]
 
     async def task_backlog_id(self, task_id: str) -> str | None:
-        row = await _fetch_one(
-            self._db,
-            "SELECT backlog_id FROM backlog_tasks WHERE task_id = ?",
-            [task_id],
+        row = (
+            (
+                await self._db.execute(
+                    select(backlog_tasks.c.backlog_id).where(backlog_tasks.c.task_id == task_id)
+                )
+            )
+            .mappings()
+            .first()
         )
         return row["backlog_id"] if row else None
 
@@ -348,21 +372,48 @@ class DbBacklogRepository(BacklogRepository):
         return backlog, await get_backlog_story_rows(self._db, backlog.id)
 
     async def get_active_sprint_backlog(self, project_id: str) -> Backlog | None:
-        row = await _fetch_one(
-            self._db,
-            "SELECT * FROM backlogs WHERE project_id = ? "
-            "AND kind = 'SPRINT' AND status = 'ACTIVE' "
-            "ORDER BY display_order ASC, created_at ASC, id ASC LIMIT 1",
-            [project_id],
+        row = (
+            (
+                await self._db.execute(
+                    select(backlogs)
+                    .where(
+                        (backlogs.c.project_id == project_id)
+                        & (backlogs.c.kind == "SPRINT")
+                        & (backlogs.c.status == "ACTIVE")
+                    )
+                    .order_by(
+                        backlogs.c.display_order.asc(),
+                        backlogs.c.created_at.asc(),
+                        backlogs.c.id.asc(),
+                    )
+                    .limit(1)
+                )
+            )
+            .mappings()
+            .first()
         )
         return _row_to_backlog(row) if row else None
 
     async def get_product_backlog(self, project_id: str) -> Backlog | None:
-        row = await _fetch_one(
-            self._db,
-            "SELECT * FROM backlogs WHERE project_id = ? "
-            "AND kind = 'BACKLOG' AND status = 'ACTIVE' "
-            "ORDER BY is_default DESC, display_order ASC, created_at ASC, id ASC LIMIT 1",
-            [project_id],
+        row = (
+            (
+                await self._db.execute(
+                    select(backlogs)
+                    .where(
+                        (backlogs.c.project_id == project_id)
+                        & (backlogs.c.kind == "BACKLOG")
+                        & (backlogs.c.status == "ACTIVE")
+                    )
+                    .order_by(
+                        backlogs.c.is_default.desc(),
+                        backlogs.c.display_order.asc(),
+                        backlogs.c.created_at.asc(),
+                        backlogs.c.id.asc(),
+                    )
+                    .limit(1)
+                )
+            )
+            .mappings()
+            .first()
         )
         return _row_to_backlog(row) if row else None

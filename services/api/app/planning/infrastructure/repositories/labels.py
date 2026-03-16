@@ -1,21 +1,19 @@
 from typing import Any
+from typing import cast as type_cast
+
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import count
 
 from app.planning.application.ports import LabelRepository
 from app.planning.domain.models import Label
 from app.planning.infrastructure.shared.mappers import _row_to_label
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _exists,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-)
+from app.planning.infrastructure.tables import labels
 
 
 class DbLabelRepository(LabelRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def list_all(
@@ -26,66 +24,65 @@ class DbLabelRepository(LabelRepository):
         limit: int = 20,
         offset: int = 0,
     ) -> tuple[list[Label], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if filter_global:
-            where_parts.append("project_id IS NULL")
+            conditions.append(labels.c.project_id.is_(None))
         elif project_id:
-            where_parts.append("(project_id = ? OR project_id IS NULL)")
-            params.append(project_id)
+            conditions.append((labels.c.project_id == project_id) | labels.c.project_id.is_(None))
 
-        count_q, select_q = _build_list_queries("labels", where_parts, "name ASC")
+        count_q = select(count()).select_from(labels)
+        select_q = select(labels)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(labels.c.name.asc()).limit(limit).offset(offset)
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_label(r) for r in rows], total
 
     async def get_by_id(self, label_id: str) -> Label | None:
-        row = await _fetch_one(self._db, "SELECT * FROM labels WHERE id = ?", [label_id])
+        row = (
+            (await self._db.execute(select(labels).where(labels.c.id == label_id)))
+            .mappings()
+            .first()
+        )
         return _row_to_label(row) if row else None
 
     async def name_exists(self, name: str, project_id: str | None) -> bool:
+        q = select(labels.c.id).where(labels.c.name == name)
         if project_id:
-            return await _exists(
-                self._db,
-                "SELECT 1 FROM labels WHERE name = ? AND project_id = ?",
-                [name, project_id],
-            )
-        return await _exists(
-            self._db,
-            "SELECT 1 FROM labels WHERE name = ? AND project_id IS NULL",
-            [name],
-        )
+            q = q.where(labels.c.project_id == project_id)
+        else:
+            q = q.where(labels.c.project_id.is_(None))
+        row = (await self._db.execute(q)).first()
+        return row is not None
 
     async def create(self, label: Label) -> Label:
         await self._db.execute(
-            """INSERT INTO labels (id, project_id, name, color, created_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            [label.id, label.project_id, label.name, label.color, label.created_at],
+            insert(labels).values(
+                id=label.id,
+                project_id=label.project_id,
+                name=label.name,
+                color=label.color,
+                created_at=label.created_at,
+            )
         )
         await self._db.commit()
         return label
 
     async def update(self, label_id: str, data: dict[str, Any]) -> Label | None:
-        sets: list[str] = []
-        params: list[Any] = []
-
-        for field in ("name", "color"):
-            if field not in data:
-                continue
-            sets.append(f"{field} = ?")
-            params.append(data[field])
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in ("name", "color")}
+        if not values:
             return await self.get_by_id(label_id)
 
-        params.append(label_id)
-        await self._db.execute(_build_update_query("labels", sets), params)
+        await self._db.execute(update(labels).where(labels.c.id == label_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(label_id)
 
     async def delete(self, label_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM labels WHERE id = ?", [label_id])
+        result = type_cast(
+            CursorResult, await self._db.execute(delete(labels).where(labels.c.id == label_id))
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0

@@ -81,6 +81,14 @@ disable = [
 max-line-length = 100
 max-module-lines = 2500
 
+[tool.pylint.typecheck]
+# sqlalchemy.func.* dispatches via __getattr__ and __call__ which pylint
+# cannot resolve statically — the E1102 false-positives are unavoidable
+# without this override.
+generated-members = [
+    "sqlalchemy.sql.functions._FunctionGenerator.*",
+]
+
 [tool.pylint.design]
 max-public-methods = 30
 max-locals = 25

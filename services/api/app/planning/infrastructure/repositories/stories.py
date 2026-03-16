@@ -1,27 +1,41 @@
+import json
 from typing import Any
+from typing import cast as type_cast
+from uuid import uuid4
+
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.engine import CursorResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import count
 
 from app.planning.application.ports import StoryRepository
 from app.planning.domain.models import Story
-from app.planning.infrastructure.shared.events import _insert_assignment_event
-from app.planning.infrastructure.shared.keys import _allocate_next_key, _project_exists
 from app.planning.infrastructure.shared.mappers import _row_to_story
-from app.planning.infrastructure.shared.sql import (
-    DbConnection,
-    _build_list_queries,
-    _build_update_query,
-    _exists,
-    _fetch_all,
-    _fetch_count,
-    _fetch_one,
-    _parse_sort,
+from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.tables import (
+    activity_log,
+    agents,
+    epics,
+    labels,
+    project_counters,
+    projects,
+    stories,
+    story_labels,
 )
+from app.shared.api.errors import ValidationError
 from app.shared.utils import utc_now
 
-_SORT_ALLOWED_STORY = {"created_at", "updated_at", "title", "priority", "status"}
+_SORT_ALLOWED_STORY = {
+    "created_at": stories.c.created_at,
+    "updated_at": stories.c.updated_at,
+    "title": stories.c.title,
+    "priority": stories.c.priority,
+    "status": stories.c.status,
+}
 
 
 class DbStoryRepository(StoryRepository):
-    def __init__(self, db: DbConnection) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def list_all(
@@ -35,67 +49,71 @@ class DbStoryRepository(StoryRepository):
         offset: int = 0,
         sort: str = "-created_at",
     ) -> tuple[list[Story], int]:
-        where_parts: list[str] = []
-        params: list[Any] = []
-
+        conditions = []
         if key:
-            where_parts.append("key = ?")
-            params.append(key)
+            conditions.append(stories.c.key == key)
         if project_id:
-            where_parts.append("project_id = ?")
-            params.append(project_id)
+            conditions.append(stories.c.project_id == project_id)
         if epic_id:
-            where_parts.append("epic_id = ?")
-            params.append(epic_id)
+            conditions.append(stories.c.epic_id == epic_id)
         if status:
-            where_parts.append("status = ?")
-            params.append(status)
+            conditions.append(stories.c.status == status)
 
-        order_sql = _parse_sort(sort, _SORT_ALLOWED_STORY)
-        count_q, select_q = _build_list_queries("stories", where_parts, order_sql)
+        order = parse_sort(sort, _SORT_ALLOWED_STORY)
+        if not order:
+            order = [stories.c.created_at.desc()]
 
-        total = await _fetch_count(self._db, count_q, params)
-        rows = await _fetch_all(self._db, select_q, [*params, limit, offset])
+        count_q = select(count()).select_from(stories)
+        select_q = select(stories)
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_story(r) for r in rows], total
 
     async def get_by_id(self, story_id: str) -> Story | None:
-        row = await _fetch_one(self._db, "SELECT * FROM stories WHERE id = ?", [story_id])
+        row = (
+            (await self._db.execute(select(stories).where(stories.c.id == story_id)))
+            .mappings()
+            .first()
+        )
         return _row_to_story(row) if row else None
 
     async def get_by_key(self, key: str) -> Story | None:
-        row = await _fetch_one(self._db, "SELECT * FROM stories WHERE key = ?", [key.upper()])
+        row = (
+            (await self._db.execute(select(stories).where(stories.c.key == key.upper())))
+            .mappings()
+            .first()
+        )
         return _row_to_story(row) if row else None
 
     async def create(self, story: Story) -> Story:
         await self._db.execute(
-            """INSERT INTO stories (id, project_id, epic_id, key, title, intent,
-               description, story_type, status,
-               is_blocked, blocked_reason, priority, current_assignee_agent_id, metadata_json,
-               created_by, updated_by, created_at, updated_at,
-               started_at, completed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [
-                story.id,
-                story.project_id,
-                story.epic_id,
-                story.key,
-                story.title,
-                story.intent,
-                story.description,
-                story.story_type,
-                story.status,
-                1 if story.is_blocked else 0,
-                story.blocked_reason,
-                story.priority,
-                story.current_assignee_agent_id,
-                story.metadata_json,
-                story.created_by,
-                story.updated_by,
-                story.created_at,
-                story.updated_at,
-                story.started_at,
-                story.completed_at,
-            ],
+            insert(stories).values(
+                id=story.id,
+                project_id=story.project_id,
+                epic_id=story.epic_id,
+                key=story.key,
+                title=story.title,
+                intent=story.intent,
+                description=story.description,
+                story_type=story.story_type,
+                status=story.status,
+                is_blocked=1 if story.is_blocked else 0,
+                blocked_reason=story.blocked_reason,
+                priority=story.priority,
+                current_assignee_agent_id=story.current_assignee_agent_id,
+                metadata_json=story.metadata_json,
+                created_by=story.created_by,
+                updated_by=story.updated_by,
+                created_at=story.created_at,
+                updated_at=story.updated_at,
+                started_at=story.started_at,
+                completed_at=story.completed_at,
+            )
         )
         await self._db.commit()
         return story
@@ -118,21 +136,14 @@ class DbStoryRepository(StoryRepository):
             "started_at",
             "completed_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                if k == "is_blocked":
-                    params.append(1 if v else 0)
-                else:
-                    params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(story_id)
 
-        params.append(story_id)
-        await self._db.execute(_build_update_query("stories", sets), params)
+        if "is_blocked" in values:
+            values["is_blocked"] = 1 if values["is_blocked"] else 0
+
+        await self._db.execute(update(stories).where(stories.c.id == story_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(story_id)
 
@@ -165,29 +176,24 @@ class DbStoryRepository(StoryRepository):
             "started_at",
             "completed_at",
         }
-        sets = []
-        params: list[Any] = []
-        for k, v in data.items():
-            if k in allowed:
-                sets.append(k + " = ?")
-                if k == "is_blocked":
-                    params.append(1 if v else 0)
-                else:
-                    params.append(v)
-
-        if not sets:
+        values = {k: v for k, v in data.items() if k in allowed}
+        if not values:
             return await self.get_by_id(story_id)
 
-        row = await _fetch_one(self._db, "SELECT key FROM stories WHERE id = ?", [story_id])
+        if "is_blocked" in values:
+            values["is_blocked"] = 1 if values["is_blocked"] else 0
+
+        row = (
+            (await self._db.execute(select(stories.c.key).where(stories.c.id == story_id)))
+            .mappings()
+            .first()
+        )
         if row is None:
             return None
 
         try:
-            await self._db.execute("BEGIN")
-            params.append(story_id)
-            await self._db.execute(_build_update_query("stories", sets), params)
-            await _insert_assignment_event(
-                self._db,
+            await self._db.execute(update(stories).where(stories.c.id == story_id).values(**values))
+            await self._insert_assignment_event(
                 actor_id=actor_id,
                 entity_type="story",
                 entity_id=story_id,
@@ -205,51 +211,145 @@ class DbStoryRepository(StoryRepository):
         return await self.get_by_id(story_id)
 
     async def delete(self, story_id: str) -> bool:
-        cursor = await self._db.execute("DELETE FROM stories WHERE id = ?", [story_id])
+        result = type_cast(
+            CursorResult, await self._db.execute(delete(stories).where(stories.c.id == story_id))
+        )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def get_task_count(self, story_id: str) -> int:
-        return await _fetch_count(
-            self._db,
-            "SELECT COUNT(*) FROM tasks WHERE story_id = ?",
-            [story_id],
+        from app.planning.infrastructure.tables import tasks
+
+        result = await self._db.execute(
+            select(count()).select_from(tasks).where(tasks.c.story_id == story_id)
         )
+        return result.scalar_one()
 
     async def allocate_key(self, project_id: str) -> str:
-        return await _allocate_next_key(self._db, project_id)
+        row = (
+            (await self._db.execute(select(projects.c.key).where(projects.c.id == project_id)))
+            .mappings()
+            .first()
+        )
+        if not row:
+            raise ValidationError(f"Project {project_id} does not exist")
+        project_key = row["key"]
+
+        counter_row = (
+            (
+                await self._db.execute(
+                    select(project_counters.c.next_number).where(
+                        project_counters.c.project_id == project_id
+                    )
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if not counter_row:
+            raise ValidationError(f"No counter found for project {project_id}")
+
+        next_num = counter_row["next_number"]
+        await self._db.execute(
+            update(project_counters)
+            .where(project_counters.c.project_id == project_id)
+            .values(
+                next_number=project_counters.c.next_number + 1,
+                updated_at=utc_now(),
+            )
+        )
+        await self._db.commit()
+        return f"{project_key}-{next_num}"
 
     async def project_exists(self, project_id: str) -> bool:
-        return await _project_exists(self._db, project_id)
+        row = (
+            await self._db.execute(select(projects.c.id).where(projects.c.id == project_id))
+        ).first()
+        return row is not None
 
     async def epic_exists(self, epic_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM epics WHERE id = ?", [epic_id])
+        row = (await self._db.execute(select(epics.c.id).where(epics.c.id == epic_id))).first()
+        return row is not None
 
     async def label_exists(self, label_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM labels WHERE id = ?", [label_id])
+        row = (await self._db.execute(select(labels.c.id).where(labels.c.id == label_id))).first()
+        return row is not None
 
     async def attach_label(self, story_id: str, label_id: str) -> None:
         await self._db.execute(
-            """INSERT INTO story_labels (story_id, label_id, added_at)
-               VALUES (?, ?, ?)""",
-            [story_id, label_id, utc_now()],
+            insert(story_labels).values(story_id=story_id, label_id=label_id, added_at=utc_now())
         )
         await self._db.commit()
 
     async def detach_label(self, story_id: str, label_id: str) -> bool:
-        cursor = await self._db.execute(
-            "DELETE FROM story_labels WHERE story_id = ? AND label_id = ?",
-            [story_id, label_id],
+        result = type_cast(
+            CursorResult,
+            await self._db.execute(
+                delete(story_labels).where(
+                    (story_labels.c.story_id == story_id) & (story_labels.c.label_id == label_id)
+                )
+            ),
         )
         await self._db.commit()
-        return (cursor.rowcount or 0) > 0
+        return (result.rowcount or 0) > 0
 
     async def label_attached(self, story_id: str, label_id: str) -> bool:
-        return await _exists(
-            self._db,
-            "SELECT 1 FROM story_labels WHERE story_id = ? AND label_id = ?",
-            [story_id, label_id],
-        )
+        row = (
+            await self._db.execute(
+                select(story_labels.c.story_id).where(
+                    (story_labels.c.story_id == story_id) & (story_labels.c.label_id == label_id)
+                )
+            )
+        ).first()
+        return row is not None
 
     async def agent_exists(self, agent_id: str) -> bool:
-        return await _exists(self._db, "SELECT 1 FROM agents WHERE id = ?", [agent_id])
+        row = (await self._db.execute(select(agents.c.id).where(agents.c.id == agent_id))).first()
+        return row is not None
+
+    async def _insert_assignment_event(
+        self,
+        *,
+        actor_id: str | None,
+        entity_type: str,
+        entity_id: str,
+        work_item_key: str | None,
+        new_assignee_agent_id: str | None,
+        previous_assignee_agent_id: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> None:
+        new_payload = {"id": new_assignee_agent_id} if new_assignee_agent_id else None
+        prev_payload = {"id": previous_assignee_agent_id} if previous_assignee_agent_id else None
+        scope = {
+            "work_item_key": work_item_key,
+            "correlation_id": correlation_id,
+            "causation_id": causation_id,
+        }
+        metadata = {
+            "work_item_key": work_item_key,
+            "assignee_agent": new_payload,
+            "previous_assignee": prev_payload,
+            "correlation_id": correlation_id,
+            "causation_id": causation_id,
+            "timestamp": occurred_at,
+        }
+        event_data_json = json.dumps(
+            {"metadata": metadata, "occurred_at": occurred_at, "scope": scope},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        await self._db.execute(
+            insert(activity_log).values(
+                id=str(uuid4()),
+                event_name="planning.assignment.changed",
+                actor_id=actor_id,
+                actor_type="system",
+                entity_type=entity_type,
+                entity_id=entity_id,
+                message="planning.assignment.changed",
+                event_data_json=event_data_json,
+                created_at=occurred_at,
+            )
+        )
