@@ -73,13 +73,11 @@ async def trigger_import(
 @router.get("/imports/status")
 async def get_import_status(
     service: MetricsService = Depends(get_metrics_service),
-) -> Envelope[ImportStatusResponse]:
+) -> ImportStatusResponse:
     raw = await service.get_import_status()
     last_import_data = raw.get("lastImport")
-    return Envelope(
-        data=ImportStatusResponse(
-            lastImport=(ImportRecordResponse(**last_import_data) if last_import_data else None),
-            lastStatus=raw.get("lastStatus"),
-            counts=raw.get("counts", {}),
-        )
+    return ImportStatusResponse(
+        lastImport=(ImportRecordResponse(**last_import_data) if last_import_data else None),
+        lastStatus=raw.get("lastStatus"),
+        counts=raw.get("counts", {}),
     )
