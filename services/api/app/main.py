@@ -29,7 +29,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await init_db_engine()
     await assert_database_revision_is_current(
         get_async_engine(),
-        database_url=settings.database_url,
+        database_url=settings.postgres_dsn,
     )
     try:
         yield

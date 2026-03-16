@@ -18,7 +18,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-database_url = config.get_main_option("sqlalchemy.url") or settings.database_url
+database_url = settings.postgres_dsn or config.get_main_option("sqlalchemy.url")
 config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = metadata
 _TABLE_MODULES = (planning_tables, observability_tables, orchestration_tables)

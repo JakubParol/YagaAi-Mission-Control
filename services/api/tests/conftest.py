@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 os.environ.setdefault(
-    "MC_API_DATABASE_URL",
+    "MC_API_POSTGRES_DSN",
     "postgresql+psycopg://postgres:postgres@127.0.0.1:5432/mission_control_test",
 )
 
@@ -43,14 +43,14 @@ def database_url() -> Iterator[str]:
         url = postgres.get_connection_url()
         url = url.replace("postgresql+psycopg2://", "postgresql+psycopg://")
         url = url.replace("postgresql://", "postgresql+psycopg://")
-        settings.database_url = url
+        settings.postgres_dsn = url
         command.upgrade(_alembic_config(url), "head")
         yield url
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _configure_database(database_url: str) -> Iterator[None]:
-    settings.database_url = database_url
+    settings.postgres_dsn = database_url
     yield
 
 
@@ -62,7 +62,7 @@ def _reset_database(database_url: str) -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _reset_engine_state(database_url: str) -> Iterator[None]:
-    settings.database_url = database_url
+    settings.postgres_dsn = database_url
     asyncio.run(close_db_engine())
     yield
     asyncio.run(close_db_engine())

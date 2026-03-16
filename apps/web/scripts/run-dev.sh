@@ -1,9 +1,11 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -eu
 
-cd /home/kuba/repos/mission-control/apps/web
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+APP_DIR="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
+cd "$APP_DIR"
 
-if [[ -n "${MC_WEB_HOST:-}" ]]; then
+if [ -n "${MC_WEB_HOST:-}" ]; then
   DEV_HOST="$MC_WEB_HOST"
 elif command -v tailscale >/dev/null 2>&1; then
   TAILSCALE_IP="$(tailscale ip -4 2>/dev/null | head -n 1 || true)"
