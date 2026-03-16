@@ -53,7 +53,7 @@ smoke_check() {
 
   log_info "Running smoke checks..."
   curl -fsS "$api_url" >/dev/null
-  curl -fsS -I "$web_url" >/dev/null
+  curl -fsS "$web_url" >/dev/null
   log_info "Smoke checks passed"
 }
 
@@ -84,15 +84,15 @@ deploy_prod() {
   log_info "Starting/updating production stack..."
   MC_IMAGE_TAG="$current_sha" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait
 
-  smoke_check "http://127.0.0.1:5100/healthz" "http://127.0.0.1:3100"
+  smoke_check "http://127.0.0.1:5100/healthz" "http://127.0.0.1:3100/dashboard"
   show_runtime_status "$PROD_COMPOSE_FILE" "$PROD_ENV" "$current_sha"
 
   log_info "API /healthz response:"
   curl -fsS http://127.0.0.1:5100/healthz
   echo
 
-  log_info "WEB headers:"
-  curl -fsS -I http://127.0.0.1:3100
+  log_info "WEB /dashboard headers:"
+  curl -fsS -I http://127.0.0.1:3100/dashboard
   echo
 
   log_ok "PROD deploy complete"
@@ -121,15 +121,15 @@ deploy_dev() {
   log_info "Starting/updating DEV stack..."
   MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" up -d --remove-orphans --wait
 
-  smoke_check "http://127.0.0.1:5000/healthz" "http://127.0.0.1:3000"
+  smoke_check "http://127.0.0.1:5000/healthz" "http://127.0.0.1:3000/dashboard"
   show_runtime_status "$DEV_COMPOSE_FILE" "$DEV_ENV" "$current_sha"
 
   log_info "API /healthz response:"
   curl -fsS http://127.0.0.1:5000/healthz
   echo
 
-  log_info "WEB headers:"
-  curl -fsS -I http://127.0.0.1:3000
+  log_info "WEB /dashboard headers:"
+  curl -fsS -I http://127.0.0.1:3000/dashboard
   echo
 
   log_ok "DEV deploy complete"
@@ -142,9 +142,10 @@ deploy_dev() {
 
 confirm_or_exit() {
   local env_name="$1"
+  local whiptail_colors=$'root=white,black\nwindow=white,black\nborder=white,black\ntitle=yellow,black\ntextbox=white,black\nbutton=black,cyan\nactbutton=black,green\ncompactbutton=white,black\nactlistbox=black,green\nlistbox=white,black\nactsel=black,green\nsel=black,green\nentry=white,black\ncheckbox=white,black'
 
   if command -v whiptail >/dev/null 2>&1; then
-    if ! whiptail \
+    if ! NEWT_COLORS="$whiptail_colors" whiptail \
       --title "Mission Control Deploy" \
       --yesno "Run ${env_name} deploy now?" \
       10 60; then
@@ -166,10 +167,11 @@ confirm_or_exit() {
 
 show_menu() {
   local choice
+  local whiptail_colors=$'root=white,black\nwindow=white,black\nborder=white,black\ntitle=yellow,black\ntextbox=white,black\nbutton=black,cyan\nactbutton=black,green\ncompactbutton=white,black\nactlistbox=black,green\nlistbox=white,black\nactsel=black,green\nsel=black,green\nentry=white,black\ncheckbox=white,black'
 
   if command -v whiptail >/dev/null 2>&1; then
     choice="$(
-      whiptail \
+      NEWT_COLORS="$whiptail_colors" whiptail \
         --title "Mission Control Deploy" \
         --menu "Choose deployment target" \
         16 72 3 \
