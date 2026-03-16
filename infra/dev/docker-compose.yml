@@ -85,7 +85,7 @@ services:
     volumes:
       - ../../:/workspace
     ports:
-      - "127.0.0.1:${MC_WEB_PORT:-3000}:3000"
+      - "${MC_WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy

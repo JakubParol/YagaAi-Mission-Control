@@ -46,7 +46,7 @@ services:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
     ports:
-      - "127.0.0.1:${MC_PROD_API_PORT:-5100}:${MC_API_INTERNAL_PORT:-5100}"
+      - "${MC_PROD_API_PORT:-5100}:${MC_API_INTERNAL_PORT:-5100}"
     depends_on:
       redis:
         condition: service_healthy
