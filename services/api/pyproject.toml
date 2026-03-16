@@ -98,7 +98,7 @@ max-branches = 15
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 include = ["app", "tests"]
-exclude = [".venv", ".venv.broken", "__pycache__", ".pytest_cache"]
+exclude = ["**/node_modules", "**/.*", "__pycache__", ".pytest_cache", ".venv", ".venv.broken"]
 reportMissingImports = true
 reportMissingTypeStubs = false
 
