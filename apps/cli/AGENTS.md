@@ -28,8 +28,8 @@ Command-line interface for Mission Control focused on planning and observability
 Before making changes in `apps/cli`, read:
 
 1. [Root AGENTS.md](../../AGENTS.md)
-2. [/home/kuba/.openclaw/standards/coding-standards.md](/home/kuba/.openclaw/standards/coding-standards.md)
-3. [/home/kuba/.openclaw/standards/documentation.md](/home/kuba/.openclaw/standards/documentation.md)
+2. [Coding standards](../../docs/standards/coding-standards.md)
+3. [Documentation standard](../../docs/standards/documentation.md)
 4. [docs/INDEX.md](./docs/INDEX.md)
 5. [services/api/docs/API_CONTRACTS.md](../../services/api/docs/API_CONTRACTS.md)
 

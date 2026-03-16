@@ -1,5 +1,7 @@
 # Mission Control Runbook (DEV vs PROD)
 
+> All commands assume you are running from the repo root unless noted otherwise.
+
 ## Ports
 
 - DEV (containers, dev runtime):
@@ -20,7 +22,6 @@
 ## Fresh Ubuntu bootstrap
 
 ```bash
-cd /home/kuba/repos/mission-control
 bash ./install.sh
 ```
 
@@ -44,14 +45,12 @@ mc --api-base http://127.0.0.1:5000 health
 ### Start full DEV runtime
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/up.sh
 ```
 
 ### Stop DEV runtime
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/down.sh
 ```
 
@@ -60,13 +59,13 @@ cd /home/kuba/repos/mission-control
 Preferred path on fresh machines: `bash ./install.sh`
 
 ```bash
-sudo cp /home/kuba/repos/mission-control/infra/systemd/mission-control-dev.service /etc/systemd/system/mission-control-dev.service
+sudo cp infra/systemd/mission-control-dev.service /etc/systemd/system/mission-control-dev.service
 sudo systemctl daemon-reload
 sudo systemctl enable mission-control-dev.service
 sudo systemctl start mission-control-dev.service
 ```
 
-The checked-in unit file is a path-specific example. If your repo is not under `/home/kuba/repos/mission-control`, adjust paths or use `install.sh`, which renders the unit from the current repo location.
+The checked-in unit file contains hardcoded paths. Prefer `install.sh`, which renders the unit from the current repo location.
 
 Weryfikacja:
 
@@ -78,14 +77,12 @@ systemctl is-active mission-control-dev.service
 ### Reset DEV runtime data (destructive)
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/reset.sh
 ```
 
 ### Rebuild API in DEV with migrations
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/rebuild-api.sh
 ```
 
@@ -103,20 +100,19 @@ Preferred path on fresh machines: `bash ./install.sh`
 
 ```bash
 sudo mkdir -p /etc/mission-control
-sudo cp /home/kuba/repos/mission-control/infra/env/prod.env.example /etc/mission-control/prod.env
+sudo cp infra/env/prod.env.example /etc/mission-control/prod.env
 sudoedit /etc/mission-control/prod.env
 
-sudo cp /home/kuba/repos/mission-control/infra/systemd/mission-control-prod.service /etc/systemd/system/mission-control-prod.service
+sudo cp infra/systemd/mission-control-prod.service /etc/systemd/system/mission-control-prod.service
 sudo systemctl daemon-reload
 sudo systemctl enable mission-control-prod.service
 ```
 
-The checked-in unit file is a path-specific example. If your repo is not under `/home/kuba/repos/mission-control`, adjust paths or use `install.sh`, which renders the unit from the current repo location.
+The checked-in unit file contains hardcoded paths. Prefer `install.sh`, which renders the unit from the current repo location.
 
 ### Deploy
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/deploy.sh
 ```
 
@@ -137,7 +133,6 @@ docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-con
 ### Rollback
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/rollback.sh <image-tag>
 ```
 
@@ -146,7 +141,6 @@ cd /home/kuba/repos/mission-control
 ### Backup PROD PostgreSQL
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/prod/postgres-backup.sh
 ```
 
@@ -161,8 +155,6 @@ infra/prod/backups/mission-control-prod-postgres-YYYYMMDD-HHMMSS.sql
 Recommended sequence:
 
 ```bash
-cd /home/kuba/repos/mission-control
-
 docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env stop api web worker dapr-api dapr-web dapr-worker
 ./infra/prod/postgres-restore.sh /path/to/backup.sql
 ./infra/deploy.sh
@@ -177,7 +169,6 @@ Notes:
 ### Refresh DEV from a PROD dump
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/scripts/postgres-restore.sh /path/to/prod-backup.sql
 ```
 
@@ -188,7 +179,6 @@ This is useful after restoring old PROD onto the new VM, or whenever you want DE
 1. On the old VM:
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/prod/postgres-backup.sh
 ```
 
@@ -197,8 +187,6 @@ cd /home/kuba/repos/mission-control
 3. On the new VM, restore into PROD:
 
 ```bash
-cd /home/kuba/repos/mission-control
-
 docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env stop api web worker dapr-api dapr-web dapr-worker
 ./infra/prod/postgres-restore.sh ~/mission-control-prod.sql
 ./infra/deploy.sh
@@ -207,7 +195,6 @@ docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-con
 4. On the new VM, refresh DEV from the same dump:
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/scripts/postgres-restore.sh ~/mission-control-prod.sql
 ```
 
@@ -216,7 +203,6 @@ cd /home/kuba/repos/mission-control
 If the dump file is already present on the new VM, you can run the full flow (PROD restore → deploy/migrations → DEV refresh) with:
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/migrate-prod-to-dev.sh ~/mission-control-prod.sql
 ```
 
@@ -239,21 +225,20 @@ Source of truth:
 Start local API:
 
 ```bash
-cd /home/kuba/repos/mission-control/services/api
+cd services/api
 ./scripts/run-dev.sh
 ```
 
 Start local WEB:
 
 ```bash
-cd /home/kuba/repos/mission-control/apps/web
+cd apps/web
 npm run dev
 ```
 
 Helper reminder:
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/dev/local-dev.sh
 ```
 
@@ -289,7 +274,6 @@ docker builder prune -af
 Potem ponów deploy:
 
 ```bash
-cd /home/kuba/repos/mission-control
 ./infra/deploy.sh
 ```
 

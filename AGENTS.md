@@ -14,8 +14,8 @@ Mission Control is a monorepo for managing AI agent workflows. It contains a web
 Before making any changes, read **all** of the following:
 
 1. This file
-2. [Workspace coding standards](/home/kuba/.openclaw/standards/coding-standards.md)
-3. [Workspace documentation standard](/home/kuba/.openclaw/standards/documentation.md)
+2. [Workspace coding standards](./docs/standards/coding-standards.md)
+3. [Workspace documentation standard](./docs/standards/documentation.md)
 4. [docs/INDEX.md](./docs/INDEX.md) - documentation index (includes mandatory link to Repo Map)
 
 ## Drill-Down Rule
@@ -56,7 +56,7 @@ If you then drill into a project, report that too.
 
 ## Rules
 
-- **Follow workspace standards.** [coding-standards.md](/home/kuba/.openclaw/standards/coding-standards.md) and [documentation.md](/home/kuba/.openclaw/standards/documentation.md) apply everywhere.
+- **Follow workspace standards.** [coding-standards.md](./docs/standards/coding-standards.md) and [documentation.md](./docs/standards/documentation.md) apply everywhere.
 - **Package by feature.** Group by domain concept, not by technical layer.
 - **Async-first.** API endpoints, DB access, and external IO are async.
 - **No cross-project imports.** Apps and services do not import from each other.

@@ -1,6 +1,6 @@
 ---
 name: mission-control-test-gate
-description: Path-aware quality gate for Mission Control changes. Use after coding in /home/kuba/repos/mission-control to run deterministic lint/typecheck/test commands for apps/web, apps/cli, and services/api, then return evidence.
+description: Path-aware quality gate for Mission Control changes. Use after coding to run deterministic lint/typecheck/test commands for apps/web, apps/cli, and services/api, then return evidence.
 ---
 
 # Mission Control Test Gate (v2)

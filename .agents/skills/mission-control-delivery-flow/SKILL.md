@@ -9,7 +9,7 @@ Execute this flow when the user asks to deliver a story/bug end-to-end.
 
 ## Preconditions
 
-- Work in `/home/kuba/repos/mission-control` unless user explicitly says otherwise.
+- Work in the Mission Control repo root unless user explicitly says otherwise.
 - Read repo/project AGENTS/docs as required by AGENTS policy.
 - For planning entities use `mc` CLI only.
 - By planning element we are colling UserStory or Task or Bug

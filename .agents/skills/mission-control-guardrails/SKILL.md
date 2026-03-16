@@ -1,6 +1,6 @@
 ---
 name: mission-control-guardrails
-description: Mission Control execution guardrails for coding and planning work in /home/kuba/repos/mission-control. Use when implementing features/bugs or mutating planning data so work stays safe, reproducible, and aligned with mc CLI-first rules.
+description: Mission Control execution guardrails for coding and planning work. Use when implementing features/bugs or mutating planning data so work stays safe, reproducible, and aligned with mc CLI-first rules.
 ---
 
 # Mission Control Guardrails (v2)
@@ -9,7 +9,7 @@ Apply this workflow for every Mission Control task.
 
 ## 1) Scope and safety boundaries
 
-- Work only in `/home/kuba/repos/mission-control` unless user explicitly states another path.
+- Work only in the Mission Control repo root unless user explicitly states another path.
 - Do not run deploy/release/infra actions unless explicitly required by current `AGENTS.md` workflow or directly requested by the user.
 - Do not modify production secrets or credentials.
 - Prefer minimal-diff changes over broad rewrites.

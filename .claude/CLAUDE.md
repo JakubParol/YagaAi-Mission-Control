@@ -6,8 +6,8 @@ On session start, you MUST follow the full drill-down from AGENTS.md:
 
 1. Read AGENTS.md (auto-loaded above)
 2. Read ALL mandatory references listed in "Required Reading":
-   - `/home/kuba/.openclaw/standards/coding-standards.md`
-   - `/home/kuba/.openclaw/standards/documentation.md`
+   - `docs/standards/coding-standards.md`
+   - `docs/standards/documentation.md`
    - `docs/INDEX.md`
 3. From docs/INDEX.md, read the mandatory doc: `docs/REPO_MAP.md`
 4. Report what you read before proceeding
