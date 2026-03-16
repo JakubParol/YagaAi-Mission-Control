@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { User } from "lucide-react";
 
 import { AvatarOption } from "@/components/planning/avatar-option";
 import { AssigneeAvatarTooltip } from "@/components/planning/assignee-avatar-tooltip";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/ui/themed-select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -28,6 +26,14 @@ export interface StoryAssigneeSelection {
 }
 
 const UNASSIGNED_OPTION = "__UNASSIGNED__";
+
+export function isUnassignedSelection(currentAssignee: StoryAssigneeSelection): boolean {
+  return currentAssignee.assignee_agent_id === null
+    && !currentAssignee.assignee_name
+    && !currentAssignee.assignee_last_name
+    && !currentAssignee.assignee_initials
+    && !currentAssignee.assignee_avatar;
+}
 
 type AssigneePickerOption = ThemedSelectOption & {
   name: string;
@@ -77,34 +83,41 @@ export function StoryAssigneeControl({
   onChange: (storyId: string, assignee: StoryAssigneeSelection) => void;
   disabled?: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
   const pickerOptions = useMemo(
     () => buildAssigneePickerOptions(assigneeOptions),
     [assigneeOptions],
   );
   const selectedValue = currentAssignee.assignee_agent_id ?? UNASSIGNED_OPTION;
   const selectedName = currentAssignee.assignee_name ?? "Unassigned";
-  const isUnassigned =
-    currentAssignee.assignee_agent_id === null
-    && !currentAssignee.assignee_name
-    && !currentAssignee.assignee_last_name
-    && !currentAssignee.assignee_initials
-    && !currentAssignee.assignee_avatar;
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-xs"
-          disabled={disabled}
-          aria-label={`Select assignee. Current assignee: ${selectedName}`}
-          className="group/assignee relative"
-          onClick={(event) => event.stopPropagation()}
-          onPointerDown={(event) => event.stopPropagation()}
-        >
-          {isUnassigned ? (
+    <ThemedSelect
+      value={selectedValue}
+      options={pickerOptions}
+      placeholder="Select assignee"
+      disabled={disabled}
+      ariaLabel={`Select assignee. Current assignee: ${selectedName}`}
+      align="end"
+      hideChevron
+      onTriggerClick={(event) => event.stopPropagation()}
+      onTriggerPointerDown={(event) => event.stopPropagation()}
+      renderOption={(option) => {
+        const assignee = option as AssigneePickerOption;
+        if (assignee.isUnassigned) return "Unassigned";
+        return (
+          <AvatarOption
+            name={assignee.name}
+            lastName={assignee.lastName}
+            initials={assignee.initials}
+            role={assignee.role}
+            avatar={assignee.avatar}
+          />
+        );
+      }}
+      renderValue={(option) => {
+        const assignee = option as AssigneePickerOption;
+        if (assignee.isUnassigned) {
+          return (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
@@ -116,81 +129,39 @@ export function StoryAssigneeControl({
               </TooltipTrigger>
               <TooltipContent side="bottom">Unassigned</TooltipContent>
             </Tooltip>
-          ) : (
-            <AssigneeAvatarTooltip
-              name={selectedName}
-              lastName={currentAssignee.assignee_last_name}
-              initials={currentAssignee.assignee_initials}
-              avatar={currentAssignee.assignee_avatar}
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-[280px] p-2"
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <p className="mb-2 px-1 text-[11px] font-medium text-muted-foreground">
-          Assignee
-        </p>
-        <ThemedSelect
-          value={selectedValue}
-          options={pickerOptions}
-          placeholder="Select assignee"
-          disabled={disabled}
-          renderOption={(option) => {
-            const assignee = option as AssigneePickerOption;
-            if (assignee.isUnassigned) return "Unassigned";
-            return (
-              <AvatarOption
-                name={assignee.name}
-                lastName={assignee.lastName}
-                initials={assignee.initials}
-                role={assignee.role}
-                avatar={assignee.avatar}
-              />
-            );
-          }}
-          renderValue={(option) => {
-            const assignee = option as AssigneePickerOption;
-            if (assignee.isUnassigned) return "Unassigned";
-            return (
-              <AvatarOption
-                name={assignee.name}
-                lastName={assignee.lastName}
-                initials={assignee.initials}
-                avatar={assignee.avatar}
-                compact
-              />
-            );
-          }}
-          onValueChange={(value) => {
-            const assignee = pickerOptions.find((option) => option.value === value);
-            if (!assignee || assignee.isUnassigned) {
-              onChange(storyId, {
-                assignee_agent_id: null,
-                assignee_name: null,
-                assignee_last_name: null,
-                assignee_initials: null,
-                assignee_avatar: null,
-              });
-              setIsOpen(false);
-              return;
-            }
-            onChange(storyId, {
-              assignee_agent_id: String(assignee.value),
-              assignee_name: assignee.name,
-              assignee_last_name: assignee.lastName,
-              assignee_initials: assignee.initials,
-              assignee_avatar: assignee.avatar,
-            });
-            setIsOpen(false);
-          }}
-          triggerClassName="h-8 text-xs"
-        />
-      </PopoverContent>
-    </Popover>
+          );
+        }
+        return (
+          <AssigneeAvatarTooltip
+            name={assignee.name}
+            lastName={assignee.lastName}
+            initials={assignee.initials}
+            avatar={assignee.avatar}
+          />
+        );
+      }}
+      onValueChange={(value) => {
+        const assignee = pickerOptions.find((option) => option.value === value);
+        if (!assignee || assignee.isUnassigned) {
+          onChange(storyId, {
+            assignee_agent_id: null,
+            assignee_name: null,
+            assignee_last_name: null,
+            assignee_initials: null,
+            assignee_avatar: null,
+          });
+          return;
+        }
+        onChange(storyId, {
+          assignee_agent_id: String(assignee.value),
+          assignee_name: assignee.name,
+          assignee_last_name: assignee.lastName,
+          assignee_initials: assignee.initials,
+          assignee_avatar: assignee.avatar,
+        });
+      }}
+      triggerClassName="group/assignee relative h-8 w-8 justify-center rounded-md px-0"
+      contentClassName="w-[280px]"
+    />
   );
 }

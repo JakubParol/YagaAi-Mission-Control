@@ -25,6 +25,11 @@ interface ThemedSelectProps {
   disabled?: boolean;
   invalid?: boolean;
   emptyMessage?: string;
+  ariaLabel?: string;
+  align?: "start" | "center" | "end";
+  hideChevron?: boolean;
+  onTriggerClick?: React.MouseEventHandler<HTMLButtonElement>;
+  onTriggerPointerDown?: React.PointerEventHandler<HTMLButtonElement>;
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
@@ -108,6 +113,11 @@ export function ThemedSelect({
   disabled = false,
   invalid = false,
   emptyMessage = "No options available",
+  ariaLabel,
+  align = "start",
+  hideChevron = false,
+  onTriggerClick,
+  onTriggerPointerDown,
   className,
   triggerClassName,
   contentClassName,
@@ -204,6 +214,7 @@ export function ThemedSelect({
           aria-controls={listboxId}
           aria-haspopup="listbox"
           aria-activedescendant={open ? activeDescendant : undefined}
+          aria-label={ariaLabel}
           aria-invalid={invalid || undefined}
           disabled={isDisabled}
           data-state={open ? "open" : "closed"}
@@ -214,6 +225,8 @@ export function ThemedSelect({
             invalid && "border-destructive/70 text-destructive",
             triggerClassName,
           )}
+          onClick={onTriggerClick}
+          onPointerDown={onTriggerPointerDown}
           onKeyDown={handleTriggerKeyDown}
         >
           <span
@@ -228,12 +241,14 @@ export function ThemedSelect({
               ))
               : placeholder}
           </span>
-          <ChevronsUpDown className="ml-2 size-3.5 shrink-0 text-muted-foreground/80" />
+          {hideChevron ? null : (
+            <ChevronsUpDown className="ml-2 size-3.5 shrink-0 text-muted-foreground/80" />
+          )}
         </button>
       </PopoverTrigger>
 
       <PopoverContent
-        align="start"
+        align={align}
         sideOffset={6}
         className={cn(
           "w-[var(--radix-popover-trigger-width)] p-1.5",
