@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 import { apiUrl } from "@/lib/api-client";
-import type { BacklogKind, BacklogStatus, ItemStatus } from "@/lib/planning/types";
+import type { BacklogKind, ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -26,12 +26,6 @@ import {
 } from "@/components/planning/planning-filters";
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
-import type { StoryCardStory } from "@/components/planning/story-card";
-import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/backlog-row";
-import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
-import { BacklogSectionHeader, type BacklogSiblingItem, type MoveDirection } from "@/components/planning/backlog-section-header";
-import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
-import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import {
   BacklogEditDialog,
   type BacklogEditItem,
@@ -44,7 +38,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { deleteStory } from "../story-actions";
 import {
@@ -58,303 +51,37 @@ import {
 } from "../sprint-lifecycle-actions";
 import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
 import { excludeClosedSprintBacklogs, sortBacklogsForPlanning } from "./backlog-filters";
-import { createBoard, deleteBoard } from "./board-actions";
+import {
+  createBoard,
+  deleteBoard,
+  addStoryToBacklog,
+  removeStoryFromBacklog,
+} from "./board-actions";
+import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import type { MoveDirection } from "@/components/planning/backlog-section-header";
 
-// ─── Types ───────────────────────────────────────────────────────────
-
-interface BacklogItem {
-  id: string;
-  name: string;
-  kind: BacklogKind;
-  status: BacklogStatus;
-  display_order?: number;
-  is_default: boolean;
-  goal: string | null;
-  start_date: string | null;
-  end_date: string | null;
-}
-
-interface BacklogWithStories {
-  backlog: BacklogItem;
-  stories: StoryCardStory[];
-}
-
-type PageState =
-  | { kind: "no-project" }
-  | { kind: "loading" }
-  | { kind: "empty" }
-  | { kind: "error"; message: string }
-  | {
-      kind: "ok";
-      sections: BacklogWithStories[];
-      assignees: PlanningFilterOption[];
-      assignableAgents: BacklogAssigneeOption[];
-    };
-
-type FetchResult =
-  | { kind: "empty" }
-  | { kind: "error"; message: string }
-  | {
-      kind: "ok";
-      sections: BacklogWithStories[];
-      assignees: PlanningFilterOption[];
-      assignableAgents: BacklogAssigneeOption[];
-    };
-
-interface ScopedFetchResult {
-  projectId: string;
-  result: FetchResult;
-}
-
-interface SprintCompleteDialogState {
-  backlogId: string;
-  backlogName: string;
-  completedCount: number;
-  openStories: StoryCardStory[];
-}
-
-interface SprintStartDialogState {
-  backlogId: string;
-  backlogName: string;
-}
-
-interface SprintCompleteConfirmDialogState {
-  backlogId: string;
-  backlogName: string;
-}
-
-interface DeleteBoardDialogState {
-  backlogId: string;
-  backlogName: string;
-}
-
-interface PlanningAgentApiItem {
-  id?: string;
-  name?: string;
-  last_name?: string | null;
-  initials?: string | null;
-  role?: string | null;
-  avatar?: string | null;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────
-
-const KIND_CONFIG: Record<BacklogKind, { label: string }> = {
-  SPRINT: { label: "Sprint" },
-  BACKLOG: { label: "Backlog" },
-  IDEAS: { label: "Ideas" },
-};
-
-function isCompleteSprintTarget(backlog: BacklogItem, sourceBacklogId: string): boolean {
-  if (backlog.id === sourceBacklogId) return false;
-  if (backlog.kind !== "SPRINT" && backlog.kind !== "BACKLOG") return false;
-  const status = String(backlog.status);
-  return status === "OPEN" || status === "ACTIVE";
-}
-
-const BOARD_KIND_OPTIONS: readonly { value: BacklogKind; label: string }[] = [
-  { value: "BACKLOG", label: "Backlog" },
-  { value: "SPRINT", label: "Sprint" },
-  { value: "IDEAS", label: "Ideas" },
-];
-
-function resolveAgentLabel(agent: PlanningAgentApiItem): string | null {
-  if (!agent.id || !agent.name) return null;
-  const fullName = [agent.name, agent.last_name ?? ""].join(" ").trim();
-  return fullName.length > 0 ? fullName : agent.name;
-}
-
-function getPluralizedWorkItems(count: number): string {
-  return count === 1 ? "work item" : "work items";
-}
-
-async function parseApiMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: { message?: string } };
-    const message = body.error?.message;
-    if (message && message.trim().length > 0) return message;
-  } catch {
-    // Ignore parse failures and use fallback text.
-  }
-  return `${fallback} HTTP ${response.status}.`;
-}
-
-async function addStoryToBacklog(backlogId: string, storyId: string): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories`), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ story_id: storyId }),
-  });
-  if (response.ok) return;
-  throw new Error(await parseApiMessage(response, "Failed to move work item to selected board."));
-}
-
-async function removeStoryFromBacklog(backlogId: string, storyId: string): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories/${storyId}`), {
-    method: "DELETE",
-  });
-  if (response.ok) return;
-  throw new Error(await parseApiMessage(response, "Failed to remove work item from source board."));
-}
-
-// ─── Backlog Section ─────────────────────────────────────────────────
-
-function BacklogSection({
-  section,
-  isActiveSprint,
-  hasAnyActiveSprint,
-  siblingBacklogs,
-  assigneeOptions,
-  onStoryClick,
-  onStoryAssigneeChange,
-  onAddToActiveSprint,
-  onRemoveFromActiveSprint,
-  onStartSprint,
-  onCompleteSprint,
-  onCreateStory,
-  onStoryDelete,
-  onStoryStatusChange,
-  onEditBoard,
-  onDeleteBoard,
-  onMoveBoard,
-  pendingStoryIds,
-  pendingDeleteStoryIds,
-  pendingSprintIds,
-  pendingBoardIds,
-}: {
-  section: BacklogWithStories;
-  isActiveSprint: boolean;
-  hasAnyActiveSprint: boolean;
-  siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
-  assigneeOptions: readonly BacklogAssigneeOption[];
-  onStoryClick: (storyId: string) => void;
-  onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
-  onAddToActiveSprint: (storyId: string) => void;
-  onRemoveFromActiveSprint: (storyId: string) => void;
-  onStartSprint: (backlogId: string, backlogName: string) => void;
-  onCompleteSprint: (backlogId: string, backlogName: string) => void;
-  onCreateStory: (backlogId: string) => void;
-  onStoryDelete: (storyId: string) => void;
-  onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
-  onEditBoard: (backlogId: string) => void;
-  onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
-  onMoveBoard: (backlogId: string, direction: MoveDirection) => void;
-  pendingStoryIds: ReadonlySet<string>;
-  pendingDeleteStoryIds: ReadonlySet<string>;
-  pendingSprintIds: ReadonlySet<string>;
-  pendingBoardIds: ReadonlySet<string>;
-}) {
-  const [collapsed, setCollapsed] = useState(false);
-  const { backlog, stories } = section;
-
-  const canAddToActiveSprint = backlog.kind === "BACKLOG";
-  const canRemoveFromActiveSprint = isActiveSprint;
-  const isSprintPending = pendingSprintIds.has(backlog.id);
-  const isBoardDeletePending = pendingBoardIds.has(backlog.id);
-
-  return (
-    <section
-      className={cn(
-        "rounded-lg border border-border/60 bg-card/30 overflow-hidden",
-      )}
-    >
-      <BacklogSectionHeader
-        backlog={backlog}
-        collapsed={collapsed}
-        stories={stories}
-        hasAnyActiveSprint={hasAnyActiveSprint}
-        isSprintPending={isSprintPending}
-        isBoardDeletePending={isBoardDeletePending}
-        siblingBacklogs={siblingBacklogs}
-        onToggleCollapsed={() => setCollapsed(!collapsed)}
-        onStartSprint={onStartSprint}
-        onCompleteSprint={onCompleteSprint}
-        onCreateStory={onCreateStory}
-        onEditBoard={onEditBoard}
-        onDeleteBoard={onDeleteBoard}
-        onMoveBoard={onMoveBoard}
-      />
-
-      {/* Row list */}
-      {!collapsed && (
-        <div className="border-t border-border/30">
-          <BacklogRowsHeader />
-
-          {stories.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[11px] text-muted-foreground/50">
-              No stories in this backlog
-            </p>
-          ) : (
-            <div className="divide-y divide-border/25">
-              {stories.map((story) => (
-                <BacklogRow
-                  key={story.id}
-                  item={story}
-                  onClick={onStoryClick}
-                  assigneeOptions={assigneeOptions}
-                  assigneePending={pendingStoryIds.has(story.id)}
-                  onAssigneeChange={onStoryAssigneeChange}
-                  actions={(
-                    <div className="flex items-center justify-end gap-1">
-                      <StoryActionsMenu
-                        storyId={story.id}
-                        storyType={story.story_type}
-                        storyKey={story.key}
-                        storyTitle={story.title}
-                        storyStatus={story.status}
-                        onDelete={onStoryDelete}
-                        onStatusChange={onStoryStatusChange}
-                        onAddLabel={onStoryClick}
-                        sprintMembershipAction={
-                          canAddToActiveSprint
-                            ? {
-                                mode: "add",
-                                onSelect: onAddToActiveSprint,
-                              }
-                            : canRemoveFromActiveSprint
-                              ? {
-                                  mode: "remove",
-                                  onSelect: onRemoveFromActiveSprint,
-                                }
-                              : undefined
-                        }
-                        disabled={pendingStoryIds.has(story.id)}
-                        isDeleting={pendingDeleteStoryIds.has(story.id)}
-                      />
-                    </div>
-                  )}
-                />
-              ))}
-            </div>
-          )}
-
-          <div className="border-t border-border/20 px-3 py-1.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={backlog.kind !== "BACKLOG"}
-                  className="text-muted-foreground"
-                  onClick={() => {
-                    if (backlog.kind === "BACKLOG") onCreateStory(backlog.id);
-                  }}
-                >
-                  + Create
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {backlog.kind === "BACKLOG"
-                  ? "Create story"
-                  : "Only product backlog supports story creation"}
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
+import type {
+  BacklogItem,
+  BacklogWithStories,
+  DeleteBoardDialogState,
+  FetchResult,
+  PageState,
+  PlanningAgentApiItem,
+  ScopedFetchResult,
+  SprintCompleteConfirmDialogState,
+  SprintCompleteDialogState,
+  SprintStartDialogState,
+} from "./backlog-types";
+import {
+  BOARD_KIND_OPTIONS,
+  KIND_CONFIG,
+} from "./backlog-types";
+import {
+  isCompleteSprintTarget,
+  resolveAgentLabel,
+  getPluralizedWorkItems,
+} from "./backlog-view-model";
+import { BacklogSection } from "./backlog-section";
 
 // ─── Page ────────────────────────────────────────────────────────────
 
@@ -574,8 +301,6 @@ function BacklogPageContent() {
       return { kind: "empty" };
     }
 
-    // Enforce backlog ordering contract in UI:
-    // active sprint first, default backlog last, the rest by display_order.
     const sections: BacklogWithStories[] = await Promise.all(
       backlogs.map(async (backlog) => {
         const storiesResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`));
@@ -601,7 +326,7 @@ function BacklogPageContent() {
       .filter((item): item is PlanningFilterOption => item !== null)
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    const assignableAgents = agents
+    const assignableAgentsResult = agents
       .filter((agent): agent is PlanningAgentApiItem & { id: string; name: string } => (
         typeof agent.id === "string"
         && agent.id.trim().length > 0
@@ -618,7 +343,7 @@ function BacklogPageContent() {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return { kind: "ok", sections, assignees, assignableAgents };
+    return { kind: "ok", sections, assignees, assignableAgents: assignableAgentsResult };
   }, []);
 
   const refreshCurrentView = useCallback(async () => {
@@ -906,7 +631,6 @@ function BacklogPageContent() {
         try {
           await addStoryToBacklog(completeTargetBacklogId, story.id);
         } catch (error) {
-          // Best-effort rollback keeps story in source sprint if target insert fails.
           try {
             await addStoryToBacklog(completeDialog.backlogId, story.id);
           } catch {

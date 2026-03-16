@@ -103,3 +103,45 @@ export async function deleteBoard(backlogId: string): Promise<void> {
 
   await assertBoardMutationResponse(response, "delete");
 }
+
+async function parseBacklogApiMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: { message?: string } };
+    const message = body.error?.message;
+    if (message && message.trim().length > 0) return message;
+  } catch {
+    // Ignore parse failures and use fallback text.
+  }
+  return `${fallback} HTTP ${response.status}.`;
+}
+
+export async function addStoryToBacklog(
+  backlogId: string,
+  storyId: string,
+): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ story_id: storyId }),
+  });
+  if (response.ok) return;
+  throw new Error(
+    await parseBacklogApiMessage(response, "Failed to move work item to selected board."),
+  );
+}
+
+export async function removeStoryFromBacklog(
+  backlogId: string,
+  storyId: string,
+): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories/${storyId}`), {
+    method: "DELETE",
+  });
+  if (response.ok) return;
+  throw new Error(
+    await parseBacklogApiMessage(response, "Failed to remove work item from source board."),
+  );
+}
