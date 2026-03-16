@@ -15,6 +15,12 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 | [ENTITY_MODEL_V1.md](./ENTITY_MODEL_V1.md) | V1 entity model — projects, epics, stories, tasks, backlogs, agents |
 | [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md) | V1 workflow logic — status derivation, blocking, assignments, backlogs |
 
+## System Design
+
+| Document | Description |
+|---|---|
+| [AGENT_WORK_ORCHESTRATION_V1.md](./AGENT_WORK_ORCHESTRATION_V1.md) | Root-level source of truth for assignment-driven specialist agent orchestration through Mission Control + OpenClaw |
+
 ## Project Docs
 
 | Project | Docs |
@@ -28,8 +34,6 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 | Document | Description |
 |---|---|
 | [MC-386_USABILITY_TEST.md](./MC-386_USABILITY_TEST.md) | Internal usability scenarios and click-reduction evidence for epic overview UX |
-| [MC-416_FAILURE_TRIAGE_WALKTHROUGH.md](./MC-416_FAILURE_TRIAGE_WALKTHROUGH.md) | Operator walkthrough for orchestration timeline failure triage in `/planning/timeline` |
-| [MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md](./MC-379_ROLLOUT_OPERATIONS_RUNBOOK.md) | Rollout controls, staged enablement matrix, rollback playbook, and operations runbook for orchestration runtime |
 | [README.md](../README.md) | Project overview, setup, deployment |
 | [AGENTS.md](../AGENTS.md) | AI agent context, rules, required reading |
 
