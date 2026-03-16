@@ -220,6 +220,41 @@ cd /home/kuba/repos/mission-control
 ./infra/migrate-prod-to-dev.sh ~/mission-control-prod.sql
 ```
 
+## Local VS Code development alongside always-on DEV/PROD
+
+Workflow goal:
+
+- containerized DEV stays online on `3000/5000`
+- containerized PROD stays online on `3100/5100`
+- local VS Code development runs in parallel on `3001/5001`
+
+Start local API:
+
+```bash
+cd /home/kuba/repos/mission-control/services/api
+./scripts/run-dev.sh
+```
+
+Start local WEB:
+
+```bash
+cd /home/kuba/repos/mission-control/apps/web
+npm run dev
+```
+
+Helper reminder:
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/dev/local-dev.sh
+```
+
+Notes:
+
+- `apps/web/scripts/run-dev.sh` uses `PORT=3001` by default and writes to `.next-vscode`, so it does not collide with containerized Next.js build artifacts.
+- `services/api/scripts/run-dev.sh` uses `0.0.0.0:5001` by default, so it does not collide with containerized DEV API on port `5000`.
+- Do **not** stop containerized DEV/PROD for normal local coding; local dev is intended to run alongside them.
+
 ## Troubleshooting quick checks
 
 ```bash
