@@ -141,6 +141,76 @@ cd /home/kuba/repos/mission-control
 ./infra/rollback.sh <image-tag>
 ```
 
+## Data migration / refresh
+
+### Backup PROD PostgreSQL
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/prod/postgres-backup.sh
+```
+
+Creates a dump in:
+
+```bash
+infra/prod/backups/mission-control-prod-postgres-YYYYMMDD-HHMMSS.sql
+```
+
+### Restore dump into PROD PostgreSQL
+
+Recommended sequence:
+
+```bash
+cd /home/kuba/repos/mission-control
+
+docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env stop api web worker dapr-api dapr-web dapr-worker
+./infra/prod/postgres-restore.sh /path/to/backup.sql
+./infra/deploy.sh
+```
+
+Notes:
+
+- The restore is logically destructive: dump files are created with `--clean --if-exists`
+- `./infra/deploy.sh` reruns migrations and brings the PROD stack back to the current repo head
+- Stopping API/web/worker before restore avoids concurrent writes during import
+
+### Refresh DEV from a PROD dump
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/dev/scripts/postgres-restore.sh /path/to/prod-backup.sql
+```
+
+This is useful after restoring old PROD onto the new VM, or whenever you want DEV to mirror current PROD data.
+
+### Typical migration flow: old VM PROD → new VM PROD → new VM DEV
+
+1. On the old VM:
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/prod/postgres-backup.sh
+```
+
+2. Copy the generated `.sql` dump to the new VM (for example with `scp` or Tailscale SSH/SCP).
+
+3. On the new VM, restore into PROD:
+
+```bash
+cd /home/kuba/repos/mission-control
+
+docker compose -f infra/prod/docker-compose.prod.yml --env-file /etc/mission-control/prod.env stop api web worker dapr-api dapr-web dapr-worker
+./infra/prod/postgres-restore.sh ~/mission-control-prod.sql
+./infra/deploy.sh
+```
+
+4. On the new VM, refresh DEV from the same dump:
+
+```bash
+cd /home/kuba/repos/mission-control
+./infra/dev/scripts/postgres-restore.sh ~/mission-control-prod.sql
+```
+
 ## Troubleshooting quick checks
 
 ```bash
