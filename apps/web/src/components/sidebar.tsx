@@ -24,7 +24,7 @@ export function Sidebar({
         "fixed inset-y-4 left-4 z-50 hidden lg:flex",
         collapsed ? "w-20 gap-4 p-4" : "w-64 gap-6 p-6",
         "flex-col",
-        "bg-slate-900/95 backdrop-blur-xl",
+        "bg-card/95 backdrop-blur-xl",
         "border border-white/[0.08]",
         "rounded-xl",
         "shadow-xl shadow-black/40"

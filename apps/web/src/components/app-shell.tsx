@@ -12,7 +12,7 @@ import {
 
 function MobileHeader() {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-white/5 bg-slate-950/80 backdrop-blur-xl lg:hidden">
+    <header className="sticky top-0 z-40 w-full border-b border-white/5 bg-card/80 backdrop-blur-xl lg:hidden">
       <div className="flex h-14 items-center px-4">
         <MobileNav />
       </div>

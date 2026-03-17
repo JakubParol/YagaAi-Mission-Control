@@ -24,7 +24,7 @@ export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
       <FloatingCard
         as="nav"
         aria-label="Module navigation"
-        className="mx-auto max-w-7xl border-white/[0.08] bg-slate-900/95 px-3 py-2 shadow-xl shadow-black/40 backdrop-blur-xl sm:px-4"
+        className="mx-auto max-w-7xl border-white/[0.08] bg-card/95 px-3 py-2 shadow-xl shadow-black/40 backdrop-blur-xl sm:px-4"
       >
         <div className="flex min-h-11 flex-wrap items-center gap-1">
           {leftSlot && (
