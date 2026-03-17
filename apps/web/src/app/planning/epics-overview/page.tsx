@@ -64,16 +64,16 @@ function EpicOverviewPageContent() {
     ? selectedProjectIds[0] : null;
 
   const sa = useStoryActions(singleProjectId, setPreviewByEpicKey);
+  const { resetAll } = sa;
 
   useEffect(() => {
     activeProjectIdRef.current = singleProjectId;
     previewFetchInFlightRef.current.clear();
     previewByEpicKeyRef.current = {};
     setPreviewByEpicKey({});
-    sa.resetAll();
+    resetAll();
     setState(singleProjectId ? { kind: "loading" } : { kind: "no-project" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- resetAll is stable, singleProjectId drives the reset
-  }, [singleProjectId]);
+  }, [singleProjectId, resetAll]);
 
   const filters = useMemo<EpicOverviewFilters>(() => ({
     search: searchParams.get(FILTER_KEYS.search) ?? EPIC_OVERVIEW_DEFAULT_FILTERS.search,

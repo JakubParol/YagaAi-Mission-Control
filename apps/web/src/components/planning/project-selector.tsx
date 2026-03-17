@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Check, ChevronsUpDown, FolderKanban } from "lucide-react";
 
@@ -39,7 +39,12 @@ export function ProjectSelector() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  const initDoneRef = useRef(false);
+
   useEffect(() => {
+    if (initDoneRef.current) return;
+    initDoneRef.current = true;
+
     let cancelled = false;
     fetch(apiUrl("/v1/planning/projects?limit=100"))
       .then((res) => {
@@ -66,7 +71,9 @@ export function ProjectSelector() {
           if (initialSelection) {
             setSelectedProjectIds([initialSelection.targetProject.id]);
             if (initialSelection.shouldUpdateUrl) {
-              updateUrlParam(initialSelection.targetProject.key);
+              const params = new URLSearchParams(searchParams.toString());
+              params.set("project", initialSelection.targetProject.key);
+              router.replace(`${pathname}?${params.toString()}`);
             }
           }
         }
@@ -80,7 +87,7 @@ export function ProjectSelector() {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname, router, searchParams, selectedProjectIds, setSelectedProjectIds]);
 
   const triggerLabel = useMemo(() => {
     if (loading) return "Projects…";
