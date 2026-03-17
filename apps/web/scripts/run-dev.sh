@@ -49,6 +49,16 @@ DEV_PORT="${PORT:-3001}"
 export API_URL="${API_URL:-http://127.0.0.1:5001}"
 export NEXT_DIST_DIR="${NEXT_DIST_DIR:-.next-local}"
 
+# Kill stale Next.js process on this port before starting
+if command -v ss >/dev/null 2>&1; then
+  STALE_PID="$(ss -tlnp "sport = :$DEV_PORT" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1 || true)"
+  if [ -n "$STALE_PID" ]; then
+    echo "Killing stale process on port $DEV_PORT (pid $STALE_PID)"
+    kill "$STALE_PID" 2>/dev/null || true
+    sleep 1
+  fi
+fi
+
 cleanup_stale_lock "$NEXT_DIST_DIR/dev/lock"
 
 exec ./node_modules/.bin/next dev --hostname "$DEV_HOST" --port "$DEV_PORT" "$@"
