@@ -1,6 +1,6 @@
 """Integration tests for GET /v1/planning/backlogs/{backlog_id}/stories."""
 
-import sqlite3
+from tests.support.postgres_compat import pg_connect
 
 PREFIX = "/v1/planning/backlogs"
 TS = "2026-01-01T00:00:00Z"
@@ -58,13 +58,13 @@ def test_backlog_stories_backlog_not_found(client):
 
 
 def test_backlog_stories_includes_label_payload(client, _setup_test_db):
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-story", "p1", "urgent", "#ff0000", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-story", "p1", "urgent", "#ff0000", TS],
+        )
+        conn.commit()
 
     attach_resp = client.post("/v1/planning/stories/s1/labels", json={"label_id": "lbl-story"})
     assert attach_resp.status_code == 201
@@ -79,13 +79,12 @@ def test_backlog_stories_includes_label_payload(client, _setup_test_db):
 
 
 def test_backlog_stories_resolves_assignee_from_story_metadata(client, _setup_test_db):
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute(
-        "UPDATE stories SET metadata_json = ? WHERE id = ?",
-        ('{"quick_create_assignee_agent_id":"a1"}', "s1"),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute(
+            "UPDATE stories SET metadata_json = %s WHERE id = %s",
+            ['{"quick_create_assignee_agent_id":"a1"}', "s1"],
+        )
+        conn.commit()
 
     _add_story(client, "b1", "s1", 0)
     resp = client.get(f"{PREFIX}/b1/stories")

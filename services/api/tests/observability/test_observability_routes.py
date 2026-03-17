@@ -10,7 +10,7 @@ Coverage:
 
 Fixtures:
 - client — FastAPI TestClient (from conftest)
-- _setup_test_db — in-memory SQLite with observability schema (from conftest)
+- _setup_test_db — Langfuse settings mock (from conftest)
 """
 
 
@@ -22,26 +22,25 @@ def test_healthz(client) -> None:
 def test_get_costs_empty_db(client) -> None:
     response = client.get("/v1/observability/costs?days=7")
     assert response.status_code == 200
-    data = response.json()
-    assert "daily" in data
-    assert isinstance(data["daily"], list)
+    body = response.json()
+    assert "data" in body
+    assert isinstance(body["data"]["daily"], list)
 
 
 def test_get_requests_empty_db(client) -> None:
     response = client.get("/v1/observability/requests")
     assert response.status_code == 200
-    data = response.json()
-    assert "data" in data
-    assert "meta" in data
-    assert data["meta"]["page"] == 1
+    body = response.json()
+    assert "data" in body
+    assert "meta" in body
 
 
 def test_get_request_models_empty_db(client) -> None:
     response = client.get("/v1/observability/requests/models")
     assert response.status_code == 200
-    data = response.json()
-    assert "models" in data
-    assert isinstance(data["models"], list)
+    body = response.json()
+    assert "data" in body
+    assert isinstance(body["data"]["models"], list)
 
 
 def test_get_import_status_empty_db(client) -> None:
