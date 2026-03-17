@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { StoryLabel } from "@/lib/planning/types";
+import type { WorkItemLabel } from "@/lib/planning/types";
 import {
   STORY_DETAIL_HEADER_LAYOUT,
   shouldShowStoryDetailActions,
@@ -34,7 +34,7 @@ export function StoryDetailDialog({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   embedded?: boolean;
-  initialLabels?: StoryLabel[];
+  initialLabels?: WorkItemLabel[];
   onStoryUpdated?: () => void;
 }) {
   const isActive = embedded ? storyId !== null : open;

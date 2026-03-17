@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import {
   calculateMainMenuCoordinates,
   calculateSubmenuCoordinates,
@@ -209,7 +209,7 @@ export function StoryActionsMenu({
     if (actionId === "copy-key") { if (storyKey) await writeClipboard(storyKey); closeMenu(); return; }
     if (actionId === "add-label") { onAddLabel?.(storyId); closeMenu(); }
   };
-  const handleStatusAction = async (status: ItemStatus) => {
+  const handleStatusAction = async (status: WorkItemStatus) => {
     if (!onStatusChange || status === storyStatus || isDisabled) return;
     await onStatusChange(storyId, status); closeMenu();
   };

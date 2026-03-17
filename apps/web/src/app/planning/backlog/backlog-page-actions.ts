@@ -4,7 +4,7 @@
  */
 
 import { apiUrl } from "@/lib/api-client";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import type { PlanningFilterOption } from "@/components/planning/planning-filters";
 import type { StoryCardStory } from "@/components/planning/story-card";
 import {
@@ -85,7 +85,7 @@ export async function fetchBacklogData(projectId: string): Promise<FetchResult> 
 
 export async function patchStoryStatus(
   storyId: string,
-  status: ItemStatus,
+  status: WorkItemStatus,
 ): Promise<void> {
   const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
     method: "PATCH",

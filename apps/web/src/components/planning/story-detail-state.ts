@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ItemStatus, StoryLabel, TaskItem } from "@/lib/planning/types";
+import type { WorkItemStatus, WorkItemLabel, TaskItemView } from "@/lib/planning/types";
 import {
   addOptimisticTask, applyOptimisticTaskPatch, createOptimisticTask,
   removeTask, replaceTask, rollbackTaskPatch, toTaskStatusDonePatch, type TaskPatch,
@@ -21,7 +21,7 @@ export interface UseStoryDetailParams {
   storyId: string | null;
   isActive: boolean;
   embedded: boolean;
-  initialLabels?: StoryLabel[];
+  initialLabels?: WorkItemLabel[];
   onOpenChange?: (open: boolean) => void;
   onStoryUpdated?: () => void;
 }
@@ -38,9 +38,9 @@ export function useStoryDetailState(p: UseStoryDetailParams) {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskError, setTaskError] = useState<string | null>(null);
   const [pendingTaskIds, setPendingTaskIds] = useState<Record<string, true>>({});
-  const [storyLabels, setStoryLabels] = useState<StoryLabel[]>([]);
+  const [storyLabels, setStoryLabels] = useState<WorkItemLabel[]>([]);
   const [storyLabelsForId, setStoryLabelsForId] = useState<string | null>(null);
-  const [availableLabels, setAvailableLabels] = useState<StoryLabel[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<WorkItemLabel[]>([]);
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
   const [selectedLabelId, setSelectedLabelId] = useState("");
   const [labelError, setLabelError] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export function useStoryDetailState(p: UseStoryDetailParams) {
     finally { setIsSavingStory(false); }
   };
 
-  const handleStoryStatusChange = async (tid: string, status: ItemStatus) => {
+  const handleStoryStatusChange = async (tid: string, status: WorkItemStatus) => {
     if (viewState.kind !== "ok" || tid !== viewState.story.id || isSavingStory) return;
     if (viewState.story.status === status) return;
     setStoryError(null); setIsSavingStory(true);
@@ -223,8 +223,8 @@ export function useStoryDetailState(p: UseStoryDetailParams) {
     const tempId = `temp-${Date.now()}`;
     const opt = createOptimisticTask({
       storyId: viewState.story.id, title,
-      objective: draft.objective.trim() === "" ? null : draft.objective.trim(),
-      task_type: draft.task_type.trim() === "" ? "TASK" : draft.task_type.trim(),
+      summary: draft.summary.trim() === "" ? null : draft.summary.trim(),
+      sub_type: draft.sub_type.trim() === "" ? "TASK" : draft.sub_type.trim(),
       priority: parseNumberOrNull(draft.priority), estimate_points: parseNumberOrNull(draft.estimate_points),
       due_at: draft.due_at.trim() === "" ? null : draft.due_at.trim(),
     }, tempId);
@@ -241,7 +241,7 @@ export function useStoryDetailState(p: UseStoryDetailParams) {
 
   const patchTask = async (taskId: string, patch: TaskPatch) => {
     if (viewState.kind !== "ok" || pendingSet.has(taskId)) return false;
-    let previousTask: TaskItem | null = null;
+    let previousTask: TaskItemView | null = null;
     setState((prev) => {
       if (prev.kind !== "ok") return prev;
       const r = applyOptimisticTaskPatch(prev.tasks, taskId, patch);

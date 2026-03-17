@@ -1,13 +1,13 @@
 import type { CSSProperties } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { StoryLabel } from "@/lib/planning/types";
+import type { WorkItemLabel } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 
-export type { StoryLabel } from "@/lib/planning/types";
+export type { WorkItemLabel } from "@/lib/planning/types";
 
 interface StoryLabelChipsProps {
-  labels: StoryLabel[] | null | undefined;
+  labels: WorkItemLabel[] | null | undefined;
   maxVisible?: number;
   className?: string;
   chipClassName?: string;
@@ -89,9 +89,9 @@ export function StoryLabelChips({
 }
 
 export function splitVisibleStoryLabels(
-  labels: readonly StoryLabel[],
+  labels: readonly WorkItemLabel[],
   maxVisible: number,
-): { visible: StoryLabel[]; overflowCount: number } {
+): { visible: WorkItemLabel[]; overflowCount: number } {
   const normalizedMax = Math.max(maxVisible, 0);
   const visible = labels.slice(0, normalizedMax);
   return {

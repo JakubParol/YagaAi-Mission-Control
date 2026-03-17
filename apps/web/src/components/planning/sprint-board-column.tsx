@@ -1,6 +1,6 @@
 import type { DragEvent } from "react";
 import { cn } from "@/lib/utils";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import { StoryCard, type StoryCardStory } from "./story-card";
 import { StoryActionsMenu } from "./story-actions-menu";
 import {
@@ -13,19 +13,19 @@ import { TodoQuickCreate } from "./sprint-board-quick-create";
 // ─── Props ───────────────────────────────────────────────────────────
 
 export interface BoardColumnProps {
-  status: ItemStatus;
+  status: WorkItemStatus;
   label: string;
   accent: string;
   stories: StoryCardStory[];
   isDropTarget: boolean;
-  onDragOver: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (status: ItemStatus, event: DragEvent<HTMLDivElement>) => void;
+  onDragOver: (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => void;
   onStoryClick?: (storyId: string) => void;
   onCardDragStart: (storyId: string) => void;
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
-  onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions: readonly QuickCreateAssigneeOption[];
   assigneeOverrides: Readonly<Record<string, StoryAssigneeSelection>>;

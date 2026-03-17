@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Layers, Loader2, Plus } from "lucide-react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
@@ -138,7 +138,7 @@ function BacklogPageContent() {
   );
 
   const handleStoryStatusChange = useCallback(
-    (storyId: string, status: ItemStatus) => void withPendingStory(storyId, { ...pendingStoryIds, ...pendingDeleteStoryIds }, setPendingStoryIds, async () => {
+    (storyId: string, status: WorkItemStatus) => void withPendingStory(storyId, { ...pendingStoryIds, ...pendingDeleteStoryIds }, setPendingStoryIds, async () => {
       await patchStoryStatus(storyId, status); await refreshCurrentView();
     }),
     [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, withPendingStory],

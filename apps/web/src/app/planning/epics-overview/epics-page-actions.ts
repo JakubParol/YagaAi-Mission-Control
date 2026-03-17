@@ -4,7 +4,7 @@
  */
 
 import { apiUrl } from "@/lib/api-client";
-import type { EpicStatus, ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import {
   toActionHttpErrorMessage,
@@ -75,12 +75,12 @@ import type { EpicOverviewItem } from "./overview-types";
 
 // ─── Parsers ────────────────────────────────────────────────────────
 
-export function parseEpicStatus(value: string | null): EpicStatus | "" {
+export function parseEpicStatus(value: string | null): WorkItemStatus | "" {
   if (value === "TODO" || value === "IN_PROGRESS" || value === "DONE") return value;
   return "";
 }
 
-export function parseItemStatus(value: string | null | undefined): ItemStatus | null {
+export function parseItemStatus(value: string | null | undefined): WorkItemStatus | null {
   if (
     value === "TODO"
     || value === "IN_PROGRESS"
@@ -220,7 +220,7 @@ export async function fetchStoriesPreview(
 
 export async function changeStoryStatus(
   storyId: string,
-  nextStatus: ItemStatus,
+  nextStatus: WorkItemStatus,
 ): Promise<{ timestamp: string | null }> {
   const response = await fetch(apiUrl("/v1/planning/epics/bulk/story-status"), {
     method: "POST",

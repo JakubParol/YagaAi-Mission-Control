@@ -10,14 +10,14 @@ import {
   ThemedSelect,
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
-import type { StoryLabel } from "@/lib/planning/types";
+import type { WorkItemLabel } from "@/lib/planning/types";
 import { toLabelChipStyle } from "./story-label-chips";
 
 // ── StoryLabelManager ───────────────────────────────────────────────────────
 
 export interface StoryLabelManagerProps {
-  labels: StoryLabel[];
-  availableLabels: StoryLabel[];
+  labels: WorkItemLabel[];
+  availableLabels: WorkItemLabel[];
   selectedLabelId: string;
   isLoading: boolean;
   pendingLabelIds: ReadonlySet<string>;

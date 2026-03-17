@@ -4,7 +4,7 @@ import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefO
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import { STATUS_LABEL } from "./story-card";
 import { type FloatingCoordinates } from "./story-actions-menu-positioning";
 import { SECTION_GROUPS, type MenuActionItem } from "./story-actions-menu-types";
@@ -92,18 +92,18 @@ export function MainMenuPanel({
 }
 
 interface StatusOption {
-  status: ItemStatus;
+  status: WorkItemStatus;
   disabled: boolean;
 }
 
 export interface StatusSubmenuPanelProps {
   submenuRef: RefObject<HTMLDivElement | null>;
   statusOptions: StatusOption[];
-  storyStatus: ItemStatus | undefined;
+  storyStatus: WorkItemStatus | undefined;
   statusActionRefs: RefObject<Array<HTMLButtonElement | null>>;
   submenuCoordinates: FloatingCoordinates | null;
   onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
-  onStatusClick: (status: ItemStatus) => void;
+  onStatusClick: (status: WorkItemStatus) => void;
   onStatusHover: (index: number) => void;
 }
 

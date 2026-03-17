@@ -6,13 +6,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { STATUS_LABEL, STATUS_STYLE } from "./story-card";
-import type { TaskItem } from "@/lib/planning/types";
+import type { TaskItemView } from "@/lib/planning/types";
 import { TASK_TYPE_OPTIONS, type TaskDraft } from "./story-detail-view-model";
 
 // ── TaskRow ─────────────────────────────────────────────────────────────────
 
 export interface TaskRowProps {
-  task: TaskItem;
+  task: TaskItemView;
   pending: boolean;
   onEdit: (trigger: HTMLButtonElement) => void;
   onMarkDone: () => void;
@@ -36,8 +36,8 @@ export function TaskRow({ task, pending, onEdit, onMarkDone, onDelete }: TaskRow
 
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-foreground">{task.title}</p>
-        {task.objective && (
-          <p className="truncate text-xs text-muted-foreground">{task.objective}</p>
+        {task.summary && (
+          <p className="truncate text-xs text-muted-foreground">{task.summary}</p>
         )}
       </div>
 
@@ -119,10 +119,10 @@ export function TaskForm({ draft, disabled, onUpdate }: TaskFormProps) {
       </div>
 
       <div className="space-y-1 sm:col-span-2">
-        <label className="text-xs text-muted-foreground">Objective</label>
+        <label className="text-xs text-muted-foreground">Summary</label>
         <textarea
-          value={draft.objective}
-          onChange={(event) => onUpdate("objective", event.target.value)}
+          value={draft.summary}
+          onChange={(event) => onUpdate("summary", event.target.value)}
           disabled={disabled}
           rows={3}
           className="w-full rounded-md border border-border/60 bg-background px-3 py-2 text-sm focus-ring"
@@ -132,8 +132,8 @@ export function TaskForm({ draft, disabled, onUpdate }: TaskFormProps) {
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">Type</label>
         <select
-          value={draft.task_type}
-          onChange={(event) => onUpdate("task_type", event.target.value)}
+          value={draft.sub_type}
+          onChange={(event) => onUpdate("sub_type", event.target.value)}
           disabled={disabled}
           className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
         >

@@ -8,8 +8,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ItemStatus } from "@/lib/planning/types";
-import type { StoryLabel } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
+import type { WorkItemLabel } from "@/lib/planning/types";
 import { StoryLabelChips } from "./story-label-chips";
 import { StoryEpicDisplay } from "./story-epic-display";
 import { StoryTaskProgress } from "./story-task-progress";
@@ -22,7 +22,7 @@ export interface StoryCardStory {
   id: string;
   key: string | null;
   title: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   priority: number | null;
   story_type: string;
   epic_id?: string | null;
@@ -31,7 +31,7 @@ export interface StoryCardStory {
   position: number;
   task_count: number;
   done_task_count: number;
-  labels?: StoryLabel[];
+  labels?: WorkItemLabel[];
   label_ids?: string[];
   assignee?: {
     name?: string | null;
@@ -50,7 +50,7 @@ export interface StoryCardStory {
 export const TYPE_CONFIG = STORY_TYPE_CONFIG;
 
 export const STATUS_STYLE: Record<
-  ItemStatus,
+  WorkItemStatus,
   { dot: string; bg: string; text: string }
 > = {
   TODO: { dot: "bg-slate-400", bg: "bg-slate-400/10", text: "text-slate-400" },
@@ -60,7 +60,7 @@ export const STATUS_STYLE: Record<
   DONE: { dot: "bg-emerald-400", bg: "bg-emerald-400/10", text: "text-emerald-400" },
 };
 
-export const STATUS_LABEL: Record<ItemStatus, string> = {
+export const STATUS_LABEL: Record<WorkItemStatus, string> = {
   TODO: "Todo",
   IN_PROGRESS: "In Progress",
   CODE_REVIEW: "Code Review",

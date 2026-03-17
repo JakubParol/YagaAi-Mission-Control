@@ -3,37 +3,37 @@
  * No React, no side effects.
  */
 
-import type { ItemStatus, StoryDetail, StoryLabel, TaskItem } from "@/lib/planning/types";
+import type { WorkItemStatus, WorkItemDetail, WorkItemLabel, TaskItemView } from "@/lib/planning/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type DialogState =
   | { kind: "loading"; forStoryId: string }
   | { kind: "error"; forStoryId: string; message: string }
-  | { kind: "ok"; forStoryId: string; story: StoryDetail; tasks: TaskItem[] };
+  | { kind: "ok"; forStoryId: string; story: WorkItemDetail; tasks: TaskItemView[] };
 
 export interface TaskDraft {
   title: string;
-  objective: string;
-  task_type: string;
+  summary: string;
+  sub_type: string;
   priority: string;
   estimate_points: string;
   due_at: string;
 }
 
 export interface TaskEditDraft extends TaskDraft {
-  status: ItemStatus;
+  status: WorkItemStatus;
   is_blocked: boolean;
   blocked_reason: string;
 }
 
 export interface StoryDraft {
   title: string;
-  story_type: string;
+  sub_type: string;
   description: string;
-  intent: string;
+  summary: string;
   priority: string;
-  epic_id: string;
+  parent_id: string;
   blocked_reason: string;
 }
 
@@ -49,11 +49,11 @@ export interface BacklogOption {
 
 interface NormalizedStory {
   title: string;
-  story_type: string;
+  sub_type: string;
   description: string | null;
-  intent: string | null;
+  summary: string | null;
   priority: number | null;
-  epic_id: string | null;
+  parent_id: string | null;
   blocked_reason: string | null;
 }
 
@@ -68,7 +68,7 @@ export const STORY_TYPE_OPTIONS = [
   { value: "CHORE", label: "Chore" },
 ] as const;
 
-export const STATUS_OPTIONS: { value: ItemStatus; label: string }[] = [
+export const STATUS_OPTIONS: { value: WorkItemStatus; label: string }[] = [
   { value: "TODO", label: "Todo" },
   { value: "IN_PROGRESS", label: "In Progress" },
   { value: "CODE_REVIEW", label: "Code Review" },
@@ -81,8 +81,8 @@ export const STATUS_OPTIONS: { value: ItemStatus; label: string }[] = [
 export function initialTaskDraft(): TaskDraft {
   return {
     title: "",
-    objective: "",
-    task_type: "CODING",
+    summary: "",
+    sub_type: "CODING",
     priority: "",
     estimate_points: "",
     due_at: "",
@@ -98,14 +98,14 @@ export function initialTaskEditDraft(): TaskEditDraft {
   };
 }
 
-export function toStoryDraft(story: StoryDetail): StoryDraft {
+export function toStoryDraft(story: WorkItemDetail): StoryDraft {
   return {
     title: story.title ?? "",
-    story_type: story.story_type ?? "USER_STORY",
+    sub_type: story.sub_type ?? "USER_STORY",
     description: story.description ?? "",
-    intent: story.intent ?? "",
+    summary: story.summary ?? "",
     priority: story.priority !== null ? String(story.priority) : "",
-    epic_id: story.epic_id ?? "",
+    parent_id: story.parent_id ?? "",
     blocked_reason: story.blocked_reason ?? "",
   };
 }
@@ -120,42 +120,42 @@ export function parsePriority(value: string): number | null {
 function normalizeStoryDraft(draft: StoryDraft): NormalizedStory {
   const title = draft.title.trim();
   const description = draft.description.trim();
-  const intent = draft.intent.trim();
+  const summary = draft.summary.trim();
   const blockedReason = draft.blocked_reason.trim();
-  const epicId = draft.epic_id.trim();
+  const parentId = draft.parent_id.trim();
   return {
     title,
-    story_type: draft.story_type,
+    sub_type: draft.sub_type,
     description: description === "" ? null : description,
-    intent: intent === "" ? null : intent,
+    summary: summary === "" ? null : summary,
     priority: parsePriority(draft.priority),
-    epic_id: epicId === "" ? null : epicId,
+    parent_id: parentId === "" ? null : parentId,
     blocked_reason: blockedReason === "" ? null : blockedReason,
   };
 }
 
-function normalizeStory(story: StoryDetail): NormalizedStory {
+function normalizeStory(story: WorkItemDetail): NormalizedStory {
   return {
     title: story.title.trim(),
-    story_type: story.story_type,
+    sub_type: story.sub_type,
     description: story.description?.trim() || null,
-    intent: story.intent?.trim() || null,
+    summary: story.summary?.trim() || null,
     priority: story.priority,
-    epic_id: story.epic_id,
+    parent_id: story.parent_id,
     blocked_reason: story.blocked_reason?.trim() || null,
   };
 }
 
-export function isStoryDirty(draft: StoryDraft, story: StoryDetail): boolean {
+export function isStoryDirty(draft: StoryDraft, story: WorkItemDetail): boolean {
   const d = normalizeStoryDraft(draft);
   const s = normalizeStory(story);
   return (
     d.title !== s.title ||
-    d.story_type !== s.story_type ||
+    d.sub_type !== s.sub_type ||
     d.description !== s.description ||
-    d.intent !== s.intent ||
+    d.summary !== s.summary ||
     d.priority !== s.priority ||
-    d.epic_id !== s.epic_id ||
+    d.parent_id !== s.parent_id ||
     d.blocked_reason !== s.blocked_reason
   );
 }
@@ -221,7 +221,7 @@ export async function parseApiMessage(response: Response): Promise<string> {
   return `Request failed. HTTP ${response.status}.`;
 }
 
-export function mapStoryLabelsFromUnknown(value: unknown): StoryLabel[] {
+export function mapStoryLabelsFromUnknown(value: unknown): WorkItemLabel[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((item) => {
@@ -232,19 +232,19 @@ export function mapStoryLabelsFromUnknown(value: unknown): StoryLabel[] {
         id: data.id,
         name: data.name,
         color: typeof data.color === "string" ? data.color : null,
-      } satisfies StoryLabel;
+      } satisfies WorkItemLabel;
     })
-    .filter((item): item is StoryLabel => item !== null);
+    .filter((item): item is WorkItemLabel => item !== null);
 }
 
-export function mapTaskFromApi(raw: Record<string, unknown>): TaskItem {
+export function mapTaskFromApi(raw: Record<string, unknown>): TaskItemView {
   return {
     id: String(raw.id),
     key: raw.key ? String(raw.key) : null,
     title: String(raw.title ?? ""),
-    objective: raw.objective ? String(raw.objective) : null,
-    task_type: String(raw.task_type ?? "CODING"),
-    status: (raw.status as ItemStatus) ?? "TODO",
+    summary: raw.objective ? String(raw.objective) : null,
+    sub_type: String(raw.task_type ?? "CODING"),
+    status: (raw.status as WorkItemStatus) ?? "TODO",
     priority: typeof raw.priority === "number" ? raw.priority : null,
     is_blocked: Boolean(raw.is_blocked),
     blocked_reason: raw.blocked_reason ? String(raw.blocked_reason) : null,
@@ -256,11 +256,11 @@ export function mapTaskFromApi(raw: Record<string, unknown>): TaskItem {
   };
 }
 
-export function toTaskEditDraft(task: TaskItem): TaskEditDraft {
+export function toTaskEditDraft(task: TaskItemView): TaskEditDraft {
   return {
     title: task.title,
-    objective: task.objective ?? "",
-    task_type: task.task_type,
+    summary: task.summary ?? "",
+    sub_type: task.sub_type,
     priority: task.priority !== null ? String(task.priority) : "",
     estimate_points: task.estimate_points !== null ? String(task.estimate_points) : "",
     due_at: toDateInputValue(task.due_at),

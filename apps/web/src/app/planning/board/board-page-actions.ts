@@ -1,6 +1,6 @@
 import { apiUrl } from "@/lib/api-client";
 import type { ActiveSprintData } from "@/components/planning/sprint-board";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import type { QuickCreateAssigneeOption } from "./quick-create";
 
 /* ------------------------------------------------------------------ */
@@ -78,7 +78,7 @@ export async function fetchAssigneeOptions(
 
 export async function patchStoryStatus(
   storyId: string,
-  nextStatus: ItemStatus,
+  nextStatus: WorkItemStatus,
 ): Promise<void> {
   const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
     method: "PATCH",

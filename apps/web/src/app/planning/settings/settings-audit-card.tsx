@@ -59,15 +59,9 @@ export function SettingsAuditCard({ auditActivity }: SettingsAuditCardProps) {
         <div className="rounded-md border border-border/60 p-3">
           <p className="font-semibold mb-2">Recent status history</p>
           <div className="space-y-2">
-            {auditActivity.story_status_history.map((entry) => (
+            {auditActivity.work_item_status_history.map((entry) => (
               <p key={entry.id} className="text-muted-foreground">
-                story {entry.story_id}: {entry.from_status ?? "null"} to {entry.to_status} (
-                {formatDateLabel(entry.changed_at)})
-              </p>
-            ))}
-            {auditActivity.task_status_history.map((entry) => (
-              <p key={entry.id} className="text-muted-foreground">
-                task {entry.task_id}: {entry.from_status ?? "null"} to {entry.to_status} (
+                work_item {entry.work_item_id}: {entry.from_status ?? "null"} to {entry.to_status} (
                 {formatDateLabel(entry.changed_at)})
               </p>
             ))}

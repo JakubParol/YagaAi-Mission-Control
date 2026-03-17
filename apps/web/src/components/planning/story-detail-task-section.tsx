@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 
-import type { ItemStatus, TaskItem } from "@/lib/planning/types";
+import type { WorkItemStatus, TaskItemView } from "@/lib/planning/types";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,7 @@ import { TaskRow, TaskForm } from "./story-detail-task-form";
 // ── TaskManager ─────────────────────────────────────────────────────────────
 
 export interface TaskManagerProps {
-  tasks: TaskItem[];
+  tasks: TaskItemView[];
   isCreating: boolean;
   pendingTaskIds: ReadonlySet<string>;
   error: string | null;
@@ -89,9 +89,9 @@ export function TaskManager({
 
     const patch: TaskPatch = {};
     const title = editDraft.title.trim();
-    const objective = editDraft.objective.trim() === "" ? null : editDraft.objective.trim();
-    const taskType =
-      editDraft.task_type.trim() === "" ? editingTask.task_type : editDraft.task_type.trim();
+    const summary = editDraft.summary.trim() === "" ? null : editDraft.summary.trim();
+    const subType =
+      editDraft.sub_type.trim() === "" ? editingTask.sub_type : editDraft.sub_type.trim();
     const priority = parseNumberOrNull(editDraft.priority);
     const estimate = parseNumberOrNull(editDraft.estimate_points);
     const dueAt = editDraft.due_at.trim() === "" ? null : editDraft.due_at.trim();
@@ -104,8 +104,8 @@ export function TaskManager({
 
     if (title === "") return;
     if (title !== editingTask.title) patch.title = title;
-    if (objective !== editingTask.objective) patch.objective = objective;
-    if (taskType !== editingTask.task_type) patch.task_type = taskType;
+    if (summary !== editingTask.summary) patch.summary = summary;
+    if (subType !== editingTask.sub_type) patch.sub_type = subType;
     if (editDraft.status !== editingTask.status) patch.status = editDraft.status;
     if (priority !== editingTask.priority) patch.priority = priority;
     if (estimate !== editingTask.estimate_points) patch.estimate_points = estimate;
@@ -212,7 +212,7 @@ export function TaskManager({
                     value={editDraft.status}
                     disabled={pendingTaskIds.has(editingTask.id)}
                     onChange={(event) =>
-                      updateEditDraft("status", event.target.value as ItemStatus)
+                      updateEditDraft("status", event.target.value as WorkItemStatus)
                     }
                     className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
                   >

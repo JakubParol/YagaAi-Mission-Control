@@ -1,4 +1,4 @@
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import {
   applyPlanningFilters,
   PLANNING_FILTER_KEYS,
@@ -12,7 +12,7 @@ export { UNASSIGNED_FILTER_VALUE };
 
 export interface PlanningListFilters {
   search: string;
-  status: ItemStatus | "";
+  status: WorkItemStatus | "";
   type: string;
   labelId: string;
   epicId: string;
@@ -55,7 +55,7 @@ export function buildTypeOptions(rows: PlanningListRow[]): OptionItem[] {
 }
 
 export function buildStatusOptions(rows: PlanningListRow[]): OptionItem[] {
-  const values = new Set<ItemStatus>();
+  const values = new Set<WorkItemStatus>();
   for (const row of rows) {
     values.add(row.status);
   }

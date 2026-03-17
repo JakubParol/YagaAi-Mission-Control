@@ -65,7 +65,7 @@ export default function PlanningSettingsPage() {
                     <input
                       type="checkbox"
                       disabled
-                      checked={project.is_default === 1}
+                      checked={project.is_default}
                       readOnly
                     />
                     is_default
@@ -150,27 +150,17 @@ export default function PlanningSettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Story and Task workflow</CardTitle>
+            <CardTitle>Work item workflow</CardTitle>
             <CardDescription>
               Shared status sets and blocked behavior cards from workflow v1.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-xs">
             <div className="rounded-md border border-border/60 p-3">
-              <p className="font-semibold mb-2">Story statuses</p>
+              <p className="font-semibold mb-2">Work item statuses</p>
               <div className="flex flex-wrap gap-1.5">
-                {settings.workflow.story_statuses.map((status) => (
-                  <Badge key={`story-${status}`} variant="outline">
-                    {status}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-md border border-border/60 p-3">
-              <p className="font-semibold mb-2">Task statuses</p>
-              <div className="flex flex-wrap gap-1.5">
-                {settings.workflow.task_statuses.map((status) => (
-                  <Badge key={`task-${status}`} variant="outline">
+                {settings.workflow.work_item_statuses.map((status) => (
+                  <Badge key={`wi-${status}`} variant="outline">
                     {status}
                   </Badge>
                 ))}
@@ -217,6 +207,7 @@ export default function PlanningSettingsPage() {
                   <Badge variant={agent.is_active ? "default" : "outline"}>
                     {agent.is_active ? "ACTIVE" : "INACTIVE"}
                   </Badge>
+
                 </div>
               ))}
             </div>

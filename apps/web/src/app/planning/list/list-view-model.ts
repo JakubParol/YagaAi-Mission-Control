@@ -1,6 +1,6 @@
 import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import type { StoryCardStory } from "@/components/planning/story-card";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import type { PlanningAgentApiItem } from "./list-types";
 
@@ -19,7 +19,7 @@ export interface PlanningStoryApiItem {
   key: string | null;
   title: string;
   story_type: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   priority: number | null;
   updated_at: string;
 }
@@ -29,7 +29,7 @@ export interface PlanningBacklogStoryApiItem {
   key: string | null;
   title: string;
   story_type: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   priority: number | null;
   epic_key: string | null;
   epic_title: string | null;
@@ -46,7 +46,7 @@ export interface PlanningTaskApiItem {
   title: string;
   objective: string | null;
   task_type: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   priority: number | null;
   updated_at: string;
 }
@@ -62,7 +62,7 @@ export interface PlanningListRow {
   id: string;
   key: string | null;
   title: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   priority: number | null;
   epic_id: string | null;
   epic_key: string | null;

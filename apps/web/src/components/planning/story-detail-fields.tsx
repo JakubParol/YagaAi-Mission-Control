@@ -3,7 +3,7 @@
 import { Calendar, CheckCircle2, Clock, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { StoryDetail, StoryLabel } from "@/lib/planning/types";
+import type { WorkItemDetail, WorkItemLabel } from "@/lib/planning/types";
 import { StoryLabelManager } from "./story-detail-label-section";
 import { TaskManager, type TaskManagerProps } from "./story-detail-task-section";
 import {
@@ -30,7 +30,7 @@ function SidebarField({ label, children }: { label: string; children: React.Reac
 // ── Props ───────────────────────────────────────────────────────────────────
 
 export interface StoryDetailFieldsProps {
-  story: StoryDetail;
+  story: WorkItemDetail;
   storyDraft: StoryDraft;
   storyError: string | null;
   epics: EpicOption[];
@@ -42,8 +42,8 @@ export interface StoryDetailFieldsProps {
   onCancel: () => void;
   taskManagerProps: TaskManagerProps;
   labelManagerProps: {
-    labels: StoryLabel[];
-    availableLabels: StoryLabel[];
+    labels: WorkItemLabel[];
+    availableLabels: WorkItemLabel[];
     selectedLabelId: string;
     isLoading: boolean;
     pendingLabelIds: ReadonlySet<string>;
@@ -89,8 +89,8 @@ export function StoryDetailFields({
             </h3>
             <input
               id="story-detail-intent"
-              value={storyDraft.intent}
-              onChange={(event) => onDraftChange("intent", event.target.value)}
+              value={storyDraft.summary}
+              onChange={(event) => onDraftChange("summary", event.target.value)}
               placeholder="One-line goal or intent for this story\u2026"
               className="mb-4 w-full border-0 bg-transparent text-sm italic text-muted-foreground outline-none placeholder:text-muted-foreground/30 focus:ring-0"
             />
@@ -117,8 +117,8 @@ export function StoryDetailFields({
           <SidebarField label="Type">
             <select
               id="story-detail-type"
-              value={storyDraft.story_type}
-              onChange={(event) => onDraftChange("story_type", event.target.value)}
+              value={storyDraft.sub_type}
+              onChange={(event) => onDraftChange("sub_type", event.target.value)}
               className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
             >
               {STORY_TYPE_OPTIONS.map((option) => (
@@ -144,9 +144,9 @@ export function StoryDetailFields({
           <SidebarField label="Epic">
             <select
               id="story-detail-epic"
-              value={storyDraft.epic_id}
+              value={storyDraft.parent_id}
               disabled={isLoadingEpics}
-              onChange={(event) => onDraftChange("epic_id", event.target.value)}
+              onChange={(event) => onDraftChange("parent_id", event.target.value)}
               className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
             >
               <option value="">No epic</option>

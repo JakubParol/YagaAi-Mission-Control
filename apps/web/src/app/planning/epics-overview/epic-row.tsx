@@ -9,7 +9,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { ThemedSelect } from "@/components/ui/themed-select";
-import type { EpicStatus, ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import {
   type EpicOverviewItem,
@@ -42,7 +42,7 @@ const PREVIEW_BLOCKED_OPTIONS = [
 
 // ─── Variant helpers ────────────────────────────────────────────────
 
-function statusVariant(status: EpicStatus): "outline" | "secondary" | "default" {
+function statusVariant(status: WorkItemStatus): "outline" | "secondary" | "default" {
   if (status === "DONE") return "default";
   if (status === "IN_PROGRESS") return "secondary";
   return "outline";
@@ -81,7 +81,7 @@ export interface EpicRowProps {
   actionError: string | undefined;
   onToggleExpand: (epicKey: string) => void;
   onPreviewFilterChange: (epicKey: string, patch: Partial<EpicOverviewStoryPreviewFilters>) => void;
-  onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: ItemStatus) => void;
+  onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
   onAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
 }
 
@@ -154,7 +154,7 @@ export function EpicRow({
               options={PREVIEW_STATUS_OPTIONS}
               placeholder="Story status"
               onValueChange={(value) => onPreviewFilterChange(item.epic_key, {
-                status: value as ItemStatus | "",
+                status: value as WorkItemStatus | "",
               })}
               triggerClassName="h-8 min-w-[170px] bg-background/80 text-xs"
               contentClassName="w-[220px]"

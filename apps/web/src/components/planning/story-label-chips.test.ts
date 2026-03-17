@@ -4,10 +4,10 @@ import test from "node:test";
 import {
   splitVisibleStoryLabels,
   toLabelChipStyle,
-  type StoryLabel,
+  type WorkItemLabel,
 } from "./story-label-chips.js";
 
-const LABELS: StoryLabel[] = [
+const LABELS: WorkItemLabel[] = [
   { id: "l1", name: "planning", color: "#ff0000" },
   { id: "l2", name: "boards", color: "#00ff00" },
   { id: "l3", name: "ui", color: "#0000ff" },

@@ -2,7 +2,7 @@
 
 import { ExternalLink, Loader2 } from "lucide-react";
 
-import type { ItemStatus, StoryDetail } from "@/lib/planning/types";
+import type { WorkItemStatus, WorkItemDetail } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -24,12 +24,12 @@ export function shouldShowStoryDetailActions(storyType: string | null | undefine
 // ── Props ───────────────────────────────────────────────────────────────────
 
 export interface StoryDetailHeaderProps {
-  story: StoryDetail;
+  story: WorkItemDetail;
   storyDraft: StoryDraft;
   embedded: boolean;
   isSaving: boolean;
   isDeleting: boolean;
-  onStatusChange: (storyId: string, status: ItemStatus) => void;
+  onStatusChange: (storyId: string, status: WorkItemStatus) => void;
   onDelete: (storyId: string) => void;
   onTitleChange: (value: string) => void;
 }
@@ -58,7 +58,7 @@ export function StoryDetailHeader({
         <select
           value={story.status}
           disabled={isSaving}
-          onChange={(e) => onStatusChange(story.id, e.target.value as ItemStatus)}
+          onChange={(e) => onStatusChange(story.id, e.target.value as WorkItemStatus)}
           className={cn(
             "h-5 cursor-pointer appearance-none rounded-full border-0 px-2 text-[10px] font-medium focus:outline-none focus:ring-1 focus:ring-ring",
             STATUS_STYLE[story.status].bg,
@@ -77,10 +77,10 @@ export function StoryDetailHeader({
         )}
 
         <div className={STORY_DETAIL_HEADER_LAYOUT.actionsGroup}>
-          {shouldShowStoryDetailActions(story.story_type) && (
+          {shouldShowStoryDetailActions(story.sub_type) && (
             <StoryActionsMenu
               storyId={story.id}
-              storyType={story.story_type}
+              storyType={story.sub_type}
               storyKey={story.key ?? null}
               storyTitle={story.title}
               storyStatus={story.status}

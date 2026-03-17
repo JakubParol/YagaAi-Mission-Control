@@ -11,8 +11,6 @@ export type {
   SettingsBacklog,
   SettingsLabel,
   SettingsProject,
-  SettingsStoryLabel,
-  SettingsStoryStatusHistory,
-  SettingsTaskLabel,
-  SettingsTaskStatusHistory,
+  SettingsWorkItemLabel,
+  SettingsWorkItemStatusHistory,
 } from "./types";

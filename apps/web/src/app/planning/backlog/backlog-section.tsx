@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
@@ -31,7 +31,7 @@ export interface BacklogSectionProps {
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
   onStoryDelete: (storyId: string) => void;
-  onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
+  onStoryStatusChange: (storyId: string, status: WorkItemStatus) => void;
   onEditBoard: (backlogId: string) => void;
   onDeleteBoard: (backlogId: string, backlogName: string, isDefault: boolean) => void;
   onMoveBoard: (backlogId: string, direction: MoveDirection) => void;

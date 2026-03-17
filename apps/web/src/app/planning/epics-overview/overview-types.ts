@@ -1,10 +1,10 @@
-import type { EpicStatus, ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 export interface EpicOverviewStoryPreview {
   story_id: string;
   story_key: string | null;
   title: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   current_assignee_agent_id: string | null;
   assignee_label: string | null;
   is_blocked: boolean;
@@ -14,7 +14,7 @@ export interface EpicOverviewStoryPreview {
 export interface EpicOverviewItem {
   epic_key: string;
   title: string;
-  status: EpicStatus;
+  status: WorkItemStatus;
   progress_pct: number;
   progress_trend_7d: number;
   stories_total: number;
@@ -56,7 +56,7 @@ export type EpicOverviewSortValue =
 
 export interface EpicOverviewFilters {
   search: string;
-  status: EpicStatus | "";
+  status: WorkItemStatus | "";
   ownerId: string;
   label: string;
   blocked: "" | "true" | "false";
@@ -64,7 +64,7 @@ export interface EpicOverviewFilters {
 }
 
 export interface EpicOverviewStoryPreviewFilters {
-  status: ItemStatus | "";
+  status: WorkItemStatus | "";
   blocked: "" | "true" | "false";
 }
 

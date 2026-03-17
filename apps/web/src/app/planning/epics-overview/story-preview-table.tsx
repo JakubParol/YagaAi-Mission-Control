@@ -5,7 +5,7 @@ import { AlertTriangle, ExternalLink } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ThemedSelect } from "@/components/ui/themed-select";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import { parseItemStatus } from "./epics-page-actions";
 import type { EpicOverviewStoryPreview } from "./overview-types";
@@ -27,7 +27,7 @@ const STATUS_OPTIONS = [
 
 // ─── Variant helpers ────────────────────────────────────────────────
 
-function storyStatusVariant(status: ItemStatus): "outline" | "secondary" | "default" {
+function storyStatusVariant(status: WorkItemStatus): "outline" | "secondary" | "default" {
   if (status === "DONE") return "default";
   if (status === "IN_PROGRESS" || status === "CODE_REVIEW" || status === "VERIFY") {
     return "secondary";
@@ -55,7 +55,7 @@ export interface StoryPreviewTableProps {
   stories: EpicOverviewStoryPreview[];
   epicKey: string;
   storyPendingById: Record<string, boolean>;
-  onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: ItemStatus) => void;
+  onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
   onAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
 }
 

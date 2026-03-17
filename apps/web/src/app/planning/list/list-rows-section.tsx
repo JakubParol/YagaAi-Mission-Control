@@ -4,7 +4,7 @@ import { BacklogRow, type BacklogAssigneeOption } from "@/components/planning/ba
 import { BacklogRowsHeader } from "@/components/planning/backlog-rows-header";
 import { EmptyState } from "@/components/empty-state";
 import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import { toBacklogRowStory, type PlanningListRow } from "./list-view-model";
 
@@ -15,7 +15,7 @@ export interface ListRowsSectionProps {
   onStoryClick: (storyId: string) => void;
   onTaskClick: (row: PlanningListRow) => void;
   onStoryDelete: (storyId: string) => void;
-  onStoryStatusChange: (storyId: string, status: ItemStatus) => void;
+  onStoryStatusChange: (storyId: string, status: WorkItemStatus) => void;
   onRowAssigneeChange: (row: PlanningListRow, nextAssigneeAgentId: string | null) => void;
   onAddLabel: (storyId: string) => void;
 }

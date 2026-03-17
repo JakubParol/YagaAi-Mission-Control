@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
 import { PageShell } from "@/components/page-shell";
@@ -114,11 +114,11 @@ function BoardPageContent() {
   }, [refreshCurrentView, singleProjectId]);
 
   const handleStoryStatusChange = useCallback(
-    async (storyId: string, nextStatus: ItemStatus) => {
+    async (storyId: string, nextStatus: WorkItemStatus) => {
       if (state.kind !== "ok") return;
       const existingStory = state.data.stories.find((item) => item.id === storyId);
       if (!existingStory || existingStory.status === nextStatus) return;
-      const previousStatus: ItemStatus = existingStory.status;
+      const previousStatus: WorkItemStatus = existingStory.status;
 
       setState((prev) => {
         if (prev.kind !== "ok") return prev;

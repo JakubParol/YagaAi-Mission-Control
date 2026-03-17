@@ -1,4 +1,4 @@
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 export const PLANNING_FILTER_KEYS = {
   search: "q",
@@ -13,7 +13,7 @@ export const UNASSIGNED_FILTER_VALUE = "unassigned";
 
 export interface PlanningFiltersValue {
   search: string;
-  status: ItemStatus | "";
+  status: WorkItemStatus | "";
   type: string;
   labelId: string;
   epicId: string;
@@ -29,7 +29,7 @@ export interface PlanningStoryFilterItem {
   id?: string;
   key: string | null;
   title: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   story_type: string;
   labels?: readonly { id: string; name?: string | null }[];
   epic_id?: string | null;
@@ -42,7 +42,7 @@ export interface PlanningStoryFilterItem {
 export interface PlanningFilterCandidate {
   key: string | null;
   title: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
   type: string;
   labelIds: readonly string[];
   epicId: string | null;

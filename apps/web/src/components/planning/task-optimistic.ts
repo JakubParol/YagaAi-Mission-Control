@@ -1,22 +1,22 @@
-import type { ItemStatus, TaskItem } from "@/lib/planning/types";
+import type { WorkItemStatus, TaskItemView } from "@/lib/planning/types";
 
 export interface TaskDraftInput {
   storyId: string;
   title: string;
-  objective: string | null;
-  task_type: string;
+  summary: string | null;
+  sub_type: string;
   priority: number | null;
   estimate_points: number | null;
   due_at: string | null;
 }
 
-export function createOptimisticTask(draft: TaskDraftInput, tempId: string): TaskItem {
+export function createOptimisticTask(draft: TaskDraftInput, tempId: string): TaskItemView {
   return {
     id: tempId,
     key: null,
     title: draft.title,
-    objective: draft.objective,
-    task_type: draft.task_type,
+    summary: draft.summary,
+    sub_type: draft.sub_type,
     status: "TODO",
     priority: draft.priority,
     is_blocked: false,
@@ -27,24 +27,24 @@ export function createOptimisticTask(draft: TaskDraftInput, tempId: string): Tas
   };
 }
 
-export function addOptimisticTask(tasks: TaskItem[], task: TaskItem): TaskItem[] {
+export function addOptimisticTask(tasks: TaskItemView[], task: TaskItemView): TaskItemView[] {
   return [task, ...tasks];
 }
 
-export function replaceTask(tasks: TaskItem[], taskId: string, replacement: TaskItem): TaskItem[] {
+export function replaceTask(tasks: TaskItemView[], taskId: string, replacement: TaskItemView): TaskItemView[] {
   return tasks.map((task) => (task.id === taskId ? replacement : task));
 }
 
-export function removeTask(tasks: TaskItem[], taskId: string): TaskItem[] {
+export function removeTask(tasks: TaskItemView[], taskId: string): TaskItemView[] {
   return tasks.filter((task) => task.id !== taskId);
 }
 
 export type TaskPatch = Partial<
   Pick<
-    TaskItem,
+    TaskItemView,
     | "title"
-    | "objective"
-    | "task_type"
+    | "summary"
+    | "sub_type"
     | "status"
     | "is_blocked"
     | "blocked_reason"
@@ -56,16 +56,16 @@ export type TaskPatch = Partial<
 >;
 
 export interface ApplyTaskPatchResult {
-  nextTasks: TaskItem[];
-  previousTask: TaskItem | null;
+  nextTasks: TaskItemView[];
+  previousTask: TaskItemView | null;
 }
 
 export function applyOptimisticTaskPatch(
-  tasks: TaskItem[],
+  tasks: TaskItemView[],
   taskId: string,
   patch: TaskPatch,
 ): ApplyTaskPatchResult {
-  let previousTask: TaskItem | null = null;
+  let previousTask: TaskItemView | null = null;
   const nextTasks = tasks.map((task) => {
     if (task.id !== taskId) return task;
     previousTask = task;
@@ -75,14 +75,14 @@ export function applyOptimisticTaskPatch(
 }
 
 export function rollbackTaskPatch(
-  tasks: TaskItem[],
+  tasks: TaskItemView[],
   taskId: string,
-  previousTask: TaskItem | null,
-): TaskItem[] {
+  previousTask: TaskItemView | null,
+): TaskItemView[] {
   if (!previousTask) return tasks;
   return tasks.map((task) => (task.id === taskId ? previousTask : task));
 }
 
-export function toTaskStatusDonePatch(): { status: ItemStatus } {
+export function toTaskStatusDonePatch(): { status: WorkItemStatus } {
   return { status: "DONE" };
 }

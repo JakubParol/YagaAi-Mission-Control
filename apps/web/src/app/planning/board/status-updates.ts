@@ -1,8 +1,8 @@
-export type ItemStatus = "TODO" | "IN_PROGRESS" | "CODE_REVIEW" | "VERIFY" | "DONE";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 export interface StoryWithStatus {
   id: string;
-  status: ItemStatus;
+  status: WorkItemStatus;
 }
 
 export interface ActiveSprintDataLike<TStory extends StoryWithStatus = StoryWithStatus> {
@@ -16,8 +16,8 @@ export function applyOptimisticStoryStatus<
 >(
   data: TData,
   storyId: string,
-  nextStatus: ItemStatus,
-): { data: TData; previousStatus: ItemStatus | null } {
+  nextStatus: WorkItemStatus,
+): { data: TData; previousStatus: WorkItemStatus | null } {
   const story = data.stories.find((item) => item.id === storyId);
   if (!story || story.status === nextStatus) {
     return { data, previousStatus: null };
@@ -40,7 +40,7 @@ export function rollbackStoryStatus<
 >(
   data: TData,
   storyId: string,
-  previousStatus: ItemStatus,
+  previousStatus: WorkItemStatus,
 ): TData {
   return {
     ...data,

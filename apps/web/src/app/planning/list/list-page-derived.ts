@@ -3,7 +3,7 @@ import {
   PLANNING_FILTER_KEYS,
   type PlanningFiltersValue,
 } from "@/components/planning/planning-filters";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import {
   buildStatusOptions,
@@ -109,7 +109,7 @@ export function readFiltersFromSearchParams(
 ): PlanningFiltersValue {
   return {
     search: searchParams.get(PLANNING_FILTER_KEYS.search) ?? "",
-    status: (searchParams.get(PLANNING_FILTER_KEYS.status) ?? "") as ItemStatus | "",
+    status: (searchParams.get(PLANNING_FILTER_KEYS.status) ?? "") as WorkItemStatus | "",
     type: searchParams.get(PLANNING_FILTER_KEYS.type) ?? "",
     labelId: searchParams.get(PLANNING_FILTER_KEYS.labelId) ?? "",
     epicId: searchParams.get(PLANNING_FILTER_KEYS.epicId) ?? "",

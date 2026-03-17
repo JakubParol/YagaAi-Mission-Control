@@ -10,15 +10,15 @@ import {
   rollbackTaskPatch,
   toTaskStatusDonePatch,
 } from "./task-optimistic.js";
-import type { TaskItem } from "./story-types.js";
+import type { TaskItemView } from "./story-types.js";
 
-function taskFixture(id: string, status: TaskItem["status"]): TaskItem {
+function taskFixture(id: string, status: TaskItemView["status"]): TaskItemView {
   return {
     id,
     key: null,
     title: `Task ${id}`,
-    objective: null,
-    task_type: "CODING",
+    summary: null,
+    sub_type: "CODING",
     status,
     priority: 3,
     is_blocked: false,
@@ -34,8 +34,8 @@ test("createOptimisticTask builds TODO task with draft values", () => {
     {
       storyId: "s1",
       title: "Add endpoint",
-      objective: "Ship API",
-      task_type: "CODING",
+      summary: "Ship API",
+      sub_type: "CODING",
       priority: 2,
       estimate_points: 3,
       due_at: "2026-03-10",

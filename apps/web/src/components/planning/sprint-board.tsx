@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from "react";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import type { StoryCardStory } from "./story-card";
 import type { StoryAssigneeSelection } from "@/components/planning/story-assignee-control";
 import type { QuickCreateAssigneeOption, QuickCreateSubmitInput } from "@/app/planning/board/quick-create";
@@ -25,7 +25,7 @@ export interface ActiveSprintData {
 
 // ─── Column config ──────────────────────────────────────────────────
 
-const COLUMNS: { status: ItemStatus; label: string; accent: string }[] = [
+const COLUMNS: { status: WorkItemStatus; label: string; accent: string }[] = [
   { status: "TODO", label: "Todo", accent: "border-l-slate-500" },
   { status: "IN_PROGRESS", label: "In Progress", accent: "border-l-blue-500" },
   { status: "CODE_REVIEW", label: "Code Review", accent: "border-l-violet-500" },
@@ -33,7 +33,7 @@ const COLUMNS: { status: ItemStatus; label: string; accent: string }[] = [
   { status: "DONE", label: "Done", accent: "border-l-emerald-500" },
 ];
 
-const VALID_DROP_STATUSES = new Set<ItemStatus>([
+const VALID_DROP_STATUSES = new Set<WorkItemStatus>([
   "TODO",
   "IN_PROGRESS",
   "CODE_REVIEW",
@@ -46,7 +46,7 @@ const VALID_DROP_STATUSES = new Set<ItemStatus>([
 export interface SprintBoardProps {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
-  onStoryStatusChange?: (storyId: string, status: ItemStatus) => void;
+  onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
   onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   pendingStoryIds?: ReadonlySet<string>;
@@ -67,7 +67,7 @@ export function SprintBoard({
   assigneeOptions = [],
 }: SprintBoardProps) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
-  const [dropTargetStatus, setDropTargetStatus] = useState<ItemStatus | null>(null);
+  const [dropTargetStatus, setDropTargetStatus] = useState<WorkItemStatus | null>(null);
   const [assigneeOverrides, setAssigneeOverrides] = useState<Record<string, StoryAssigneeSelection>>({});
   const pendingSet = useMemo(() => new Set(pendingStoryIds ?? []), [pendingStoryIds]);
 
@@ -90,7 +90,7 @@ export function SprintBoard({
   };
 
   const byStatus = useMemo(() => {
-    const grouped = new Map<ItemStatus, StoryCardStory[]>();
+    const grouped = new Map<WorkItemStatus, StoryCardStory[]>();
     for (const col of COLUMNS) {
       grouped.set(col.status, []);
     }
@@ -112,7 +112,7 @@ export function SprintBoard({
     setDropTargetStatus(null);
   };
 
-  const handleDragOver = (status: ItemStatus, event: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => {
     if (!draggingStoryId || pendingSet.has(draggingStoryId)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
@@ -121,7 +121,7 @@ export function SprintBoard({
     }
   };
 
-  const handleDrop = (status: ItemStatus, event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const draggedStoryId = event.dataTransfer.getData("text/plain") || draggingStoryId;
     setDropTargetStatus(null);

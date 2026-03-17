@@ -14,7 +14,7 @@ import {
 import { PageShell } from "@/components/page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 import { deleteStory } from "../story-actions";
 import type { PlanningListRow } from "./list-view-model";
 import { applyPlanningListFilters } from "./list-filters";
@@ -156,7 +156,7 @@ function PlanningListPageContent() {
   );
 
   const handleStoryStatusChange = useCallback(
-    (storyId: string, status: ItemStatus) => {
+    (storyId: string, status: WorkItemStatus) => {
       runWithPending(storyId, () => patchStoryStatus(storyId, status), "Failed to update story status.");
     },
     [runWithPending],

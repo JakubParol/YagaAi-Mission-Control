@@ -4,7 +4,7 @@
  */
 
 import { apiUrl } from "@/lib/api-client";
-import type { ItemStatus, StoryDetail, StoryLabel, TaskItem } from "@/lib/planning/types";
+import type { WorkItemStatus, WorkItemDetail, WorkItemLabel, TaskItemView } from "@/lib/planning/types";
 import type { TaskPatch } from "./task-optimistic";
 import {
   mapStoryLabelsFromUnknown,
@@ -20,9 +20,9 @@ import {
 // ── Story fetching ──────────────────────────────────────────────────────────
 
 export interface FetchStoryResult {
-  story: StoryDetail;
-  tasks: TaskItem[];
-  labels: StoryLabel[];
+  story: WorkItemDetail;
+  tasks: TaskItemView[];
+  labels: WorkItemLabel[];
   labelIds: string[];
 }
 
@@ -38,7 +38,7 @@ export async function fetchStoryAndTasks(storyId: string): Promise<FetchStoryRes
     }),
   ]);
 
-  const rawStory = storyJson.data as StoryDetail & {
+  const rawStory = storyJson.data as WorkItemDetail & {
     labels?: unknown;
     label_ids?: unknown;
   };
@@ -46,7 +46,7 @@ export async function fetchStoryAndTasks(storyId: string): Promise<FetchStoryRes
   const labelIds = Array.isArray(rawStory.label_ids)
     ? rawStory.label_ids.filter((value): value is string => typeof value === "string")
     : labels.map((label) => label.id);
-  const story: StoryDetail = { ...rawStory, labels, label_ids: labelIds };
+  const story: WorkItemDetail = { ...rawStory, labels, label_ids: labelIds };
   const tasks = ((tasksJson.data ?? []) as Record<string, unknown>[]).map(mapTaskFromApi);
 
   return { story, tasks, labels, labelIds };
@@ -57,7 +57,7 @@ export async function fetchStoryAndTasks(storyId: string): Promise<FetchStoryRes
 export async function fetchStoryLabelsFromBacklogs(
   storyId: string,
   projectId: string,
-): Promise<{ found: boolean; labels: StoryLabel[] }> {
+): Promise<{ found: boolean; labels: WorkItemLabel[] }> {
   const backlogsResponse = await fetch(
     apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100`),
   );
@@ -88,7 +88,7 @@ export async function fetchStoryLabelsFromBacklogs(
   return sections.find((result) => result !== null) ?? { found: false, labels: [] };
 }
 
-export async function fetchAvailableLabels(projectId: string): Promise<StoryLabel[]> {
+export async function fetchAvailableLabels(projectId: string): Promise<WorkItemLabel[]> {
   const response = await fetch(
     apiUrl(`/v1/planning/labels?project_id=${projectId}&limit=100`),
   );
@@ -102,31 +102,31 @@ export async function fetchAvailableLabels(projectId: string): Promise<StoryLabe
 export async function patchStoryFields(
   storyId: string,
   draft: StoryDraft,
-): Promise<StoryDetail> {
+): Promise<WorkItemDetail> {
   const normalized = normalizeStoryDraftForSave(draft);
   const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       title: normalized.title,
-      story_type: normalized.story_type,
+      story_type: normalized.sub_type,
       description: normalized.description,
-      intent: normalized.intent,
+      intent: normalized.summary,
       priority: normalized.priority,
-      epic_id: normalized.epic_id,
+      epic_id: normalized.parent_id,
       is_blocked: normalized.blocked_reason !== null,
       blocked_reason: normalized.blocked_reason,
     }),
   });
   if (!response.ok) throw new Error(await parseApiMessage(response));
   const json = await response.json();
-  return json.data as StoryDetail;
+  return json.data as WorkItemDetail;
 }
 
 export async function patchStoryStatus(
   storyId: string,
-  status: ItemStatus,
-): Promise<StoryDetail> {
+  status: WorkItemStatus,
+): Promise<WorkItemDetail> {
   const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -134,7 +134,7 @@ export async function patchStoryStatus(
   });
   if (!response.ok) throw new Error(await parseApiMessage(response));
   const json = await response.json();
-  return json.data as StoryDetail;
+  return json.data as WorkItemDetail;
 }
 
 // ── Task mutations ──────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export async function createTaskApi(
   projectId: string,
   storyId: string,
   draft: TaskDraft,
-): Promise<TaskItem> {
+): Promise<TaskItemView> {
   const response = await fetch(apiUrl("/v1/planning/tasks"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -151,8 +151,8 @@ export async function createTaskApi(
       project_id: projectId,
       story_id: storyId,
       title: draft.title.trim(),
-      objective: draft.objective.trim() === "" ? null : draft.objective.trim(),
-      task_type: draft.task_type.trim() === "" ? "TASK" : draft.task_type.trim(),
+      objective: draft.summary.trim() === "" ? null : draft.summary.trim(),
+      task_type: draft.sub_type.trim() === "" ? "TASK" : draft.sub_type.trim(),
       priority: parseNumberOrNull(draft.priority),
       estimate_points: parseNumberOrNull(draft.estimate_points),
       due_at: draft.due_at.trim() === "" ? null : draft.due_at.trim(),
@@ -163,7 +163,7 @@ export async function createTaskApi(
   return mapTaskFromApi(json.data as Record<string, unknown>);
 }
 
-export async function patchTaskApi(taskId: string, patch: TaskPatch): Promise<TaskItem> {
+export async function patchTaskApi(taskId: string, patch: TaskPatch): Promise<TaskItemView> {
   const apiPatch = { ...patch } as Record<string, unknown>;
   delete apiPatch.current_assignee_agent_id;
 

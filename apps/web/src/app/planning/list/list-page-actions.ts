@@ -1,6 +1,6 @@
 import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import { apiUrl } from "@/lib/api-client";
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import {
   buildLabelOptions,
@@ -117,7 +117,7 @@ export async function fetchListResult(projectId: string): Promise<FetchResult> {
 
 export async function patchStoryStatus(
   storyId: string,
-  status: ItemStatus,
+  status: WorkItemStatus,
 ): Promise<void> {
   const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
     method: "PATCH",

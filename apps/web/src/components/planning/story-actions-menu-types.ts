@@ -1,10 +1,10 @@
 import type { ComponentType } from "react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 export const STORY_ACTIONS_SUPPORTED_TYPES = ["USER_STORY", "TASK", "BUG"] as const;
 
-export const STORY_STATUS_ORDER: readonly ItemStatus[] = [
+export const STORY_STATUS_ORDER: readonly WorkItemStatus[] = [
   "TODO",
   "IN_PROGRESS",
   "CODE_REVIEW",
@@ -69,9 +69,9 @@ export interface StoryActionsMenuProps {
   storyType: string | null | undefined;
   storyKey: string | null;
   storyTitle: string;
-  storyStatus?: ItemStatus;
+  storyStatus?: WorkItemStatus;
   onDelete: (storyId: string) => void | Promise<void>;
-  onStatusChange?: (storyId: string, status: ItemStatus) => void | Promise<void>;
+  onStatusChange?: (storyId: string, status: WorkItemStatus) => void | Promise<void>;
   onAddLabel?: (storyId: string) => void;
   sprintMembershipAction?: {
     mode: "add" | "remove";

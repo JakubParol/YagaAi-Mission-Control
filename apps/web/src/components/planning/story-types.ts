@@ -1,1 +1,1 @@
-export type { StoryDetail, TaskItem } from "@/lib/planning/types";
+export type { WorkItemDetail, TaskItemView } from "@/lib/planning/types";

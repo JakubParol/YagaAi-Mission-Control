@@ -15,28 +15,15 @@ export function buildPlanningSettingsViewModel(
 
   const labelUsageById = new Map<
     string,
-    {
-      story_count: number;
-      task_count: number;
-    }
+    { work_item_count: number }
   >();
 
-  for (const storyLabel of fixture.story_labels) {
-    const usage = labelUsageById.get(storyLabel.label_id) ?? {
-      story_count: 0,
-      task_count: 0,
+  for (const workItemLabel of fixture.work_item_labels) {
+    const usage = labelUsageById.get(workItemLabel.label_id) ?? {
+      work_item_count: 0,
     };
-    usage.story_count += 1;
-    labelUsageById.set(storyLabel.label_id, usage);
-  }
-
-  for (const taskLabel of fixture.task_labels) {
-    const usage = labelUsageById.get(taskLabel.label_id) ?? {
-      story_count: 0,
-      task_count: 0,
-    };
-    usage.task_count += 1;
-    labelUsageById.set(taskLabel.label_id, usage);
+    usage.work_item_count += 1;
+    labelUsageById.set(workItemLabel.label_id, usage);
   }
 
   return {
@@ -46,7 +33,7 @@ export function buildPlanningSettingsViewModel(
     },
     backlog_policy: {
       default_backlog:
-        selectedProjectBacklogs.find((backlog) => backlog.is_default === 1) ?? null,
+        selectedProjectBacklogs.find((backlog) => backlog.is_default) ?? null,
       backlogs: selectedProjectBacklogs,
       kinds: [...BACKLOG_KINDS_ORDER],
       visibility_options: {
@@ -56,20 +43,19 @@ export function buildPlanningSettingsViewModel(
       sprint_lifecycle_policy: {
         start_semantics: "Start only when no other ACTIVE sprint exists in project scope.",
         complete_semantics:
-          "Complete sprint when all stories are DONE; otherwise show non-blocking preview warning.",
+          "Complete sprint when all work items are DONE; otherwise show non-blocking preview warning.",
       },
     },
     workflow: {
-      story_statuses: fixture.story_statuses,
-      task_statuses: fixture.task_statuses,
+      work_item_statuses: fixture.work_item_statuses,
       blocked_behavior_cards: [
         {
-          title: "Task to Story propagation",
-          summary: "If any child task has is_blocked=1, parent story is treated as blocked.",
+          title: "Child to parent propagation",
+          summary: "If any child work item has is_blocked=true, parent work item is treated as blocked.",
         },
         {
-          title: "Story to Epic propagation",
-          summary: "If any child story has is_blocked=1, parent epic is treated as blocked.",
+          title: "Work item to epic propagation",
+          summary: "If any child work item has is_blocked=true, parent epic is treated as blocked.",
         },
       ],
     },
@@ -78,36 +64,33 @@ export function buildPlanningSettingsViewModel(
       policy_cards: [
         {
           title: "Single active assignee",
-          summary: "Only one active row in task_assignments per task (unassigned_at is NULL).",
+          summary: "Only one active row in work_item_assignments per work item (unassigned_at is NULL).",
         },
         {
           title: "Auto-close on DONE",
-          summary: "Task DONE should close current assignment by setting unassigned_at.",
+          summary: "Work item DONE should close current assignment by setting unassigned_at.",
         },
         {
           title: "Manual handoff",
-          summary: "Re-assignment is explicit and keeps task assignment history.",
+          summary: "Re-assignment is explicit and keeps work item assignment history.",
         },
       ],
     },
     label_taxonomy: {
       labels: fixture.labels.map((label) => {
         const usage = labelUsageById.get(label.id) ?? {
-          story_count: 0,
-          task_count: 0,
+          work_item_count: 0,
         };
 
         return {
           ...label,
-          story_count: usage.story_count,
-          task_count: usage.task_count,
+          work_item_count: usage.work_item_count,
         };
       }),
     },
     audit_activity: {
       activity_log: fixture.activity_log,
-      story_status_history: fixture.story_status_history,
-      task_status_history: fixture.task_status_history,
+      work_item_status_history: fixture.work_item_status_history,
       retention_notes: [
         "activity_log is append-only and keeps key planning events.",
         "Status history remains available for traceability after core entity deletion.",

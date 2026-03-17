@@ -5,7 +5,7 @@
 
 import { useCallback, useState } from "react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { WorkItemStatus } from "@/lib/planning/types";
 
 import { type PreviewState } from "./epic-row";
 import {
@@ -28,7 +28,7 @@ export interface StoryActionsState {
 export interface StoryActionsCallbacks {
   handleToggleExpand: (epicKey: string) => void;
   handlePreviewFilterChange: (epicKey: string, patch: Partial<EpicOverviewStoryPreviewFilters>) => void;
-  handleChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: ItemStatus) => void;
+  handleChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
   handleAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
   resetAll: () => void;
 }
@@ -109,7 +109,7 @@ export function useStoryActions(
   const handleChangeStoryStatus = useCallback((
     epicKey: string,
     story: EpicOverviewStoryPreview,
-    nextStatus: ItemStatus,
+    nextStatus: WorkItemStatus,
   ) => {
     if (storyPendingById[story.story_id]) return;
     markStoryPending(story.story_id, true);
