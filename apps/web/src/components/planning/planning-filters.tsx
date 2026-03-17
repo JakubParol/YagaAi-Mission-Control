@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/ui/themed-select";
 import { cn } from "@/lib/utils";
 
-import { hasActivePlanningFilters, type PlanningFilterOption, type PlanningFiltersValue } from "./planning-filter-logic.js";
+import { hasActivePlanningFilters, type PlanningFilterOption, type PlanningFiltersValue } from "./planning-filter-logic";
 
 // Re-export all logic so existing imports from this module keep working.
 export {
@@ -23,7 +23,7 @@ export {
   type PlanningFilterOption,
   type PlanningFiltersValue,
   type PlanningStoryFilterItem,
-} from "./planning-filter-logic.js";
+} from "./planning-filter-logic";
 
 interface PlanningFiltersProps {
   value: PlanningFiltersValue;
