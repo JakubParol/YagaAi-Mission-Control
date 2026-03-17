@@ -2,11 +2,11 @@
 
 Command-line interface for Mission Control.
 
-The CLI is the operator-focused entry point for planning, observability, and orchestration workflows exposed by the Mission Control API.
+The CLI is the operator-focused entry point for planning, observability, and control-plane workflows exposed by the Mission Control API.
 
 ## Status
 
-v1 implemented. Planning, observability, and orchestration command groups are functional.
+v1 implemented. Planning, observability, and control-plane command groups are functional.
 
 ## Scope (v1)
 
@@ -14,7 +14,7 @@ v1 implemented. Planning, observability, and orchestration command groups are fu
   - projects, epics, stories, tasks, backlogs, assignments, labels, agents
 - Observability operations mapped to `/v1/observability` API resources:
   - costs, requests, imports
-- Orchestration operations mapped to `/v1/orchestration` API resources:
+- Control-plane operations mapped to `/v1/control-plane` API resources:
   - run command submission, run status read model, timeline tailing
 - Human-friendly table output with optional JSON mode (`--output json`) for scripting
 
@@ -78,7 +78,7 @@ apps/cli/
 │       ├── planning/
 │       │   ├── commands.ts               # All planning commands
 │       │   └── resources.ts              # Resource path specs
-│       ├── orchestration/
+│       ├── control-plane/
 │       │   └── commands.ts               # Run submit/status/tail commands
 │       └── observability/
 │           └── commands.ts               # Observability commands

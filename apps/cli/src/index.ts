@@ -13,7 +13,7 @@ import { parseIntegerOption } from "./core/kv";
 import type { CommandContext } from "./core/runtime";
 import { printPayload } from "./core/output";
 import { registerObservabilityCommands } from "./features/observability/commands";
-import { registerOrchestrationCommands } from "./features/orchestration/commands";
+import { registerControlPlaneCommands } from "./features/control-plane/commands";
 import { registerPlanningCommands } from "./features/planning/commands";
 
 function contextFromCommand(command: Command): CommandContext {
@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   registerPlanningCommands(program, contextFromCommand);
   registerObservabilityCommands(program, contextFromCommand);
-  registerOrchestrationCommands(program, contextFromCommand);
+  registerControlPlaneCommands(program, contextFromCommand);
 
   program
     .command("health")

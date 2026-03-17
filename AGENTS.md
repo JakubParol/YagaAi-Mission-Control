@@ -6,7 +6,7 @@ Mission Control is a monorepo for managing AI agent workflows. It contains a web
 
 ## Scope
 
-- **In scope:** Dashboard UI, REST API (planning + observability + orchestration modules), CLI, PostgreSQL persistence, Langfuse integration
+- **In scope:** Dashboard UI, REST API (planning + observability + control-plane modules), CLI, PostgreSQL persistence, Langfuse integration
 - **Out of scope:** Authentication enforcement (v2), real-time WebSocket events (v2), multi-tenancy (v2)
 
 ## Required Reading (Mandatory)

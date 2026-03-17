@@ -10,7 +10,7 @@ Active documentation for the Mission Control API.
 ## Core
 
 - [Architecture](./ARCHITECTURE.md) — current module layout, dependency rules, routing, and runtime wiring
-- [API Contracts](./API_CONTRACTS.md) — request/response contracts and endpoint behavior across planning, observability, and orchestration
+- [API Contracts](./API_CONTRACTS.md) — request/response contracts and endpoint behavior across planning, observability, and control-plane
 - [Auth](./AUTH.md) — current internal-service auth posture and actor identity headers
 - [Status Transitions](./STATUS_TRANSITIONS.md) — planning status rules and important lifecycle side effects
 - [Test Strategy](./TEST_STRATEGY.md) — current backend test scope, structure, and execution workflow

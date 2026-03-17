@@ -51,7 +51,7 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 - All API logs are JSON-formatted (structured) and include an `event` field.
 - Every request gets a `request_id` (`X-Request-Id` header or auto-generated UUID) and the response echoes it.
 - Request completion/failure logs include: `request_id`, `method`, `path`, `status_code`, `duration_ms`, `actor_id`, `actor_type`, and optional `correlation_id`.
-- Orchestration services emit correlation-aware events (`orchestration.command.accepted`, `orchestration.worker.transition_applied`, `orchestration.delivery.retry_scheduled`, `orchestration.delivery.dead_lettered`, `orchestration.watchdog.action_applied`).
+- Control-plane services emit correlation-aware events (`control-plane.command.accepted`, `control-plane.worker.transition_applied`, `control-plane.delivery.retry_scheduled`, `control-plane.delivery.dead_lettered`, `control-plane.watchdog.action_applied`).
 
 ### Health Check
 
@@ -60,30 +60,30 @@ For POST endpoints, clients may send an `X-Idempotency-Key` header. v1 behavior:
 
 ### Metrics
 
-- Orchestration operational metrics are exposed via `GET /v1/orchestration/metrics`.
+- Control-plane operational metrics are exposed via `GET /v1/control-plane/metrics`.
 - Current metrics: queue pending + oldest age, retries total, dead-letter total, watchdog interventions, terminal run latency avg/p95.
 - This endpoint is intended for local runtime diagnostics and incident triage.
 
 ### Trace Context
 
-- Dapr ingress (`POST /v1/orchestration/dapr/events`) propagates `correlation_id` and `causation_id` into worker state-machine timeline writes.
+- Dapr ingress (`POST /v1/control-plane/dapr/events`) propagates `correlation_id` and `causation_id` into worker state-machine timeline writes.
 - Fallback behavior: when `data.causation_id` is absent, CloudEvent `traceparent` is used as `causation_id`.
 
 ### Rollout controls (MC-379)
 
-Orchestration capability gates are controlled by env flags:
+Control-plane capability gates are controlled by env flags:
 
-- `MC_API_ORCHESTRATION_COMMANDS_ENABLED` (default `true`)
-- `MC_API_ORCHESTRATION_DAPR_INGEST_ENABLED` (default `true`)
-- `MC_API_ORCHESTRATION_WATCHDOG_ENABLED` (default `true`)
+- `MC_API_CONTROL_PLANE_COMMANDS_ENABLED` (default `true`)
+- `MC_API_CONTROL_PLANE_DAPR_INGEST_ENABLED` (default `true`)
+- `MC_API_CONTROL_PLANE_WATCHDOG_ENABLED` (default `true`)
 
 Gate behavior:
 
-- commands gate OFF: `/v1/orchestration/commands` returns `503`
+- commands gate OFF: `/v1/control-plane/commands` returns `503`
 - Dapr ingest gate OFF:
   - `/dapr/subscribe` returns no subscriptions
-  - `/v1/orchestration/dapr/events` returns `status=IGNORED`
-- watchdog gate OFF: `/v1/orchestration/watchdog/sweep` returns `503`
+  - `/v1/control-plane/dapr/events` returns `status=IGNORED`
+- watchdog gate OFF: `/v1/control-plane/watchdog/sweep` returns `503`
 
 ---
 

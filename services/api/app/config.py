@@ -30,20 +30,20 @@ class Settings(BaseSettings):
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3100"]
-    orchestration_stream_prefix: str = "mc:orchestration"
-    orchestration_stream_version: int = 1
-    orchestration_stream_partitions: int = 8
-    orchestration_worker_consumer_group: str = "orchestration-workers-v1"
-    orchestration_watchdog_consumer_group: str = "orchestration-watchdog-v1"
-    orchestration_retry_max_attempts: int = 5
-    orchestration_retry_base_backoff_seconds: int = 5
-    orchestration_retry_max_backoff_seconds: int = 300
-    orchestration_watchdog_stale_lease_seconds: int = 90
-    orchestration_watchdog_heartbeat_grace_seconds: int = 90
-    orchestration_watchdog_default_timeout_seconds: int = 900
-    orchestration_commands_enabled: bool = True
-    orchestration_dapr_ingest_enabled: bool = True
-    orchestration_watchdog_enabled: bool = True
+    control_plane_stream_prefix: str = "mc:control-plane"
+    control_plane_stream_version: int = 1
+    control_plane_stream_partitions: int = 8
+    control_plane_worker_consumer_group: str = "control-plane-workers-v1"
+    control_plane_watchdog_consumer_group: str = "control-plane-watchdog-v1"
+    control_plane_retry_max_attempts: int = 5
+    control_plane_retry_base_backoff_seconds: int = 5
+    control_plane_retry_max_backoff_seconds: int = 300
+    control_plane_watchdog_stale_lease_seconds: int = 90
+    control_plane_watchdog_heartbeat_grace_seconds: int = 90
+    control_plane_watchdog_default_timeout_seconds: int = 900
+    control_plane_commands_enabled: bool = True
+    control_plane_dapr_ingest_enabled: bool = True
+    control_plane_watchdog_enabled: bool = True
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 

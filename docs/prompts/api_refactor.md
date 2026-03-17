@@ -28,7 +28,7 @@ Scan the entire `services/api/` codebase and fix any deviation from the coding s
 - Routers never import repositories — always through application services
 - Application owns ports (ABCs/Protocols), infrastructure implements them
 - Domain has zero external dependencies — pure models, enums, invariants
-- No cross-module imports (planning ↛ observability ↛ orchestration), shared code in `shared/`
+- No cross-module imports (planning ↛ observability ↛ control_plane), shared code in `shared/`
 
 ### File Size & Structure
 - Hard limit: 300 lines per file — split by entity or concern when exceeded

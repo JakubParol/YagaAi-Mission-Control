@@ -18,11 +18,11 @@ from testcontainers.postgres import PostgresContainer  # noqa: E402
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from app.config import settings  # noqa: E402
+from app.control_plane.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
+    tables as control_plane_tables,
+)
 from app.observability.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
     tables as observability_tables,
-)
-from app.orchestration.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
-    tables as orchestration_tables,
 )
 from app.planning.infrastructure import (  # noqa: E402,F401  # pylint: disable=unused-import
     tables as planning_tables,

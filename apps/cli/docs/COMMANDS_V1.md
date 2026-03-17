@@ -30,7 +30,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | `agent` | `list`, `get`, `create`, `update`, `delete`, `sync` |
 | `label` | `list`, `get`, `create`, `update`, `delete`, `attach-story`, `detach-story`, `attach-task`, `detach-task` |
 
-## Orchestration Commands
+## Control Plane Commands
 
 | Group | Core Commands |
 |---|---|
@@ -111,7 +111,7 @@ mc run status --run-id incident-2026-03-08 --output json
 mc run metrics --output json
 
 # 4) Tail latest timeline events for triage
-mc run tail --run-id incident-2026-03-08 --event-type orchestration.watchdog.action --max-polls 5 --interval-ms 2000 --output json
+mc run tail --run-id incident-2026-03-08 --event-type control-plane.watchdog.action --max-polls 5 --interval-ms 2000 --output json
 ```
 
 Agent fallback precedence for consumers is: `avatar` -> `initials` -> derived initials from `name` + `last_name` -> first letter of `name`.

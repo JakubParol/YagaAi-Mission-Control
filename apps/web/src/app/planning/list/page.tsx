@@ -11,8 +11,8 @@ import {
   UNASSIGNED_FILTER_VALUE,
   type PlanningFiltersValue,
 } from "@/components/planning/planning-filters";
-import { PlanningTopShell } from "@/components/planning/planning-top-shell";
-import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
+import { PageShell } from "@/components/page-shell";
+import { RefreshControl } from "@/components/refresh-control";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import type { ItemStatus } from "@/lib/planning/types";
 import { deleteStory } from "../story-actions";
@@ -198,7 +198,7 @@ function PlanningListPageContent() {
         </div>
       )}
 
-      <PlanningTopShell
+      <PageShell
         icon={ListTodo}
         title="List"
         subtitle="Unified project view of stories and standalone tasks."
@@ -218,7 +218,7 @@ function PlanningListPageContent() {
           ) : null
         }
         actions={(
-          <PlanningRefreshControl
+          <RefreshControl
             onRefresh={refreshCurrentView}
             disabled={!singleProjectId}
             className="items-stretch sm:items-end"

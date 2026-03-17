@@ -7,8 +7,8 @@ import { Loader2, Target } from "lucide-react";
 import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
-import { PlanningTopShell } from "@/components/planning/planning-top-shell";
-import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
+import { PageShell } from "@/components/page-shell";
+import { RefreshControl } from "@/components/refresh-control";
 import { EmptyState } from "@/components/empty-state";
 import { SprintBoard } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
@@ -200,7 +200,7 @@ function BoardPageContent() {
         </div>
       )}
 
-      <PlanningTopShell
+      <PageShell
         icon={Target}
         title={boardSummary?.sprintName ?? "Board"}
         subtitle="Active sprint board for the selected project."
@@ -221,7 +221,7 @@ function BoardPageContent() {
         }
         actions={(
           <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:items-end">
-            <PlanningRefreshControl
+            <RefreshControl
               onRefresh={refreshCurrentView}
               disabled={!singleProjectId}
               className="items-stretch sm:items-end"

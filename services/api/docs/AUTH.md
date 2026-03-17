@@ -1,7 +1,7 @@
 # Auth Approach — Mission Control API
 
 **Status:** Active v1 posture
-**Applies to:** `services/api` — planning, observability, orchestration
+**Applies to:** `services/api` — planning, observability, control-plane
 
 ---
 

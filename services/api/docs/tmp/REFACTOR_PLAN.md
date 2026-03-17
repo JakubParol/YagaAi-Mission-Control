@@ -12,7 +12,7 @@
 **Infrastructure**: Already refactored in PR #146. No changes needed.
 **Dependencies**: OK — follows Depends() chain pattern. No changes needed.
 
-### Orchestration Module
+### Control Plane Module
 **Domain**: OK — models.py + stream_contract.py, clean dataclasses/enums.
 **Application**: OK — ports.py, services follow pattern.
 **Infrastructure**: NEEDS REFACTOR
@@ -41,8 +41,8 @@
 **Dependencies**: Uses SqlTextSession — needs update after infra refactor.
 
 ## Execution Order
-1. Orchestration infrastructure (biggest, most impactful)
-2. Orchestration dependencies
+1. Control-plane infrastructure (biggest, most impactful)
+2. Control-plane dependencies
 3. Observability infrastructure
 4. Observability API (add schemas, envelope wrapping)
 5. Observability dependencies

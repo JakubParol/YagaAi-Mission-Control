@@ -1123,17 +1123,17 @@ Response:
 
 ---
 
-## 6) Orchestration Module — `/v1/orchestration`
+## 6) Control Plane Module — `/v1/control-plane`
 
 ### 6.1) Commands
 
-**Base path:** `/v1/orchestration/commands`
+**Base path:** `/v1/control-plane/commands`
 
-#### `POST /v1/orchestration/commands` — Submit orchestration command
+#### `POST /v1/control-plane/commands` — Submit control-plane command
 
 Accepts a versioned command envelope, validates taxonomy and metadata, and atomically persists:
-- command record (`orchestration_commands`),
-- derived accepted event in transactional outbox (`orchestration_outbox`).
+- command record (`control_plane_commands`),
+- derived accepted event in transactional outbox (`control_plane_outbox`).
 
 Response `202`:
 ```jsonc
@@ -1143,7 +1143,7 @@ Response `202`:
     "command": {
       "id": "...",
       "kind": "COMMAND",
-      "type": "orchestration.run.submit",
+      "type": "control-plane.run.submit",
       "schema_version": "1.0",
       "occurred_at": "2026-03-08T09:00:00Z",
       "producer": "mc-cli",
@@ -1154,7 +1154,7 @@ Response `202`:
     "outbox_event": {
       "id": "...",
       "kind": "EVENT",
-      "type": "orchestration.run.submit.accepted",
+      "type": "control-plane.run.submit.accepted",
       "schema_version": "1.0",
       "occurred_at": "2026-03-08T09:00:00Z",
       "producer": "mc-cli",
@@ -1162,7 +1162,7 @@ Response `202`:
       "causation_id": null,
       "payload": {
         "accepted_command_id": "...",
-        "accepted_command_type": "orchestration.run.submit",
+        "accepted_command_type": "control-plane.run.submit",
         "command_payload": { "run_id": "run-123" },
         "delivery": {
           "attempt": 1,
@@ -1179,7 +1179,7 @@ Response `202`:
 Request:
 ```jsonc
 {
-  "command_type": "orchestration.run.submit",
+  "command_type": "control-plane.run.submit",
   "schema_version": "1.0",
   "payload": { "run_id": "run-123" },
   "metadata": {
@@ -1222,7 +1222,7 @@ Transactional guarantee:
 
 Read endpoints for operational triage and UI/CLI diagnostics.
 
-#### `GET /v1/orchestration/runs` — List run state read models
+#### `GET /v1/control-plane/runs` — List run state read models
 
 Query:
 - `run_id` (optional exact match)
@@ -1241,12 +1241,12 @@ Ordering/pagination:
 - deterministic order: `updated_at DESC`, then `run_id DESC`
 - offset-based pagination via `limit`/`offset`
 
-#### `GET /v1/orchestration/runs/{run_id}` — Get single run state
+#### `GET /v1/control-plane/runs/{run_id}` — Get single run state
 
 Returns the same shape as list items.  
 Returns `404 NOT_FOUND` when run does not exist.
 
-#### `GET /v1/orchestration/timeline` — List timeline events
+#### `GET /v1/control-plane/timeline` — List timeline events
 
 Query:
 - `run_id` (optional exact match)
@@ -1267,7 +1267,7 @@ Ordering/pagination:
 - deterministic order: `occurred_at DESC`, then `id DESC`
 - offset-based pagination via `limit`/`offset`
 
-#### `GET /v1/orchestration/runs/{run_id}/attempts` — List run delivery attempts
+#### `GET /v1/control-plane/runs/{run_id}/attempts` — List run delivery attempts
 
 Attempts are sourced from outbox rows correlated to the run by `correlation_id`.
 
@@ -1289,7 +1289,7 @@ Contract guarantees:
 - filtering is available for run id, run status, event type, and time range.
 - pagination order is deterministic and stable for repeated queries.
 
-#### `GET /v1/orchestration/metrics` — Get orchestration health metrics
+#### `GET /v1/control-plane/metrics` — Get control-plane health metrics
 
 Returns DEV runtime diagnostics for queue health and failure paths.
 
@@ -1314,7 +1314,7 @@ Field semantics:
 - `queue_oldest_pending_age_seconds`: age of oldest pending outbox item (seconds, nullable when queue empty).
 - `retries_total`: outbox rows with `retry_attempt > 1`.
 - `dead_letter_total`: outbox rows dead-lettered or marked failed.
-- `watchdog_interventions`: accepted timeline entries of `orchestration.watchdog.action`.
+- `watchdog_interventions`: accepted timeline entries of `control-plane.watchdog.action`.
 - `run_latency_*`: latency distribution over terminal runs (`terminal_at - created_at`, milliseconds).
 
 ### 6.3) Dapr bridge endpoints (local runtime)
@@ -1329,20 +1329,20 @@ Returns runtime subscription contract for Dapr sidecar:
 [
   {
     "pubsubname": "local-pubsub",
-    "topic": "orchestration.events",
+    "topic": "control-plane.events",
     "routes": {
-      "default": "v1/orchestration/dapr/events"
+      "default": "v1/control-plane/dapr/events"
     }
   }
 ]
 ```
 
-#### `POST /v1/orchestration/dapr/events` — Worker event ingress (via Dapr pub/sub)
+#### `POST /v1/control-plane/dapr/events` — Worker event ingress (via Dapr pub/sub)
 
 Accepts Dapr CloudEvent envelope (or plain JSON fallback), persists the latest run event into Dapr state store (`local-statestore`), then invokes worker ack endpoint through Dapr service invocation:
 
 - state write: `POST /v1.0/state/local-statestore` (through sidecar),
-- invocation: `POST /v1.0/invoke/mission-control-worker/method/orchestration/ack` (through sidecar).
+- invocation: `POST /v1.0/invoke/mission-control-worker/method/control-plane/ack` (through sidecar).
 
 Success response `200`:
 

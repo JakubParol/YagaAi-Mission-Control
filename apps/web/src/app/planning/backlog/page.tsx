@@ -8,8 +8,8 @@ import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
-import { PlanningTopShell } from "@/components/planning/planning-top-shell";
-import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
+import { PageShell } from "@/components/page-shell";
+import { RefreshControl } from "@/components/refresh-control";
 import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { deleteStory } from "../story-actions";
@@ -192,7 +192,7 @@ function BacklogPageContent() {
         </div>
       )}
 
-      <PlanningTopShell
+      <PageShell
         icon={Layers}
         title="Backlog"
         subtitle="All backlogs and their stories for the selected project."
@@ -205,7 +205,7 @@ function BacklogPageContent() {
             </Button>
           </div>
         ) : null}
-        actions={<PlanningRefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
+        actions={<RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
       />
 
       {state.kind === "no-project" && <EmptyState icon="backlog" title="Select a project" description="Choose a single project from the selector above to view its backlogs." />}

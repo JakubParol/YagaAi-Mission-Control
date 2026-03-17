@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from app.config import settings
 from app.observability.infrastructure import tables as observability_tables
-from app.orchestration.infrastructure import tables as orchestration_tables
+from app.control_plane.infrastructure import tables as control_plane_tables
 from app.planning.infrastructure import tables as planning_tables
 from app.shared.db.metadata import metadata
 
@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 database_url = settings.postgres_dsn or config.get_main_option("sqlalchemy.url")
 config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = metadata
-_TABLE_MODULES = (planning_tables, observability_tables, orchestration_tables)
+_TABLE_MODULES = (planning_tables, observability_tables, control_plane_tables)
 
 
 def run_migrations_offline() -> None:

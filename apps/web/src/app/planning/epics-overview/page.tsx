@@ -5,8 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Filter, Loader2, Radar, Search, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
-import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
-import { PlanningTopShell } from "@/components/planning/planning-top-shell";
+import { RefreshControl } from "@/components/refresh-control";
+import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import { cn } from "@/lib/utils";
@@ -184,7 +184,7 @@ function EpicOverviewPageContent() {
 
   return (
     <>
-      <PlanningTopShell
+      <PageShell
         icon={Radar}
         title="Epics Overview"
         subtitle="Health, progress, and risk overview for all epics in selected project."
@@ -217,7 +217,7 @@ function EpicOverviewPageContent() {
             </div>
           </div>
         ) : null}
-        actions={<PlanningRefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
+        actions={<RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
       />
 
       {pageState.kind === "no-project" && (
