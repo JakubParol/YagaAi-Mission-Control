@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 
-import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import {
@@ -21,7 +20,7 @@ import {
 import { PlanningTopShell } from "@/components/planning/planning-top-shell";
 import { PlanningRefreshControl } from "@/components/planning/planning-refresh-control";
 import { EmptyState } from "@/components/empty-state";
-import { SprintBoard, type ActiveSprintData } from "@/components/planning/sprint-board";
+import { SprintBoard } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { deleteStory } from "../story-actions";
 import {
@@ -31,25 +30,13 @@ import {
 } from "./quick-create";
 import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
 import { subscribeToSprintLifecycleChanged } from "../sprint-lifecycle-events";
-
-type BoardState =
-  | { kind: "no-project" }
-  | { kind: "loading"; projectId: string }
-  | { kind: "no-sprint"; projectId: string }
-  | { kind: "error"; projectId: string; message: string }
-  | { kind: "ok"; projectId: string; data: ActiveSprintData };
-
-interface AgentListEnvelope {
-  data?: Array<{
-    id?: string;
-    name?: string;
-    last_name?: string | null;
-    initials?: string | null;
-    role?: string | null;
-    avatar?: string | null;
-    openclaw_key?: string;
-  }>;
-}
+import {
+  fetchBoardState,
+  fetchAssigneeOptions,
+  patchStoryStatus,
+  patchStoryAssignee,
+  type BoardState,
+} from "./board-page-actions";
 
 function BoardPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
@@ -170,38 +157,25 @@ function BoardPageContent() {
       })()
     : null;
 
-  const fetchBoardState = useCallback(async (projectId: string): Promise<BoardState> => {
+  const loadBoardState = useCallback(async (projectId: string): Promise<BoardState> => {
     setPendingStoryIds({});
-    const response = await fetch(
-      apiUrl(`/v1/planning/backlogs/active-sprint?project_id=${projectId}`),
-    );
-
-    if (response.status === 404) {
-      return { kind: "no-sprint", projectId };
-    }
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
-    const json = await response.json();
-    return { kind: "ok", projectId, data: json.data };
+    return fetchBoardState(projectId);
   }, []);
 
   const refreshCurrentView = useCallback(async () => {
     if (!singleProjectId) {
       throw new Error("Select a single project before refreshing.");
     }
-    const nextState = await fetchBoardState(singleProjectId);
+    const nextState = await loadBoardState(singleProjectId);
     setState(nextState);
-  }, [fetchBoardState, singleProjectId]);
+  }, [loadBoardState, singleProjectId]);
 
   useEffect(() => {
     if (!singleProjectId) return;
 
     let cancelled = false;
 
-    void fetchBoardState(singleProjectId)
+    void loadBoardState(singleProjectId)
       .then((nextState) => {
         if (cancelled) return;
         setState(nextState);
@@ -218,7 +192,7 @@ function BoardPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [fetchBoardState, singleProjectId]);
+  }, [loadBoardState, singleProjectId]);
 
   useEffect(() => {
     if (!singleProjectId) {
@@ -227,26 +201,9 @@ function BoardPageContent() {
     }
 
     let cancelled = false;
-    fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name"))
-      .then((response) => {
-        if (!response.ok) throw new Error(`API error: ${response.status}`);
-        return response.json();
-      })
-      .then((json) => {
-        if (cancelled) return;
-        const body = json as AgentListEnvelope;
-        const parsed = (body.data ?? [])
-          .filter((item) => item.id && item.name && item.openclaw_key)
-          .map((item) => ({
-            id: item.id!,
-            name: item.name!,
-            last_name: item.last_name ?? null,
-            initials: item.initials ?? null,
-            role: item.role ?? null,
-            avatar: item.avatar ?? null,
-            openclaw_key: item.openclaw_key!,
-          }));
-        setAssigneeOptions(parsed);
+    fetchAssigneeOptions()
+      .then((parsed) => {
+        if (!cancelled) setAssigneeOptions(parsed);
       })
       .catch(() => {
         if (!cancelled) setAssigneeOptions([]);
@@ -285,22 +242,13 @@ function BoardPageContent() {
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
 
       try {
-        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: nextStatus }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        await patchStoryStatus(storyId, nextStatus);
       } catch {
-        const fallbackStatus = previousStatus;
         setState((prevState) => {
           if (prevState.kind !== "ok") return prevState;
           return {
             ...prevState,
-            data: rollbackStoryStatus(prevState.data, storyId, fallbackStatus),
+            data: rollbackStoryStatus(prevState.data, storyId, previousStatus),
           };
         });
         showErrorToast("Failed to update story status. Changes were rolled back.");
@@ -370,7 +318,7 @@ function BoardPageContent() {
         if (selectedStoryId === storyId) {
           setSelectedStoryId(null);
         }
-        const nextState = await fetchBoardState(projectId);
+        const nextState = await loadBoardState(projectId);
         setState(nextState);
       } catch (error) {
         showErrorToast(
@@ -384,7 +332,7 @@ function BoardPageContent() {
         });
       }
     },
-    [fetchBoardState, pendingStoryIds, selectedStoryId, showErrorToast, state],
+    [loadBoardState, pendingStoryIds, selectedStoryId, showErrorToast, state],
   );
 
   const handleStoryAssigneeChange = useCallback(
@@ -395,14 +343,7 @@ function BoardPageContent() {
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
 
       try {
-        const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ current_assignee_agent_id: assigneeAgentId }),
-        });
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
+        await patchStoryAssignee(storyId, assigneeAgentId);
       } finally {
         setPendingStoryIds((prev) => {
           const next = { ...prev };
