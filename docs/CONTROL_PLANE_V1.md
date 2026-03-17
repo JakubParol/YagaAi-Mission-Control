@@ -2,7 +2,7 @@
 
 **Status:** Proposed v1 direction  
 **Date:** 2026-03-16  
-**Scope:** Mission Control + OpenClaw integration at the product/system level
+**Scope:** Control Plane module within Mission Control + OpenClaw integration
 
 ---
 
@@ -10,12 +10,18 @@
 
 This document is the **root-level source of truth** for the Control Plane in Mission Control.
 
-The Control Plane is the orchestration module responsible for routing assigned work to specialist agents, tracking runtime state, and keeping execution observable.
+The Control Plane is the orchestration module responsible for:
+- taking assignment intent from Planning,
+- queueing work per specialist,
+- dispatching work to execution,
+- tracking runtime state,
+- handling retries / stale sessions / watchdog flows,
+- providing operator-facing monitoring read models.
 
 This document defines:
 - the target operating model,
 - the primary use cases,
-- the system boundaries,
+- the module boundaries,
 - the runtime states and high-level events,
 - the implementation constraints that later API / Web / CLI technical docs must follow.
 
@@ -24,7 +30,29 @@ Implementation details belong in module docs such as `services/api/docs/*`.
 
 ---
 
-## 2) Goals
+## 2) Module positioning
+
+The system is intentionally split into distinct concerns:
+
+| Module / System | Responsibility |
+|---|---|
+| **Planning** | Work system of record: projects, epics, stories, tasks, bugs, backlog/sprint context, assignees, business-facing status |
+| **Control Plane** | Orchestration module inside Mission Control: queueing, dispatch, capacity, runtime state, retries, watchdog, monitoring read models |
+| **Control Plane → OpenClaw adapter** | Integration layer that translates Control Plane actions into OpenClaw session operations and maps runtime signals back into Control Plane events |
+| **OpenClaw Runtime** | External execution plane: agents, sessions, ACP threads, sub-sessions, tool execution |
+| **James** | User-facing orchestrator persona and strategic front door |
+
+### Important design rule
+
+**The Control Plane is a module inside Mission Control.**  
+It is **not** a separate product and **not** the execution runtime itself.
+
+**OpenClaw remains the execution runtime.**  
+The Control Plane decides and tracks. OpenClaw executes.
+
+---
+
+## 3) Goals
 
 ### Primary goals
 
@@ -37,7 +65,7 @@ Implementation details belong in module docs such as `services/api/docs/*`.
 - Keep **Planning** as the source of truth for work items.
 - Use the **Control Plane** as the orchestration module inside Mission Control.
 - Use **OpenClaw** as the execution fabric for agent sessions.
-- Support **assignment-driven execution** starting from a Mission Control work item.
+- Support **assignment-driven execution** starting from a Planning work item.
 - Provide clear monitoring for:
   - what each agent is doing,
   - what is queued,
@@ -54,34 +82,43 @@ Implementation details belong in module docs such as `services/api/docs/*`.
 
 ---
 
-## 3) Non-goals for v1
+## 4) Non-goals for v1
 
 - Direct day-to-day conversation with specialist agents as the primary user experience.
 - Parallel execution of multiple tasks from the same story by the same specialist agent.
 - A generic event runtime detached from actual work execution.
 - Full multi-agent swarm planning/execution semantics.
 - High-throughput queue optimization.
+- Multiple execution backends beyond OpenClaw.
 
 v1 is intentionally biased toward **clarity, determinism, and operator visibility**.
 
 ---
 
-## 4) Core operating model
+## 5) Core operating model
 
-### 4.1 Human interaction model
+### 5.1 Human interaction model
 
 - **Kuba primarily talks to James.**
 - James is the strategic front door, status surface, and orchestrator of specialist work.
 - Specialist agents are treated as **internal crew**, not primary user-facing personas.
+- Specialists should report back into the system and to James; James should remain the normal user-facing voice.
 
-### 4.2 Runtime model
+### 5.2 Execution model
 
-- **Planning** owns the work objects: project, epic, user story, task, bug.
-- The **Control Plane** owns the orchestration state for those work objects.
-- **OpenClaw** executes the actual specialist work in agent sessions.
-- The preferred execution primitive is an **ACP thread/session** bound to the specialist agent.
+The intended path is:
 
-### 4.3 Capacity model
+**Planning → Control Plane → OpenClaw → Specialist Agent → Control Plane → James / operator visibility**
+
+More concretely:
+1. Planning records assignment intent.
+2. The Control Plane converts that intent into runtime work.
+3. The Control Plane dispatches work to OpenClaw.
+4. OpenClaw runs the specialist session.
+5. Runtime signals flow back into the Control Plane.
+6. James and the operator see a clean orchestration view.
+
+### 5.3 Capacity model
 
 Each specialist agent has:
 - **capacity = 1 active story** in v1
@@ -92,20 +129,13 @@ This means:
 - but Naomi should actively work only on the first available one,
 - the rest remain queued until Naomi becomes free.
 
----
+### 5.4 Ownership model
 
-## 5) Roles and responsibilities
-
-| Actor / System | Responsibility |
-|---|---|
-| Kuba | Prioritizes and assigns work; talks mainly to James |
-| James | Strategic orchestrator, user-facing summary layer, escalation target, monitoring surface |
-| Naomi | Implements a story, plans tasks when missing, executes tasks sequentially, opens PR, hands off to Amos |
-| Amos | Review / QA stage after Naomi finishes development |
-| Alex | Research / analysis agent for future flows |
-| Planning | Source of truth for work items, assignees, status, and backlog/sprint context |
-| Control Plane | Queueing, dispatch, capacity rules, runtime state, retries, watchdog, and monitoring read models |
-| OpenClaw | Agent execution runtime and session management fabric |
+In v1:
+- one specialist owns **one active story** at a time,
+- one story uses **one active branch** at a time,
+- one specialist executes **one active task sub-session** at a time within that story,
+- James remains the orchestration persona, but should **not** be the runtime bottleneck.
 
 ---
 
@@ -126,7 +156,7 @@ A User Story in `TODO` is assigned to Naomi:
 - If Naomi is busy, the story remains queued.
 
 #### Important rule
-**Assignee and runtime state are separate concerns.**
+**Assignee and runtime state are separate concerns.**  
 A story may be assigned to Naomi while still waiting in queue.
 
 ---
@@ -240,7 +270,23 @@ This gives:
 - lower infrastructure overhead,
 - easier orchestration across specialist agents.
 
-### 7.2 Push-driven dispatch
+### 7.2 The Control Plane lives inside Mission Control
+
+The Control Plane is a Mission Control module.
+It should be modeled as first-class Mission Control functionality, not as a sidecar concept or naming wrapper over generic runtime plumbing.
+
+### 7.3 OpenClaw is the execution plane
+
+OpenClaw is the external runtime that actually executes specialist work:
+- agent identity,
+- sessions,
+- ACP threads,
+- sub-sessions,
+- tool execution.
+
+The Control Plane should integrate with OpenClaw through a dedicated adapter layer, but should not duplicate OpenClaw runtime responsibilities.
+
+### 7.4 Push-driven dispatch
 
 The primary dispatch model is:
 - **Planning records an assignment**,
@@ -253,7 +299,7 @@ This is preferred over polling because it is:
 - easier to reason about,
 - better for retries and idempotency.
 
-### 7.3 Cron is only a safety net
+### 7.5 Cron is only a safety net
 
 Cron / scheduled sweeps should be used only for:
 - reconciliation,
@@ -264,7 +310,7 @@ Cron / scheduled sweeps should be used only for:
 
 Cron should **not** be the primary work-discovery mechanism for specialist agents.
 
-### 7.4 Planning state and runtime state must be separate
+### 7.6 Planning state and runtime state must be separate
 
 The Control Plane must distinguish:
 - planning status (`TODO`, `IN_PROGRESS`, `BLOCKED`, `CODE_REVIEW`, ...)
@@ -272,7 +318,7 @@ The Control Plane must distinguish:
 
 A single planning status field is not enough to express queueing, acceptance, dispatch failure, or stale execution.
 
-### 7.5 Story is the unit of active specialist ownership
+### 7.7 Story is the unit of active specialist ownership
 
 In v1:
 - a specialist agent owns **one active story** at a time,
@@ -280,11 +326,18 @@ In v1:
 - the story is the main execution container,
 - tasks are subordinate execution steps inside that story.
 
+### 7.8 James should not be the hot-path dispatcher
+
+James is the strategic orchestrator and user-facing persona.
+The Control Plane should still be able to dispatch work directly based on system state.
+
+James should observe, summarize, escalate, and steer — not be required as a human-style relay hop for every runtime action.
+
 ---
 
 ## 8) Canonical state model
 
-### 8.1 Planning status (existing / user-facing)
+### 8.1 Planning state (existing / user-facing)
 
 | State | Meaning |
 |---|---|
@@ -294,6 +347,11 @@ In v1:
 | `CODE_REVIEW` | development complete; ready for review |
 | `VERIFY` | verification / QA phase |
 | `DONE` | finished |
+
+### Important note
+
+**Assignee is not a state.**  
+A story may be assigned to Naomi while still sitting in Control Plane runtime state `QUEUED`.
 
 ### 8.2 Runtime state (Control Plane-facing)
 
@@ -315,12 +373,17 @@ In v1:
 
 These are **Control Plane domain events**, not transport-specific implementation details.
 
+### Event namespace note
+
+For v1, example event names use the `agent.*` namespace because the orchestration domain is specialist-agent work execution inside the Control Plane.
+
 ### Assignment / queue
 - `agent.assignment.requested`
 - `agent.assignment.queued`
 - `agent.assignment.dispatched`
 - `agent.assignment.accepted`
 - `agent.assignment.rejected`
+- `agent.assignment.ack_timed_out`
 - `agent.assignment.retry_scheduled`
 
 ### Planning
@@ -340,6 +403,7 @@ These are **Control Plane domain events**, not transport-specific implementation
 - `agent.execution.completed`
 
 ### Recovery / operations
+- `agent.dispatch.failed`
 - `agent.session.stale`
 - `agent.watchdog.intervened`
 - `agent.execution.failed`
@@ -377,7 +441,28 @@ If tasks exist:
 2. Naomi executes tasks by spawning sub-sessions sequentially.
 3. Each task moves through `TODO -> IN_PROGRESS -> DONE` or `BLOCKED`.
 
-### 10.6 Completion and handoff
+### 10.6 Abnormal conditions
+
+#### No acknowledgment
+If Naomi does not acknowledge within the defined timeout window:
+1. Emit `agent.assignment.ack_timed_out`.
+2. Schedule retry according to Control Plane policy.
+3. If retries are exhausted, move runtime state to `FAILED` or escalate for operator action.
+
+#### Blocker during planning or execution
+If Naomi or a sub-session returns a blocker:
+1. Mark the relevant task or story as blocked according to Planning rules.
+2. Move runtime state to `BLOCKED`.
+3. Preserve blocker reason for monitoring.
+4. Surface the blocker to James and the operator.
+
+#### Stale session
+If the active specialist session stops updating within the watchdog window:
+1. Emit `agent.session.stale`.
+2. Let the watchdog decide whether to retry, requeue, fail, or escalate.
+3. Record the intervention in Control Plane monitoring state.
+
+### 10.7 Completion and handoff
 1. Naomi opens a PR.
 2. The story becomes `CODE_REVIEW`.
 3. The story is assigned to Amos.
@@ -401,6 +486,7 @@ If tasks exist:
 - capacity rules,
 - runtime state,
 - monitoring read models,
+- retry / watchdog / reconciliation behavior,
 - operator actions such as retry, requeue, reassign, and escalation.
 
 ### OpenClaw owns
@@ -442,6 +528,7 @@ Raw event timelines should remain available for diagnostics, but they are **not*
 - Task execution is sequential in v1.
 - Planning that explodes past a reasonable threshold should escalate rather than silently over-decompose.
 - Recovery logic must be explicit and observable.
+- The Control Plane should model real work execution, not a generic runtime demo detached from product flow.
 
 ---
 
@@ -481,7 +568,7 @@ If there is one short version of this document, it is this:
 - **James is the front door**
 - **Planning is the work source of truth**
 - **Control Plane owns orchestration**
-- **OpenClaw is the execution fabric**
+- **OpenClaw is the execution plane**
 - **Assignments should flow from Planning into the Control Plane**
 - **Naomi plans when needed, then executes tasks sequentially**
 - **Amos receives review handoff after PR creation**
