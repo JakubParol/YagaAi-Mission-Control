@@ -61,4 +61,5 @@ fi
 
 cleanup_stale_lock "$NEXT_DIST_DIR/dev/lock"
 
+export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--no-deprecation"
 exec ./node_modules/.bin/next dev --hostname "$DEV_HOST" --port "$DEV_PORT" "$@"
