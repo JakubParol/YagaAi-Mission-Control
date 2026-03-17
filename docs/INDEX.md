@@ -19,7 +19,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 
 | Document | Description |
 |---|---|
-| [AGENT_WORK_ORCHESTRATION_V1.md](./AGENT_WORK_ORCHESTRATION_V1.md) | Root-level source of truth for assignment-driven specialist agent orchestration through Mission Control + OpenClaw |
+| [CONTROL_PLANE_V1.md](./CONTROL_PLANE_V1.md) | Root-level source of truth for the Control Plane: assignment-driven specialist orchestration through Mission Control + OpenClaw |
 
 ## Project Docs
 

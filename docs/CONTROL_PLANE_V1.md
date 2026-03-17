@@ -1,4 +1,4 @@
-# Agent Work Orchestration v1 — Mission Control
+# Control Plane v1
 
 **Status:** Proposed v1 direction  
 **Date:** 2026-03-16  
@@ -8,9 +8,11 @@
 
 ## 1) Purpose
 
-This document is the **root-level source of truth** for how Mission Control should orchestrate specialist agents through OpenClaw.
+This document is the **root-level source of truth** for the Control Plane in Mission Control.
 
-It defines:
+The Control Plane is the orchestration module responsible for routing assigned work to specialist agents, tracking runtime state, and keeping execution observable.
+
+This document defines:
 - the target operating model,
 - the primary use cases,
 - the system boundaries,
@@ -32,7 +34,8 @@ Implementation details belong in module docs such as `services/api/docs/*`.
   - **Naomi** — coding / implementation
   - **Amos** — QA / verification / review execution
   - **Alex** — research / analysis
-- Use **Mission Control** as the planning and work-system source of truth.
+- Keep **Planning** as the source of truth for work items.
+- Use the **Control Plane** as the orchestration module inside Mission Control.
 - Use **OpenClaw** as the execution fabric for agent sessions.
 - Support **assignment-driven execution** starting from a Mission Control work item.
 - Provide clear monitoring for:
@@ -55,7 +58,7 @@ Implementation details belong in module docs such as `services/api/docs/*`.
 
 - Direct day-to-day conversation with specialist agents as the primary user experience.
 - Parallel execution of multiple tasks from the same story by the same specialist agent.
-- Generic orchestration runtime divorced from agent work.
+- A generic event runtime detached from actual work execution.
 - Full multi-agent swarm planning/execution semantics.
 - High-throughput queue optimization.
 
@@ -73,9 +76,9 @@ v1 is intentionally biased toward **clarity, determinism, and operator visibilit
 
 ### 4.2 Runtime model
 
-- Mission Control owns the planning objects: project, epic, user story, task, bug.
-- Mission Control also owns the agent-work orchestration state for those planning objects.
-- OpenClaw executes the actual specialist work in agent sessions.
+- **Planning** owns the work objects: project, epic, user story, task, bug.
+- The **Control Plane** owns the orchestration state for those work objects.
+- **OpenClaw** executes the actual specialist work in agent sessions.
 - The preferred execution primitive is an **ACP thread/session** bound to the specialist agent.
 
 ### 4.3 Capacity model
@@ -100,7 +103,8 @@ This means:
 | Naomi | Implements a story, plans tasks when missing, executes tasks sequentially, opens PR, hands off to Amos |
 | Amos | Review / QA stage after Naomi finishes development |
 | Alex | Research / analysis agent for future flows |
-| Mission Control | System of record for work items, assignments, queue state, runtime state, and monitoring read models |
+| Planning | Source of truth for work items, assignees, status, and backlog/sprint context |
+| Control Plane | Queueing, dispatch, capacity rules, runtime state, retries, watchdog, and monitoring read models |
 | OpenClaw | Agent execution runtime and session management fabric |
 
 ---
@@ -115,8 +119,8 @@ A User Story in `TODO` is assigned to Naomi:
 - via CLI / automation (for example by James using `mc`).
 
 #### Expected behavior
-- The assignment enters the orchestration flow.
-- Mission Control records that the story is intended for Naomi.
+- The assignment enters the Control Plane.
+- Planning records that the story is intended for Naomi.
 - The story is placed into Naomi's queue.
 - If Naomi is idle, dispatch can start immediately.
 - If Naomi is busy, the story remains queued.
@@ -175,7 +179,7 @@ The story has tasks and Naomi is in execution mode.
 - Naomi works through tasks **one by one**.
 - For each task:
   - mark task `IN_PROGRESS`,
-  - spawns sub-session to execute the work,
+  - spawn a sub-session to execute the work,
   - commit the result,
   - mark task `DONE`, or mark it blocked if needed.
 
@@ -239,7 +243,8 @@ This gives:
 ### 7.2 Push-driven dispatch
 
 The primary dispatch model is:
-- **Mission Control emits an assignment event**,
+- **Planning records an assignment**,
+- the **Control Plane** emits the orchestration event,
 - a dispatch worker delivers the work to the specialist agent.
 
 This is preferred over polling because it is:
@@ -261,7 +266,7 @@ Cron should **not** be the primary work-discovery mechanism for specialist agent
 
 ### 7.4 Planning state and runtime state must be separate
 
-Mission Control must distinguish:
+The Control Plane must distinguish:
 - planning status (`TODO`, `IN_PROGRESS`, `BLOCKED`, `CODE_REVIEW`, ...)
 - runtime execution state (`QUEUED`, `DISPATCHING`, `PLANNING`, `EXECUTING`, ...)
 
@@ -290,7 +295,7 @@ In v1:
 | `VERIFY` | verification / QA phase |
 | `DONE` | finished |
 
-### 8.2 Runtime state (new orchestration-facing)
+### 8.2 Runtime state (Control Plane-facing)
 
 | State | Meaning |
 |---|---|
@@ -308,7 +313,7 @@ In v1:
 
 ## 9) High-level event model
 
-These are **domain-level orchestration events**, not transport-specific implementation details.
+These are **Control Plane domain events**, not transport-specific implementation details.
 
 ### Assignment / queue
 - `agent.assignment.requested`
@@ -344,38 +349,38 @@ These are **domain-level orchestration events**, not transport-specific implemen
 ## 10) Recommended system flow
 
 ### 10.1 Assignment ingress
-1. Story is assigned to Naomi.
-2. Mission Control records the assignment change.
-3. Mission Control creates a runtime work item in Naomi's queue.
+1. A story is assigned to Naomi in Planning.
+2. Planning records the assignment change.
+3. The Control Plane creates a runtime work item in Naomi's queue.
 4. Runtime state becomes `QUEUED`.
 
 ### 10.2 Dispatch
-1. Dispatch worker checks Naomi capacity.
+1. A Control Plane dispatch worker checks Naomi capacity.
 2. If Naomi is idle, the queued story is dispatched.
 3. Runtime state becomes `DISPATCHING`, then `ACK_PENDING`.
 
 ### 10.3 Acceptance
 1. Naomi accepts the assignment.
-2. Story becomes `IN_PROGRESS`.
+2. The story becomes `IN_PROGRESS`.
 3. Naomi checks whether tasks exist.
 
 ### 10.4 Planning branch
 If tasks do not exist:
 1. Runtime state becomes `PLANNING`.
-2. Planning sub-session creates tasks or returns a blocker.
+2. A planning sub-session creates tasks or returns a blocker.
 3. If blocked, runtime state becomes `BLOCKED`.
 4. If tasks are created, runtime state moves to `EXECUTING`.
 
 ### 10.5 Execution branch
 If tasks exist:
 1. Naomi creates one branch for the story.
-2. Naomi executes tasks, by spawnig sub-sessions sequentially.
+2. Naomi executes tasks by spawning sub-sessions sequentially.
 3. Each task moves through `TODO -> IN_PROGRESS -> DONE` or `BLOCKED`.
 
 ### 10.6 Completion and handoff
 1. Naomi opens a PR.
-2. Story becomes `CODE_REVIEW`.
-3. Story is assigned to Amos.
+2. The story becomes `CODE_REVIEW`.
+3. The story is assigned to Amos.
 4. Naomi runtime state becomes `REVIEW_READY` / `DONE`.
 5. Naomi becomes available for the next queued story.
 
@@ -383,12 +388,19 @@ If tasks exist:
 
 ## 11) System boundaries
 
-### Mission Control owns
-- planning entities,
-- assignment intent,
+### Planning owns
+- work items,
+- assignee fields,
+- planning status,
+- backlog / sprint / project context.
+
+### Control Plane owns
+- assignment intake,
 - queue/order per specialist,
-- runtime read model,
-- monitoring / dashboards,
+- dispatch,
+- capacity rules,
+- runtime state,
+- monitoring read models,
 - operator actions such as retry, requeue, reassign, and escalation.
 
 ### OpenClaw owns
@@ -467,9 +479,10 @@ If there is one short version of this document, it is this:
 
 - **One Gateway, many agents**
 - **James is the front door**
-- **Mission Control is the work and orchestration source of truth**
+- **Planning is the work source of truth**
+- **Control Plane owns orchestration**
 - **OpenClaw is the execution fabric**
-- **Assignments should push work to specialists**
+- **Assignments should flow from Planning into the Control Plane**
 - **Naomi plans when needed, then executes tasks sequentially**
 - **Amos receives review handoff after PR creation**
 - **Cron is recovery logic, not the main dispatch mechanism**
