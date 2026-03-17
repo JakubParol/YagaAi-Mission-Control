@@ -73,7 +73,7 @@ v1 is intentionally biased toward **clarity, determinism, and operator visibilit
 
 ### 4.2 Runtime model
 
-- Mission Control owns the planning objects: project, epic, user story, task.
+- Mission Control owns the planning objects: project, epic, user story, task, bug.
 - Mission Control also owns the agent-work orchestration state for those planning objects.
 - OpenClaw executes the actual specialist work in agent sessions.
 - The preferred execution primitive is an **ACP thread/session** bound to the specialist agent.
@@ -175,7 +175,7 @@ The story has tasks and Naomi is in execution mode.
 - Naomi works through tasks **one by one**.
 - For each task:
   - mark task `IN_PROGRESS`,
-  - execute the work,
+  - spawns sub-session to execute the work,
   - commit the result,
   - mark task `DONE`, or mark it blocked if needed.
 
@@ -369,7 +369,7 @@ If tasks do not exist:
 ### 10.5 Execution branch
 If tasks exist:
 1. Naomi creates one branch for the story.
-2. Naomi executes tasks sequentially.
+2. Naomi executes tasks, by spawnig sub-sessions sequentially.
 3. Each task moves through `TODO -> IN_PROGRESS -> DONE` or `BLOCKED`.
 
 ### 10.6 Completion and handoff
