@@ -6,7 +6,7 @@ into new tables. Verifies counts after migration.
 
 import logging
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection
 
 from app.shared.lexorank import rank_batch
@@ -14,30 +14,51 @@ from app.shared.lexorank import rank_batch
 logger = logging.getLogger(__name__)
 
 
+def _safe_read(conn: Connection, table_name: str) -> list:
+    """Read all rows from a table, returning [] if the table doesn't exist."""
+    inspector = inspect(conn)
+    if table_name not in inspector.get_table_names():
+        logger.info("Table %s does not exist, skipping", table_name)
+        return []
+    return conn.execute(text(f"SELECT * FROM {table_name}")).mappings().all()
+
+
+def _safe_read_ordered(conn: Connection, table_name: str, order: str) -> list:
+    """Read all rows ordered, returning [] if the table doesn't exist."""
+    inspector = inspect(conn)
+    if table_name not in inspector.get_table_names():
+        logger.info("Table %s does not exist, skipping", table_name)
+        return []
+    return conn.execute(text(f"SELECT * FROM {table_name} ORDER BY {order}")).mappings().all()
+
+
 def migrate_v1_to_v2(conn: Connection) -> None:
     """Run the full v1→v2 data migration inside the Alembic transaction."""
     logger.info("Reading old data...")
 
-    old_epics = conn.execute(text("SELECT * FROM epics")).mappings().all()
-    old_stories = conn.execute(text("SELECT * FROM stories")).mappings().all()
-    old_tasks = conn.execute(text("SELECT * FROM tasks")).mappings().all()
-    old_bs = conn.execute(
-        text("SELECT * FROM backlog_stories ORDER BY backlog_id, position")
-    ).mappings().all()
-    old_bt = conn.execute(
-        text("SELECT * FROM backlog_tasks ORDER BY backlog_id, position")
-    ).mappings().all()
-    old_story_labels = conn.execute(text("SELECT * FROM story_labels")).mappings().all()
-    old_task_labels = conn.execute(text("SELECT * FROM task_labels")).mappings().all()
-    old_task_assignments = conn.execute(text("SELECT * FROM task_assignments")).mappings().all()
-    old_backlogs = conn.execute(
-        text("SELECT * FROM backlogs ORDER BY project_id, display_order")
-    ).mappings().all()
+    old_epics = _safe_read(conn, "epics")
+    old_stories = _safe_read(conn, "stories")
+    old_tasks = _safe_read(conn, "tasks")
+    old_bs = _safe_read_ordered(conn, "backlog_stories", "backlog_id, position")
+    old_bt = _safe_read_ordered(conn, "backlog_tasks", "backlog_id, position")
+    old_story_labels = _safe_read(conn, "story_labels")
+    old_task_labels = _safe_read(conn, "task_labels")
+    old_task_assignments = _safe_read(conn, "task_assignments")
+    # Backlogs always exist — check if display_order column is present.
+    inspector = inspect(conn)
+    backlog_cols = {c["name"] for c in inspector.get_columns("backlogs")}
+    if "display_order" in backlog_cols:
+        old_backlogs = conn.execute(
+            text("SELECT * FROM backlogs ORDER BY project_id, display_order")
+        ).mappings().all()
+    else:
+        old_backlogs = conn.execute(
+            text("SELECT * FROM backlogs ORDER BY project_id, rank")
+        ).mappings().all()
 
-    # Read status histories.
-    old_epic_hist = conn.execute(text("SELECT * FROM epic_status_history")).mappings().all()
-    old_story_hist = conn.execute(text("SELECT * FROM story_status_history")).mappings().all()
-    old_task_hist = conn.execute(text("SELECT * FROM task_status_history")).mappings().all()
+    old_epic_hist = _safe_read(conn, "epic_status_history")
+    old_story_hist = _safe_read(conn, "story_status_history")
+    old_task_hist = _safe_read(conn, "task_status_history")
 
     logger.info(
         "Old counts: %d epics, %d stories, %d tasks, %d backlog_stories, "
@@ -71,7 +92,7 @@ def migrate_v1_to_v2(conn: Connection) -> None:
     logger.info("Creating new tables...")
 
     conn.execute(text("""
-        CREATE TABLE work_items (
+        CREATE TABLE IF NOT EXISTS work_items (
             id TEXT PRIMARY KEY,
             project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
             parent_id TEXT REFERENCES work_items(id) ON DELETE SET NULL,
@@ -102,7 +123,7 @@ def migrate_v1_to_v2(conn: Connection) -> None:
     """))
 
     conn.execute(text("""
-        CREATE TABLE backlog_items (
+        CREATE TABLE IF NOT EXISTS backlog_items (
             backlog_id TEXT NOT NULL REFERENCES backlogs(id) ON DELETE CASCADE,
             work_item_id TEXT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
             rank TEXT NOT NULL,
@@ -113,7 +134,7 @@ def migrate_v1_to_v2(conn: Connection) -> None:
     """))
 
     conn.execute(text("""
-        CREATE TABLE work_item_labels (
+        CREATE TABLE IF NOT EXISTS work_item_labels (
             work_item_id TEXT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
             label_id TEXT NOT NULL REFERENCES labels(id) ON DELETE CASCADE,
             added_at TEXT NOT NULL,
@@ -122,7 +143,7 @@ def migrate_v1_to_v2(conn: Connection) -> None:
     """))
 
     conn.execute(text("""
-        CREATE TABLE work_item_assignments (
+        CREATE TABLE IF NOT EXISTS work_item_assignments (
             id TEXT PRIMARY KEY,
             work_item_id TEXT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
             agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -134,7 +155,7 @@ def migrate_v1_to_v2(conn: Connection) -> None:
     """))
 
     conn.execute(text("""
-        CREATE TABLE work_item_status_history (
+        CREATE TABLE IF NOT EXISTS work_item_status_history (
             id TEXT PRIMARY KEY,
             project_id TEXT,
             work_item_id TEXT NOT NULL,

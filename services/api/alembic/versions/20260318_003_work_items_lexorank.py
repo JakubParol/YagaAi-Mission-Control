@@ -25,10 +25,11 @@ def upgrade() -> None:
 
     # If work_items already exists (fresh DB via metadata.create_all),
     # the baseline already created the new schema — nothing to do.
-    if "work_items" in existing_tables:
+    if "work_items" in existing_tables and "epics" not in existing_tables:
         return
 
-    # Old schema present — run the destructive migration.
+    # Old schema present (or partially present) — run the migration.
+    # The migration handles missing tables gracefully.
     from app.planning.infrastructure.migrations.v1_to_v2_data import migrate_v1_to_v2
 
     migrate_v1_to_v2(conn)
