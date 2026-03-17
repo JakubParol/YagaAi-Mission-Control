@@ -214,8 +214,8 @@ export default function PlanningSettingsPage() {
                       {agent.name} - {agent.role ?? "no role"}
                     </p>
                   </div>
-                  <Badge variant={agent.is_active === 1 ? "default" : "outline"}>
-                    {agent.is_active === 1 ? "ACTIVE" : "INACTIVE"}
+                  <Badge variant={agent.is_active ? "default" : "outline"}>
+                    {agent.is_active ? "ACTIVE" : "INACTIVE"}
                   </Badge>
                 </div>
               ))}
