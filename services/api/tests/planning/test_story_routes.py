@@ -431,7 +431,7 @@ def test_update_story_same_assignee_is_noop_for_events(client, _setup_test_db) -
 
 
 def test_update_story_assignee_rolls_back_without_activity_log_table(
-    client, _setup_test_db
+    client, _setup_test_db, restore_schema
 ) -> None:
     story_id = client.post(
         "/v1/planning/stories",

@@ -29,9 +29,14 @@ from app.planning.infrastructure import (  # noqa: E402,F401  # pylint: disable=
 )
 from app.shared.db.metadata import metadata  # noqa: E402,F401  # pylint: disable=unused-import
 from app.shared.db.session import close_db_engine  # noqa: E402
-from tests.support.postgres_compat import reset_database_schema  # noqa: E402
+from tests.support.postgres_compat import (  # noqa: E402
+    reset_database_schema,
+    truncate_all_tables,
+)
 
 # pylint: enable=wrong-import-position
+
+_TABLE_NAMES: list[str] = [t.name for t in reversed(metadata.sorted_tables)]
 
 
 def _alembic_config(database_url: str) -> Config:
@@ -59,19 +64,17 @@ def _configure_database(
 ) -> Iterator[None]:
     settings.postgres_dsn = database_url
     yield
+    asyncio.run(close_db_engine())
 
 
 @pytest.fixture(autouse=True)
 def _reset_database(database_url: str) -> Iterator[None]:
+    truncate_all_tables(database_url, table_names=_TABLE_NAMES)
+    yield
+
+
+@pytest.fixture()
+def restore_schema(database_url: str) -> Iterator[None]:
+    """Use on tests that modify schema (DROP TABLE/INDEX)."""
+    yield
     reset_database_schema(database_url)
-    yield
-
-
-@pytest.fixture(autouse=True)
-def _reset_engine_state(
-    database_url: str,
-) -> Iterator[None]:
-    settings.postgres_dsn = database_url
-    asyncio.run(close_db_engine())
-    yield
-    asyncio.run(close_db_engine())

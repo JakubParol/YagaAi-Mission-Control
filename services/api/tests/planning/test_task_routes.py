@@ -651,7 +651,9 @@ def test_unassign_agent(client) -> None:
     assert task_resp.json()["data"]["current_assignee_agent_id"] is None
 
 
-def test_assign_agent_rolls_back_without_activity_log_table(client, _setup_test_db) -> None:
+def test_assign_agent_rolls_back_without_activity_log_table(
+    client, _setup_test_db, restore_schema
+) -> None:
     task_id = client.post(
         "/v1/planning/tasks",
         json={"title": "T", "task_type": "TASK", "project_id": "p1"},
