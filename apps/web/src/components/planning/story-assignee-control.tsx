@@ -160,7 +160,7 @@ export function StoryAssigneeControl({
           assignee_avatar: assignee.avatar,
         });
       }}
-      triggerClassName="group/assignee relative h-8 w-8 justify-center rounded-md px-0"
+      triggerClassName="group/assignee relative size-5 min-h-0 justify-center rounded-full border-0 bg-transparent p-0"
       contentClassName="w-[280px]"
     />
   );

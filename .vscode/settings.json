@@ -5,7 +5,7 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "chatgpt.openOnStartup": true,
-    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
     "python.defaultInterpreterPath": "${workspaceFolder}/services/api/.venv/bin/python",
     "python.analysis.extraPaths": [
         "services/api"
@@ -19,6 +19,7 @@
         "**/.import_linter_cache": true,
         "**/.venv": true,
         "**/node_modules": true,
+        "**/.next": true,
         "**/.next-local": true,
         "**/.next-vscode": true,
         "apps/cli/dist": true

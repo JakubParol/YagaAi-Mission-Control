@@ -172,3 +172,35 @@ export function applyFailureFilter(
   if (!category) return [...events];
   return events.filter((event) => event.failure_category === category);
 }
+
+export function formatDateTime(value: string | null): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+export function statusBadgeClass(status: RunStatus): string {
+  if (status === "RUNNING")
+    return "border-blue-400/40 bg-blue-500/10 text-blue-200";
+  if (status === "SUCCEEDED")
+    return "border-emerald-400/40 bg-emerald-500/10 text-emerald-200";
+  if (status === "FAILED")
+    return "border-red-400/40 bg-red-500/10 text-red-200";
+  if (status === "CANCELLED")
+    return "border-amber-400/40 bg-amber-500/10 text-amber-200";
+  return "border-zinc-400/40 bg-zinc-500/10 text-zinc-200";
+}
+
+export function eventLabel(value: string): string {
+  return value
+    .replace("orchestration.", "")
+    .replaceAll(".", " ")
+    .replaceAll("_", " ");
+}

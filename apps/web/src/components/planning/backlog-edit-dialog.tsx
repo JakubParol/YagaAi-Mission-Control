@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Calendar, Loader2 } from "lucide-react";
 
-import { apiUrl } from "@/lib/api-client";
 import type { BacklogKind, BacklogStatus } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import {
@@ -14,7 +13,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { ConfirmDiscardDialog } from "./story-detail-confirm-dialog";
+import {
+  isDraftDirty,
+  patchBacklog,
+  toBacklogDraft,
+  validateDraft,
+} from "./backlog-edit-actions";
 
 export interface BacklogEditItem {
   id: string;
@@ -27,14 +32,12 @@ export interface BacklogEditItem {
   is_default: boolean;
 }
 
-interface BacklogDraft {
+export interface BacklogDraft {
   name: string;
   goal: string;
   start_date: string;
   end_date: string;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const KIND_LABEL: Record<BacklogKind, string> = {
   SPRINT: "Sprint",
@@ -47,46 +50,6 @@ const STATUS_TONE: Record<string, string> = {
   OPEN: "bg-cyan-500/10 text-cyan-300",
   CLOSED: "bg-muted/40 text-muted-foreground/70",
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function toBacklogDraft(backlog: BacklogEditItem): BacklogDraft {
-  return {
-    name: backlog.name,
-    goal: backlog.goal ?? "",
-    start_date: backlog.start_date ? backlog.start_date.slice(0, 10) : "",
-    end_date: backlog.end_date ? backlog.end_date.slice(0, 10) : "",
-  };
-}
-
-function isDraftDirty(draft: BacklogDraft, backlog: BacklogEditItem): boolean {
-  const trimmedName = draft.name.trim();
-  const trimmedGoal = draft.goal.trim();
-  const originalGoal = backlog.goal?.trim() ?? "";
-  const originalStartDate = backlog.start_date ? backlog.start_date.slice(0, 10) : "";
-  const originalEndDate = backlog.end_date ? backlog.end_date.slice(0, 10) : "";
-
-  return (
-    trimmedName !== backlog.name ||
-    trimmedGoal !== originalGoal ||
-    draft.start_date !== originalStartDate ||
-    draft.end_date !== originalEndDate
-  );
-}
-
-async function parseApiMessage(response: Response): Promise<string> {
-  try {
-    const json = (await response.json()) as {
-      error?: { message?: string };
-    };
-    if (json.error?.message) return json.error.message;
-  } catch {
-    // ignore
-  }
-  return `Request failed. HTTP ${response.status}.`;
-}
-
-// ─── FormField ────────────────────────────────────────────────────────────────
 
 function FormField({
   label,
@@ -109,8 +72,6 @@ function FormField({
     </div>
   );
 }
-
-// ─── BacklogEditDialog ────────────────────────────────────────────────────────
 
 export function BacklogEditDialog({
   backlog,
@@ -155,14 +116,9 @@ export function BacklogEditDialog({
   const handleSave = async () => {
     if (!backlog || !draft || isSaving) return;
 
-    const trimmedName = draft.name.trim();
-    if (trimmedName === "") {
-      setError("Board name is required.");
-      return;
-    }
-
-    if (isSprint && draft.start_date && draft.end_date && draft.start_date > draft.end_date) {
-      setError("End date must be on or after start date.");
+    const validationError = validateDraft(draft, isSprint);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -170,25 +126,7 @@ export function BacklogEditDialog({
     setIsSaving(true);
 
     try {
-      const body: Record<string, unknown> = { name: trimmedName };
-
-      if (isSprint) {
-        const trimmedGoal = draft.goal.trim();
-        body.goal = trimmedGoal === "" ? null : trimmedGoal;
-        body.start_date = draft.start_date === "" ? null : draft.start_date;
-        body.end_date = draft.end_date === "" ? null : draft.end_date;
-      }
-
-      const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error(await parseApiMessage(response));
-      }
-
+      await patchBacklog(backlog.id, draft, isSprint);
       // Reset draft tracking so next open gets fresh data
       setDraftForId(null);
       setDraft(null);
@@ -255,7 +193,7 @@ export function BacklogEditDialog({
                 id="backlog-edit-name"
                 value={draft.name}
                 onChange={(e) => update("name", e.target.value)}
-                placeholder="Board name…"
+                placeholder="Board name..."
                 className="w-full border-0 bg-transparent text-lg font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:ring-0"
               />
             </DialogHeader>
@@ -346,34 +284,14 @@ export function BacklogEditDialog({
       </DialogContent>
     </Dialog>
 
-    <Dialog
+    <ConfirmDiscardDialog
       open={showDiscardConfirm}
-      onOpenChange={(nextOpen) => { if (!nextOpen) setShowDiscardConfirm(false); }}
-    >
-      <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>Discard changes?</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          You have unsaved changes. If you close now, your edits will be lost.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => setShowDiscardConfirm(false)}>
-            Keep editing
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => {
-              setShowDiscardConfirm(false);
-              executeClose();
-            }}
-          >
-            Discard changes
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      onKeepEditing={() => setShowDiscardConfirm(false)}
+      onDiscard={() => {
+        setShowDiscardConfirm(false);
+        executeClose();
+      }}
+    />
     </>
   );
 }

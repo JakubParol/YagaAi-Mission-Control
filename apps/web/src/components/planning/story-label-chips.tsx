@@ -1,13 +1,10 @@
 import type { CSSProperties } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { StoryLabel } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 
-export interface StoryLabel {
-  id: string;
-  name: string;
-  color: string | null;
-}
+export type { StoryLabel } from "@/lib/planning/types";
 
 interface StoryLabelChipsProps {
   labels: StoryLabel[] | null | undefined;

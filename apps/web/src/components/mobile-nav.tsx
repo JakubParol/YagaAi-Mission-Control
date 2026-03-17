@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ConnectionStatus } from "./connection-status";
+import { ThemeToggle } from "./theme-toggle";
 import { navModules, isModuleActive } from "@/lib/navigation";
 
 const DRAWER_ID = "mobile-nav-drawer";
@@ -80,7 +81,7 @@ export function MobileNav() {
         className={cn(
           "focus-ring flex h-9 w-9 items-center justify-center rounded-lg",
           "text-muted-foreground hover:text-foreground",
-          "hover:bg-white/[0.04]",
+          "hover:bg-foreground/[0.04]",
           "transition-colors duration-150 lg:hidden"
         )}
         aria-label="Open navigation menu"
@@ -106,7 +107,7 @@ export function MobileNav() {
             className={cn(
               "fixed inset-y-4 left-4 z-[9999] w-72 lg:hidden",
               "bg-card",
-              "border border-white/[0.08]",
+              "border border-border",
               "shadow-2xl",
               "rounded-xl",
               "flex flex-col gap-6 overflow-hidden p-6"
@@ -137,7 +138,7 @@ export function MobileNav() {
                 className={cn(
                   "focus-ring flex h-8 w-8 items-center justify-center rounded-lg",
                   "text-muted-foreground hover:text-foreground",
-                  "hover:bg-white/[0.04]",
+                  "hover:bg-foreground/[0.04]",
                   "transition-colors duration-150"
                 )}
                 aria-label="Close navigation menu"
@@ -164,7 +165,7 @@ export function MobileNav() {
                       "transition-colors duration-150",
                       active
                         ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+                        : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                     )}
                   >
                     <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -175,8 +176,11 @@ export function MobileNav() {
             </div>
 
             {/* Connection Status */}
-            <div className="shrink-0 border-t border-white/5 pt-4">
-              <ConnectionStatus />
+            <div className="shrink-0 border-t border-border/30 pt-4">
+              <div className="flex items-center justify-between">
+                <ConnectionStatus />
+                <ThemeToggle />
+              </div>
             </div>
           </nav>
         </>,

@@ -187,7 +187,7 @@ export interface Label {
   created_at: string;
 }
 
-export interface StoryLabel {
+export interface StoryLabelLink {
   story_id: string;
   label_id: string;
   added_at: string;
@@ -276,4 +276,52 @@ export interface TaskStatusHistory {
   changed_by: string | null;
   changed_at: string;
   note: string | null;
+}
+
+// ─── UI Domain Types ────────────────────────────────────────────────
+
+/** Label summary used across planning UI components. */
+export interface StoryLabel {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+/** Story with aggregated UI fields (labels, task count, boolean flags). */
+export interface StoryDetail {
+  id: string;
+  project_id: string | null;
+  epic_id: string | null;
+  key: string | null;
+  title: string;
+  intent: string | null;
+  description: string | null;
+  story_type: string;
+  status: ItemStatus;
+  is_blocked: boolean;
+  blocked_reason: string | null;
+  priority: number | null;
+  created_at: string;
+  updated_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  task_count: number;
+  labels?: StoryLabel[];
+  label_ids?: string[];
+}
+
+/** Task list item used in story detail views. */
+export interface TaskItem {
+  id: string;
+  key: string | null;
+  title: string;
+  objective: string | null;
+  task_type: string;
+  status: ItemStatus;
+  priority: number | null;
+  is_blocked: boolean;
+  blocked_reason: string | null;
+  estimate_points: number | null;
+  due_at: string | null;
+  current_assignee_agent_id: string | null;
 }

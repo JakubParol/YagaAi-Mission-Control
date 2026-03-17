@@ -2,11 +2,11 @@
 
 import { useState, useCallback } from "react";
 import { AlertCircle } from "lucide-react";
-import { apiUrl } from "@/lib/api-client";
 import { EmptyState } from "@/components/empty-state";
 import { CostsSection } from "./costs-section";
 import { RequestsSection } from "./requests-section";
 import { ImportButton, ImportStatusBar } from "./import-controls";
+import { fetchImportStatus } from "@/app/dashboard/dashboard-actions";
 import type {
   CostMetrics,
   LLMRequestsResponse,
@@ -31,17 +31,10 @@ export function Dashboard({
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleImportComplete = useCallback(async () => {
-    // Re-fetch import status
-    try {
-      const res = await fetch(apiUrl("/v1/observability/imports/status"));
-      if (res.ok) {
-        const data: ImportStatusInfo = await res.json();
-        setImportStatus(data);
-      }
-    } catch {
-      // Status fetch failed; data will refresh on next page load
+    const status = await fetchImportStatus();
+    if (status) {
+      setImportStatus(status);
     }
-    // Bump key to force sections to re-fetch
     setRefreshKey((k) => k + 1);
   }, []);
 

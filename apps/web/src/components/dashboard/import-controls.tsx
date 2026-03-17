@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { apiUrl } from "@/lib/api-client";
 import {
   Download,
   Loader2,
@@ -15,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/dashboard/format-helpers";
 import type { ImportStatusInfo } from "@/lib/dashboard/types";
+import { triggerImport } from "@/app/dashboard/dashboard-actions";
 
 type ImportButtonState = "idle" | "loading" | "success" | "error";
 
@@ -31,14 +31,9 @@ export function ImportButton({
     setErrorMsg(null);
 
     try {
-      const res = await fetch(apiUrl("/v1/observability/imports"), { method: "POST" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
+      await triggerImport();
       setState("success");
       onImportComplete();
-      // Reset to idle after a brief flash
       setTimeout(() => setState("idle"), 2000);
     } catch (err) {
       setState("error");

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { apiUrl } from "@/lib/api-client";
 import {
   DollarSign,
   Hash,
@@ -17,56 +16,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { formatUSD, formatTokens, startOfDay } from "@/lib/dashboard/format-helpers";
+import { formatUSD, formatTokens } from "@/lib/dashboard/format-helpers";
+import { StatCard } from "@/components/stat-card";
 import type { DateRange } from "react-day-picker";
-import type { CostMetrics, DailyCost } from "@/lib/dashboard/types";
+import type { CostMetrics } from "@/lib/dashboard/types";
 import {
   TIME_RANGES,
   buildCostUrl,
   aggregateModels,
   aggregateStatCards,
   computeCostTotals,
-  mergeStatCardData,
   type CostStatCardValues,
 } from "@/app/dashboard/costs-view-model";
-
-interface CostStatCardProps {
-  label: string;
-  value: string;
-  icon: typeof DollarSign;
-  iconColor: string;
-  iconBg: string;
-}
-
-function CostStatCard({
-  label,
-  value,
-  icon: Icon,
-  iconColor,
-  iconBg,
-}: CostStatCardProps) {
-  return (
-    <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
-      <div
-        aria-hidden="true"
-        className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
-          iconBg,
-        )}
-      >
-        <Icon className={cn("h-5 w-5", iconColor)} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-2xl font-bold tabular-nums text-foreground">
-          {value}
-        </p>
-        <p className="truncate text-xs font-medium text-muted-foreground">
-          {label}
-        </p>
-      </div>
-    </div>
-  );
-}
+import {
+  fetchCostMetrics,
+  fetchStatCardData,
+} from "@/app/dashboard/dashboard-actions";
 
 export interface CostsSectionProps {
   initialData: CostMetrics;
@@ -81,11 +46,7 @@ export function CostsSection({ initialData }: CostsSectionProps) {
 
   const [costs, setCosts] = useState<CostMetrics>(initialData);
   useEffect(() => {
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
+    fetchCostMetrics(url)
       .then((data) => setCosts(data))
       .catch(() => {});
   }, [url]);
@@ -94,23 +55,8 @@ export function CostsSection({ initialData }: CostsSectionProps) {
     aggregateStatCards(initialData.daily),
   );
   useEffect(() => {
-    const now = new Date();
-    const todayStart = startOfDay(now);
-    const yesterdayStart = new Date(todayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-    const todayUrl = apiUrl(`/v1/observability/costs?from=${todayStart.toISOString()}&to=${now.toISOString()}`);
-    const yesterdayUrl = apiUrl(`/v1/observability/costs?from=${yesterdayStart.toISOString()}&to=${todayStart.toISOString()}`);
-
-    Promise.all([
-      fetch(todayUrl).then((r) => r.json()),
-      fetch(yesterdayUrl).then((r) => r.json()),
-    ])
-      .then(([todayData, yesterdayData]) => {
-        const tDaily: DailyCost[] = todayData.daily ?? [];
-        const yDaily: DailyCost[] = yesterdayData.daily ?? [];
-        setStatCards(mergeStatCardData(tDaily, yDaily));
-      })
+    fetchStatCardData()
+      .then((data) => setStatCards(data))
       .catch(() => {});
   }, []);
   const { todaySpend, yesterdaySpend, todayRequests, avgCost } = statCards;
@@ -149,28 +95,28 @@ export function CostsSection({ initialData }: CostsSectionProps) {
 
       {/* Stat cards */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <CostStatCard
+        <StatCard
           label="Today's Spend"
           value={formatUSD(todaySpend)}
           icon={DollarSign}
           iconColor="text-green-400"
           iconBg="bg-green-500/10"
         />
-        <CostStatCard
+        <StatCard
           label="Yesterday's Spend"
           value={formatUSD(yesterdaySpend)}
           icon={DollarSign}
           iconColor="text-blue-400"
           iconBg="bg-blue-500/10"
         />
-        <CostStatCard
+        <StatCard
           label="Requests Today"
           value={String(todayRequests)}
           icon={Hash}
           iconColor="text-amber-400"
           iconBg="bg-amber-500/10"
         />
-        <CostStatCard
+        <StatCard
           label="Avg Cost/Request"
           value={formatUSD(avgCost)}
           icon={TrendingUp}

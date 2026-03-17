@@ -1,4 +1,8 @@
+import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
+import type { StoryCardStory } from "@/components/planning/story-card";
 import type { ItemStatus } from "@/lib/planning/types";
+
+import type { PlanningAgentApiItem } from "./list-types";
 
 export const COMING_SOON_LABEL = "Coming soon";
 
@@ -170,4 +174,68 @@ export function buildPlanningListRows(input: {
     if (tsDiff !== 0) return tsDiff;
     return (a.key ?? a.id).localeCompare(b.key ?? b.id);
   });
+}
+
+export function formatUpdatedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function getPriorityLabel(priority: number | null): string {
+  return priority === null ? "—" : String(priority);
+}
+
+export function resolveAgentLabel(agent: PlanningAgentApiItem): string | null {
+  if (!agent.id || !agent.name) return null;
+  const fullName = [agent.name, agent.last_name ?? ""].join(" ").trim();
+  return fullName.length > 0 ? fullName : agent.name;
+}
+
+export function buildLabelOptions(rows: PlanningListRow[]): PlanningListLabel[] {
+  const labelsById = new Map<string, PlanningListLabel>();
+
+  for (const row of rows) {
+    for (const label of row.labels) {
+      if (!labelsById.has(label.id)) {
+        labelsById.set(label.id, label);
+      }
+    }
+  }
+
+  return [...labelsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function toBacklogRowStory(
+  row: PlanningListRow,
+  assigneeById: ReadonlyMap<string, BacklogAssigneeOption>,
+): StoryCardStory {
+  const selectedAssignee =
+    row.current_assignee_agent_id ? assigneeById.get(row.current_assignee_agent_id) : null;
+
+  return {
+    id: row.id,
+    key: row.key,
+    title: row.title,
+    status: row.status,
+    priority: row.priority,
+    story_type: row.story_type ?? row.task_type ?? "TASK",
+    epic_key: row.epic_key,
+    epic_title: row.epic_title,
+    position: 0,
+    task_count: row.task_count,
+    done_task_count: row.done_task_count,
+    labels: row.labels,
+    assignee_agent_id: row.current_assignee_agent_id,
+    current_assignee_agent_id: row.current_assignee_agent_id,
+    assignee_name: selectedAssignee?.name ?? null,
+    assignee_last_name: selectedAssignee?.last_name ?? null,
+    assignee_initials: selectedAssignee?.initials ?? null,
+    assignee_avatar: selectedAssignee?.avatar ?? null,
+  };
 }

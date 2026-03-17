@@ -6,6 +6,7 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConnectionStatus } from "./connection-status";
+import { ThemeToggle } from "./theme-toggle";
 import { navModules, isModuleActive } from "@/lib/navigation";
 
 export function Sidebar({
@@ -24,10 +25,10 @@ export function Sidebar({
         "fixed inset-y-4 left-4 z-50 hidden lg:flex",
         collapsed ? "w-20 gap-4 p-4" : "w-64 gap-6 p-6",
         "flex-col",
-        "bg-slate-900/95 backdrop-blur-xl",
-        "border border-white/[0.08]",
+        "bg-card/95 backdrop-blur-xl",
+        "border border-border",
         "rounded-xl",
-        "shadow-xl shadow-black/40"
+        "shadow-xl shadow-black/10 dark:shadow-black/40"
       )}
     >
       {/* Logo */}
@@ -60,7 +61,7 @@ export function Sidebar({
             className={cn(
               "focus-ring flex h-8 w-8 items-center justify-center rounded-lg",
               "text-muted-foreground hover:text-foreground",
-              "hover:bg-white/[0.04]",
+              "hover:bg-foreground/[0.04]",
               "transition-colors duration-150"
             )}
           >
@@ -78,7 +79,7 @@ export function Sidebar({
           className={cn(
             "focus-ring flex h-8 w-full items-center justify-center rounded-lg",
             "text-muted-foreground hover:text-foreground",
-            "hover:bg-white/[0.04]",
+            "hover:bg-foreground/[0.04]",
             "transition-colors duration-150"
           )}
         >
@@ -106,7 +107,7 @@ export function Sidebar({
                     collapsed ? "justify-center px-2" : "gap-3 px-3",
                     active
                       ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground"
+                      : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
                   )}
                 >
                   <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -121,10 +122,13 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Connection Status */}
+      {/* Connection Status & Theme Toggle */}
       {!collapsed ? (
-        <div className="border-t border-white/5 pt-4">
-          <ConnectionStatus />
+        <div className="border-t border-border/30 pt-4">
+          <div className="flex items-center justify-between">
+            <ConnectionStatus />
+            <ThemeToggle />
+          </div>
         </div>
       ) : null}
     </aside>

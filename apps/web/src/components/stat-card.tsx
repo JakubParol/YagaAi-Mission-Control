@@ -1,9 +1,9 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface StatCardProps {
+export interface StatCardProps {
   label: string;
-  value: number;
+  value: string | number;
   icon: LucideIcon;
   /** Tailwind text color class for the icon, e.g. "text-green-400" */
   iconColor: string;
