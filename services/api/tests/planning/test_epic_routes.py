@@ -10,10 +10,10 @@ Coverage:
 
 Fixtures:
 - client — FastAPI TestClient (from conftest)
-- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+- _setup_test_db — PostgreSQL test database with schema + seed data (from conftest)
 """
 
-import sqlite3
+from tests.support.postgres_compat import pg_connect
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -195,20 +195,18 @@ def test_get_epic_includes_story_count(client, _setup_test_db) -> None:
     # Direct DB access: stories CRUD is not yet exposed via the API, so we
     # insert test stories directly to verify the story_count aggregation.
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-count-1", "p1", epic_id, "Story 1", "USER_STORY", "TODO", TS, TS),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-count-2", "p1", epic_id, "Story 2", "USER_STORY", "TODO", TS, TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
+            "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-count-1", "p1", epic_id, "Story 1", "USER_STORY", "TODO", TS, TS],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
+            "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-count-2", "p1", epic_id, "Story 2", "USER_STORY", "TODO", TS, TS],
+        )
+        conn.commit()
 
     resp = client.get(f"/v1/planning/epics/{epic_id}")
     assert resp.json()["data"]["story_count"] == 2
@@ -308,19 +306,17 @@ def test_delete_epic_sets_null_on_stories(client, _setup_test_db) -> None:
     # Direct DB access: stories CRUD is not yet exposed via the API, so we
     # insert and query stories directly to verify ON DELETE SET NULL behavior.
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-del-1", "p1", epic_id, "Child Story", "USER_STORY", "TODO", TS, TS),
-    )
-    conn.commit()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, "
+            "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-del-1", "p1", epic_id, "Child Story", "USER_STORY", "TODO", TS, TS],
+        )
+        conn.commit()
 
-    client.delete(f"/v1/planning/epics/{epic_id}")
+        client.delete(f"/v1/planning/epics/{epic_id}")
 
-    row = conn.execute("SELECT epic_id FROM stories WHERE id = 's-del-1'").fetchone()
-    conn.close()
+        row = conn.execute("SELECT epic_id FROM stories WHERE id = 's-del-1'").fetchone()
     assert row is not None
     assert row[0] is None  # ON DELETE SET NULL
 
@@ -392,48 +388,51 @@ def test_list_epics_overview_returns_aggregate_metrics(client, _setup_test_db) -
     ]
 
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-api", "p1", "API", None, TS),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
-        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-ov-1", "p1", e1["id"], "Done story", "USER_STORY", "DONE", 0, "a1", TS, TS),
-    )
-    conn.execute(
-        "UPDATE stories SET completed_at = datetime('now', '-2 days') WHERE id = ?",
-        ("s-ov-1",),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
-        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            "s-ov-2",
-            "p1",
-            e1["id"],
-            "In-progress story",
-            "USER_STORY",
-            "IN_PROGRESS",
-            0,
-            "a2",
-            TS,
-            TS,
-        ),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
-        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-ov-3", "p1", e1["id"], "Blocked story", "USER_STORY", "TODO", 1, None, TS, TS),
-    )
-    conn.execute(
-        "INSERT INTO story_labels (story_id, label_id, added_at) VALUES (?, ?, ?)",
-        ("s-ov-1", "lbl-api", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-api", "p1", "API", None, TS],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+            "current_assignee_agent_id, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-ov-1", "p1", e1["id"], "Done story", "USER_STORY", "DONE", 0, "a1", TS, TS],
+        )
+        conn.execute(
+            "UPDATE stories SET completed_at = "
+            "CURRENT_TIMESTAMP - INTERVAL '2 days' WHERE id = %s",
+            ["s-ov-1"],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+            "current_assignee_agent_id, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            [
+                "s-ov-2",
+                "p1",
+                e1["id"],
+                "In-progress story",
+                "USER_STORY",
+                "IN_PROGRESS",
+                0,
+                "a2",
+                TS,
+                TS,
+            ],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+            "current_assignee_agent_id, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-ov-3", "p1", e1["id"], "Blocked story", "USER_STORY", "TODO", 1, None, TS, TS],
+        )
+        conn.execute(
+            "INSERT INTO story_labels (story_id, label_id, added_at) VALUES (%s, %s, %s)",
+            ["s-ov-1", "lbl-api", TS],
+        )
+        conn.commit()
 
     resp = client.get("/v1/planning/epics/overview", params={"project_id": "p1"})
     assert resp.status_code == 200
@@ -472,33 +471,35 @@ def test_list_epics_overview_filters_and_sort(client, _setup_test_db) -> None:
     ).json()["data"]
 
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-be", "p1", "Backend", None, TS),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
-        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-f-1", "p1", e1["id"], "Story 1", "USER_STORY", "DONE", 1, "a1", TS, TS),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
-        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-f-2", "p1", e1["id"], "Story 2", "USER_STORY", "DONE", 0, "a1", TS, TS),
-    )
-    conn.execute(
-        "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
-        "current_assignee_agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        ("s-f-3", "p1", e2["id"], "Story 3", "USER_STORY", "IN_PROGRESS", 0, "a2", TS, TS),
-    )
-    conn.execute(
-        "INSERT INTO story_labels (story_id, label_id, added_at) VALUES (?, ?, ?)",
-        ("s-f-1", "lbl-be", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-be", "p1", "Backend", None, TS],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+            "current_assignee_agent_id, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-f-1", "p1", e1["id"], "Story 1", "USER_STORY", "DONE", 1, "a1", TS, TS],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+            "current_assignee_agent_id, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-f-2", "p1", e1["id"], "Story 2", "USER_STORY", "DONE", 0, "a1", TS, TS],
+        )
+        conn.execute(
+            "INSERT INTO stories (id, project_id, epic_id, title, story_type, status, is_blocked, "
+            "current_assignee_agent_id, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            ["s-f-3", "p1", e2["id"], "Story 3", "USER_STORY", "IN_PROGRESS", 0, "a2", TS, TS],
+        )
+        conn.execute(
+            "INSERT INTO story_labels (story_id, label_id, added_at) VALUES (%s, %s, %s)",
+            ["s-f-1", "lbl-be", TS],
+        )
+        conn.commit()
 
     resp = client.get(
         "/v1/planning/epics/overview",

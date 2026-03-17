@@ -1,5 +1,3 @@
-import sqlite3
-
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -11,6 +9,7 @@ from app.orchestration.domain.models import (
 )
 from app.orchestration.infrastructure.repositories.command import DbCommandRepository
 from app.shared.db.session import get_session_factory
+from tests.support.postgres_compat import pg_connect
 
 
 def _valid_body(*, schema_version: str = "1.0") -> dict:
@@ -28,10 +27,10 @@ def _valid_body(*, schema_version: str = "1.0") -> dict:
 
 
 def _count_rows(db_path: str, table: str) -> int:
-    conn = sqlite3.connect(db_path)
-    value = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-    conn.close()
-    return int(value)
+    with pg_connect(db_path) as conn:
+        row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()  # type: ignore[arg-type]
+    assert row is not None
+    return int(row[0])
 
 
 @pytest.mark.parametrize("schema_version", ["1.0", "1.1"])
@@ -176,14 +175,13 @@ async def test_outbox_insert_failure_rolls_back_command_insert(db_path: str) -> 
         with pytest.raises(IntegrityError):
             await repo.create_command_with_outbox(command=command_two, outbox_event=outbox_two)
 
-    conn = sqlite3.connect(db_path)
-    command_count = conn.execute("SELECT COUNT(*) FROM orchestration_commands").fetchone()[0]
-    outbox_count = conn.execute("SELECT COUNT(*) FROM orchestration_outbox").fetchone()[0]
-    command_two_count = conn.execute(
-        "SELECT COUNT(*) FROM orchestration_commands WHERE id = 'cmd-2'"
-    ).fetchone()[0]
-    conn.close()
+    with pg_connect(db_path) as conn:
+        cmd_row = conn.execute("SELECT COUNT(*) FROM orchestration_commands").fetchone()
+        out_row = conn.execute("SELECT COUNT(*) FROM orchestration_outbox").fetchone()
+        cmd2_row = conn.execute(
+            "SELECT COUNT(*) FROM orchestration_commands WHERE id = 'cmd-2'"
+        ).fetchone()
 
-    assert command_count == 1
-    assert outbox_count == 1
-    assert command_two_count == 0
+    assert cmd_row is not None and cmd_row[0] == 1
+    assert out_row is not None and out_row[0] == 1
+    assert cmd2_row is not None and cmd2_row[0] == 0

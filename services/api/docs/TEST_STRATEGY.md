@@ -12,7 +12,7 @@ The API test suite is intended to protect:
 - planning business rules
 - orchestration runtime behavior at service/API level
 - observability import/read flows
-- integration between routing, application services, repositories, and DB compatibility layers
+- integration between routing, application services, repositories, and PostgreSQL
 
 The suite is intentionally integration-heavy because the application is thin at the edge and most bugs show up at route/service/repository boundaries.
 
@@ -64,19 +64,52 @@ Orchestration tests cover:
 
 ---
 
-## 3) Test style
+## 3) Test types
 
-Current default style:
-- **integration-first** for route + service + repository flows
-- **targeted service tests** for orchestration behavior where route-only coverage is not enough
-- **support fixtures** for DB/runtime compatibility setup
+### Integration tests (default — bulk of the suite)
 
-Typical assertions validate:
-- status code
-- response envelope shape
-- DB side effects
-- business rule enforcement
-- deterministic orchestration/read-model outputs
+Route → service → repo → real PostgreSQL. Full vertical slice. Use when testing CRUD, business rules, status lifecycle, side effects, response shape.
+
+```python
+def test_create_task_with_story(client) -> None:
+    resp = client.post("/v1/planning/tasks", json={
+        "title": "Child Task", "task_type": "TASK",
+        "project_id": "p1", "story_id": "s1",
+    })
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    assert data["story_id"] == "s1"
+    assert data["key"] == "P1-1"
+```
+
+**When to use:** Default choice. Covers routing, validation, DI wiring, SQL, and response shape in one test.
+
+### Service tests (application layer, mocked ports)
+
+Service instantiated with fake/stub repositories. No DB, no HTTP. Use for complex orchestration logic, state machines, multi-step workflows where integration test would be slow or hard to set up.
+
+```python
+async def test_watchdog_retries_before_failing():
+    fake_repo = FakeRunRepository(runs=[
+        Run(id="r1", status="RUNNING", watchdog_attempt=2, max_attempts=3),
+    ])
+    service = WatchdogService(run_repo=fake_repo)
+    decisions = await service.sweep(evaluated_at=now)
+    assert decisions[0].action == "RETRY"  # not FAIL — still under max
+```
+
+**When to use:** Logic has branching/state that's tedious to reach via HTTP. Orchestration services are the prime candidate.
+
+### Unit tests (domain layer, pure functions)
+
+No dependencies. Test domain models, enums, value objects, validators, calculations.
+
+```python
+def test_status_transition_blocked_to_done_rejected():
+    assert not is_valid_transition(current="IN_PROGRESS", target="DONE", is_blocked=True)
+```
+
+**When to use:** Domain grows non-trivial invariants, calculations, or state rules that deserve isolated coverage.
 
 ---
 
@@ -110,6 +143,10 @@ Areas that deserve extra care:
 - assignee change / event emission behavior
 - orchestration retry / watchdog / read-model correctness
 - Dapr bridge behavior and failure handling
+
+## Related
+
+- [Testing Standards — Backend](../../../docs/standards/testing-standards-backend.md) — workspace-level test infrastructure rules, fixtures, and patterns
 
 ## Navigation
 

@@ -1,15 +1,14 @@
-import sqlite3
+from tests.support.postgres_compat import pg_connect
 
 TS = "2026-01-01T00:00:00Z"
 
 
 def _activity_count(db_path: str, event_name: str) -> int:
-    conn = sqlite3.connect(db_path)
-    row = conn.execute(
-        "SELECT COUNT(*) FROM activity_log WHERE event_name = ?",
-        (event_name,),
-    ).fetchone()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM activity_log WHERE event_name = %s",
+            [event_name],
+        ).fetchone()
     return int(row[0]) if row else 0
 
 
@@ -31,12 +30,11 @@ def test_change_epic_status_quick_action_and_audit(client, _setup_test_db) -> No
     assert data["to_status"] == "IN_PROGRESS"
     assert data["actor_id"] == "agent-1"
 
-    conn = sqlite3.connect(_setup_test_db)
-    row = conn.execute(
-        "SELECT event_name, actor_id, actor_type, entity_type, entity_id FROM activity_log "
-        "WHERE event_name = 'epic.status.changed' ORDER BY created_at DESC LIMIT 1"
-    ).fetchone()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        row = conn.execute(
+            "SELECT event_name, actor_id, actor_type, entity_type, entity_id FROM activity_log "
+            "WHERE event_name = 'epic.status.changed' ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
     assert row == ("epic.status.changed", "agent-1", "agent", "epic", epic["id"])
 
 

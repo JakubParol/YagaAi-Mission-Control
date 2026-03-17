@@ -8,7 +8,7 @@ cd "$APP_DIR"
 if [[ ! -x ".venv/bin/python" ]]; then
   echo "[ERROR] Missing local virtualenv at $APP_DIR/.venv" >&2
   echo "Create it with:" >&2
-  echo "  cd $APP_DIR && python3 -m venv .venv && .venv/bin/pip install -r requirements-prod.txt" >&2
+  echo "  cd $APP_DIR && python3 -m venv .venv && .venv/bin/pip install poetry && .venv/bin/poetry install" >&2
   exit 1
 fi
 

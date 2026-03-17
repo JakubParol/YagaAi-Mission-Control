@@ -11,7 +11,7 @@ Note: Seed data (conftest) includes b2 = SPRINT/ACTIVE for project p1.
 Tests that need a clean slate for sprints use project p2 (no seeded sprint).
 """
 
-import sqlite3
+from tests.support.postgres_compat import pg_connect
 
 PREFIX = "/v1/planning/backlogs"
 ACTIVE_SPRINT_URL = f"{PREFIX}/active-sprint"
@@ -154,13 +154,13 @@ def test_active_sprint_nonexistent_project(client):
 
 
 def test_active_sprint_reflects_story_label_mutation(client, _setup_test_db):
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-hotfix", "p1", "hotfix", "#ffaa00", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-hotfix", "p1", "hotfix", "#ffaa00", TS],
+        )
+        conn.commit()
 
     _add_story(client, "b2", "s1", 0)
     attach_resp = client.post("/v1/planning/stories/s1/labels", json={"label_id": "lbl-hotfix"})
@@ -183,17 +183,19 @@ def test_active_sprint_reflects_story_label_mutation(client, _setup_test_db):
 
 
 def test_active_sprint_resolves_story_assignee_from_metadata(client, _setup_test_db):
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute(
-        """
-        UPDATE stories
-        SET metadata_json = ?
-        WHERE id = ?
-        """,
-        ('{"quick_create_assignee_agent_id":"a1","quick_create_source":"board_todo_column"}', "s1"),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute(
+            """
+            UPDATE stories
+            SET metadata_json = %s
+            WHERE id = %s
+            """,
+            [
+                '{"quick_create_assignee_agent_id":"a1","quick_create_source":"board_todo_column"}',
+                "s1",
+            ],
+        )
+        conn.commit()
 
     _add_story(client, "b2", "s1", 0)
 
@@ -208,13 +210,12 @@ def test_active_sprint_resolves_story_assignee_from_metadata(client, _setup_test
 
 
 def test_active_sprint_keeps_assignee_id_when_agent_missing(client, _setup_test_db):
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute(
-        "UPDATE stories SET metadata_json = ? WHERE id = ?",
-        ('{"quick_create_assignee_agent_id":"missing-agent"}', "s1"),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute(
+            "UPDATE stories SET metadata_json = %s WHERE id = %s",
+            ['{"quick_create_assignee_agent_id":"missing-agent"}', "s1"],
+        )
+        conn.commit()
 
     _add_story(client, "b2", "s1", 0)
 

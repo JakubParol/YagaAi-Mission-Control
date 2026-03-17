@@ -1,16 +1,18 @@
-import sqlite3
+import psycopg
+
+from tests.support.postgres_compat import pg_connect
 
 
-def _seed_command(conn: sqlite3.Connection, *, command_id: str, correlation_id: str) -> None:
+def _seed_command(conn: psycopg.Connection, *, command_id: str, correlation_id: str) -> None:
     conn.execute(
         """
         INSERT INTO orchestration_commands(
           id, command_type, schema_version, occurred_at, producer, correlation_id,
           causation_id, payload_json, status, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (
+        [
             command_id,
             "orchestration.run.submit",
             "1.0",
@@ -21,11 +23,11 @@ def _seed_command(conn: sqlite3.Connection, *, command_id: str, correlation_id: 
             "{}",
             "ACCEPTED",
             "2026-03-08T10:00:00Z",
-        ),
+        ],
     )
 
 
-def _seed_run(conn: sqlite3.Connection, *, run_id: str, status: str, correlation_id: str) -> None:
+def _seed_run(conn: psycopg.Connection, *, run_id: str, status: str, correlation_id: str) -> None:
     conn.execute(
         """
         INSERT INTO orchestration_runs(
@@ -33,9 +35,9 @@ def _seed_run(conn: sqlite3.Connection, *, run_id: str, status: str, correlation
           created_at, updated_at, run_type, lease_owner, lease_token,
           last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (
+        [
             run_id,
             status,
             correlation_id,
@@ -51,12 +53,12 @@ def _seed_run(conn: sqlite3.Connection, *, run_id: str, status: str, correlation
             1,
             "RETRY_SCHEDULED",
             None,
-        ),
+        ],
     )
 
 
 def _seed_timeline_entry(
-    conn: sqlite3.Connection,
+    conn: psycopg.Connection,
     *,
     entry_id: str,
     run_id: str,
@@ -73,9 +75,9 @@ def _seed_timeline_entry(
           id, run_id, step_id, message_id, event_type, decision, reason_code, reason_message,
           correlation_id, causation_id, payload_json, occurred_at, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (
+        [
             entry_id,
             run_id,
             "step-1",
@@ -89,26 +91,25 @@ def _seed_timeline_entry(
             payload_json,
             occurred_at,
             occurred_at,
-        ),
+        ],
     )
 
 
 def test_run_state_endpoints_include_identifier_contract(client, db_path: str) -> None:
-    conn = sqlite3.connect(db_path)
-    _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
-    _seed_timeline_entry(
-        conn,
-        entry_id="t-1",
-        run_id="run-1",
-        event_type="orchestration.run.started",
-        decision="ACCEPTED",
-        occurred_at="2026-03-08T10:09:00Z",
-        correlation_id="corr-1",
-        causation_id="cause-1",
-        payload_json='{"step_id":"step-1"}',
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
+        _seed_timeline_entry(
+            conn,
+            entry_id="t-1",
+            run_id="run-1",
+            event_type="orchestration.run.started",
+            decision="ACCEPTED",
+            occurred_at="2026-03-08T10:09:00Z",
+            correlation_id="corr-1",
+            causation_id="cause-1",
+            payload_json='{"step_id":"step-1"}',
+        )
+        conn.commit()
 
     list_response = client.get("/v1/orchestration/runs", params={"status": "RUNNING"})
     assert list_response.status_code == 200
@@ -131,56 +132,55 @@ def test_run_state_endpoints_include_identifier_contract(client, db_path: str) -
 def test_timeline_endpoint_supports_filters_and_deterministic_pagination(
     client, db_path: str
 ) -> None:
-    conn = sqlite3.connect(db_path)
-    _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
-    _seed_run(conn, run_id="run-2", status="FAILED", correlation_id="corr-2")
+    with pg_connect(db_path) as conn:
+        _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
+        _seed_run(conn, run_id="run-2", status="FAILED", correlation_id="corr-2")
 
-    _seed_timeline_entry(
-        conn,
-        entry_id="t-1",
-        run_id="run-1",
-        event_type="orchestration.run.started",
-        decision="ACCEPTED",
-        occurred_at="2026-03-08T10:00:00Z",
-        correlation_id="corr-1",
-        causation_id="cause-1",
-        payload_json='{"step_id":"step-1"}',
-    )
-    _seed_timeline_entry(
-        conn,
-        entry_id="t-2",
-        run_id="run-1",
-        event_type="orchestration.watchdog.action",
-        decision="ACCEPTED",
-        occurred_at="2026-03-08T10:00:00Z",
-        correlation_id="corr-1",
-        causation_id="cause-2",
-        payload_json='{"action":"RETRY"}',
-    )
-    _seed_timeline_entry(
-        conn,
-        entry_id="t-3",
-        run_id="run-1",
-        event_type="orchestration.step.started",
-        decision="ACCEPTED",
-        occurred_at="2026-03-08T10:01:00Z",
-        correlation_id="corr-1",
-        causation_id="cause-3",
-        payload_json='{"step_id":"step-2"}',
-    )
-    _seed_timeline_entry(
-        conn,
-        entry_id="t-4",
-        run_id="run-2",
-        event_type="orchestration.run.failed",
-        decision="ACCEPTED",
-        occurred_at="2026-03-08T10:02:00Z",
-        correlation_id="corr-2",
-        causation_id="cause-4",
-        payload_json="{}",
-    )
-    conn.commit()
-    conn.close()
+        _seed_timeline_entry(
+            conn,
+            entry_id="t-1",
+            run_id="run-1",
+            event_type="orchestration.run.started",
+            decision="ACCEPTED",
+            occurred_at="2026-03-08T10:00:00Z",
+            correlation_id="corr-1",
+            causation_id="cause-1",
+            payload_json='{"step_id":"step-1"}',
+        )
+        _seed_timeline_entry(
+            conn,
+            entry_id="t-2",
+            run_id="run-1",
+            event_type="orchestration.watchdog.action",
+            decision="ACCEPTED",
+            occurred_at="2026-03-08T10:00:00Z",
+            correlation_id="corr-1",
+            causation_id="cause-2",
+            payload_json='{"action":"RETRY"}',
+        )
+        _seed_timeline_entry(
+            conn,
+            entry_id="t-3",
+            run_id="run-1",
+            event_type="orchestration.step.started",
+            decision="ACCEPTED",
+            occurred_at="2026-03-08T10:01:00Z",
+            correlation_id="corr-1",
+            causation_id="cause-3",
+            payload_json='{"step_id":"step-2"}',
+        )
+        _seed_timeline_entry(
+            conn,
+            entry_id="t-4",
+            run_id="run-2",
+            event_type="orchestration.run.failed",
+            decision="ACCEPTED",
+            occurred_at="2026-03-08T10:02:00Z",
+            correlation_id="corr-2",
+            causation_id="cause-4",
+            payload_json="{}",
+        )
+        conn.commit()
 
     page1 = client.get("/v1/orchestration/timeline", params={"limit": 2, "offset": 0})
     assert page1.status_code == 200
@@ -214,41 +214,40 @@ def test_timeline_endpoint_supports_filters_and_deterministic_pagination(
 
 
 def test_run_attempts_endpoint_returns_attempts_and_not_found(client, db_path: str) -> None:
-    conn = sqlite3.connect(db_path)
-    _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
-    _seed_command(conn, command_id="cmd-1", correlation_id="corr-1")
-    conn.execute(
-        """
-        INSERT INTO orchestration_outbox(
-          id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
-          causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
-          published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+    with pg_connect(db_path) as conn:
+        _seed_run(conn, run_id="run-1", status="RUNNING", correlation_id="corr-1")
+        _seed_command(conn, command_id="cmd-1", correlation_id="corr-1")
+        conn.execute(
+            """
+            INSERT INTO orchestration_outbox(
+              id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
+              causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
+              published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "out-1",
+                "cmd-1",
+                "orchestration.run.submit.accepted",
+                "1.0",
+                "2026-03-08T10:03:00Z",
+                "mc-cli",
+                "corr-1",
+                "cause-1",
+                '{"accepted_command_id":"cmd-1"}',
+                "PENDING",
+                2,
+                5,
+                "2026-03-08T10:04:00Z",
+                None,
+                "WORKER_ERROR: timeout",
+                None,
+                None,
+                "2026-03-08T10:03:00Z",
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "out-1",
-            "cmd-1",
-            "orchestration.run.submit.accepted",
-            "1.0",
-            "2026-03-08T10:03:00Z",
-            "mc-cli",
-            "corr-1",
-            "cause-1",
-            '{"accepted_command_id":"cmd-1"}',
-            "PENDING",
-            2,
-            5,
-            "2026-03-08T10:04:00Z",
-            None,
-            "WORKER_ERROR: timeout",
-            None,
-            None,
-            "2026-03-08T10:03:00Z",
-        ),
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     response = client.get("/v1/orchestration/runs/run-1/attempts")
     assert response.status_code == 200
@@ -269,149 +268,148 @@ def test_run_attempts_endpoint_returns_attempts_and_not_found(client, db_path: s
 def test_orchestration_metrics_endpoint_returns_queue_and_latency_metrics(
     client, db_path: str
 ) -> None:
-    conn = sqlite3.connect(db_path)
-    _seed_command(conn, command_id="cmd-metrics-1", correlation_id="corr-metrics-1")
-    _seed_command(conn, command_id="cmd-metrics-2", correlation_id="corr-metrics-2")
-    conn.execute(
-        """
-        INSERT INTO orchestration_runs(
-          run_id, status, correlation_id, current_step_id, last_event_type,
-          created_at, updated_at, run_type, lease_owner, lease_token,
-          last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+    with pg_connect(db_path) as conn:
+        _seed_command(conn, command_id="cmd-metrics-1", correlation_id="corr-metrics-1")
+        _seed_command(conn, command_id="cmd-metrics-2", correlation_id="corr-metrics-2")
+        conn.execute(
+            """
+            INSERT INTO orchestration_runs(
+              run_id, status, correlation_id, current_step_id, last_event_type,
+              created_at, updated_at, run_type, lease_owner, lease_token,
+              last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "run-metrics-1",
+                "SUCCEEDED",
+                "corr-metrics-1",
+                None,
+                "orchestration.run.succeeded",
+                "2026-03-08T10:00:00Z",
+                "2026-03-08T10:00:03Z",
+                "DEFAULT",
+                None,
+                None,
+                None,
+                None,
+                0,
+                "NONE",
+                "2026-03-08T10:00:03Z",
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "run-metrics-1",
-            "SUCCEEDED",
-            "corr-metrics-1",
-            None,
-            "orchestration.run.succeeded",
-            "2026-03-08T10:00:00Z",
-            "2026-03-08T10:00:03Z",
-            "DEFAULT",
-            None,
-            None,
-            None,
-            None,
-            0,
-            "NONE",
-            "2026-03-08T10:00:03Z",
-        ),
-    )
-    conn.execute(
-        """
-        INSERT INTO orchestration_runs(
-          run_id, status, correlation_id, current_step_id, last_event_type,
-          created_at, updated_at, run_type, lease_owner, lease_token,
-          last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+        conn.execute(
+            """
+            INSERT INTO orchestration_runs(
+              run_id, status, correlation_id, current_step_id, last_event_type,
+              created_at, updated_at, run_type, lease_owner, lease_token,
+              last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "run-metrics-2",
+                "FAILED",
+                "corr-metrics-2",
+                None,
+                "orchestration.run.failed",
+                "2026-03-08T10:00:00Z",
+                "2026-03-08T10:00:08Z",
+                "DEFAULT",
+                None,
+                None,
+                None,
+                None,
+                0,
+                "FAILED_BY_WATCHDOG",
+                "2026-03-08T10:00:08Z",
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "run-metrics-2",
-            "FAILED",
-            "corr-metrics-2",
-            None,
-            "orchestration.run.failed",
-            "2026-03-08T10:00:00Z",
-            "2026-03-08T10:00:08Z",
-            "DEFAULT",
-            None,
-            None,
-            None,
-            None,
-            0,
-            "FAILED_BY_WATCHDOG",
-            "2026-03-08T10:00:08Z",
-        ),
-    )
-    conn.execute(
-        """
-        INSERT INTO orchestration_outbox(
-          id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
-          causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
-          published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+        conn.execute(
+            """
+            INSERT INTO orchestration_outbox(
+              id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
+              causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
+              published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "out-metrics-1",
+                "cmd-metrics-1",
+                "orchestration.run.submit.accepted",
+                "1.0",
+                "2026-03-08T10:00:00Z",
+                "mc-cli",
+                "corr-metrics-1",
+                None,
+                '{"run_id":"run-metrics-1"}',
+                "PENDING",
+                2,
+                5,
+                "2026-03-08T10:00:00Z",
+                None,
+                "WORKER_ERROR: timeout",
+                None,
+                None,
+                "2026-03-08T10:00:00Z",
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "out-metrics-1",
-            "cmd-metrics-1",
-            "orchestration.run.submit.accepted",
-            "1.0",
-            "2026-03-08T10:00:00Z",
-            "mc-cli",
-            "corr-metrics-1",
-            None,
-            '{"run_id":"run-metrics-1"}',
-            "PENDING",
-            2,
-            5,
-            "2026-03-08T10:00:00Z",
-            None,
-            "WORKER_ERROR: timeout",
-            None,
-            None,
-            "2026-03-08T10:00:00Z",
-        ),
-    )
-    conn.execute(
-        """
-        INSERT INTO orchestration_outbox(
-          id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
-          causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
-          published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+        conn.execute(
+            """
+            INSERT INTO orchestration_outbox(
+              id, command_id, event_type, schema_version, occurred_at, producer, correlation_id,
+              causation_id, payload_json, status, retry_attempt, max_attempts, available_at,
+              published_at, last_error, dead_lettered_at, dead_letter_payload_json, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "out-metrics-2",
+                "cmd-metrics-2",
+                "orchestration.run.submit.accepted",
+                "1.0",
+                "2026-03-08T10:00:00Z",
+                "mc-cli",
+                "corr-metrics-2",
+                None,
+                '{"run_id":"run-metrics-2"}',
+                "FAILED",
+                5,
+                5,
+                "2026-03-08T10:00:00Z",
+                None,
+                "WORKER_ERROR: poison payload",
+                "2026-03-08T10:01:00Z",
+                '{"dead_letter_reason":"MAX_ATTEMPTS_EXCEEDED"}',
+                "2026-03-08T10:00:00Z",
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "out-metrics-2",
-            "cmd-metrics-2",
-            "orchestration.run.submit.accepted",
-            "1.0",
-            "2026-03-08T10:00:00Z",
-            "mc-cli",
-            "corr-metrics-2",
-            None,
-            '{"run_id":"run-metrics-2"}',
-            "FAILED",
-            5,
-            5,
-            "2026-03-08T10:00:00Z",
-            None,
-            "WORKER_ERROR: poison payload",
-            "2026-03-08T10:01:00Z",
-            '{"dead_letter_reason":"MAX_ATTEMPTS_EXCEEDED"}',
-            "2026-03-08T10:00:00Z",
-        ),
-    )
-    conn.execute(
-        """
-        INSERT INTO orchestration_run_timeline(
-          id, run_id, step_id, message_id, event_type, decision, reason_code, reason_message,
-          correlation_id, causation_id, payload_json, occurred_at, created_at
+        conn.execute(
+            """
+            INSERT INTO orchestration_run_timeline(
+              id, run_id, step_id, message_id, event_type, decision, reason_code, reason_message,
+              correlation_id, causation_id, payload_json, occurred_at, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "timeline-metrics-1",
+                "run-metrics-2",
+                None,
+                "msg-metrics-1",
+                "orchestration.watchdog.action",
+                "ACCEPTED",
+                "RUN_TIMEOUT",
+                "Watchdog applied FAIL",
+                "corr-metrics-2",
+                None,
+                '{"action":"FAIL"}',
+                "2026-03-08T10:01:00Z",
+                "2026-03-08T10:01:00Z",
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "timeline-metrics-1",
-            "run-metrics-2",
-            None,
-            "msg-metrics-1",
-            "orchestration.watchdog.action",
-            "ACCEPTED",
-            "RUN_TIMEOUT",
-            "Watchdog applied FAIL",
-            "corr-metrics-2",
-            None,
-            '{"action":"FAIL"}',
-            "2026-03-08T10:01:00Z",
-            "2026-03-08T10:01:00Z",
-        ),
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     response = client.get("/v1/orchestration/metrics")
     assert response.status_code == 200

@@ -7,6 +7,7 @@ These standards apply to all projects unless a project-specific doc overrides th
 Before working on any layer, read this entire file **and** the stack-specific standard:
 
 - **Backend (Python / FastAPI):** [coding-standards-backend.md](./coding-standards-backend.md) — MANDATORY before any backend change
+- **Backend Testing:** [testing-standards-backend.md](./testing-standards-backend.md) — MANDATORY before writing or modifying backend tests
 - **Frontend (Next.js / React):** [coding-standards-frontend.md](./coding-standards-frontend.md) — MANDATORY before any frontend change
 
 ---

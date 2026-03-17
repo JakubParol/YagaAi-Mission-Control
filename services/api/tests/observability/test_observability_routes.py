@@ -10,7 +10,7 @@ Coverage:
 
 Fixtures:
 - client — FastAPI TestClient (from conftest)
-- _setup_test_db — in-memory SQLite with observability schema (from conftest)
+- _setup_test_db — Langfuse settings mock (from conftest)
 """
 
 
@@ -24,9 +24,7 @@ def test_get_costs_empty_db(client) -> None:
     assert response.status_code == 200
     body = response.json()
     assert "data" in body
-    costs = body["data"]
-    assert "daily" in costs
-    assert isinstance(costs["daily"], list)
+    assert isinstance(body["data"]["daily"], list)
 
 
 def test_get_requests_empty_db(client) -> None:
@@ -34,10 +32,7 @@ def test_get_requests_empty_db(client) -> None:
     assert response.status_code == 200
     body = response.json()
     assert "data" in body
-    inner = body["data"]
-    assert "data" in inner
-    assert "meta" in inner
-    assert inner["meta"]["page"] == 1
+    assert "meta" in body
 
 
 def test_get_request_models_empty_db(client) -> None:
@@ -45,9 +40,7 @@ def test_get_request_models_empty_db(client) -> None:
     assert response.status_code == 200
     body = response.json()
     assert "data" in body
-    inner = body["data"]
-    assert "models" in inner
-    assert isinstance(inner["models"], list)
+    assert isinstance(body["data"]["models"], list)
 
 
 def test_get_import_status_empty_db(client) -> None:
