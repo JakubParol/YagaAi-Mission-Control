@@ -6,7 +6,6 @@
 import { apiUrl } from "@/lib/api-client";
 import { startOfDay } from "@/lib/dashboard/format-helpers";
 import type {
-  CostMetrics,
   DailyCost,
   LangfuseModelUsage,
   ModelUsage,
@@ -183,9 +182,3 @@ export function buildCustomRangeLabel(
   return formatFn(customRange.from, "MMM d, yyyy");
 }
 
-/** Fetch cost metrics for a given URL. */
-export async function fetchCostMetrics(url: string): Promise<CostMetrics> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as CostMetrics;
-}

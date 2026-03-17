@@ -1,25 +1,14 @@
-# Dashboard Refactoring Plan
+# Dashboard Refactor Plan (Phase 2)
 
-## Current State
-- `lib/dashboard-types.ts` — types at root level
-- `components/dashboard/format-helpers.ts` — pure helpers
-- `components/dashboard/costs-section.tsx` — 467 lines, has inline business logic
-- `components/dashboard/dashboard.tsx` — main component, OK size
-- `components/dashboard/import-controls.tsx` — OK
-- `components/dashboard/requests-section.tsx` — OK size
-- `components/dashboard/index.ts` — barrel export
-- `app/dashboard/page.tsx` — has inline fetchJson
+## Remaining Issues
+1. `costs-view-model.ts` contains `fetchCostMetrics()` — API call in a pure view model
+2. `costs-section.tsx` (333 lines) — over 300-line limit, inline fetch calls
+3. `dashboard.tsx` — inline fetch in handleImportComplete
+4. `import-controls.tsx` — inline fetch for import trigger
+5. `requests-section.tsx` — inline fetch for models list
 
-## Target Structure
-1. Move `lib/dashboard-types.ts` → `lib/dashboard/types.ts`
-2. Move `components/dashboard/format-helpers.ts` → `lib/dashboard/format-helpers.ts` (pure functions belong in lib)
-3. Extract costs business logic from `costs-section.tsx` into `app/dashboard/costs-view-model.ts`
-4. Update all imports
-
-## Execution Order
-1. Create `lib/dashboard/types.ts` and `lib/dashboard/index.ts`
-2. Move `format-helpers.ts` to `lib/dashboard/`
-3. Extract costs view model
-4. Update all imports
-5. Remove old files
-6. Lint check
+## Actions
+1. Create `app/dashboard/dashboard-actions.ts` with all API call functions
+2. Remove `fetchCostMetrics` from costs-view-model.ts (side effect in pure module)
+3. Refactor costs-section.tsx to use actions, get under 300 lines
+4. Refactor import-controls.tsx, requests-section.tsx, dashboard.tsx to use actions

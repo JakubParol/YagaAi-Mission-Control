@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { formatUSD, formatTokens, timeAgo } from "@/lib/dashboard/format-helpers";
+import { fetchRequestModels } from "@/app/dashboard/dashboard-actions";
 import type { LLMRequest, LLMRequestsResponse } from "@/lib/dashboard/types";
 
 function RequestRow({ req }: { req: LLMRequest }) {
@@ -108,9 +109,8 @@ export function RequestsSection({
 
   const [models, setModels] = useState<string[]>([]);
   useEffect(() => {
-    fetch(apiUrl("/v1/observability/requests/models"))
-      .then((res) => res.json())
-      .then((data) => setModels(data.models ?? []))
+    fetchRequestModels()
+      .then((data) => setModels(data))
       .catch(() => {});
   }, []);
 
