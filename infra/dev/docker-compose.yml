@@ -84,6 +84,8 @@ services:
         npm run dev -- --hostname 0.0.0.0 --port 3000
     volumes:
       - ../../:/workspace
+      - web-node-modules:/workspace/apps/web/node_modules
+      - web-next-cache:/workspace/apps/web/.next
     ports:
       - "${MC_WEB_PORT:-3000}:3000"
     depends_on:
@@ -209,3 +211,5 @@ services:
 
 volumes:
   postgres-data:
+  web-node-modules:
+  web-next-cache:
