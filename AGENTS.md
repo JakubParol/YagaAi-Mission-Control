@@ -80,6 +80,13 @@ If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one
 - Focus ONLY on the specific task described in your prompt
 - Read project docs for context (drill-down is still useful), but do NOT execute any workflow steps beyond what your prompt asks
 
+## Review guidelines
+
+- Treat correctness, edge cases, error handling, and performance regressions as P1.
+- Do not stop after the first 1-2 findings.
+- Review the entire diff systematically.
+- Check API contract changes, null handling, retries, race conditions, and backward compatibility.
+
 ## Navigation
 
 - [README.md](./README.md)
