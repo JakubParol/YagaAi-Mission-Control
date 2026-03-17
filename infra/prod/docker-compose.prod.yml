@@ -74,6 +74,7 @@ services:
       API_URL: ${API_URL:-http://api:5100}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
       PORT: ${MC_WEB_INTERNAL_PORT:-3000}
+      HOSTNAME: "0.0.0.0"
       NODE_ENV: production
     ports:
       - "${MC_PROD_WEB_PORT:-3100}:${MC_WEB_INTERNAL_PORT:-3000}"
