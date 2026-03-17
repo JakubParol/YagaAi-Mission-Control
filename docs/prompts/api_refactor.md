@@ -3,7 +3,7 @@ You are running a fully autonomous code quality and architecture enforcement ses
 ## Git Setup
 
 1. You MUST be on `main`. Run `git pull` to get latest.
-2. Create a new branch: `git checkout -b refactor/api-quality-sweep`
+2. Create a new branch: `git checkout -b refactor/api-quality-sweep-{UUID}`
 3. All work happens on this branch. Commit frequently.
 
 ## Required Reading (read ALL before doing anything)

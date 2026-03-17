@@ -11,7 +11,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label="Toggle theme"
       className={cn(
         "focus-ring flex h-7 w-7 items-center justify-center rounded-lg",
         "text-muted-foreground hover:text-foreground",
@@ -19,11 +19,11 @@ export function ThemeToggle() {
         "transition-colors duration-150",
       )}
     >
-      {theme === "dark" ? (
-        <Sun aria-hidden="true" className="h-3.5 w-3.5" />
-      ) : (
-        <Moon aria-hidden="true" className="h-3.5 w-3.5" />
-      )}
+      {/* Render both icons; CSS hides the inactive one to avoid hydration mismatch.
+          Server always renders "dark" so Sun is visible, Moon is hidden.
+          The inline head script + useSyncExternalStore correct this before paint. */}
+      <Sun aria-hidden="true" className={cn("h-3.5 w-3.5", theme !== "dark" && "hidden")} />
+      <Moon aria-hidden="true" className={cn("h-3.5 w-3.5", theme === "dark" && "hidden")} />
     </button>
   );
 }
