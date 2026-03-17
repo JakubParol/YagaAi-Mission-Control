@@ -11,7 +11,7 @@ import type {
   CostMetrics,
   LLMRequestsResponse,
   ImportStatusInfo,
-} from "@/lib/dashboard-types";
+} from "@/lib/dashboard/types";
 
 export interface DashboardProps {
   initialCosts: CostMetrics;

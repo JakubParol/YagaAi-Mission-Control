@@ -17,140 +17,25 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  formatUSD,
-  formatTokens,
-  toDateStr,
-  startOfDay,
-} from "./format-helpers";
+import { formatUSD, formatTokens, startOfDay } from "@/lib/dashboard/format-helpers";
 import type { DateRange } from "react-day-picker";
-import type {
-  CostMetrics,
-  DailyCost,
-  ModelUsage,
-  LangfuseModelUsage,
-} from "@/lib/dashboard-types";
+import type { CostMetrics, DailyCost } from "@/lib/dashboard/types";
+import {
+  TIME_RANGES,
+  buildCostUrl,
+  aggregateModels,
+  aggregateStatCards,
+  computeCostTotals,
+  mergeStatCardData,
+  type CostStatCardValues,
+} from "@/app/dashboard/costs-view-model";
 
-const TIME_RANGES = [
-  { label: "Today", key: "today" },
-  { label: "Yesterday", key: "yesterday" },
-  { label: "7 Days", key: "7d" },
-  { label: "30 Days", key: "30d" },
-] as const;
-
-/**
- * All filters use ISO timestamps so the API queries individual requests
- * with timezone-aware boundaries (local midnight → now / next midnight).
- */
-function buildCostUrl(
-  activeFilter: string,
-  customRange?: DateRange,
-): string {
-  const now = new Date();
-  const todayStart = startOfDay(now);
-
-  let from: string;
-  let to: string;
-
-  if (activeFilter === "custom" && customRange?.from) {
-    const fromDay = startOfDay(customRange.from);
-    const toDay = customRange.to ? startOfDay(customRange.to) : fromDay;
-    const toNextDay = new Date(toDay);
-    toNextDay.setDate(toNextDay.getDate() + 1);
-    from = fromDay.toISOString();
-    to = toNextDay.toISOString();
-  } else {
-    switch (activeFilter) {
-      case "today":
-        from = todayStart.toISOString();
-        to = now.toISOString();
-        break;
-      case "yesterday": {
-        const yesterdayStart = new Date(todayStart);
-        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-        from = yesterdayStart.toISOString();
-        to = todayStart.toISOString();
-        break;
-      }
-      case "30d": {
-        const d = new Date(todayStart);
-        d.setDate(d.getDate() - 30);
-        from = d.toISOString();
-        to = now.toISOString();
-        break;
-      }
-      default: {
-        // "7d"
-        const d = new Date(todayStart);
-        d.setDate(d.getDate() - 7);
-        from = d.toISOString();
-        to = now.toISOString();
-        break;
-      }
-    }
-  }
-
-  return apiUrl(`/v1/observability/costs?from=${from}&to=${to}`);
-}
-
-function mapUsage(u: LangfuseModelUsage): ModelUsage {
-  return {
-    model: u.model,
-    inputTokens: u.inputUsage ?? 0,
-    outputTokens: u.outputUsage ?? 0,
-    totalCost: u.totalCost ?? 0,
-    countObservations: u.countObservations ?? 0,
-  };
-}
-
-/** Compute stat card values — always based on today/yesterday regardless of filter. */
-function aggregateStatCards(daily: DailyCost[]) {
-  const now = new Date();
-  const today = toDateStr(now);
-  const yesterdayDate = new Date(now);
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterday = toDateStr(yesterdayDate);
-
-  let todaySpend = 0;
-  let yesterdaySpend = 0;
-  let todayRequests = 0;
-
-  for (const day of daily) {
-    const date = day.date?.split("T")[0];
-    if (date === today) {
-      todaySpend += day.totalCost ?? 0;
-      todayRequests += day.countObservations ?? 0;
-    }
-    if (date === yesterday) {
-      yesterdaySpend += day.totalCost ?? 0;
-    }
-  }
-
-  const avgCost = todayRequests > 0 ? todaySpend / todayRequests : 0;
-  return { todaySpend, yesterdaySpend, todayRequests, avgCost };
-}
-
-/** Aggregate per-model breakdown from filtered daily data. */
-function aggregateModels(daily: DailyCost[]): ModelUsage[] {
-  const modelMap = new Map<string, ModelUsage>();
-
-  for (const day of daily) {
-    for (const u of day.usage ?? []) {
-      const existing = modelMap.get(u.model);
-      if (existing) {
-        existing.inputTokens += u.inputUsage ?? 0;
-        existing.outputTokens += u.outputUsage ?? 0;
-        existing.totalCost += u.totalCost ?? 0;
-        existing.countObservations += u.countObservations ?? 0;
-      } else {
-        modelMap.set(u.model, mapUsage(u));
-      }
-    }
-  }
-
-  return Array.from(modelMap.values()).sort(
-    (a, b) => b.totalCost - a.totalCost,
-  );
+interface CostStatCardProps {
+  label: string;
+  value: string;
+  icon: typeof DollarSign;
+  iconColor: string;
+  iconBg: string;
 }
 
 function CostStatCard({
@@ -159,13 +44,7 @@ function CostStatCard({
   icon: Icon,
   iconColor,
   iconBg,
-}: {
-  label: string;
-  value: string;
-  icon: typeof DollarSign;
-  iconColor: string;
-  iconBg: string;
-}) {
+}: CostStatCardProps) {
   return (
     <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
       <div
@@ -189,7 +68,11 @@ function CostStatCard({
   );
 }
 
-export function CostsSection({ initialData }: { initialData: CostMetrics }) {
+export interface CostsSectionProps {
+  initialData: CostMetrics;
+}
+
+export function CostsSection({ initialData }: CostsSectionProps) {
   const [activeFilter, setActiveFilter] = useState<string>("today");
   const [customRange, setCustomRange] = useState<DateRange | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -207,7 +90,7 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
       .catch(() => {});
   }, [url]);
 
-  const [statCards, setStatCards] = useState(() =>
+  const [statCards, setStatCards] = useState<CostStatCardValues>(() =>
     aggregateStatCards(initialData.daily),
   );
   useEffect(() => {
@@ -226,31 +109,14 @@ export function CostsSection({ initialData }: { initialData: CostMetrics }) {
       .then(([todayData, yesterdayData]) => {
         const tDaily: DailyCost[] = todayData.daily ?? [];
         const yDaily: DailyCost[] = yesterdayData.daily ?? [];
-        const todaySpend = tDaily.reduce((s, d) => s + (d.totalCost ?? 0), 0);
-        const todayReqs = tDaily.reduce((s, d) => s + (d.countObservations ?? 0), 0);
-        const yesterdaySpend = yDaily.reduce((s, d) => s + (d.totalCost ?? 0), 0);
-        setStatCards({
-          todaySpend,
-          yesterdaySpend,
-          todayRequests: todayReqs,
-          avgCost: todayReqs > 0 ? todaySpend / todayReqs : 0,
-        });
+        setStatCards(mergeStatCardData(tDaily, yDaily));
       })
       .catch(() => {});
   }, []);
   const { todaySpend, yesterdaySpend, todayRequests, avgCost } = statCards;
 
-  const models = useMemo(
-    () => aggregateModels(costs.daily),
-    [costs.daily],
-  );
-
-  const totals = useMemo(() => ({
-    requests: models.reduce((s, m) => s + m.countObservations, 0),
-    tokensIn: models.reduce((s, m) => s + m.inputTokens, 0),
-    tokensOut: models.reduce((s, m) => s + m.outputTokens, 0),
-    cost: models.reduce((s, m) => s + m.totalCost, 0),
-  }), [models]);
+  const models = useMemo(() => aggregateModels(costs.daily), [costs.daily]);
+  const totals = useMemo(() => computeCostTotals(models), [models]);
 
   const handlePresetClick = (key: string) => {
     setActiveFilter(key);

@@ -5,7 +5,7 @@ import type {
   CostMetrics,
   LLMRequestsResponse,
   ImportStatusInfo,
-} from "@/lib/dashboard-types";
+} from "@/lib/dashboard/types";
 
 export const dynamic = "force-dynamic";
 

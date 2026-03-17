@@ -37,22 +37,7 @@ services:
     environment:
       MC_API_POSTGRES_DSN: postgresql+psycopg://${MC_POSTGRES_USER:-mission_control}:${MC_POSTGRES_PASSWORD:-mission_control_dev}@postgres:5432/${MC_POSTGRES_DB:-mission_control}
       MC_API_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:3100","http://127.0.0.1:3100","http://localhost:3001","http://127.0.0.1:3001"]'
-    command:
-      - /bin/sh
-      - -lc
-      - |
-        python - <<'PY'
-        import socket, time, sys
-        for _ in range(60):
-          try:
-            socket.gethostbyname('postgres')
-            break
-          except Exception:
-            time.sleep(1)
-        else:
-          sys.exit('postgres DNS not ready after 60s')
-        PY
-        exec uvicorn app.main:app --host 0.0.0.0 --port 5100
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5100"]
     ports:
       - "${MC_API_PORT:-5000}:5100"
     depends_on:
@@ -61,11 +46,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5100/healthz', timeout=2)\""]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; r.urlopen('http://127.0.0.1:5100/healthz',timeout=2)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   web:
     image: node:22-alpine
@@ -81,9 +66,11 @@ services:
       - -lc
       - |
         npm ci
-        npm run dev -- --hostname 0.0.0.0 --port 3000
+        npx next dev --hostname 0.0.0.0 --port 3000
     volumes:
       - ../../:/workspace
+      - web-node-modules:/workspace/apps/web/node_modules
+      - web-next-cache:/workspace/apps/web/.next
     ports:
       - "${MC_WEB_PORT:-3000}:3000"
     depends_on:
@@ -209,3 +196,5 @@ services:
 
 volumes:
   postgres-data:
+  web-node-modules:
+  web-next-cache:

@@ -53,11 +53,11 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5100/healthz', timeout=2)\""]
-      interval: 10s
-      timeout: 5s
-      retries: 15
-      start_period: 20s
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; r.urlopen('http://127.0.0.1:5100/healthz',timeout=2)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
   web:
     image: mission-control/web:${MC_IMAGE_TAG:-latest}

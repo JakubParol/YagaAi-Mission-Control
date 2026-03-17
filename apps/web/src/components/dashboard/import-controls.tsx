@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "./format-helpers";
-import type { ImportStatusInfo } from "@/lib/dashboard-types";
+import { formatDate } from "@/lib/dashboard/format-helpers";
+import type { ImportStatusInfo } from "@/lib/dashboard/types";
 
 type ImportButtonState = "idle" | "loading" | "success" | "error";
 

@@ -12,6 +12,7 @@ const allowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS
 
 const nextConfig: NextConfig = {
   distDir: NEXT_DIST_DIR,
+  output: "standalone",
   allowedDevOrigins,
   async rewrites() {
     return [

@@ -5,8 +5,8 @@ import { apiUrl } from "@/lib/api-client";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
-import { formatUSD, formatTokens, timeAgo } from "./format-helpers";
-import type { LLMRequest, LLMRequestsResponse } from "@/lib/dashboard-types";
+import { formatUSD, formatTokens, timeAgo } from "@/lib/dashboard/format-helpers";
+import type { LLMRequest, LLMRequestsResponse } from "@/lib/dashboard/types";
 
 function RequestRow({ req }: { req: LLMRequest }) {
   const [expanded, setExpanded] = useState(false);
