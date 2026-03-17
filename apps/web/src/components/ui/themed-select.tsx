@@ -62,8 +62,7 @@ export function findSelectedEnabledOptionIndex(
   options: readonly ThemedSelectOption[],
   value: string,
 ): number {
-  if (value === "") return -1;
-  return options.findIndex((option) => option.value === value && !option.disabled);
+  return value === "" ? -1 : options.findIndex((o) => o.value === value && !o.disabled);
 }
 
 export function getNextEnabledOptionIndex(
@@ -71,11 +70,11 @@ export function getNextEnabledOptionIndex(
   currentIndex: number,
   direction: 1 | -1,
 ): number {
-  if (options.length === 0) return -1;
   const total = options.length;
+  if (total === 0) return -1;
   for (let step = 1; step <= total; step += 1) {
-    const nextIndex = (currentIndex + direction * step + total) % total;
-    if (!options[nextIndex]?.disabled) return nextIndex;
+    const idx = (currentIndex + direction * step + total) % total;
+    if (!options[idx]?.disabled) return idx;
   }
   return -1;
 }
@@ -85,18 +84,10 @@ export function getHighlightIndexForKey(
   currentIndex: number,
   key: "ArrowDown" | "ArrowUp" | "Home" | "End",
 ): number | null {
-  if (key === "ArrowDown") {
-    return getNextEnabledOptionIndex(options, currentIndex, 1);
-  }
-  if (key === "ArrowUp") {
-    return getNextEnabledOptionIndex(options, currentIndex, -1);
-  }
-  if (key === "Home") {
-    return findFirstEnabledOptionIndex(options);
-  }
-  if (key === "End") {
-    return findLastEnabledOptionIndex(options);
-  }
+  if (key === "ArrowDown") return getNextEnabledOptionIndex(options, currentIndex, 1);
+  if (key === "ArrowUp") return getNextEnabledOptionIndex(options, currentIndex, -1);
+  if (key === "Home") return findFirstEnabledOptionIndex(options);
+  if (key === "End") return findLastEnabledOptionIndex(options);
   return null;
 }
 
@@ -104,9 +95,61 @@ export function resolveInitialHighlightIndex(
   options: readonly ThemedSelectOption[],
   value: string,
 ): number {
-  const selectedIndex = findSelectedEnabledOptionIndex(options, value);
-  if (selectedIndex >= 0) return selectedIndex;
-  return findFirstEnabledOptionIndex(options);
+  const idx = findSelectedEnabledOptionIndex(options, value);
+  return idx >= 0 ? idx : findFirstEnabledOptionIndex(options);
+}
+
+const OPEN_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", " "]);
+const NAV_KEYS = new Set<"ArrowDown" | "ArrowUp" | "Home" | "End">(["ArrowDown", "ArrowUp", "Home", "End"]);
+
+function useSelectInteraction(
+  options: readonly ThemedSelectOption[],
+  value: string,
+  isDisabled: boolean,
+  onValueChange: (value: string) => void,
+) {
+  const [open, setOpen] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
+
+  React.useEffect(() => {
+    if (open) setHighlightedIndex(resolveInitialHighlightIndex(options, value));
+  }, [open, options, value]);
+
+  const close = React.useCallback(() => { setOpen(false); setHighlightedIndex(-1); }, []);
+
+  const selectOption = React.useCallback(
+    (option: ThemedSelectOption) => {
+      if (!option.disabled) { onValueChange(option.value); close(); }
+    },
+    [close, onValueChange],
+  );
+
+  const handleTriggerKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>) => {
+      if (isDisabled) return;
+      if (!open) {
+        if (OPEN_KEYS.has(event.key)) { event.preventDefault(); setOpen(true); }
+        return;
+      }
+      const navKey = event.key as "ArrowDown" | "ArrowUp" | "Home" | "End";
+      if (NAV_KEYS.has(navKey)) {
+        event.preventDefault();
+        const base = highlightedIndex === -1 ? resolveInitialHighlightIndex(options, value) : highlightedIndex;
+        const nextIndex = getHighlightIndexForKey(options, base, navKey);
+        if (nextIndex !== null) setHighlightedIndex(nextIndex);
+        return;
+      }
+      if (event.key === "Escape") { event.preventDefault(); close(); return; }
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const option = highlightedIndex >= 0 ? options[highlightedIndex] : undefined;
+        if (option && !option.disabled) selectOption(option);
+      }
+    },
+    [isDisabled, open, options, value, highlightedIndex, close, selectOption],
+  );
+
+  return { open, setOpen, highlightedIndex, setHighlightedIndex, selectOption, handleTriggerKeyDown };
 }
 
 /**
@@ -131,81 +174,16 @@ export function ThemedSelect({
   renderOption,
   onValueChange,
 }: ThemedSelectProps) {
-  const [open, setOpen] = React.useState(false);
-  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
   const listboxId = React.useId();
+  const isDisabled = disabled || options.length === 0;
 
   const selectedOption = React.useMemo(
     () => options.find((option) => option.value === value) ?? null,
     [options, value],
   );
 
-  const isDisabled = disabled || options.length === 0;
-
-  React.useEffect(() => {
-    if (!open) return;
-    setHighlightedIndex(resolveInitialHighlightIndex(options, value));
-  }, [open, options, value]);
-
-  const close = React.useCallback(() => {
-    setOpen(false);
-    setHighlightedIndex(-1);
-  }, []);
-
-  const selectOption = React.useCallback(
-    (option: ThemedSelectOption) => {
-      if (option.disabled) return;
-      onValueChange(option.value);
-      close();
-    },
-    [close, onValueChange],
-  );
-
-  const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (isDisabled) return;
-    if (!open) {
-      if (
-        event.key === "ArrowDown" ||
-        event.key === "ArrowUp" ||
-        event.key === "Enter" ||
-        event.key === " "
-      ) {
-        event.preventDefault();
-        setOpen(true);
-      }
-      return;
-    }
-
-    if (
-      event.key === "ArrowDown" ||
-      event.key === "ArrowUp" ||
-      event.key === "Home" ||
-      event.key === "End"
-    ) {
-      event.preventDefault();
-      const nextIndex = getHighlightIndexForKey(
-        options,
-        highlightedIndex === -1 ? resolveInitialHighlightIndex(options, value) : highlightedIndex,
-        event.key,
-      );
-      if (nextIndex !== null) setHighlightedIndex(nextIndex);
-      return;
-    }
-
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      if (highlightedIndex < 0 || highlightedIndex >= options.length) return;
-      const option = options[highlightedIndex];
-      if (!option || option.disabled) return;
-      selectOption(option);
-    }
-  };
+  const { open, setOpen, highlightedIndex, setHighlightedIndex, selectOption, handleTriggerKeyDown } =
+    useSelectInteraction(options, value, isDisabled, onValueChange);
 
   const activeDescendant =
     highlightedIndex >= 0 ? `${listboxId}-option-${highlightedIndex}` : undefined;
@@ -271,46 +249,34 @@ export function ThemedSelect({
           ) : (
             <div className="space-y-1">
               {options.map((option, index) => {
-                const selected = option.value === value;
-                const highlighted = index === highlightedIndex;
-                const disabledOption = Boolean(option.disabled);
-                const optionState: ThemedSelectRenderState = {
-                  selected,
-                  highlighted,
-                  disabled: disabledOption,
-                };
-
+                const isSelected = option.value === value;
+                const isHighlighted = index === highlightedIndex;
+                const isOptionDisabled = Boolean(option.disabled);
                 return (
                   <button
                     key={option.value}
                     id={`${listboxId}-option-${index}`}
                     type="button"
                     role="option"
-                    aria-selected={selected}
-                    disabled={disabledOption}
-                    data-highlighted={highlighted || undefined}
+                    aria-selected={isSelected}
+                    disabled={isOptionDisabled}
+                    data-highlighted={isHighlighted || undefined}
                     className={cn(
                       "focus-ring flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm transition-colors",
                       "text-foreground hover:bg-accent/70 hover:text-accent-foreground",
                       "data-[highlighted=true]:bg-accent/70 data-[highlighted=true]:text-accent-foreground",
                       "disabled:cursor-not-allowed disabled:opacity-50",
                     )}
-                    onMouseEnter={() => {
-                      if (disabledOption) return;
-                      setHighlightedIndex(index);
-                    }}
+                    onMouseEnter={() => !isOptionDisabled && setHighlightedIndex(index)}
                     onPointerDown={stopThemedSelectEventPropagation}
-                    onClick={(event) => {
-                      stopThemedSelectEventPropagation(event);
-                      selectOption(option);
-                    }}
+                    onClick={(e) => { stopThemedSelectEventPropagation(e); selectOption(option); }}
                   >
                     <span className="min-w-0 grow truncate">
-                      {renderOption ? renderOption(option, optionState) : option.label}
+                      {renderOption
+                        ? renderOption(option, { selected: isSelected, highlighted: isHighlighted, disabled: isOptionDisabled })
+                        : option.label}
                     </span>
-                    {selected ? (
-                      <Check className="size-3.5 text-primary" aria-hidden="true" />
-                    ) : null}
+                    {isSelected && <Check className="size-3.5 text-primary" aria-hidden="true" />}
                   </button>
                 );
               })}
