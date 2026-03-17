@@ -5,7 +5,6 @@ class BacklogCreate(BaseModel):
     project_id: str | None = None
     name: str = Field(..., min_length=1, max_length=200)
     kind: str = Field(..., pattern=r"^(BACKLOG|SPRINT|IDEAS)$")
-    display_order: int | None = Field(None, ge=0)
     goal: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -14,7 +13,7 @@ class BacklogCreate(BaseModel):
 class BacklogUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     status: str | None = Field(None, pattern=r"^(OPEN|ACTIVE|CLOSED)$")
-    display_order: int | None = Field(None, ge=0)
+    rank: str | None = None
     goal: str | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -27,7 +26,7 @@ class BacklogResponse(BaseModel):
     name: str
     kind: str
     status: str
-    display_order: int
+    rank: str
     is_default: bool
     goal: str | None
     start_date: str | None
@@ -39,96 +38,90 @@ class BacklogResponse(BaseModel):
     updated_at: str
 
 
-class BacklogAddStory(BaseModel):
-    story_id: str = Field(..., min_length=1)
-    position: int | None = Field(None, ge=0)
-
-
-class BacklogAddTask(BaseModel):
-    task_id: str = Field(..., min_length=1)
-    position: int = Field(..., ge=0)
-
-
-class BacklogStoryItemResponse(BaseModel):
-    backlog_id: str
-    story_id: str
-    position: int
-    added_at: str
-
-
-class BacklogTaskItemResponse(BaseModel):
-    backlog_id: str
-    task_id: str
-    position: int
-    added_at: str
-
-
-class BacklogReorderStoryItem(BaseModel):
-    story_id: str = Field(..., min_length=1)
-    position: int = Field(..., ge=0)
-
-
-class BacklogReorderTaskItem(BaseModel):
-    task_id: str = Field(..., min_length=1)
-    position: int = Field(..., ge=0)
-
-
-class BacklogReorderRequest(BaseModel):
-    stories: list[BacklogReorderStoryItem] = Field(default_factory=list)
-    tasks: list[BacklogReorderTaskItem] = Field(default_factory=list)
-
-
-class BacklogReorderResponse(BaseModel):
-    updated_story_count: int
-    updated_task_count: int
-
-
 class BacklogKindTransitionRequest(BaseModel):
     kind: str = Field(..., pattern=r"^(BACKLOG|SPRINT|IDEAS)$")
 
 
-class SprintStoryLabelResponse(BaseModel):
+# ---------------------------------------------------------------------------
+# Item membership (unified)
+# ---------------------------------------------------------------------------
+
+
+class BacklogAddItem(BaseModel):
+    work_item_id: str = Field(..., min_length=1)
+    rank: str | None = None
+
+
+class BacklogItemResponse(BaseModel):
+    backlog_id: str
+    work_item_id: str
+    rank: str
+    added_at: str
+
+
+class BacklogItemRankUpdateRequest(BaseModel):
+    rank: str = Field(..., min_length=1)
+
+
+# ---------------------------------------------------------------------------
+# Active sprint
+# ---------------------------------------------------------------------------
+
+
+class ActiveSprintItemLabelResponse(BaseModel):
     id: str
     name: str
     color: str | None
 
 
-class SprintStoryResponse(BaseModel):
+class ActiveSprintItemResponse(BaseModel):
     id: str
     key: str | None
     title: str
+    type: str
+    sub_type: str | None
     status: str
     priority: int | None
-    story_type: str
-    epic_key: str | None = None
-    epic_title: str | None = None
-    position: int
-    task_count: int
-    done_task_count: int
+    parent_id: str | None
+    parent_key: str | None = None
+    parent_title: str | None = None
+    rank: str
+    children_count: int = 0
+    done_children_count: int = 0
     assignee_agent_id: str | None = None
     assignee_name: str | None = None
     assignee_last_name: str | None = None
     assignee_initials: str | None = None
     assignee_avatar: str | None = None
-    labels: list[SprintStoryLabelResponse] = Field(default_factory=list)
+    labels: list[ActiveSprintItemLabelResponse] = Field(default_factory=list)
     label_ids: list[str] = Field(default_factory=list)
 
 
 class ActiveSprintResponse(BaseModel):
     backlog: BacklogResponse
-    stories: list[SprintStoryResponse]
+    items: list[ActiveSprintItemResponse]
 
 
-class SprintMembershipMoveRequest(BaseModel):
-    story_id: str = Field(..., min_length=1)
-    position: int | None = Field(None, ge=0)
+# ---------------------------------------------------------------------------
+# Sprint membership
+# ---------------------------------------------------------------------------
 
 
-class SprintMembershipMoveResponse(BaseModel):
-    story_id: str
-    project_id: str
+class SprintMembershipRequest(BaseModel):
+    work_item_id: str = Field(..., min_length=1)
+
+
+class SprintMembershipResponse(BaseModel):
+    work_item_id: str
     source_backlog_id: str
     target_backlog_id: str
-    source_position: int | None
-    target_position: int | None
     moved: bool
+
+
+# ---------------------------------------------------------------------------
+# Sprint completion
+# ---------------------------------------------------------------------------
+
+
+class SprintCompleteRequest(BaseModel):
+    target_backlog_id: str = Field(..., min_length=1)
