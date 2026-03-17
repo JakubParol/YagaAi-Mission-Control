@@ -24,7 +24,11 @@ export function useTheme(): ThemeContextValue {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === "undefined") return "dark";
-    return parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY));
+    try {
+      return parseThemePreference(localStorage.getItem(THEME_STORAGE_KEY));
+    } catch {
+      return "dark";
+    }
   });
 
   useEffect(() => {
@@ -39,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
-      localStorage.setItem(THEME_STORAGE_KEY, serializeThemePreference(next));
+      try { localStorage.setItem(THEME_STORAGE_KEY, serializeThemePreference(next)); } catch { /* storage unavailable */ }
       return next;
     });
   }, []);
