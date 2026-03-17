@@ -172,7 +172,7 @@ function BacklogPageContent() {
     () => {
       if (!completeDialog) return;
       void ops.handleCompleteDialogConfirm(completeDialog, completeTargetBacklogId, completeDialogTargetOptions, setCompleteDialogError)
-        .then(() => { setCompleteDialog(null); setCompleteTargetBacklogId(""); });
+        .then((ok) => { if (ok) { setCompleteDialog(null); setCompleteTargetBacklogId(""); } });
     },
     [completeDialog, completeDialogTargetOptions, completeTargetBacklogId, ops],
   );

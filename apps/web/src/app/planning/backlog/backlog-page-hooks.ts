@@ -75,10 +75,10 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
       completeTargetBacklogId: string,
       completeDialogTargetOptions: ReadonlyArray<{ id: string }>,
       setError: (msg: string | null) => void,
-    ) => {
-      if (!singleProjectId || !defaultBacklogId) return;
-      if (!completeTargetBacklogId) { setError("Select where open work items should be moved."); return; }
-      if (!completeDialogTargetOptions.some((b) => b.id === completeTargetBacklogId)) { setError("Selected target board is no longer available. Refresh and try again."); return; }
+    ): Promise<boolean> => {
+      if (!singleProjectId || !defaultBacklogId) return false;
+      if (!completeTargetBacklogId) { setError("Select where open work items should be moved."); return false; }
+      if (!completeDialogTargetOptions.some((b) => b.id === completeTargetBacklogId)) { setError("Selected target board is no longer available. Refresh and try again."); return false; }
       setError(null);
       setPendingSprintIds((prev) => ({ ...prev, [completeDialog.backlogId]: true }));
       try {
@@ -86,7 +86,8 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
         await completeSprint(singleProjectId, completeDialog.backlogId);
         emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId: completeDialog.backlogId, operation: "complete" });
         await refreshCurrentView();
-      } catch (error) { setError(error instanceof Error ? error.message : "Failed to complete sprint."); }
+        return true;
+      } catch (error) { setError(error instanceof Error ? error.message : "Failed to complete sprint."); return false; }
       finally { setPendingSprintIds((prev) => removePendingId(prev, completeDialog.backlogId)); }
     },
     [defaultBacklogId, refreshCurrentView, singleProjectId, setPendingSprintIds],
