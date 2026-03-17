@@ -1,37 +1,36 @@
-import sqlite3
+from tests.support.postgres_compat import pg_connect
 
 
 def test_watchdog_sweep_endpoint_returns_decisions(client, db_path: str) -> None:
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        INSERT INTO orchestration_runs(
-          run_id, status, correlation_id, current_step_id, last_event_type,
-          created_at, updated_at, run_type, lease_owner, lease_token,
-          last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO orchestration_runs(
+              run_id, status, correlation_id, current_step_id, last_event_type,
+              created_at, updated_at, run_type, lease_owner, lease_token,
+              last_heartbeat_at, watchdog_timeout_at, watchdog_attempt, watchdog_state, terminal_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            [
+                "run-watchdog-route-1",
+                "RUNNING",
+                "corr-route-1",
+                None,
+                "orchestration.run.started",
+                "2026-03-08T12:00:00Z",
+                "2026-03-08T12:00:00Z",
+                "DEFAULT",
+                "worker-a",
+                "lease-route-1",
+                "2026-03-08T12:00:00Z",
+                "2026-03-08T12:01:00Z",
+                0,
+                "NONE",
+                None,
+            ],
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            "run-watchdog-route-1",
-            "RUNNING",
-            "corr-route-1",
-            None,
-            "orchestration.run.started",
-            "2026-03-08T12:00:00Z",
-            "2026-03-08T12:00:00Z",
-            "DEFAULT",
-            "worker-a",
-            "lease-route-1",
-            "2026-03-08T12:00:00Z",
-            "2026-03-08T12:01:00Z",
-            0,
-            "NONE",
-            None,
-        ),
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     response = client.post(
         "/v1/orchestration/watchdog/sweep",

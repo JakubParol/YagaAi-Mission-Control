@@ -13,14 +13,15 @@ Coverage:
 
 Fixtures:
 - client — FastAPI TestClient (from conftest)
-- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+- _setup_test_db — PostgreSQL test database with schema + seed data (from conftest)
 """
 
 import json
-import sqlite3
 
 import pytest
 from sqlalchemy.exc import ProgrammingError
+
+from tests.support.postgres_compat import pg_connect
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -289,20 +290,18 @@ def test_get_story_includes_task_count(client, _setup_test_db) -> None:
     story_id = create_resp.json()["data"]["id"]
 
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "INSERT INTO tasks (id, project_id, story_id, title, task_type, status, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("t-cnt-1", "p1", story_id, "Task 1", "TASK", "TODO", TS, TS),
-    )
-    conn.execute(
-        "INSERT INTO tasks (id, project_id, story_id, title, task_type, status, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("t-cnt-2", "p1", story_id, "Task 2", "TASK", "TODO", TS, TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO tasks (id, project_id, story_id, title, task_type, status, "
+            "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            ["t-cnt-1", "p1", story_id, "Task 1", "TASK", "TODO", TS, TS],
+        )
+        conn.execute(
+            "INSERT INTO tasks (id, project_id, story_id, title, task_type, status, "
+            "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            ["t-cnt-2", "p1", story_id, "Task 2", "TASK", "TODO", TS, TS],
+        )
+        conn.commit()
 
     resp = client.get(f"/v1/planning/stories/{story_id}")
     assert resp.json()["data"]["task_count"] == 2
@@ -386,16 +385,13 @@ def test_update_story_assignee_emits_activity_event(client, _setup_test_db) -> N
     )
     assert resp.status_code == 200
 
-    conn = sqlite3.connect(_setup_test_db)
-    row = conn.execute(
-        """
-        SELECT event_data_json
-        FROM activity_log
-        WHERE entity_type = 'story' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        """,
-        (story_id,),
-    ).fetchone()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        row = conn.execute(
+            "SELECT event_data_json FROM activity_log "
+            "WHERE entity_type = 'story' AND entity_id = %s "
+            "AND event_name = 'planning.assignment.changed'",
+            [story_id],
+        ).fetchone()
 
     assert row is not None
     payload = json.loads(row[0])
@@ -422,18 +418,16 @@ def test_update_story_same_assignee_is_noop_for_events(client, _setup_test_db) -
     )
     assert second.status_code == 200
 
-    conn = sqlite3.connect(_setup_test_db)
-    count = conn.execute(
-        """
-        SELECT COUNT(*)
-        FROM activity_log
-        WHERE entity_type = 'story' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        """,
-        (story_id,),
-    ).fetchone()[0]
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM activity_log "
+            "WHERE entity_type = 'story' AND entity_id = %s "
+            "AND event_name = 'planning.assignment.changed'",
+            [story_id],
+        ).fetchone()
 
-    assert count == 1
+    assert row is not None
+    assert row[0] == 1
 
 
 def test_update_story_assignee_rolls_back_without_activity_log_table(
@@ -444,10 +438,9 @@ def test_update_story_assignee_rolls_back_without_activity_log_table(
         json={"title": "St", "story_type": "USER_STORY", "project_id": "p1"},
     ).json()["data"]["id"]
 
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute("DROP TABLE activity_log")
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute("DROP TABLE activity_log")
+        conn.commit()
 
     with pytest.raises(ProgrammingError):
         client.patch(f"/v1/planning/stories/{story_id}", json={"current_assignee_agent_id": "a1"})
@@ -568,19 +561,17 @@ def test_delete_story_sets_null_on_tasks(client, _setup_test_db) -> None:
     story_id = create_resp.json()["data"]["id"]
 
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute(
-        "INSERT INTO tasks (id, project_id, story_id, title, task_type, status, "
-        "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        ("t-del-1", "p1", story_id, "Child Task", "TASK", "TODO", TS, TS),
-    )
-    conn.commit()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO tasks (id, project_id, story_id, title, task_type, status, "
+            "created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            ["t-del-1", "p1", story_id, "Child Task", "TASK", "TODO", TS, TS],
+        )
+        conn.commit()
 
-    client.delete(f"/v1/planning/stories/{story_id}")
+        client.delete(f"/v1/planning/stories/{story_id}")
 
-    row = conn.execute("SELECT story_id FROM tasks WHERE id = 't-del-1'").fetchone()
-    conn.close()
+        row = conn.execute("SELECT story_id FROM tasks WHERE id = 't-del-1'").fetchone()
     assert row is not None
     assert row[0] is None  # tasks.story_id references stories(id) ON DELETE SET NULL
 
@@ -590,13 +581,13 @@ def test_delete_story_sets_null_on_tasks(client, _setup_test_db) -> None:
 
 def test_attach_label(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-1", "p1", "bug", "red", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-1", "p1", "bug", "red", TS],
+        )
+        conn.commit()
 
     create_resp = client.post(
         "/v1/planning/stories",
@@ -616,13 +607,13 @@ def test_attach_label(client, _setup_test_db) -> None:
 
 def test_attach_label_duplicate(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-dup", "p1", "feature", "blue", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-dup", "p1", "feature", "blue", TS],
+        )
+        conn.commit()
 
     create_resp = client.post(
         "/v1/planning/stories",
@@ -637,13 +628,13 @@ def test_attach_label_duplicate(client, _setup_test_db) -> None:
 
 def test_attach_label_story_not_found(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-nf", "p1", "nf", "green", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-nf", "p1", "nf", "green", TS],
+        )
+        conn.commit()
 
     resp = client.post("/v1/planning/stories/nope/labels", json={"label_id": "lbl-nf"})
     assert resp.status_code == 404
@@ -662,13 +653,13 @@ def test_attach_label_nonexistent(client) -> None:
 
 def test_detach_label(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-det", "p1", "detach", "yellow", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-det", "p1", "detach", "yellow", TS],
+        )
+        conn.commit()
 
     create_resp = client.post(
         "/v1/planning/stories",

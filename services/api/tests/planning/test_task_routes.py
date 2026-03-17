@@ -16,14 +16,15 @@ Coverage:
 
 Fixtures:
 - client — FastAPI TestClient (from conftest)
-- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+- _setup_test_db — PostgreSQL test database with schema + seed data (from conftest)
 """
 
 import json
-import sqlite3
 
 import pytest
 from sqlalchemy.exc import ProgrammingError
+
+from tests.support.postgres_compat import pg_connect
 
 TS = "2026-01-01T00:00:00Z"
 
@@ -462,17 +463,16 @@ def test_update_task_same_assignee_is_noop_for_events(client, _setup_test_db) ->
     second = client.patch(f"/v1/planning/tasks/{task_id}", json={"current_assignee_agent_id": "a1"})
     assert second.status_code == 200
 
-    conn = sqlite3.connect(_setup_test_db)
-    count = conn.execute(
-        """
-        SELECT COUNT(*)
-        FROM activity_log
-        WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        """,
-        (task_id,),
-    ).fetchone()[0]
-    conn.close()
-    assert count == 1
+    with pg_connect(_setup_test_db) as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM activity_log "
+            "WHERE entity_type = 'task' AND entity_id = %s "
+            "AND event_name = 'planning.assignment.changed'",
+            [task_id],
+        ).fetchone()
+
+    assert row is not None
+    assert row[0] == 1
 
 
 # ── Delete ────────────────────────────────────────────────────────────────
@@ -546,18 +546,14 @@ def test_assign_agent_emits_activity_event(client, _setup_test_db) -> None:
     resp = client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a1"})
     assert resp.status_code == 201
 
-    conn = sqlite3.connect(_setup_test_db)
-    row = conn.execute(
-        """
-        SELECT event_data_json
-        FROM activity_log
-        WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-        """,
-        (task_id,),
-    ).fetchone()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        row = conn.execute(
+            "SELECT event_data_json FROM activity_log "
+            "WHERE entity_type = 'task' AND entity_id = %s "
+            "AND event_name = 'planning.assignment.changed' "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            [task_id],
+        ).fetchone()
 
     assert row is not None
     payload = json.loads(row[0])
@@ -600,18 +596,14 @@ def test_assign_agent_event_reassign_includes_previous_assignee(client, _setup_t
     second = client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a2"})
     assert second.status_code == 201
 
-    conn = sqlite3.connect(_setup_test_db)
-    row = conn.execute(
-        """
-        SELECT event_data_json
-        FROM activity_log
-        WHERE entity_type = 'task' AND entity_id = ? AND event_name = 'planning.assignment.changed'
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
-        """,
-        (task_id,),
-    ).fetchone()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        row = conn.execute(
+            "SELECT event_data_json FROM activity_log "
+            "WHERE entity_type = 'task' AND entity_id = %s "
+            "AND event_name = 'planning.assignment.changed' "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            [task_id],
+        ).fetchone()
 
     assert row is not None
     payload = json.loads(row[0])
@@ -665,10 +657,9 @@ def test_assign_agent_rolls_back_without_activity_log_table(client, _setup_test_
         json={"title": "T", "task_type": "TASK", "project_id": "p1"},
     ).json()["data"]["id"]
 
-    conn = sqlite3.connect(_setup_test_db)
-    conn.execute("DROP TABLE activity_log")
-    conn.commit()
-    conn.close()
+    with pg_connect(_setup_test_db) as conn:
+        conn.execute("DROP TABLE activity_log")
+        conn.commit()
 
     with pytest.raises(ProgrammingError):
         client.post(f"/v1/planning/tasks/{task_id}/assignments", json={"agent_id": "a1"})
@@ -693,13 +684,13 @@ def test_unassign_agent_not_assigned(client) -> None:
 
 def test_attach_label(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-t1", "p1", "bug", "red", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-t1", "p1", "bug", "red", TS],
+        )
+        conn.commit()
 
     task_id = client.post(
         "/v1/planning/tasks",
@@ -718,13 +709,13 @@ def test_attach_label(client, _setup_test_db) -> None:
 
 def test_attach_label_duplicate(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-tdup", "p1", "feature", "blue", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-tdup", "p1", "feature", "blue", TS],
+        )
+        conn.commit()
 
     task_id = client.post(
         "/v1/planning/tasks",
@@ -738,13 +729,13 @@ def test_attach_label_duplicate(client, _setup_test_db) -> None:
 
 def test_attach_label_task_not_found(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-tnf", "p1", "nf", "green", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-tnf", "p1", "nf", "green", TS],
+        )
+        conn.commit()
 
     resp = client.post("/v1/planning/tasks/nope/labels", json={"label_id": "lbl-tnf"})
     assert resp.status_code == 404
@@ -762,13 +753,13 @@ def test_attach_label_nonexistent(client) -> None:
 
 def test_detach_label(client, _setup_test_db) -> None:
     db_path = _setup_test_db
-    conn = sqlite3.connect(db_path)
-    conn.execute(
-        "INSERT INTO labels (id, project_id, name, color, created_at) VALUES (?, ?, ?, ?, ?)",
-        ("lbl-tdet", "p1", "detach", "yellow", TS),
-    )
-    conn.commit()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO labels (id, project_id, name, color, created_at) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ["lbl-tdet", "p1", "detach", "yellow", TS],
+        )
+        conn.commit()
 
     task_id = client.post(
         "/v1/planning/tasks",

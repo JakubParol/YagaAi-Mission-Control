@@ -3,10 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sqlite3
 from collections.abc import Iterator
 from pathlib import Path
-from unittest.mock import patch
 
 os.environ.setdefault(
     "MC_API_POSTGRES_DSN",
@@ -14,7 +12,6 @@ os.environ.setdefault(
 )
 
 # pylint: disable=wrong-import-position
-import aiosqlite  # noqa: E402
 import pytest  # noqa: E402
 from testcontainers.postgres import PostgresContainer  # noqa: E402
 
@@ -32,17 +29,15 @@ from app.planning.infrastructure import (  # noqa: E402,F401  # pylint: disable=
 )
 from app.shared.db.metadata import metadata  # noqa: E402,F401  # pylint: disable=unused-import
 from app.shared.db.session import close_db_engine  # noqa: E402
-from tests.support.postgres_compat import (  # noqa: E402
-    aiosqlite_connect,
-    reset_database_schema,
-    sqlite_connect,
-)
+from tests.support.postgres_compat import reset_database_schema  # noqa: E402
 
 # pylint: enable=wrong-import-position
 
 
 def _alembic_config(database_url: str) -> Config:
-    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    api_root = Path(__file__).resolve().parents[1]
+    config = Config(str(api_root / "alembic.ini"))
+    config.set_main_option("script_location", str(api_root / "alembic"))
     config.set_main_option("sqlalchemy.url", database_url)
     return config
 
@@ -80,22 +75,3 @@ def _reset_engine_state(
     asyncio.run(close_db_engine())
     yield
     asyncio.run(close_db_engine())
-
-
-@pytest.fixture(autouse=True)
-def _patch_sqlite_clients(
-    database_url: str,
-) -> Iterator[None]:
-    with (
-        patch.object(
-            sqlite3,
-            "connect",
-            lambda *args, **kwargs: sqlite_connect(database_url, *args, **kwargs),
-        ),
-        patch.object(
-            aiosqlite,
-            "connect",
-            lambda *args, **kwargs: aiosqlite_connect(database_url, *args, **kwargs),
-        ),
-    ):
-        yield

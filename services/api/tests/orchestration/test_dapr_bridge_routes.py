@@ -1,9 +1,10 @@
-import sqlite3
 from collections.abc import Sequence
 from typing import Any
 from unittest.mock import patch
 
 import httpx
+
+from tests.support.postgres_compat import pg_connect
 
 
 class _FakeAsyncClient:
@@ -138,18 +139,17 @@ def test_dapr_event_bridge_persists_state_and_invokes_worker(client, db_path: st
     assert fake.post_calls[0][0].endswith("/v1.0/state/local-statestore")
     assert fake.post_calls[1][0].endswith("/method/orchestration/ack")
 
-    conn = sqlite3.connect(db_path)
-    row = conn.execute(
-        """
-        SELECT correlation_id, causation_id
-        FROM orchestration_run_timeline
-        WHERE run_id = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        ("run-42",),
-    ).fetchone()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT correlation_id, causation_id
+            FROM orchestration_run_timeline
+            WHERE run_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            ["run-42"],
+        ).fetchone()
 
     assert row == ("corr-42", "cause-42")
 
@@ -210,18 +210,17 @@ def test_dapr_event_bridge_uses_traceparent_as_fallback_causation(client, db_pat
         )
 
     assert response.status_code == 200
-    conn = sqlite3.connect(db_path)
-    row = conn.execute(
-        """
-        SELECT causation_id
-        FROM orchestration_run_timeline
-        WHERE run_id = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        ("run-fallback-1",),
-    ).fetchone()
-    conn.close()
+    with pg_connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT causation_id
+            FROM orchestration_run_timeline
+            WHERE run_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            ["run-fallback-1"],
+        ).fetchone()
     assert row == ("00-fallback-parent-span-01",)
 
 
