@@ -1,20 +1,17 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
-from app.planning.api.schemas import (
+from app.planning.api.schemas.backlog import (
     ActiveSprintResponse,
-    BacklogAddStory,
-    BacklogAddTask,
+    BacklogAddItem,
     BacklogCreate,
+    BacklogItemRankUpdateRequest,
+    BacklogItemResponse,
     BacklogKindTransitionRequest,
-    BacklogReorderRequest,
-    BacklogReorderResponse,
     BacklogResponse,
-    BacklogStoryItemResponse,
-    BacklogTaskItemResponse,
     BacklogUpdate,
-    SprintMembershipMoveRequest,
-    SprintMembershipMoveResponse,
-    SprintStoryResponse,
+    SprintCompleteRequest,
+    SprintMembershipRequest,
+    SprintMembershipResponse,
 )
 from app.planning.application.backlog_service import BacklogService
 from app.planning.dependencies import get_backlog_service, resolve_project_key
@@ -25,7 +22,13 @@ from app.shared.api.errors import ValidationError
 router = APIRouter(prefix="/backlogs", tags=["planning/backlogs"])
 
 
-def _validate_backlog_project_scope(backlog_project_id: str | None, project_id: str | None) -> None:
+def _backlog_response(b) -> BacklogResponse:
+    return BacklogResponse(**b.__dict__)
+
+
+def _validate_backlog_project_scope(
+    backlog_project_id: str | None, project_id: str | None
+) -> None:
     if project_id is None:
         return
     if project_id == "null":
@@ -33,7 +36,14 @@ def _validate_backlog_project_scope(backlog_project_id: str | None, project_id: 
             raise ValidationError("Backlog does not belong to global scope")
         return
     if backlog_project_id != project_id:
-        raise ValidationError(f"Backlog does not belong to project {project_id}")
+        raise ValidationError(
+            f"Backlog does not belong to project {project_id}"
+        )
+
+
+# ------------------------------------------------------------------
+# CRUD
+# ------------------------------------------------------------------
 
 
 @router.post("", status_code=201)
@@ -45,12 +55,11 @@ async def create_backlog(
         project_id=body.project_id,
         name=body.name,
         kind=BacklogKind(body.kind),
-        display_order=body.display_order,
         goal=body.goal,
         start_date=body.start_date,
         end_date=body.end_date,
     )
-    return Envelope(data=BacklogResponse(**backlog.__dict__))
+    return Envelope(data=_backlog_response(backlog))
 
 
 @router.get("")
@@ -76,58 +85,9 @@ async def list_backlogs(
         sort=sort,
     )
     return ListEnvelope(
-        data=[BacklogResponse(**b.__dict__) for b in items],
+        data=[_backlog_response(b) for b in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
-
-
-@router.get("/active-sprint")
-async def get_active_sprint(
-    project_id: str | None = Depends(resolve_project_key),
-    service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[ActiveSprintResponse]:
-    if not project_id:
-        raise ValidationError("Either project_id or project_key is required")
-    backlog, stories = await service.get_active_sprint(project_id)
-    return Envelope(
-        data=ActiveSprintResponse(
-            backlog=BacklogResponse(**backlog.__dict__),
-            stories=[SprintStoryResponse(**s) for s in stories],
-        )
-    )
-
-
-@router.post("/active-sprint/stories")
-async def add_story_to_active_sprint(
-    body: SprintMembershipMoveRequest,
-    project_id: str | None = Depends(resolve_project_key),
-    service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[SprintMembershipMoveResponse]:
-    if not project_id:
-        raise ValidationError("Either project_id or project_key is required")
-    result = await service.move_story_to_active_sprint(
-        project_id=project_id,
-        story_id=body.story_id,
-        position=body.position,
-    )
-    return Envelope(data=SprintMembershipMoveResponse(**result))
-
-
-@router.delete("/active-sprint/stories/{story_id}")
-async def remove_story_from_active_sprint(
-    story_id: str,
-    project_id: str | None = Depends(resolve_project_key),
-    service: BacklogService = Depends(get_backlog_service),
-    position: int | None = Query(None, ge=0),
-) -> Envelope[SprintMembershipMoveResponse]:
-    if not project_id:
-        raise ValidationError("Either project_id or project_key is required")
-    result = await service.move_story_to_product_backlog(
-        project_id=project_id,
-        story_id=story_id,
-        position=position,
-    )
-    return Envelope(data=SprintMembershipMoveResponse(**result))
 
 
 @router.get("/{backlog_id}")
@@ -137,10 +97,31 @@ async def get_backlog(
 ) -> Envelope[BacklogResponse]:
     backlog = await service.get_backlog(backlog_id)
     counts = await service.get_backlog_counts(backlog_id)
-    return Envelope(
-        data=BacklogResponse(**backlog.__dict__),
-        meta=counts,
-    )
+    return Envelope(data=_backlog_response(backlog), meta=counts)
+
+
+@router.patch("/{backlog_id}")
+async def update_backlog(
+    backlog_id: str,
+    body: BacklogUpdate,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[BacklogResponse]:
+    data = body.model_dump(exclude_unset=True)
+    backlog = await service.update_backlog(backlog_id, data)
+    return Envelope(data=_backlog_response(backlog))
+
+
+@router.delete("/{backlog_id}", status_code=204)
+async def delete_backlog(
+    backlog_id: str,
+    service: BacklogService = Depends(get_backlog_service),
+) -> None:
+    await service.delete_backlog(backlog_id)
+
+
+# ------------------------------------------------------------------
+# Lifecycle
+# ------------------------------------------------------------------
 
 
 @router.post("/{backlog_id}/start")
@@ -152,19 +133,22 @@ async def start_sprint(
     backlog = await service.get_backlog(backlog_id)
     _validate_backlog_project_scope(backlog.project_id, project_id)
     updated, meta = await service.start_sprint(backlog_id)
-    return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
+    return Envelope(data=_backlog_response(updated), meta=meta)
 
 
 @router.post("/{backlog_id}/complete")
 async def complete_sprint(
     backlog_id: str,
+    body: SprintCompleteRequest,
     project_id: str | None = Depends(resolve_project_key),
     service: BacklogService = Depends(get_backlog_service),
 ) -> Envelope[BacklogResponse]:
     backlog = await service.get_backlog(backlog_id)
     _validate_backlog_project_scope(backlog.project_id, project_id)
-    updated, meta = await service.complete_sprint(backlog_id)
-    return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
+    updated, meta = await service.complete_sprint(
+        backlog_id, target_backlog_id=body.target_backlog_id
+    )
+    return Envelope(data=_backlog_response(updated), meta=meta)
 
 
 @router.post("/{backlog_id}/transition-kind")
@@ -177,116 +161,107 @@ async def transition_backlog_kind(
     backlog = await service.get_backlog(backlog_id)
     _validate_backlog_project_scope(backlog.project_id, project_id)
     updated, meta = await service.transition_backlog_kind(
-        backlog_id,
-        target_kind=BacklogKind(body.kind),
+        backlog_id, target_kind=BacklogKind(body.kind)
     )
-    return Envelope(data=BacklogResponse(**updated.__dict__), meta=meta)
+    return Envelope(data=_backlog_response(updated), meta=meta)
 
 
-@router.patch("/{backlog_id}")
-async def update_backlog(
+# ------------------------------------------------------------------
+# Item membership (unified)
+# ------------------------------------------------------------------
+
+
+@router.post("/{backlog_id}/items", status_code=201)
+async def add_item_to_backlog(
     backlog_id: str,
-    body: BacklogUpdate,
+    body: BacklogAddItem,
     service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[BacklogResponse]:
-    data = body.model_dump(exclude_unset=True)
-    backlog = await service.update_backlog(backlog_id, data)
-    return Envelope(data=BacklogResponse(**backlog.__dict__))
+) -> Envelope[BacklogItemResponse]:
+    result = await service.add_item_to_backlog(
+        backlog_id, body.work_item_id, body.rank
+    )
+    return Envelope(data=BacklogItemResponse(**result))
 
 
-@router.delete("/{backlog_id}", status_code=204)
-async def delete_backlog(
+@router.get("/{backlog_id}/items")
+async def list_backlog_items(
     backlog_id: str,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[list[dict]]:
+    items = await service.get_backlog_items(backlog_id)
+    return Envelope(data=items)
+
+
+@router.delete("/{backlog_id}/items/{work_item_id}", status_code=204)
+async def remove_item_from_backlog(
+    backlog_id: str,
+    work_item_id: str,
     service: BacklogService = Depends(get_backlog_service),
 ) -> None:
-    await service.delete_backlog(backlog_id)
+    await service.remove_item_from_backlog(backlog_id, work_item_id)
 
 
-@router.post("/{backlog_id}/stories")
-async def add_story_to_backlog(
+@router.patch("/{backlog_id}/items/{work_item_id}/rank")
+async def update_item_rank(
     backlog_id: str,
-    body: BacklogAddStory,
+    work_item_id: str,
+    body: BacklogItemRankUpdateRequest,
     service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[BacklogStoryItemResponse]:
-    item = await service.add_story_to_backlog(backlog_id, body.story_id, body.position)
-    return Envelope(
-        data=BacklogStoryItemResponse(
-            backlog_id=item.backlog_id,
-            story_id=item.story_id,
-            position=item.position,
-            added_at=item.added_at,
-        )
-    )
+) -> dict:
+    await service.update_item_rank(backlog_id, work_item_id, body.rank)
+    return {"updated": True}
 
 
-@router.get("/{backlog_id}/stories")
-async def list_backlog_stories(
-    backlog_id: str,
-    service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[list[SprintStoryResponse]]:
-    stories = await service.get_backlog_stories(backlog_id)
-    return Envelope(data=[SprintStoryResponse(**s) for s in stories])
+# ------------------------------------------------------------------
+# Active sprint
+# ------------------------------------------------------------------
 
 
-@router.get("/{backlog_id}/tasks")
-async def list_backlog_tasks(
-    backlog_id: str,
-    service: BacklogService = Depends(get_backlog_service),
+@router.get("/active-sprint")
+async def get_active_sprint(
     project_id: str | None = Depends(resolve_project_key),
-) -> ListEnvelope[BacklogTaskItemResponse]:
-    backlog = await service.get_backlog(backlog_id)
-    _validate_backlog_project_scope(backlog.project_id, project_id)
-    tasks = await service.list_backlog_tasks(backlog_id)
-    return ListEnvelope(
-        data=[BacklogTaskItemResponse(**item.__dict__) for item in tasks],
-        meta=ListMeta(total=len(tasks), limit=len(tasks), offset=0),
-    )
-
-
-@router.delete("/{backlog_id}/stories/{story_id}", status_code=204)
-async def remove_story_from_backlog(
-    backlog_id: str,
-    story_id: str,
     service: BacklogService = Depends(get_backlog_service),
-) -> None:
-    await service.remove_story_from_backlog(backlog_id, story_id)
-
-
-@router.post("/{backlog_id}/tasks")
-async def add_task_to_backlog(
-    backlog_id: str,
-    body: BacklogAddTask,
-    service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[BacklogTaskItemResponse]:
-    item = await service.add_task_to_backlog(backlog_id, body.task_id, body.position)
+) -> Envelope[ActiveSprintResponse]:
+    if not project_id:
+        raise ValidationError(
+            "Either project_id or project_key is required"
+        )
+    backlog, items = await service.get_active_sprint(project_id)
     return Envelope(
-        data=BacklogTaskItemResponse(
-            backlog_id=item.backlog_id,
-            task_id=item.task_id,
-            position=item.position,
-            added_at=item.added_at,
+        data=ActiveSprintResponse(
+            backlog=_backlog_response(backlog),
+            items=items,
         )
     )
 
 
-@router.delete("/{backlog_id}/tasks/{task_id}", status_code=204)
-async def remove_task_from_backlog(
-    backlog_id: str,
-    task_id: str,
+@router.post("/active-sprint/items")
+async def add_item_to_active_sprint(
+    body: SprintMembershipRequest,
+    project_id: str | None = Depends(resolve_project_key),
     service: BacklogService = Depends(get_backlog_service),
-) -> None:
-    await service.remove_task_from_backlog(backlog_id, task_id)
-
-
-@router.patch("/{backlog_id}/reorder")
-async def reorder_backlog_items(
-    backlog_id: str,
-    body: BacklogReorderRequest,
-    service: BacklogService = Depends(get_backlog_service),
-) -> Envelope[BacklogReorderResponse]:
-    summary = await service.reorder_backlog_items(
-        backlog_id,
-        [row.model_dump() for row in body.stories],
-        [row.model_dump() for row in body.tasks],
+) -> Envelope[SprintMembershipResponse]:
+    if not project_id:
+        raise ValidationError(
+            "Either project_id or project_key is required"
+        )
+    result = await service.move_item_to_active_sprint(
+        project_id=project_id, work_item_id=body.work_item_id
     )
-    return Envelope(data=BacklogReorderResponse(**summary))
+    return Envelope(data=SprintMembershipResponse(**result))
+
+
+@router.delete("/active-sprint/items/{work_item_id}")
+async def remove_item_from_active_sprint(
+    work_item_id: str,
+    project_id: str | None = Depends(resolve_project_key),
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[SprintMembershipResponse]:
+    if not project_id:
+        raise ValidationError(
+            "Either project_id or project_key is required"
+        )
+    result = await service.move_item_to_product_backlog(
+        project_id=project_id, work_item_id=work_item_id
+    )
+    return Envelope(data=SprintMembershipResponse(**result))

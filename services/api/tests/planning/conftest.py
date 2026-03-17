@@ -17,30 +17,27 @@ def _setup_test_db(database_url: str):
 
         INSERT INTO project_counters (project_id, next_number, updated_at)
         VALUES
-          ('p1', 1, '{TS}'),
+          ('p1', 6, '{TS}'),
           ('p2', 1, '{TS}');
 
         INSERT INTO backlogs (
-          id, project_id, name, kind, status, display_order, is_default, created_at, updated_at
+          id, project_id, name, kind, status, rank, is_default, created_at, updated_at
         )
         VALUES
-          ('b1', 'p1', 'P1 Backlog', 'BACKLOG', 'ACTIVE', 200, 0, '{TS}', '{TS}'),
-          ('b2', 'p1', 'P1 Sprint', 'SPRINT', 'ACTIVE', 100, 0, '{TS}', '{TS}'),
-          ('bg', NULL, 'Global Backlog', 'BACKLOG', 'ACTIVE', 100, 0, '{TS}', '{TS}');
+          ('b1', 'p1', 'P1 Backlog', 'BACKLOG', 'ACTIVE', 'n', 1, '{TS}', '{TS}'),
+          ('b2', 'p1', 'P1 Sprint', 'SPRINT', 'ACTIVE', 'g', 0, '{TS}', '{TS}'),
+          ('bg', NULL, 'Global Backlog', 'BACKLOG', 'ACTIVE', 'n', 0, '{TS}', '{TS}');
 
-        INSERT INTO stories (id, project_id, title, story_type, status, created_at, updated_at)
+        INSERT INTO work_items (id, project_id, parent_id, key, type, sub_type,
+          title, summary, status, status_mode, is_blocked, created_at, updated_at)
         VALUES
-          ('s1', 'p1', 'Story 1', 'USER_STORY', 'TODO', '{TS}', '{TS}'),
-          ('s2', 'p1', 'Story 2', 'USER_STORY', 'TODO', '{TS}', '{TS}'),
-          ('sp2', 'p2', 'Story P2', 'USER_STORY', 'TODO', '{TS}', '{TS}'),
-          ('sg', NULL, 'Global Story', 'USER_STORY', 'TODO', '{TS}', '{TS}');
-
-        INSERT INTO tasks (id, project_id, title, task_type, status, created_at, updated_at)
-        VALUES
-          ('t1', 'p1', 'Task 1', 'TASK', 'TODO', '{TS}', '{TS}'),
-          ('t2', 'p1', 'Task 2', 'TASK', 'TODO', '{TS}', '{TS}'),
-          ('tp2', 'p2', 'Task P2', 'TASK', 'TODO', '{TS}', '{TS}'),
-          ('tg', NULL, 'Global Task', 'TASK', 'TODO', '{TS}', '{TS}');
+          ('e1', 'p1', NULL, 'P1-1', 'EPIC', NULL, 'Epic 1', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}'),
+          ('s1', 'p1', 'e1', 'P1-2', 'STORY', 'USER_STORY', 'Story 1', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}'),
+          ('s2', 'p1', NULL, 'P1-3', 'STORY', 'USER_STORY', 'Story 2', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}'),
+          ('t1', 'p1', 's1', 'P1-4', 'TASK', 'CODING', 'Task 1', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}'),
+          ('t2', 'p1', NULL, 'P1-5', 'TASK', 'CODING', 'Task 2', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}'),
+          ('sp2', 'p2', NULL, NULL, 'STORY', 'USER_STORY', 'Story P2', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}'),
+          ('sg', NULL, NULL, NULL, 'STORY', 'USER_STORY', 'Global Story', NULL, 'TODO', 'MANUAL', 0, '{TS}', '{TS}');
 
         INSERT INTO agents (id, openclaw_key, name, last_name, initials, role, avatar, is_active, source, created_at, updated_at)
         VALUES

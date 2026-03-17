@@ -37,29 +37,6 @@ project_counters = Table(
     Column("updated_at", Text, nullable=False),
 )
 
-epics = Table(
-    "epics",
-    metadata,
-    Column("id", Text, primary_key=True),
-    Column("project_id", Text, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False),
-    Column("key", Text, nullable=False),
-    Column("title", Text, nullable=False),
-    Column("description", Text),
-    Column("status", Text, nullable=False, server_default=text("'TODO'")),
-    Column("status_mode", Text, nullable=False, server_default=text("'MANUAL'")),
-    Column("status_override", Text),
-    Column("status_override_set_at", Text),
-    Column("is_blocked", Integer, nullable=False, server_default=text("0")),
-    Column("blocked_reason", Text),
-    Column("priority", Integer),
-    Column("metadata_json", Text),
-    Column("created_by", Text),
-    Column("updated_by", Text),
-    Column("created_at", Text, nullable=False),
-    Column("updated_at", Text, nullable=False),
-    UniqueConstraint("project_id", "key"),
-)
-
 agents = Table(
     "agents",
     metadata,
@@ -79,22 +56,36 @@ agents = Table(
     Column("updated_at", Text, nullable=False),
 )
 
-stories = Table(
-    "stories",
+# ---------------------------------------------------------------------------
+# Work Items — unified polymorphic table (replaces stories, tasks, epics)
+# ---------------------------------------------------------------------------
+
+work_items = Table(
+    "work_items",
     metadata,
     Column("id", Text, primary_key=True),
     Column("project_id", Text, ForeignKey("projects.id", ondelete="CASCADE")),
-    Column("epic_id", Text, ForeignKey("epics.id", ondelete="SET NULL")),
+    Column("parent_id", Text, ForeignKey("work_items.id", ondelete="SET NULL")),
     Column("key", Text),
+    Column("type", Text, nullable=False),
+    Column("sub_type", Text),
     Column("title", Text, nullable=False),
-    Column("intent", Text),
+    Column("summary", Text),
     Column("description", Text),
-    Column("story_type", Text, nullable=False),
-    Column("status", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default=text("'TODO'")),
+    Column("status_mode", Text, nullable=False, server_default=text("'MANUAL'")),
+    Column("status_override", Text),
+    Column("status_override_set_at", Text),
     Column("is_blocked", Integer, nullable=False, server_default=text("0")),
     Column("blocked_reason", Text),
     Column("priority", Integer),
-    Column("current_assignee_agent_id", Text, ForeignKey("agents.id", ondelete="SET NULL")),
+    Column("estimate_points", REAL),
+    Column("due_at", Text),
+    Column(
+        "current_assignee_agent_id",
+        Text,
+        ForeignKey("agents.id", ondelete="SET NULL"),
+    ),
     Column("metadata_json", Text),
     Column("created_by", Text),
     Column("updated_by", Text),
@@ -104,31 +95,9 @@ stories = Table(
     Column("completed_at", Text),
 )
 
-tasks = Table(
-    "tasks",
-    metadata,
-    Column("id", Text, primary_key=True),
-    Column("project_id", Text, ForeignKey("projects.id", ondelete="CASCADE")),
-    Column("story_id", Text, ForeignKey("stories.id", ondelete="SET NULL")),
-    Column("key", Text),
-    Column("title", Text, nullable=False),
-    Column("objective", Text),
-    Column("task_type", Text, nullable=False),
-    Column("status", Text, nullable=False),
-    Column("is_blocked", Integer, nullable=False, server_default=text("0")),
-    Column("blocked_reason", Text),
-    Column("priority", Integer),
-    Column("estimate_points", REAL),
-    Column("due_at", Text),
-    Column("current_assignee_agent_id", Text, ForeignKey("agents.id", ondelete="SET NULL")),
-    Column("metadata_json", Text),
-    Column("created_by", Text),
-    Column("updated_by", Text),
-    Column("created_at", Text, nullable=False),
-    Column("updated_at", Text, nullable=False),
-    Column("started_at", Text),
-    Column("completed_at", Text),
-)
+# ---------------------------------------------------------------------------
+# Backlogs — rank replaces display_order
+# ---------------------------------------------------------------------------
 
 backlogs = Table(
     "backlogs",
@@ -138,7 +107,7 @@ backlogs = Table(
     Column("name", Text, nullable=False),
     Column("kind", Text, nullable=False),
     Column("status", Text, nullable=False),
-    Column("display_order", Integer, nullable=False, server_default=text("1000")),
+    Column("rank", Text, nullable=False, server_default=text("'n'")),
     Column("is_default", Integer, nullable=False, server_default=text("0")),
     Column("goal", Text),
     Column("start_date", Text),
@@ -150,27 +119,34 @@ backlogs = Table(
     Column("updated_at", Text, nullable=False),
 )
 
-backlog_stories = Table(
-    "backlog_stories",
+# ---------------------------------------------------------------------------
+# Backlog Items — unified (replaces backlog_stories + backlog_tasks)
+# ---------------------------------------------------------------------------
+
+backlog_items = Table(
+    "backlog_items",
     metadata,
-    Column("backlog_id", Text, ForeignKey("backlogs.id", ondelete="CASCADE"), nullable=False),
-    Column("story_id", Text, ForeignKey("stories.id", ondelete="CASCADE"), nullable=False),
-    Column("position", Integer, nullable=False),
+    Column(
+        "backlog_id",
+        Text,
+        ForeignKey("backlogs.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column(
+        "work_item_id",
+        Text,
+        ForeignKey("work_items.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("rank", Text, nullable=False),
     Column("added_at", Text, nullable=False),
-    PrimaryKeyConstraint("backlog_id", "story_id"),
-    UniqueConstraint("story_id"),
+    PrimaryKeyConstraint("backlog_id", "work_item_id"),
+    UniqueConstraint("work_item_id"),
 )
 
-backlog_tasks = Table(
-    "backlog_tasks",
-    metadata,
-    Column("backlog_id", Text, ForeignKey("backlogs.id", ondelete="CASCADE"), nullable=False),
-    Column("task_id", Text, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
-    Column("position", Integer, nullable=False),
-    Column("added_at", Text, nullable=False),
-    PrimaryKeyConstraint("backlog_id", "task_id"),
-    UniqueConstraint("task_id"),
-)
+# ---------------------------------------------------------------------------
+# Labels
+# ---------------------------------------------------------------------------
 
 labels = Table(
     "labels",
@@ -182,35 +158,54 @@ labels = Table(
     Column("created_at", Text, nullable=False),
 )
 
-story_labels = Table(
-    "story_labels",
+work_item_labels = Table(
+    "work_item_labels",
     metadata,
-    Column("story_id", Text, ForeignKey("stories.id", ondelete="CASCADE"), nullable=False),
-    Column("label_id", Text, ForeignKey("labels.id", ondelete="CASCADE"), nullable=False),
+    Column(
+        "work_item_id",
+        Text,
+        ForeignKey("work_items.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column(
+        "label_id",
+        Text,
+        ForeignKey("labels.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
     Column("added_at", Text, nullable=False),
-    PrimaryKeyConstraint("story_id", "label_id"),
+    PrimaryKeyConstraint("work_item_id", "label_id"),
 )
 
-task_labels = Table(
-    "task_labels",
-    metadata,
-    Column("task_id", Text, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
-    Column("label_id", Text, ForeignKey("labels.id", ondelete="CASCADE"), nullable=False),
-    Column("added_at", Text, nullable=False),
-    PrimaryKeyConstraint("task_id", "label_id"),
-)
+# ---------------------------------------------------------------------------
+# Assignments — unified (replaces task_assignments)
+# ---------------------------------------------------------------------------
 
-task_assignments = Table(
-    "task_assignments",
+work_item_assignments = Table(
+    "work_item_assignments",
     metadata,
     Column("id", Text, primary_key=True),
-    Column("task_id", Text, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
-    Column("agent_id", Text, ForeignKey("agents.id", ondelete="CASCADE"), nullable=False),
+    Column(
+        "work_item_id",
+        Text,
+        ForeignKey("work_items.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column(
+        "agent_id",
+        Text,
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
     Column("assigned_at", Text, nullable=False),
     Column("unassigned_at", Text),
     Column("assigned_by", Text),
     Column("reason", Text),
 )
+
+# ---------------------------------------------------------------------------
+# Audit / history
+# ---------------------------------------------------------------------------
 
 activity_log = Table(
     "activity_log",
@@ -219,9 +214,7 @@ activity_log = Table(
     Column("project_id", Text),
     Column("entity_type", Text, nullable=False),
     Column("entity_id", Text, nullable=False),
-    Column("epic_id", Text),
-    Column("story_id", Text),
-    Column("task_id", Text),
+    Column("work_item_id", Text),
     Column("backlog_id", Text),
     Column("actor_type", Text, nullable=False),
     Column("actor_id", Text),
@@ -233,24 +226,48 @@ activity_log = Table(
     Column("created_at", Text, nullable=False),
 )
 
+work_item_status_history = Table(
+    "work_item_status_history",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("project_id", Text),
+    Column("work_item_id", Text, nullable=False),
+    Column("from_status", Text),
+    Column("to_status", Text, nullable=False),
+    Column("changed_by", Text),
+    Column("changed_at", Text, nullable=False),
+    Column("note", Text),
+)
+
+# ---------------------------------------------------------------------------
+# Indexes
+# ---------------------------------------------------------------------------
+
+# Work items
+Index("idx_work_items_project_id", work_items.c.project_id)
+Index("idx_work_items_parent_id", work_items.c.parent_id)
+Index("idx_work_items_type", work_items.c.type)
+Index("idx_work_items_status", work_items.c.status)
 Index(
-    "idx_task_assignments_active",
-    task_assignments.c.task_id,
+    "idx_work_items_project_key",
+    work_items.c.project_id,
+    work_items.c.key,
     unique=True,
-    postgresql_where=text("unassigned_at IS NULL"),
+    postgresql_where=text("key IS NOT NULL"),
 )
+Index("idx_work_items_project_type", work_items.c.project_id, work_items.c.type)
+Index("idx_work_items_parent_status", work_items.c.parent_id, work_items.c.status)
 Index(
-    "idx_activity_log_entity",
-    activity_log.c.entity_type,
-    activity_log.c.entity_id,
-    activity_log.c.created_at,
+    "idx_work_items_assignee",
+    work_items.c.current_assignee_agent_id,
+    postgresql_where=text("current_assignee_agent_id IS NOT NULL"),
 )
-Index(
-    "idx_projects_one_default",
-    projects.c.is_default,
-    unique=True,
-    postgresql_where=text("is_default = 1"),
-)
+
+# Backlog items
+Index("idx_backlog_items_backlog_rank", backlog_items.c.backlog_id, backlog_items.c.rank)
+
+# Backlogs
+Index("idx_backlogs_project_rank", backlogs.c.project_id, backlogs.c.rank)
 Index(
     "idx_backlogs_one_default_per_project",
     backlogs.c.project_id,
@@ -261,6 +278,38 @@ Index(
     "idx_backlogs_one_active_sprint_per_project",
     backlogs.c.project_id,
     unique=True,
-    postgresql_where=text("project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'"),
+    postgresql_where=text(
+        "project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'"
+    ),
 )
-Index("idx_backlogs_project_display_order", backlogs.c.project_id, backlogs.c.display_order)
+
+# Assignments
+Index(
+    "idx_work_item_assignments_active",
+    work_item_assignments.c.work_item_id,
+    unique=True,
+    postgresql_where=text("unassigned_at IS NULL"),
+)
+
+# Activity log
+Index(
+    "idx_activity_log_entity",
+    activity_log.c.entity_type,
+    activity_log.c.entity_id,
+    activity_log.c.created_at,
+)
+
+# Projects
+Index(
+    "idx_projects_one_default",
+    projects.c.is_default,
+    unique=True,
+    postgresql_where=text("is_default = 1"),
+)
+
+# Status history
+Index(
+    "idx_work_item_status_history_item",
+    work_item_status_history.c.work_item_id,
+    work_item_status_history.c.changed_at,
+)

@@ -3,6 +3,8 @@ export type PlanningResourceName =
   | "agent"
   | "label"
   | "backlog"
+  | "work-item"
+  // Legacy aliases — delegate to work-item with type filter
   | "story"
   | "task"
   | "epic";
@@ -24,8 +26,7 @@ const PATHS = {
   agent: "/v1/planning/agents",
   label: "/v1/planning/labels",
   backlog: "/v1/planning/backlogs",
-  story: "/v1/planning/stories",
-  task: "/v1/planning/tasks",
+  "work-item": "/v1/planning/work-items",
 } as const;
 
 export const PLANNING_RESOURCES: Record<PlanningResourceName, PlanningResourceSpec> = {
@@ -56,24 +57,32 @@ export const PLANNING_RESOURCES: Record<PlanningResourceName, PlanningResourceSp
     requiredContext: [],
     defaultSort: "-created_at",
   },
+  "work-item": {
+    name: "work-item",
+    listPath: () => PATHS["work-item"],
+    itemPath: (id) => `${PATHS["work-item"]}/${id}`,
+    requiredContext: [],
+    defaultSort: "-created_at",
+  },
+  // Legacy aliases: point to work-items with type query param
   story: {
     name: "story",
-    listPath: () => PATHS.story,
-    itemPath: (id) => `${PATHS.story}/${id}`,
+    listPath: () => `${PATHS["work-item"]}?type=STORY`,
+    itemPath: (id) => `${PATHS["work-item"]}/${id}`,
     requiredContext: [],
     defaultSort: "-created_at",
   },
   task: {
     name: "task",
-    listPath: () => PATHS.task,
-    itemPath: (id) => `${PATHS.task}/${id}`,
+    listPath: () => `${PATHS["work-item"]}?type=TASK`,
+    itemPath: (id) => `${PATHS["work-item"]}/${id}`,
     requiredContext: [],
     defaultSort: "-created_at",
   },
   epic: {
     name: "epic",
-    listPath: () => "/v1/planning/epics",
-    itemPath: (id) => `/v1/planning/epics/${id}`,
+    listPath: () => `${PATHS["work-item"]}?type=EPIC`,
+    itemPath: (id) => `${PATHS["work-item"]}/${id}`,
     requiredContext: [],
     defaultSort: "-created_at",
   },
