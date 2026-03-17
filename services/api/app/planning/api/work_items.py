@@ -25,7 +25,7 @@ from app.planning.dependencies import (
     get_work_item_service,
     resolve_project_key,
 )
-from app.shared.api.envelope import ListEnvelope
+from app.shared.api.envelope import ListEnvelope, ListMeta
 
 router = APIRouter(prefix="/work-items", tags=["work-items"])
 
@@ -89,10 +89,8 @@ async def list_work_items(
         offset=offset,
     )
     return ListEnvelope(
-        items=[WorkItemResponse(**_to_dict(i)) for i in items],
-        total=total,
-        limit=limit,
-        offset=offset,
+        data=[WorkItemResponse(**_to_dict(i)) for i in items],
+        meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 
 
@@ -123,10 +121,8 @@ async def list_overview(
         offset=offset,
     )
     return ListEnvelope(
-        items=[WorkItemOverviewResponse(**_overview_to_dict(i)) for i in items],
-        total=total,
-        limit=limit,
-        offset=offset,
+        data=[WorkItemOverviewResponse(**_overview_to_dict(i)) for i in items],
+        meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 
 
@@ -204,10 +200,8 @@ async def list_children(
         work_item_id, type=type, status=status, sort=sort, limit=limit, offset=offset
     )
     return ListEnvelope(
-        items=[WorkItemResponse(**_to_dict(i)) for i in items],
-        total=total,
-        limit=limit,
-        offset=offset,
+        data=[WorkItemResponse(**_to_dict(i)) for i in items],
+        meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 
 

@@ -249,7 +249,8 @@ Index("idx_work_items_parent_id", work_items.c.parent_id)
 Index("idx_work_items_type", work_items.c.type)
 Index("idx_work_items_status", work_items.c.status)
 Index(
-    "idx_work_items_key",
+    "idx_work_items_project_key",
+    work_items.c.project_id,
     work_items.c.key,
     unique=True,
     postgresql_where=text("key IS NOT NULL"),
