@@ -1,6 +1,8 @@
 /**
- * Full entity interfaces matching the v2 DB schema.
+ * Full entity interfaces matching the DB schema.
  *
+ * These map to columns in schema.ts / ENTITY_MODEL_V1.md and are used
+ * by settings adapters and other infrastructure-level code.
  * For lightweight UI types see ./types.ts.
  */
 
@@ -10,10 +12,10 @@ import type {
   BacklogKind,
   BacklogStatus,
   EntityType,
+  EpicStatus,
+  ItemStatus,
   ProjectStatus,
   StatusMode,
-  WorkItemStatus,
-  WorkItemType,
 } from "./types";
 
 // ─── Entity Interfaces ───────────────────────────────────────────────
@@ -37,21 +39,58 @@ export interface ProjectCounter {
   updated_at: string;
 }
 
-export interface WorkItem {
+export interface Epic {
   id: string;
-  type: WorkItemType;
-  project_id: string | null;
-  parent_id: string | null;
-  key: string | null;
+  project_id: string;
+  key: string;
   title: string;
-  sub_type: string | null;
-  summary: string | null;
   description: string | null;
-  status: WorkItemStatus;
+  status: EpicStatus;
   status_mode: StatusMode;
   status_override: string | null;
   status_override_set_at: string | null;
-  is_blocked: boolean;
+  is_blocked: number;
+  blocked_reason: string | null;
+  priority: number | null;
+  current_assignee_agent_id: string | null;
+  metadata_json: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Story {
+  id: string;
+  project_id: string | null;
+  epic_id: string | null;
+  key: string | null;
+  title: string;
+  intent: string | null;
+  description: string | null;
+  story_type: string;
+  status: ItemStatus;
+  is_blocked: number;
+  blocked_reason: string | null;
+  priority: number | null;
+  metadata_json: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface Task {
+  id: string;
+  project_id: string | null;
+  story_id: string | null;
+  key: string | null;
+  title: string;
+  objective: string | null;
+  task_type: string;
+  status: ItemStatus;
+  is_blocked: number;
   blocked_reason: string | null;
   priority: number | null;
   estimate_points: number | null;
@@ -72,8 +111,8 @@ export interface Backlog {
   name: string;
   kind: BacklogKind;
   status: BacklogStatus;
-  rank: string;
-  is_default: boolean;
+  display_order: number;
+  is_default: number;
   goal: string | null;
   start_date: string | null;
   end_date: string | null;
@@ -84,10 +123,17 @@ export interface Backlog {
   updated_at: string;
 }
 
-export interface BacklogItem {
+export interface BacklogStory {
   backlog_id: string;
-  work_item_id: string;
-  rank: string;
+  story_id: string;
+  position: number;
+  added_at: string;
+}
+
+export interface BacklogTask {
+  backlog_id: string;
+  task_id: string;
+  position: number;
   added_at: string;
 }
 
@@ -100,7 +146,7 @@ export interface Agent {
   role: string | null;
   worker_type: string | null;
   avatar: string | null;
-  is_active: boolean;
+  is_active: number;
   source: AgentSource;
   metadata_json: string | null;
   last_synced_at: string | null;
@@ -108,9 +154,9 @@ export interface Agent {
   updated_at: string;
 }
 
-export interface WorkItemAssignment {
+export interface TaskAssignment {
   id: string;
-  work_item_id: string;
+  task_id: string;
   agent_id: string;
   assigned_at: string;
   unassigned_at: string | null;
@@ -126,13 +172,17 @@ export interface Label {
   created_at: string;
 }
 
-export interface WorkItemLabel {
-  work_item_id: string;
+export interface StoryLabelLink {
+  story_id: string;
   label_id: string;
   added_at: string;
 }
 
-// ─── Audit Types ─────────────────────────────────────────────────────
+export interface TaskLabel {
+  task_id: string;
+  label_id: string;
+  added_at: string;
+}
 
 export interface Comment {
   id: string;
@@ -164,9 +214,11 @@ export interface Attachment {
 export interface ActivityLogEntry {
   id: string;
   project_id: string | null;
-  entity_type: string;
+  entity_type: EntityType;
   entity_id: string;
-  work_item_id: string | null;
+  epic_id: string | null;
+  story_id: string | null;
+  task_id: string | null;
   backlog_id: string | null;
   actor_type: ActorType;
   actor_id: string | null;
@@ -178,10 +230,32 @@ export interface ActivityLogEntry {
   created_at: string;
 }
 
-export interface WorkItemStatusHistory {
+export interface EpicStatusHistory {
   id: string;
   project_id: string | null;
-  work_item_id: string;
+  epic_id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  changed_at: string;
+  note: string | null;
+}
+
+export interface StoryStatusHistory {
+  id: string;
+  project_id: string | null;
+  story_id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by: string | null;
+  changed_at: string;
+  note: string | null;
+}
+
+export interface TaskStatusHistory {
+  id: string;
+  project_id: string | null;
+  task_id: string;
   from_status: string | null;
   to_status: string;
   changed_by: string | null;

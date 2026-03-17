@@ -1,17 +1,17 @@
 /**
- * TypeScript types for the v2 work-planning domain.
+ * TypeScript types for the v1 work-planning domain.
  *
  * Status enums and lightweight UI domain types live here.
  * Full entity interfaces (matching DB schema) live in ./entity-types.ts.
  */
 
-// ─── Enums ───────────────────────────────────────────────────────────
+// ─── Status Enums ─────────────────────────────────────────────────────
 
-/** Work item type discriminator. */
-export type WorkItemType = "EPIC" | "STORY" | "TASK" | "BUG";
+/** Status values for stories and tasks. */
+export type ItemStatus = "TODO" | "IN_PROGRESS" | "CODE_REVIEW" | "VERIFY" | "DONE";
 
-/** Unified status for all work item types. */
-export type WorkItemStatus = "TODO" | "IN_PROGRESS" | "CODE_REVIEW" | "VERIFY" | "DONE";
+/** Status values for epics. */
+export type EpicStatus = "TODO" | "IN_PROGRESS" | "DONE";
 
 /** Status values for projects. */
 export type ProjectStatus = "ACTIVE" | "ARCHIVED";
@@ -32,50 +32,60 @@ export type AgentSource = "openclaw_json" | "manual";
 export type ActorType = "human" | "agent" | "system";
 
 /** Entity types that support comments, attachments, and activity log. */
-export type EntityType = "project" | "backlog" | "work_item";
+export type EntityType = "project" | "backlog" | "epic" | "story" | "task";
 
 // ─── UI Domain Types ────────────────────────────────────────────────
 
 /** Label summary used across planning UI components. */
-export interface WorkItemLabel {
+export interface StoryLabel {
   id: string;
   name: string;
   color: string | null;
 }
 
-/** Work item with aggregated UI fields. */
-export interface WorkItemDetail {
+/** Story with aggregated UI fields (labels, task count, boolean flags). */
+export interface StoryDetail {
   id: string;
-  type: WorkItemType;
   project_id: string | null;
-  parent_id: string | null;
+  epic_id: string | null;
   key: string | null;
   title: string;
-  sub_type: string | null;
-  summary: string | null;
+  intent: string | null;
   description: string | null;
-  status: WorkItemStatus;
-  status_mode: StatusMode;
+  story_type: string;
+  status: ItemStatus;
   is_blocked: boolean;
   blocked_reason: string | null;
   priority: number | null;
-  estimate_points: number | null;
-  due_at: string | null;
-  current_assignee_agent_id: string | null;
   created_at: string;
   updated_at: string;
   started_at: string | null;
   completed_at: string | null;
-  children_count: number;
-  labels?: WorkItemLabel[];
+  task_count: number;
+  labels?: StoryLabel[];
   label_ids?: string[];
 }
 
-// ─── Legacy aliases (for incremental migration of UI components) ────
+/** Task list item used in story detail views. */
+export interface TaskItem {
+  id: string;
+  key: string | null;
+  title: string;
+  objective: string | null;
+  task_type: string;
+  status: ItemStatus;
+  priority: number | null;
+  is_blocked: boolean;
+  blocked_reason: string | null;
+  estimate_points: number | null;
+  due_at: string | null;
+  current_assignee_agent_id: string | null;
+}
 
-/** @deprecated Use WorkItemStatus */
-export type ItemStatus = WorkItemStatus;
-/** @deprecated Use WorkItemStatus */
-export type EpicStatus = WorkItemStatus;
-/** @deprecated Use WorkItemLabel */
-export type StoryLabel = WorkItemLabel;
+// ─── V2 Types (for new /work-items API) ─────────────────────────────
+
+/** Work item type discriminator (v2). */
+export type WorkItemType = "EPIC" | "STORY" | "TASK" | "BUG";
+
+/** Unified status for all work item types (v2). */
+export type WorkItemStatus = ItemStatus;
