@@ -289,13 +289,7 @@ function PlanningListPageContent() {
 
 export default function PlanningListPage() {
   return (
-    <Suspense
-      fallback={(
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
-    >
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div>}>
       <PlanningListPageContent />
     </Suspense>
   );
