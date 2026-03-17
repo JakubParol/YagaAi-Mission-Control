@@ -6,6 +6,10 @@
 import { apiUrl } from "@/lib/api-client";
 import type { ItemStatus } from "@/lib/planning/types";
 import type { PlanningFilterOption } from "@/components/planning/planning-filters";
+import type { StoryCardStory } from "@/components/planning/story-card";
+import {
+  removeStoryFromActiveSprint,
+} from "../sprint-membership-actions";
 import { excludeClosedSprintBacklogs, sortBacklogsForPlanning } from "./backlog-filters";
 import type {
   BacklogItem,
@@ -14,6 +18,7 @@ import type {
   PlanningAgentApiItem,
 } from "./backlog-types";
 import { resolveAgentLabel } from "./backlog-view-model";
+import { addStoryToBacklog, removeStoryFromBacklog } from "./board-actions";
 
 export async function fetchBacklogData(projectId: string): Promise<FetchResult> {
   const response = await fetch(
@@ -128,4 +133,34 @@ export async function swapBoardOrder(
       if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
     }),
   ]);
+}
+
+/**
+ * Move open stories from a completing sprint to the target board,
+ * then return. Caller is responsible for the actual completeSprint call.
+ */
+export async function moveOpenStoriesToTarget(
+  projectId: string,
+  sourceBacklogId: string,
+  targetBacklogId: string,
+  defaultBacklogId: string,
+  openStories: readonly StoryCardStory[],
+): Promise<void> {
+  for (const story of openStories) {
+    if (targetBacklogId === defaultBacklogId) {
+      await removeStoryFromActiveSprint(projectId, story.id);
+      continue;
+    }
+    await removeStoryFromBacklog(sourceBacklogId, story.id);
+    try {
+      await addStoryToBacklog(targetBacklogId, story.id);
+    } catch (error) {
+      try {
+        await addStoryToBacklog(sourceBacklogId, story.id);
+      } catch {
+        /* rollback failure; original error is more actionable */
+      }
+      throw error;
+    }
+  }
 }

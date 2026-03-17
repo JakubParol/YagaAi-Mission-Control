@@ -13,6 +13,60 @@ import type { BacklogItem, SprintCompleteDialogState } from "./backlog-types";
 import { KIND_CONFIG } from "./backlog-types";
 import { getPluralizedWorkItems } from "./backlog-view-model";
 
+// ─── Shared simple confirmation dialog ──────────────────────────────
+
+interface ConfirmActionDialogProps {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  submittingLabel: string;
+  variant?: "default" | "destructive";
+  open: boolean;
+  submitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}
+
+function ConfirmActionDialog({
+  title,
+  description,
+  confirmLabel,
+  submittingLabel,
+  variant = "default",
+  open,
+  submitting,
+  onOpenChange,
+  onConfirm,
+}: ConfirmActionDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{description}</p>
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="button" variant={variant} onClick={onConfirm} disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-1 size-3.5 animate-spin" />
+                  {submittingLabel}
+                </>
+              ) : (
+                confirmLabel
+              )}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Sprint start ────────────────────────────────────────────────────
 
 export interface SprintStartDialogProps {
@@ -23,48 +77,18 @@ export interface SprintStartDialogProps {
   onConfirm: () => void;
 }
 
-export function SprintStartDialog({
-  backlogName,
-  open,
-  submitting,
-  onOpenChange,
-  onConfirm,
-}: SprintStartDialogProps) {
+export function SprintStartDialog(props: SprintStartDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>Start sprint</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to start{" "}
-            <span className="font-semibold text-foreground">{backlogName}</span>
-            ? This sprint will become the active sprint board.
-          </p>
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={onConfirm} disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-1 size-3.5 animate-spin" />
-                  Starting sprint...
-                </>
-              ) : (
-                "Start sprint"
-              )}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      title="Start sprint"
+      description={`Are you sure you want to start ${props.backlogName}? This sprint will become the active sprint board.`}
+      confirmLabel="Start sprint"
+      submittingLabel="Starting sprint..."
+      open={props.open}
+      submitting={props.submitting}
+      onOpenChange={props.onOpenChange}
+      onConfirm={props.onConfirm}
+    />
   );
 }
 
@@ -78,48 +102,18 @@ export interface SprintCompleteConfirmDialogProps {
   onConfirm: () => void;
 }
 
-export function SprintCompleteConfirmDialog({
-  backlogName,
-  open,
-  submitting,
-  onOpenChange,
-  onConfirm,
-}: SprintCompleteConfirmDialogProps) {
+export function SprintCompleteConfirmDialog(props: SprintCompleteConfirmDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>Complete sprint</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to complete{" "}
-            <span className="font-semibold text-foreground">{backlogName}</span>
-            ? This will close the sprint and remove it from the active board.
-          </p>
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button type="button" onClick={onConfirm} disabled={submitting}>
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-1 size-3.5 animate-spin" />
-                  Completing sprint...
-                </>
-              ) : (
-                "Complete sprint"
-              )}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      title="Complete sprint"
+      description={`Are you sure you want to complete ${props.backlogName}? This will close the sprint and remove it from the active board.`}
+      confirmLabel="Complete sprint"
+      submittingLabel="Completing sprint..."
+      open={props.open}
+      submitting={props.submitting}
+      onOpenChange={props.onOpenChange}
+      onConfirm={props.onConfirm}
+    />
   );
 }
 
@@ -215,22 +209,13 @@ export function SprintCompleteWithTargetDialog({
           )}
 
           <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={submitting}
-            >
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
             <Button
               type="button"
               onClick={onConfirm}
-              disabled={
-                submitting ||
-                dialog.openStories.length === 0 ||
-                targetBacklogId.length === 0
-              }
+              disabled={submitting || dialog.openStories.length === 0 || targetBacklogId.length === 0}
             >
               {submitting ? (
                 <>
@@ -258,52 +243,18 @@ export interface DeleteBoardDialogProps {
   onConfirm: () => void;
 }
 
-export function DeleteBoardDialog({
-  backlogName,
-  open,
-  submitting,
-  onOpenChange,
-  onConfirm,
-}: DeleteBoardDialogProps) {
+export function DeleteBoardDialog(props: DeleteBoardDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle>Delete board</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete{" "}
-            <span className="font-semibold text-foreground">{backlogName}</span>
-            ? This action cannot be undone.
-          </p>
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={onConfirm}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-1 size-3.5 animate-spin" />
-                  Deleting board...
-                </>
-              ) : (
-                "Delete board"
-              )}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ConfirmActionDialog
+      title="Delete board"
+      description={`Are you sure you want to delete ${props.backlogName}? This action cannot be undone.`}
+      confirmLabel="Delete board"
+      submittingLabel="Deleting board..."
+      variant="destructive"
+      open={props.open}
+      submitting={props.submitting}
+      onOpenChange={props.onOpenChange}
+      onConfirm={props.onConfirm}
+    />
   );
 }
