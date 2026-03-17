@@ -24,6 +24,7 @@ import {
   TIME_RANGES,
   buildCostUrl,
   aggregateModels,
+  aggregateStatCards,
   computeCostTotals,
   mergeStatCardData,
   type CostStatCardValues,
@@ -67,13 +68,6 @@ function CostStatCard({
   );
 }
 
-const INITIAL_STAT_CARDS: CostStatCardValues = {
-  todaySpend: 0,
-  yesterdaySpend: 0,
-  todayRequests: 0,
-  avgCost: 0,
-};
-
 export interface CostsSectionProps {
   initialData: CostMetrics;
 }
@@ -96,7 +90,9 @@ export function CostsSection({ initialData }: CostsSectionProps) {
       .catch(() => {});
   }, [url]);
 
-  const [statCards, setStatCards] = useState<CostStatCardValues>(INITIAL_STAT_CARDS);
+  const [statCards, setStatCards] = useState<CostStatCardValues>(() =>
+    aggregateStatCards(initialData.daily),
+  );
   useEffect(() => {
     const now = new Date();
     const todayStart = startOfDay(now);
