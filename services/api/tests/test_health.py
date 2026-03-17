@@ -1,12 +1,10 @@
 from fastapi.testclient import TestClient
 
+from app.main import app
 
-def test_healthz(monkeypatch) -> None:
-    from app.main import app
-    from tests.support.runtime import disable_runtime_postgres
 
-    disable_runtime_postgres(monkeypatch)
-    with TestClient(app) as client:
+def test_healthz() -> None:
+    with TestClient(app, raise_server_exceptions=False) as client:
         response = client.get("/healthz")
 
     assert response.status_code == 200

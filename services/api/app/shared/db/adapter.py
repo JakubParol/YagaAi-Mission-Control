@@ -161,95 +161,101 @@ def _translate_sqlite_datetime_functions(query: str) -> str:
     return _JULIANDAY_DIFF_RE.sub(replace_julianday_diff, translated)
 
 
-def _replace_unquoted_qmarks(  # pylint: disable=too-many-branches,too-many-statements
-    query: str,
-) -> tuple[str, list[str]]:
-    out: list[str] = []
-    names: list[str] = []
-    in_single_quote = False
-    in_double_quote = False
-    in_line_comment = False
-    in_block_comment = False
-    idx = 0
+class _QmarkReplacer:
+    """Stateful scanner that replaces unquoted '?' with named parameters."""
 
-    while idx < len(query):
-        char = query[idx]
-        nxt = query[idx + 1] if idx + 1 < len(query) else ""
+    def __init__(self, query: str) -> None:
+        self._query = query
+        self._out: list[str] = []
+        self._names: list[str] = []
+        self._in_single_quote = False
+        self._in_double_quote = False
+        self._in_line_comment = False
+        self._in_block_comment = False
+        self._idx = 0
 
-        if in_line_comment:
-            out.append(char)
-            if char == "\n":
-                in_line_comment = False
-            idx += 1
-            continue
+    def run(self) -> tuple[str, list[str]]:
+        while self._idx < len(self._query):
+            char = self._query[self._idx]
+            nxt = self._query[self._idx + 1] if self._idx + 1 < len(self._query) else ""
 
-        if in_block_comment:
-            out.append(char)
-            if char == "*" and nxt == "/":
-                out.append(nxt)
-                idx += 2
-                in_block_comment = False
-                continue
-            idx += 1
-            continue
+            if self._in_line_comment:
+                self._consume_line_comment(char)
+            elif self._in_block_comment:
+                self._consume_block_comment(char, nxt)
+            elif self._in_single_quote:
+                self._consume_single_quote(char, nxt)
+            elif self._in_double_quote:
+                self._consume_double_quote(char, nxt)
+            else:
+                self._consume_normal(char, nxt)
 
-        if in_single_quote:
-            out.append(char)
-            if char == "'" and nxt == "'":
-                out.append(nxt)
-                idx += 2
-                continue
+        return "".join(self._out), self._names
+
+    def _consume_line_comment(self, char: str) -> None:
+        self._out.append(char)
+        if char == "\n":
+            self._in_line_comment = False
+        self._idx += 1
+
+    def _consume_block_comment(self, char: str, nxt: str) -> None:
+        self._out.append(char)
+        if char == "*" and nxt == "/":
+            self._out.append(nxt)
+            self._idx += 2
+            self._in_block_comment = False
+        else:
+            self._idx += 1
+
+    def _consume_single_quote(self, char: str, nxt: str) -> None:
+        self._out.append(char)
+        if char == "'" and nxt == "'":
+            self._out.append(nxt)
+            self._idx += 2
+        else:
             if char == "'":
-                in_single_quote = False
-            idx += 1
-            continue
+                self._in_single_quote = False
+            self._idx += 1
 
-        if in_double_quote:
-            out.append(char)
-            if char == '"' and nxt == '"':
-                out.append(nxt)
-                idx += 2
-                continue
+    def _consume_double_quote(self, char: str, nxt: str) -> None:
+        self._out.append(char)
+        if char == '"' and nxt == '"':
+            self._out.append(nxt)
+            self._idx += 2
+        else:
             if char == '"':
-                in_double_quote = False
-            idx += 1
-            continue
+                self._in_double_quote = False
+            self._idx += 1
 
+    def _consume_normal(self, char: str, nxt: str) -> None:
         if char == "-" and nxt == "-":
-            out.extend((char, nxt))
-            idx += 2
-            in_line_comment = True
-            continue
+            self._out.extend((char, nxt))
+            self._idx += 2
+            self._in_line_comment = True
+        elif char == "/" and nxt == "*":
+            self._out.extend((char, nxt))
+            self._idx += 2
+            self._in_block_comment = True
+        elif char == "'":
+            self._out.append(char)
+            self._idx += 1
+            self._in_single_quote = True
+        elif char == '"':
+            self._out.append(char)
+            self._idx += 1
+            self._in_double_quote = True
+        elif char == "?":
+            name = f"p{len(self._names)}"
+            self._names.append(name)
+            self._out.append(f":{name}")
+            self._idx += 1
+        else:
+            self._out.append(char)
+            self._idx += 1
 
-        if char == "/" and nxt == "*":
-            out.extend((char, nxt))
-            idx += 2
-            in_block_comment = True
-            continue
 
-        if char == "'":
-            out.append(char)
-            idx += 1
-            in_single_quote = True
-            continue
-
-        if char == '"':
-            out.append(char)
-            idx += 1
-            in_double_quote = True
-            continue
-
-        if char == "?":
-            name = f"p{len(names)}"
-            names.append(name)
-            out.append(f":{name}")
-            idx += 1
-            continue
-
-        out.append(char)
-        idx += 1
-
-    return "".join(out), names
+def _replace_unquoted_qmarks(query: str) -> tuple[str, list[str]]:
+    return _QmarkReplacer(query).run()
 
 
 def _normalize_query(query: str) -> tuple[str, list[str]]:

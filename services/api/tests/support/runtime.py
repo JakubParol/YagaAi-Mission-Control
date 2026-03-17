@@ -50,11 +50,10 @@ async def _ensure_backlog_runtime_guard(db: aiosqlite.Connection) -> None:
 
 
 def disable_runtime_postgres(monkeypatch: MonkeyPatch) -> None:
-    import app.main as main_module
+    from app.shared.db import session as session_module
 
-    monkeypatch.setattr(main_module, "bootstrap_postgres_storage", lambda: None)
-    monkeypatch.setattr(main_module, "init_postgres_pool", _noop_async)
-    monkeypatch.setattr(main_module, "close_postgres_pool", _noop_async)
+    monkeypatch.setattr(session_module, "init_db_engine", _noop_async)
+    monkeypatch.setattr(session_module, "close_db_engine", _noop_async)
 
 
 def override_test_db(app, monkeypatch: MonkeyPatch, db_path: str) -> None:

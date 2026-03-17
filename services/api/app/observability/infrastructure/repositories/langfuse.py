@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
+from typing import Any
 
-from sqlalchemy import and_, func, literal_column, select, update
+from sqlalchemy import Row, and_, func, literal_column, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.functions import coalesce, count
@@ -24,44 +25,44 @@ _m = langfuse_daily_metrics.c
 _r = langfuse_requests.c
 
 
-def _row_to_import(row: object) -> ImportRecord:
+def _row_to_import(row: Row[Any]) -> ImportRecord:
     return ImportRecord(
-        id=row.id,  # type: ignore[union-attr]
-        started_at=row.started_at,  # type: ignore[union-attr]
-        finished_at=row.finished_at,  # type: ignore[union-attr]
-        mode=row.mode,  # type: ignore[union-attr]
-        from_timestamp=row.from_timestamp,  # type: ignore[union-attr]
-        to_timestamp=row.to_timestamp,  # type: ignore[union-attr]
-        status=row.status,  # type: ignore[union-attr]
-        error_message=row.error_message,  # type: ignore[union-attr]
+        id=row.id,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        mode=row.mode,
+        from_timestamp=row.from_timestamp,
+        to_timestamp=row.to_timestamp,
+        status=row.status,
+        error_message=row.error_message,
     )
 
 
-def _row_to_daily_metric(row: object) -> DailyMetric:
+def _row_to_daily_metric(row: Row[Any]) -> DailyMetric:
     return DailyMetric(
-        date=row.date,  # type: ignore[union-attr]
-        model=row.model,  # type: ignore[union-attr]
-        input_tokens=row.input_tokens,  # type: ignore[union-attr]
-        output_tokens=row.output_tokens,  # type: ignore[union-attr]
-        total_tokens=row.total_tokens,  # type: ignore[union-attr]
-        request_count=row.request_count,  # type: ignore[union-attr]
-        total_cost=row.total_cost,  # type: ignore[union-attr]
+        date=row.date,
+        model=row.model,
+        input_tokens=row.input_tokens,
+        output_tokens=row.output_tokens,
+        total_tokens=row.total_tokens,
+        request_count=row.request_count,
+        total_cost=row.total_cost,
     )
 
 
-def _row_to_langfuse_request(row: object) -> LangfuseRequest:
+def _row_to_langfuse_request(row: Row[Any]) -> LangfuseRequest:
     return LangfuseRequest(
-        id=row.id,  # type: ignore[union-attr]
-        trace_id=row.trace_id,  # type: ignore[union-attr]
-        name=row.name,  # type: ignore[union-attr]
-        model=row.model,  # type: ignore[union-attr]
-        started_at=row.started_at,  # type: ignore[union-attr]
-        finished_at=row.finished_at,  # type: ignore[union-attr]
-        input_tokens=row.input_tokens,  # type: ignore[union-attr]
-        output_tokens=row.output_tokens,  # type: ignore[union-attr]
-        total_tokens=row.total_tokens,  # type: ignore[union-attr]
-        cost=row.cost,  # type: ignore[union-attr]
-        latency_ms=row.latency_ms,  # type: ignore[union-attr]
+        id=row.id,
+        trace_id=row.trace_id,
+        name=row.name,
+        model=row.model,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        input_tokens=row.input_tokens,
+        output_tokens=row.output_tokens,
+        total_tokens=row.total_tokens,
+        cost=row.cost,
+        latency_ms=row.latency_ms,
     )
 
 
