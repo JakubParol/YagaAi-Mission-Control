@@ -74,7 +74,7 @@ def _reset_database(database_url: str) -> Iterator[None]:
 
 
 @pytest.fixture()
-def restore_schema(database_url: str) -> Iterator[None]:
+def _restore_schema(database_url: str) -> Iterator[None]:
     """Use on tests that modify schema (DROP TABLE/INDEX)."""
     yield
     reset_database_schema(database_url)
