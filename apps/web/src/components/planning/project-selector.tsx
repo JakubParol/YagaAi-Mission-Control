@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Check, ChevronsUpDown, FolderKanban } from "lucide-react";
 
@@ -39,6 +39,16 @@ export function ProjectSelector() {
     router.replace(`${pathname}?${params.toString()}`);
   };
 
+  // Sync reactive values into refs so the mount-only fetch reads
+  // current values at resolve time without reactive deps that would
+  // cause cleanup→cancel→no-retry if they change mid-flight.
+  const selectedProjectIdsRef = useRef(selectedProjectIds);
+  useEffect(() => { selectedProjectIdsRef.current = selectedProjectIds; }, [selectedProjectIds]);
+  const searchParamsRef = useRef(searchParams);
+  useEffect(() => { searchParamsRef.current = searchParams; }, [searchParams]);
+  const pathnameRef = useRef(pathname);
+  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
+
   useEffect(() => {
     let cancelled = false;
     fetch(apiUrl("/v1/planning/projects?limit=100"))
@@ -60,13 +70,15 @@ export function ProjectSelector() {
 
           const initialSelection = resolveInitialProjectSelection({
             projects: items,
-            selectedProjectIds,
-            projectKeyFromUrl: searchParams.get("project"),
+            selectedProjectIds: selectedProjectIdsRef.current,
+            projectKeyFromUrl: searchParamsRef.current.get("project"),
           });
           if (initialSelection) {
             setSelectedProjectIds([initialSelection.targetProject.id]);
             if (initialSelection.shouldUpdateUrl) {
-              updateUrlParam(initialSelection.targetProject.key);
+              const params = new URLSearchParams(searchParamsRef.current.toString());
+              params.set("project", initialSelection.targetProject.key);
+              router.replace(`${pathnameRef.current}?${params.toString()}`);
             }
           }
         }
@@ -80,7 +92,7 @@ export function ProjectSelector() {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router, setSelectedProjectIds]);
 
   const triggerLabel = useMemo(() => {
     if (loading) return "Projects…";

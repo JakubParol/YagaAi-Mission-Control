@@ -13,25 +13,22 @@ import { PlanningRefreshControl } from "@/components/planning/planning-refresh-c
 import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { deleteStory } from "../story-actions";
-import { addStoryToActiveSprint, removeStoryFromActiveSprint } from "../sprint-membership-actions";
-import { completeSprint, startSprint, type SprintLifecycleOperation } from "../sprint-lifecycle-actions";
-import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
-import { deleteBoard } from "./board-actions";
 
 import type {
   DeleteBoardDialogState, PageState, ScopedFetchResult,
   SprintCompleteConfirmDialogState, SprintCompleteDialogState, SprintStartDialogState,
 } from "./backlog-types";
 import { BacklogSection } from "./backlog-section";
-import { fetchBacklogData, moveOpenStoriesToTarget, patchStoryStatus, patchStoryAssignee, swapBoardOrder } from "./backlog-page-actions";
+import { fetchBacklogData, patchStoryStatus, patchStoryAssignee } from "./backlog-page-actions";
 import { BacklogPageDialogs } from "./backlog-page-dialogs";
 import {
   readFiltersFromSearchParams, buildFilterUrl, buildClearFiltersUrl,
   computeFilteredSections, buildBacklogFilterOptions, getAssignableAgents,
   computeWorkItemStats, hasAnyActiveSprint, findDefaultBacklogId,
   computeCompleteDialogTargets, resolveActiveSelectedStoryId, resolveSelectedStoryLabels,
-  removePendingId, computeBoardSwapTarget, prepareSprintCompletion, buildEditBoardItem,
+  removePendingId, buildEditBoardItem,
 } from "./backlog-page-derived";
+import { useBacklogPageCallbacks } from "./backlog-page-hooks";
 
 // ─── Page ────────────────────────────────────────────────────────────
 
@@ -154,81 +151,36 @@ function BacklogPageContent() {
     [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, withPendingStory],
   );
 
-  const updateSprintMembership = useCallback(
-    async (storyId: string, op: "add" | "remove") => {
-      if (!singleProjectId) return;
-      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
-      try {
-        if (op === "add") await addStoryToActiveSprint(singleProjectId, storyId);
-        else await removeStoryFromActiveSprint(singleProjectId, storyId);
-        await refreshCurrentView();
-      } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to update sprint membership."); }
-      finally { setPendingStoryIds((prev) => removePendingId(prev, storyId)); }
-    },
-    [refreshCurrentView, showErrorToast, singleProjectId],
-  );
+  const ops = useBacklogPageCallbacks({
+    singleProjectId, state, defaultBacklogId, showErrorToast, refreshCurrentView,
+    setPendingStoryIds, setPendingSprintIds, setPendingBoardIds,
+  });
 
-  const updateSprintLifecycle = useCallback(
-    async (backlogId: string, op: SprintLifecycleOperation) => {
-      if (!singleProjectId) return;
-      setPendingSprintIds((prev) => ({ ...prev, [backlogId]: true }));
-      try {
-        if (op === "start") await startSprint(singleProjectId, backlogId);
-        else await completeSprint(singleProjectId, backlogId);
-        emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId, operation: op });
-        await refreshCurrentView();
-      } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to update sprint status."); }
-      finally { setPendingSprintIds((prev) => removePendingId(prev, backlogId)); }
-    },
-    [refreshCurrentView, showErrorToast, singleProjectId],
-  );
-
-  const handleCompleteSprint = useCallback(
+  const onCompleteSprint = useCallback(
     (backlogId: string, backlogName: string) => {
-      const result = prepareSprintCompletion(state, backlogId, backlogName);
+      const result = ops.handleCompleteSprint(backlogId, backlogName);
       if (result.outcome === "error") { showErrorToast(result.message); return; }
       if (result.outcome === "no-open-stories") { setCompleteConfirmDialog({ backlogId, backlogName }); return; }
       setCompleteDialog(result.dialog);
       setCompleteTargetBacklogId(result.defaultTargetId);
       setCompleteDialogError(null);
     },
-    [showErrorToast, state],
+    [ops, showErrorToast],
   );
 
-  const handleCompleteDialogConfirm = useCallback(async () => {
-    if (!completeDialog || !singleProjectId || !defaultBacklogId) return;
-    if (!completeTargetBacklogId) { setCompleteDialogError("Select where open work items should be moved."); return; }
-    if (!completeDialogTargetOptions.some((b) => b.id === completeTargetBacklogId)) { setCompleteDialogError("Selected target board is no longer available. Refresh and try again."); return; }
-    setCompleteDialogError(null);
-    setPendingSprintIds((prev) => ({ ...prev, [completeDialog.backlogId]: true }));
-    try {
-      await moveOpenStoriesToTarget(singleProjectId, completeDialog.backlogId, completeTargetBacklogId, defaultBacklogId, completeDialog.openStories);
-      await completeSprint(singleProjectId, completeDialog.backlogId);
-      emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId: completeDialog.backlogId, operation: "complete" });
-      setCompleteDialog(null); setCompleteTargetBacklogId(""); await refreshCurrentView();
-    } catch (error) { setCompleteDialogError(error instanceof Error ? error.message : "Failed to complete sprint."); }
-    finally { setPendingSprintIds((prev) => removePendingId(prev, completeDialog.backlogId)); }
-  }, [completeDialog, completeDialogTargetOptions, completeTargetBacklogId, defaultBacklogId, refreshCurrentView, singleProjectId]);
-
-  const handleMoveBoard = useCallback(
-    async (backlogId: string, direction: "top" | "up" | "down" | "bottom") => {
-      const swap = computeBoardSwapTarget(state, backlogId, direction);
-      if (!swap) return;
-      setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
-      try { await swapBoardOrder(swap.currentId, swap.swapWithId, swap.currentOrder, swap.swapWithOrder); await refreshCurrentView(); }
-      catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to reorder board."); }
-      finally { setPendingBoardIds((prev) => removePendingId(prev, backlogId)); }
+  const onCompleteDialogConfirm = useCallback(
+    () => {
+      if (!completeDialog) return;
+      void ops.handleCompleteDialogConfirm(completeDialog, completeTargetBacklogId, completeDialogTargetOptions, setCompleteDialogError)
+        .then((ok) => { if (ok) { setCompleteDialog(null); setCompleteTargetBacklogId(""); } });
     },
-    [refreshCurrentView, showErrorToast, state],
+    [completeDialog, completeDialogTargetOptions, completeTargetBacklogId, ops],
   );
 
-  const handleDeleteBoardConfirm = useCallback(async () => {
-    if (!deleteBoardDialog) return;
-    setPendingBoardIds((prev) => ({ ...prev, [deleteBoardDialog.backlogId]: true }));
-    try { await deleteBoard(deleteBoardDialog.backlogId); setDeleteBoardDialog(null); await refreshCurrentView(); }
-    catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to delete board."); }
-    finally { setPendingBoardIds((prev) => removePendingId(prev, deleteBoardDialog.backlogId)); }
-  }, [deleteBoardDialog, refreshCurrentView, showErrorToast]);
+  const onDeleteBoardConfirm = useCallback(
+    () => { if (deleteBoardDialog) void ops.handleDeleteBoardConfirm(deleteBoardDialog.backlogId, () => setDeleteBoardDialog(null)); },
+    [deleteBoardDialog, ops],
+  );
 
   // ── Render ────────────────────────────────────────────────────────
 
@@ -273,16 +225,16 @@ function BacklogPageContent() {
               assigneeOptions={assignableAgents}
               onStoryClick={setSelectedStoryId}
               onStoryAssigneeChange={handleStoryAssigneeChange}
-              onAddToActiveSprint={(id) => void updateSprintMembership(id, "add")}
-              onRemoveFromActiveSprint={(id) => void updateSprintMembership(id, "remove")}
+              onAddToActiveSprint={(id) => void ops.updateSprintMembership(id, "add")}
+              onRemoveFromActiveSprint={(id) => void ops.updateSprintMembership(id, "remove")}
               onStartSprint={(id, name) => setStartDialog({ backlogId: id, backlogName: name })}
-              onCompleteSprint={handleCompleteSprint}
+              onCompleteSprint={onCompleteSprint}
               onCreateStory={setCreateBacklogId}
               onStoryDelete={handleStoryDelete}
               onStoryStatusChange={handleStoryStatusChange}
               onEditBoard={(id) => { const item = buildEditBoardItem(state, id); if (item) setEditBoardBacklog(item); }}
               onDeleteBoard={(id, name, isDefault) => { if (isDefault) { showErrorToast("Default board cannot be deleted."); return; } setDeleteBoardDialog({ backlogId: id, backlogName: name }); }}
-              onMoveBoard={handleMoveBoard}
+              onMoveBoard={ops.handleMoveBoard}
               pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
               pendingDeleteStoryIds={new Set(Object.keys(pendingDeleteStoryIds))}
               pendingSprintIds={new Set(Object.keys(pendingSprintIds))}
@@ -312,15 +264,15 @@ function BacklogPageContent() {
         editBoardBacklog={editBoardBacklog}
         createBacklogId={createBacklogId}
         onStartDialogChange={(open) => { if (!open) setStartDialog(null); }}
-        onStartDialogConfirm={() => { if (startDialog) { void updateSprintLifecycle(startDialog.backlogId, "start"); setStartDialog(null); } }}
+        onStartDialogConfirm={() => { if (startDialog) { void ops.updateSprintLifecycle(startDialog.backlogId, "start"); setStartDialog(null); } }}
         onCompleteConfirmDialogChange={(open) => { if (!open) setCompleteConfirmDialog(null); }}
-        onCompleteConfirmDialogConfirm={() => { if (completeConfirmDialog) { void updateSprintLifecycle(completeConfirmDialog.backlogId, "complete"); setCompleteConfirmDialog(null); } }}
+        onCompleteConfirmDialogConfirm={() => { if (completeConfirmDialog) { void ops.updateSprintLifecycle(completeConfirmDialog.backlogId, "complete"); setCompleteConfirmDialog(null); } }}
         onCompleteDialogChange={(open) => { if (!open) { setCompleteDialog(null); setCompleteTargetBacklogId(""); setCompleteDialogError(null); } }}
-        onCompleteDialogConfirm={() => void handleCompleteDialogConfirm()}
+        onCompleteDialogConfirm={onCompleteDialogConfirm}
         onCompleteTargetChange={setCompleteTargetBacklogId}
         onClearCompleteError={() => setCompleteDialogError(null)}
         onDeleteBoardDialogChange={(open) => { if (!open) setDeleteBoardDialog(null); }}
-        onDeleteBoardConfirm={() => void handleDeleteBoardConfirm()}
+        onDeleteBoardConfirm={onDeleteBoardConfirm}
         onCreateBoardOpenChange={setCreateBoardOpen}
         onBoardCreated={safeRefresh}
         onSelectedStoryChange={(open) => { if (!open) setSelectedStoryId(null); }}

@@ -1,15 +1,15 @@
+import type { ItemStatus } from "@/lib/planning/types";
 import type {
   ActivityLogEntry,
   Agent,
   Backlog,
-  ItemStatus,
   Label,
   Project,
   StoryLabelLink,
   StoryStatusHistory,
   TaskLabel,
   TaskStatusHistory,
-} from "@/lib/planning/types";
+} from "@/lib/planning/entity-types";
 
 export type SettingsProject = Pick<
   Project,
