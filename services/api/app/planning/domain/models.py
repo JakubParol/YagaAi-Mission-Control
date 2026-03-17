@@ -19,17 +19,18 @@ class BacklogStatus(StrEnum):
     CLOSED = "CLOSED"
 
 
-class ItemStatus(StrEnum):
+class WorkItemType(StrEnum):
+    EPIC = "EPIC"
+    STORY = "STORY"
+    TASK = "TASK"
+    BUG = "BUG"
+
+
+class WorkItemStatus(StrEnum):
     TODO = "TODO"
     IN_PROGRESS = "IN_PROGRESS"
     CODE_REVIEW = "CODE_REVIEW"
     VERIFY = "VERIFY"
-    DONE = "DONE"
-
-
-class EpicStatus(StrEnum):
-    TODO = "TODO"
-    IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
 
 
@@ -92,7 +93,7 @@ class Backlog:
     name: str
     kind: BacklogKind
     status: BacklogStatus
-    display_order: int
+    rank: str
     is_default: bool
     goal: str | None
     start_date: str | None
@@ -105,94 +106,20 @@ class Backlog:
 
 
 @dataclass
-class Epic:
+class WorkItem:
     id: str
-    project_id: str
-    key: str
+    project_id: str | None
+    parent_id: str | None
+    key: str | None
+    type: WorkItemType
+    sub_type: str | None
     title: str
+    summary: str | None
     description: str | None
-    status: EpicStatus
+    status: WorkItemStatus
     status_mode: StatusMode
     status_override: str | None
     status_override_set_at: str | None
-    is_blocked: bool
-    blocked_reason: str | None
-    priority: int | None
-    metadata_json: str | None
-    created_by: str | None
-    updated_by: str | None
-    created_at: str
-    updated_at: str
-
-
-@dataclass
-class EpicOverview:
-    epic_key: str
-    title: str
-    status: EpicStatus
-    progress_pct: float
-    progress_trend_7d: float
-    stories_total: int
-    stories_done: int
-    stories_in_progress: int
-    blocked_count: int
-    stale_days: int
-    priority: int | None
-    updated_at: str
-
-
-@dataclass
-class Story:
-    id: str
-    project_id: str | None
-    epic_id: str | None
-    key: str | None
-    title: str
-    intent: str | None
-    description: str | None
-    # story_type is intentionally a free-form string (no enum constraint).
-    # Consumers may use values like USER_STORY, SPIKE, BUG, CHORE, etc.
-    story_type: str
-    status: ItemStatus
-    is_blocked: bool
-    blocked_reason: str | None
-    priority: int | None
-    current_assignee_agent_id: str | None
-    metadata_json: str | None
-    created_by: str | None
-    updated_by: str | None
-    created_at: str
-    updated_at: str
-    started_at: str | None
-    completed_at: str | None
-
-
-@dataclass
-class BacklogStoryItem:
-    backlog_id: str
-    story_id: str
-    position: int
-    added_at: str
-
-
-@dataclass
-class BacklogTaskItem:
-    backlog_id: str
-    task_id: str
-    position: int
-    added_at: str
-
-
-@dataclass
-class Task:
-    id: str
-    project_id: str | None
-    story_id: str | None
-    key: str | None
-    title: str
-    objective: str | None
-    task_type: str
-    status: ItemStatus
     is_blocked: bool
     blocked_reason: str | None
     priority: int | None
@@ -209,11 +136,36 @@ class Task:
 
 
 @dataclass
-class TaskAssignment:
+class BacklogItem:
+    backlog_id: str
+    work_item_id: str
+    rank: str
+    added_at: str
+
+
+@dataclass
+class WorkItemAssignment:
     id: str
-    task_id: str
+    work_item_id: str
     agent_id: str
     assigned_at: str
     unassigned_at: str | None
     assigned_by: str | None
     reason: str | None
+
+
+@dataclass
+class WorkItemOverview:
+    work_item_key: str
+    title: str
+    type: WorkItemType
+    status: WorkItemStatus
+    progress_pct: float
+    progress_trend_7d: float
+    children_total: int
+    children_done: int
+    children_in_progress: int
+    blocked_count: int
+    stale_days: int
+    priority: int | None
+    updated_at: str
