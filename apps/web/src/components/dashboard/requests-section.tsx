@@ -15,7 +15,7 @@ function RequestRow({ req }: { req: LLMRequest }) {
 
   return (
     <>
-      <tr className="border-b border-border transition-colors hover:bg-white/[0.02]">
+      <tr className="border-b border-border transition-colors hover:bg-foreground/[0.02]">
         <td className="px-4 py-3 text-xs text-muted-foreground">
           <button
             type="button"
@@ -196,7 +196,7 @@ export function RequestsSection({
                 "focus-ring rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors",
                 page <= 1
                   ? "cursor-not-allowed text-muted-foreground/50"
-                  : "text-foreground hover:bg-white/[0.04]",
+                  : "text-foreground hover:bg-foreground/[0.04]",
               )}
             >
               Previous
@@ -209,7 +209,7 @@ export function RequestsSection({
                 "focus-ring rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors",
                 page >= response.meta.totalPages
                   ? "cursor-not-allowed text-muted-foreground/50"
-                  : "text-foreground hover:bg-white/[0.04]",
+                  : "text-foreground hover:bg-foreground/[0.04]",
               )}
             >
               Next
