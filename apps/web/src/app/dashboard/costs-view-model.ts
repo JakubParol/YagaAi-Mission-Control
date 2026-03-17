@@ -92,7 +92,8 @@ export interface CostStatCardValues {
 }
 
 /** Compute stat card values from daily cost data (single-day data). */
-export function aggregateStatCards(daily: DailyCost[]): CostStatCardValues {
+export function aggregateStatCards(daily: DailyCost[] | undefined | null): CostStatCardValues {
+  if (!daily) return { todaySpend: 0, yesterdaySpend: 0, todayRequests: 0, avgCost: 0 };
   let todaySpend = 0;
   let todayRequests = 0;
 
@@ -126,7 +127,8 @@ export function mergeStatCardData(
 }
 
 /** Aggregate per-model breakdown from filtered daily data. */
-export function aggregateModels(daily: DailyCost[]): ModelUsage[] {
+export function aggregateModels(daily: DailyCost[] | undefined | null): ModelUsage[] {
+  if (!daily) return [];
   const modelMap = new Map<string, ModelUsage>();
 
   for (const day of daily) {
