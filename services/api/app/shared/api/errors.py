@@ -49,7 +49,8 @@ class ConflictError(AppError):
         super().__init__(409, message, "CONFLICT")
 
 
-async def app_error_handler(_request: Request, exc: AppError) -> JSONResponse:
+async def app_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, AppError)
     error_payload: dict[str, Any] = {"code": exc.code, "message": exc.message}
     if exc.details:
         error_payload["details"] = exc.details

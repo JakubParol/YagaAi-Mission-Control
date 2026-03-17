@@ -1,7 +1,5 @@
-import json
 from typing import Any
 from typing import cast as type_cast
-from uuid import uuid4
 
 from sqlalchemy import case, delete, insert, select, update
 from sqlalchemy.engine import CursorResult
@@ -11,16 +9,33 @@ from sqlalchemy.sql.functions import sum as sa_sum
 
 from app.planning.application.ports import TaskRepository
 from app.planning.domain.models import Task, TaskAssignment
-from app.planning.infrastructure.shared.mappers import _row_to_assignment, _row_to_task
+from app.planning.infrastructure.repositories.tasks._assignments import (
+    assign_agent_with_event as _assign_agent_with_event,
+)
+from app.planning.infrastructure.repositories.tasks._assignments import (
+    close_assignment as _close_assignment,
+)
+from app.planning.infrastructure.repositories.tasks._assignments import (
+    create_assignment as _create_assignment,
+)
+from app.planning.infrastructure.repositories.tasks._assignments import (
+    get_active_assignment as _get_active_assignment,
+)
+from app.planning.infrastructure.repositories.tasks._assignments import (
+    get_assignments as _get_assignments,
+)
+from app.planning.infrastructure.repositories.tasks._assignments import (
+    unassign_agent_with_event as _unassign_agent_with_event,
+)
+from app.planning.infrastructure.shared.events import insert_assignment_event
+from app.planning.infrastructure.shared.mappers import _row_to_task
 from app.planning.infrastructure.shared.sorting import parse_sort
 from app.planning.infrastructure.tables import (
-    activity_log,
     agents,
     labels,
     project_counters,
     projects,
     stories,
-    task_assignments,
     task_labels,
     tasks,
 )
@@ -204,7 +219,8 @@ class DbTaskRepository(TaskRepository):
 
         try:
             await self._db.execute(update(tasks).where(tasks.c.id == task_id).values(**values))
-            await self._insert_assignment_event(
+            await insert_assignment_event(
+                self._db,
                 actor_id=actor_id,
                 entity_type="task",
                 entity_id=task_id,
@@ -333,63 +349,16 @@ class DbTaskRepository(TaskRepository):
         return (result.rowcount or 0) > 0
 
     async def get_active_assignment(self, task_id: str) -> TaskAssignment | None:
-        row = (
-            (
-                await self._db.execute(
-                    select(task_assignments).where(
-                        (task_assignments.c.task_id == task_id)
-                        & task_assignments.c.unassigned_at.is_(None)
-                    )
-                )
-            )
-            .mappings()
-            .first()
-        )
-        return _row_to_assignment(row) if row else None
+        return await _get_active_assignment(self._db, task_id)
 
     async def get_assignments(self, task_id: str) -> list[TaskAssignment]:
-        rows = (
-            (
-                await self._db.execute(
-                    select(task_assignments)
-                    .where(task_assignments.c.task_id == task_id)
-                    .order_by(task_assignments.c.assigned_at.desc())
-                )
-            )
-            .mappings()
-            .all()
-        )
-        return [_row_to_assignment(r) for r in rows]
+        return await _get_assignments(self._db, task_id)
 
     async def create_assignment(self, assignment: TaskAssignment) -> TaskAssignment:
-        await self._db.execute(
-            insert(task_assignments).values(
-                id=assignment.id,
-                task_id=assignment.task_id,
-                agent_id=assignment.agent_id,
-                assigned_at=assignment.assigned_at,
-                unassigned_at=assignment.unassigned_at,
-                assigned_by=assignment.assigned_by,
-                reason=assignment.reason,
-            )
-        )
-        await self._db.commit()
-        return assignment
+        return await _create_assignment(self._db, assignment)
 
     async def close_assignment(self, task_id: str, unassigned_at: str) -> bool:
-        result = type_cast(
-            CursorResult,
-            await self._db.execute(
-                update(task_assignments)
-                .where(
-                    (task_assignments.c.task_id == task_id)
-                    & task_assignments.c.unassigned_at.is_(None)
-                )
-                .values(unassigned_at=unassigned_at)
-            ),
-        )
-        await self._db.commit()
-        return (result.rowcount or 0) > 0
+        return await _close_assignment(self._db, task_id, unassigned_at)
 
     async def assign_agent_with_event(
         self,
@@ -402,68 +371,16 @@ class DbTaskRepository(TaskRepository):
         correlation_id: str,
         causation_id: str,
     ) -> TaskAssignment:
-        row = (
-            (await self._db.execute(select(tasks.c.key).where(tasks.c.id == task_id)))
-            .mappings()
-            .first()
-        )
-        if row is None:
-            raise ValidationError(f"Task {task_id} not found")
-
-        assignment = TaskAssignment(
-            id=str(uuid4()),
+        return await _assign_agent_with_event(
+            self._db,
             task_id=task_id,
             agent_id=agent_id,
-            assigned_at=occurred_at,
-            unassigned_at=None,
+            previous_assignee_agent_id=previous_assignee_agent_id,
             assigned_by=assigned_by,
-            reason=None,
+            occurred_at=occurred_at,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
         )
-        try:
-            if previous_assignee_agent_id is not None:
-                await self._db.execute(
-                    update(task_assignments)
-                    .where(
-                        (task_assignments.c.task_id == task_id)
-                        & task_assignments.c.unassigned_at.is_(None)
-                    )
-                    .values(unassigned_at=occurred_at)
-                )
-            await self._db.execute(
-                insert(task_assignments).values(
-                    id=assignment.id,
-                    task_id=assignment.task_id,
-                    agent_id=assignment.agent_id,
-                    assigned_at=assignment.assigned_at,
-                    unassigned_at=assignment.unassigned_at,
-                    assigned_by=assignment.assigned_by,
-                    reason=assignment.reason,
-                )
-            )
-            await self._db.execute(
-                update(tasks)
-                .where(tasks.c.id == task_id)
-                .values(
-                    current_assignee_agent_id=agent_id,
-                    updated_at=occurred_at,
-                )
-            )
-            await self._insert_assignment_event(
-                actor_id=assigned_by,
-                entity_type="task",
-                entity_id=task_id,
-                work_item_key=row["key"],
-                new_assignee_agent_id=agent_id,
-                previous_assignee_agent_id=previous_assignee_agent_id,
-                occurred_at=occurred_at,
-                correlation_id=correlation_id,
-                causation_id=causation_id,
-            )
-            await self._db.commit()
-        except Exception:
-            await self._db.rollback()
-            raise
-        return assignment
 
     async def unassign_agent_with_event(
         self,
@@ -474,93 +391,11 @@ class DbTaskRepository(TaskRepository):
         correlation_id: str,
         causation_id: str,
     ) -> bool:
-        row = (
-            (await self._db.execute(select(tasks.c.key).where(tasks.c.id == task_id)))
-            .mappings()
-            .first()
-        )
-        if row is None:
-            return False
-        try:
-            result = type_cast(
-                CursorResult,
-                await self._db.execute(
-                    update(task_assignments)
-                    .where(
-                        (task_assignments.c.task_id == task_id)
-                        & task_assignments.c.unassigned_at.is_(None)
-                    )
-                    .values(unassigned_at=occurred_at)
-                ),
-            )
-            await self._db.execute(
-                update(tasks)
-                .where(tasks.c.id == task_id)
-                .values(
-                    current_assignee_agent_id=None,
-                    updated_at=occurred_at,
-                )
-            )
-            await self._insert_assignment_event(
-                actor_id=None,
-                entity_type="task",
-                entity_id=task_id,
-                work_item_key=row["key"],
-                new_assignee_agent_id=None,
-                previous_assignee_agent_id=previous_assignee_agent_id,
-                occurred_at=occurred_at,
-                correlation_id=correlation_id,
-                causation_id=causation_id,
-            )
-            await self._db.commit()
-        except Exception:
-            await self._db.rollback()
-            raise
-        return (result.rowcount or 0) > 0
-
-    async def _insert_assignment_event(
-        self,
-        *,
-        actor_id: str | None,
-        entity_type: str,
-        entity_id: str,
-        work_item_key: str | None,
-        new_assignee_agent_id: str | None,
-        previous_assignee_agent_id: str | None,
-        occurred_at: str,
-        correlation_id: str,
-        causation_id: str,
-    ) -> None:
-        new_payload = {"id": new_assignee_agent_id} if new_assignee_agent_id else None
-        prev_payload = {"id": previous_assignee_agent_id} if previous_assignee_agent_id else None
-        scope = {
-            "work_item_key": work_item_key,
-            "correlation_id": correlation_id,
-            "causation_id": causation_id,
-        }
-        metadata = {
-            "work_item_key": work_item_key,
-            "assignee_agent": new_payload,
-            "previous_assignee": prev_payload,
-            "correlation_id": correlation_id,
-            "causation_id": causation_id,
-            "timestamp": occurred_at,
-        }
-        event_data_json = json.dumps(
-            {"metadata": metadata, "occurred_at": occurred_at, "scope": scope},
-            separators=(",", ":"),
-            sort_keys=True,
-        )
-        await self._db.execute(
-            insert(activity_log).values(
-                id=str(uuid4()),
-                event_name="planning.assignment.changed",
-                actor_id=actor_id,
-                actor_type="system",
-                entity_type=entity_type,
-                entity_id=entity_id,
-                message="planning.assignment.changed",
-                event_data_json=event_data_json,
-                created_at=occurred_at,
-            )
+        return await _unassign_agent_with_event(
+            self._db,
+            task_id=task_id,
+            previous_assignee_agent_id=previous_assignee_agent_id,
+            occurred_at=occurred_at,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
         )

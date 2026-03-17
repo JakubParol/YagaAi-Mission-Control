@@ -9,31 +9,37 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import settings
 
-_ENGINE: AsyncEngine | None = None
-_SESSION_FACTORY: async_sessionmaker[AsyncSession] | None = None
+_state: dict[str, AsyncEngine | async_sessionmaker[AsyncSession]] = {}
+
+_ENGINE_KEY = "engine"
+_FACTORY_KEY = "factory"
 
 
 def get_async_engine() -> AsyncEngine:
-    global _ENGINE  # pylint: disable=global-statement
-    if _ENGINE is None:
-        _ENGINE = create_async_engine(
-            settings.postgres_dsn,
-            pool_pre_ping=True,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_max_overflow,
-        )
-    return _ENGINE
+    engine = _state.get(_ENGINE_KEY)
+    if isinstance(engine, AsyncEngine):
+        return engine
+    new_engine = create_async_engine(
+        settings.postgres_dsn,
+        pool_pre_ping=True,
+        pool_size=settings.db_pool_size,
+        max_overflow=settings.db_max_overflow,
+    )
+    _state[_ENGINE_KEY] = new_engine
+    return new_engine
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    global _SESSION_FACTORY  # pylint: disable=global-statement
-    if _SESSION_FACTORY is None:
-        _SESSION_FACTORY = async_sessionmaker(
-            get_async_engine(),
-            expire_on_commit=False,
-            autoflush=False,
-        )
-    return _SESSION_FACTORY
+    factory = _state.get(_FACTORY_KEY)
+    if isinstance(factory, async_sessionmaker):
+        return factory
+    new_factory = async_sessionmaker(
+        get_async_engine(),
+        expire_on_commit=False,
+        autoflush=False,
+    )
+    _state[_FACTORY_KEY] = new_factory
+    return new_factory
 
 
 async def init_db_engine() -> None:
@@ -41,12 +47,11 @@ async def init_db_engine() -> None:
 
 
 async def close_db_engine() -> None:
-    global _ENGINE, _SESSION_FACTORY  # pylint: disable=global-statement
-    if _ENGINE is None:
+    engine = _state.get(_ENGINE_KEY)
+    if not isinstance(engine, AsyncEngine):
         return
-    await _ENGINE.dispose()
-    _ENGINE = None
-    _SESSION_FACTORY = None
+    await engine.dispose()
+    _state.clear()
 
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:
