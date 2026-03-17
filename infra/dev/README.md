@@ -1,6 +1,6 @@
 # Local runtime (Docker + Dapr)
 
-Deterministic local stack for Mission Control orchestration runtime.
+Deterministic local stack for Mission Control control-plane runtime.
 
 ## Topology
 
@@ -8,7 +8,7 @@ Deterministic local stack for Mission Control orchestration runtime.
 - `redis`
 - `api` (FastAPI on host `:5000`, container `:5100`)
 - `web` (Next.js on host `:3000`)
-- `worker` (HTTP worker that publishes orchestration heartbeats via Dapr pub/sub and receives API acknowledgements via Dapr service invocation)
+- `worker` (HTTP worker that publishes control-plane heartbeats via Dapr pub/sub and receives API acknowledgements via Dapr service invocation)
 - `dapr-placement`
 - Dapr sidecars: `dapr-api`, `dapr-web`, `dapr-worker`
 
@@ -70,24 +70,24 @@ For a quick reminder of the local manual flow, run:
 ./infra/dev/rebuild-all.sh  # rebuild app images, run migrations, recreate full DEV stack
 ```
 
-## Orchestration smoke suite
+## Control-plane smoke suite
 
-Run deterministic orchestration smoke coverage (happy path + retry + dead-letter + watchdog):
+Run deterministic control-plane smoke coverage (happy path + retry + dead-letter + watchdog):
 
 ```bash
-./infra/dev/scripts/orchestration-smoke.py
+./infra/dev/scripts/control-plane-smoke.py
 ```
 
 Run against an already running stack:
 
 ```bash
-./infra/dev/scripts/orchestration-smoke.py --skip-up
+./infra/dev/scripts/control-plane-smoke.py --skip-up
 ```
 
 CI-style (runtime booted separately, non-default API host):
 
 ```bash
-./infra/dev/scripts/orchestration-smoke.py --skip-up --api-base http://127.0.0.1:5000
+./infra/dev/scripts/control-plane-smoke.py --skip-up --api-base http://127.0.0.1:5000
 ```
 
 ## PostgreSQL backup/restore

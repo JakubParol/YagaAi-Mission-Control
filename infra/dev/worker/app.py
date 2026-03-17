@@ -17,7 +17,7 @@ REDIS_PORT = int(os.environ.get("MC_WORKER_REDIS_PORT", "6379"))
 WORKER_APP_PORT = int(os.environ.get("MC_WORKER_APP_PORT", "8000"))
 DAPR_HTTP_URL = os.environ.get("MC_WORKER_DAPR_HTTP_URL", "http://127.0.0.1:3520")
 PUBSUB_NAME = os.environ.get("MC_WORKER_DAPR_PUBSUB", "local-pubsub")
-PUBSUB_TOPIC = os.environ.get("MC_WORKER_DAPR_TOPIC", "orchestration.events")
+PUBSUB_TOPIC = os.environ.get("MC_WORKER_DAPR_TOPIC", "control-plane.events")
 STATESTORE_NAME = os.environ.get("MC_WORKER_DAPR_STATESTORE", "local-statestore")
 PUBLISH_INTERVAL_SECONDS = int(os.environ.get("MC_WORKER_PUBLISH_INTERVAL_SECONDS", "15"))
 
@@ -74,14 +74,14 @@ def _post_json(url: str, payload: Any) -> None:
         return
 
 
-def _publish_orchestration_event() -> None:
+def _publish_control_plane_event() -> None:
     event = {
         "event_id": str(uuid.uuid4()),
         "run_id": f"local-run-{int(time.time())}",
         "producer": "mission-control-worker",
         "correlation_id": str(uuid.uuid4()),
         "occurred_at": _iso_now(),
-        "type": "orchestration.run.submit.accepted",
+        "type": "control-plane.run.submit.accepted",
         "payload": {"source": "dev-runtime-worker", "status": "heartbeat"},
     }
 
@@ -96,7 +96,7 @@ def _publish_orchestration_event() -> None:
         _latest_publish = event
     _log(
         "INFO",
-        "worker.orchestration_event.published",
+        "worker.control_plane_event.published",
         run_id=event["run_id"],
         event_type=event["type"],
         correlation_id=event["correlation_id"],
@@ -115,11 +115,11 @@ def _publisher_loop() -> None:
         try:
             _check_api_health()
             _check_redis_health()
-            _publish_orchestration_event()
+            _publish_control_plane_event()
             _set_last_error(None)
         except (OSError, urllib.error.URLError, urllib.error.HTTPError, ValueError) as error:
             _set_last_error(str(error))
-            _log("ERROR", "worker.orchestration_event.publish_failed", error=str(error))
+            _log("ERROR", "worker.control_plane_event.publish_failed", error=str(error))
         time.sleep(PUBLISH_INTERVAL_SECONDS)
 
 
@@ -151,7 +151,7 @@ class WorkerHandler(BaseHTTPRequestHandler):
         self._send_json(200, payload)
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/orchestration/ack":
+        if self.path != "/control-plane/ack":
             self._send_json(404, {"error": "not_found"})
             return
 
@@ -163,7 +163,7 @@ class WorkerHandler(BaseHTTPRequestHandler):
             _latest_ack = payload
         _log(
             "INFO",
-            "worker.orchestration_ack.received",
+            "worker.control_plane_ack.received",
             run_id=str(payload.get("run_id", "")),
             correlation_id=str(payload.get("correlation_id", "")),
             causation_id=str(payload.get("causation_id", "")),

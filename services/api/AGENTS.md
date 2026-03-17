@@ -2,11 +2,11 @@
 
 ## What This Is
 
-FastAPI REST service for Mission Control. Three domain modules: **planning** (work management), **observability** (LLM costs), and **orchestration** (versioned command intake + transactional outbox).
+FastAPI REST service for Mission Control. Three domain modules: **planning** (work management), **observability** (LLM costs), and **control-plane** (versioned command intake + transactional outbox).
 
 ## Scope
 
-- **In scope:** REST API for planning (projects, epics, stories, tasks, backlogs, assignments, labels), observability (costs, requests, Langfuse import), and orchestration (commands, outbox)
+- **In scope:** REST API for planning (projects, epics, stories, tasks, backlogs, assignments, labels), observability (costs, requests, Langfuse import), and control-plane (commands, outbox)
 - **Out of scope:** Frontend UI (see `apps/web/`), CLI (see `apps/cli/`), auth enforcement (v2)
 
 ## Required Reading
@@ -25,7 +25,7 @@ Domain context (read if unfamiliar):
 
 | Decision | Rationale |
 |---|---|
-| Package by feature | Per workspace coding-standards - `planning/`, `observability/`, `orchestration/` as top-level modules |
+| Package by feature | Per workspace coding-standards - `planning/`, `observability/`, `control_plane/` as top-level modules |
 | Clean Architecture layers | api -> application <- infrastructure, domain standalone |
 | Port/Adapter pattern | Application defines interfaces, infrastructure implements them |
 | Async-first | Async endpoints and PostgreSQL access via async psycopg compatibility layer |

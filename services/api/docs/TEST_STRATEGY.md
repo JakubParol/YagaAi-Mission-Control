@@ -10,7 +10,7 @@
 The API test suite is intended to protect:
 - HTTP contracts
 - planning business rules
-- orchestration runtime behavior at service/API level
+- control-plane runtime behavior at service/API level
 - observability import/read flows
 - integration between routing, application services, repositories, and PostgreSQL
 
@@ -26,7 +26,7 @@ services/api/tests/
 ├── test_health.py
 ├── planning/
 ├── observability/
-├── orchestration/
+├── control_plane/
 └── support/
 ```
 
@@ -51,9 +51,9 @@ Observability tests cover:
 - request listing/model listing
 - import status and import-trigger flows
 
-### Orchestration coverage
+### Control-plane coverage
 
-Orchestration tests cover:
+Control-plane tests cover:
 - command acceptance routes
 - Dapr bridge routes
 - run/timeline read model routes
@@ -98,7 +98,7 @@ async def test_watchdog_retries_before_failing():
     assert decisions[0].action == "RETRY"  # not FAIL — still under max
 ```
 
-**When to use:** Logic has branching/state that's tedious to reach via HTTP. Orchestration services are the prime candidate.
+**When to use:** Logic has branching/state that's tedious to reach via HTTP. Control-plane services are the prime candidate.
 
 ### Unit tests (domain layer, pure functions)
 
@@ -125,7 +125,7 @@ Useful variants:
 ```bash
 poetry run pytest -v
 poetry run pytest tests/planning/test_task_routes.py
-poetry run pytest tests/orchestration/test_command_routes.py
+poetry run pytest tests/control_plane/test_command_routes.py
 poetry run pytest --cov=app --cov-report=term-missing
 ```
 
@@ -136,12 +136,12 @@ poetry run pytest --cov=app --cov-report=term-missing
 When changing API behavior, the default expectation is:
 - update or add tests in the relevant module
 - keep route contracts stable unless intentionally changed
-- cover regression cases for bug fixes, especially in orchestration and planning lifecycle behavior
+- cover regression cases for bug fixes, especially in control-plane and planning lifecycle behavior
 
 Areas that deserve extra care:
 - sprint lifecycle and backlog movement semantics
 - assignee change / event emission behavior
-- orchestration retry / watchdog / read-model correctness
+- control-plane retry / watchdog / read-model correctness
 - Dapr bridge behavior and failure handling
 
 ## Related

@@ -13,7 +13,7 @@
 |---|---|---|
 | `planning` | `/v1/planning` | projects, epics, stories, tasks, backlogs, labels, agents |
 | `observability` | `/v1/observability` | Langfuse-backed costs, requests, imports |
-| `orchestration` | `/v1/orchestration` | command intake, run/timeline read models, Dapr bridge, watchdog |
+| `control_plane` | `/v1/control-plane` | command intake, run/timeline read models, Dapr bridge, watchdog |
 
 The service is organized **by feature first**, then by layer inside each feature.
 
@@ -43,7 +43,7 @@ services/api/
 │   │   ├── domain/
 │   │   ├── infrastructure/
 │   │   └── dependencies.py
-│   └── orchestration/
+│   └── control_plane/
 │       ├── api/
 │       ├── application/
 │       ├── domain/
@@ -52,7 +52,7 @@ services/api/
 ├── tests/
 │   ├── planning/
 │   ├── observability/
-│   ├── orchestration/
+│   ├── control_plane/
 │   └── support/
 └── docs/
 ```
@@ -89,8 +89,8 @@ Rules that matter:
 - health endpoints
 - planning router
 - observability router
-- orchestration router
-- orchestration Dapr bridge router
+- control-plane router
+- control-plane Dapr bridge router
 
 ### Configuration
 
@@ -99,8 +99,8 @@ Runtime config is environment-driven via `app/config.py` with the `MC_API_` pref
 Important families of settings include:
 - database connectivity
 - OpenClaw config path for agent sync
-- orchestration retry / watchdog thresholds
-- orchestration rollout flags
+- control-plane retry / watchdog thresholds
+- control-plane rollout flags
 - Langfuse credentials for observability import
 
 ### Shared infrastructure
@@ -109,12 +109,12 @@ Important families of settings include:
 
 ---
 
-## 5) Orchestration-specific notes
+## 5) Control-plane-specific notes
 
-The orchestration module is split into three concerns:
+The control-plane module is split into three concerns:
 
 1. **Command intake**
-   - validates and accepts orchestration commands
+   - validates and accepts control-plane commands
    - persists transactional outbox state
 
 2. **Runtime services**
@@ -129,7 +129,7 @@ The orchestration module is split into three concerns:
    - metrics
    - Dapr event ingress / readiness hooks
 
-This means the web timeline and CLI diagnostics are consumers of orchestration read models, not owners of orchestration state.
+This means the web timeline and CLI diagnostics are consumers of control-plane read models, not owners of control-plane state.
 
 ---
 

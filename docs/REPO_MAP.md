@@ -8,9 +8,9 @@ Overview of all projects and components in this monorepo.
 
 | Project | Path | Type | Description |
 |---|---|---|---|
-| **Web** | `apps/web/` | Next.js 16 | Dashboard UI - planning + orchestration observability |
+| **Web** | `apps/web/` | Next.js 16 | Dashboard UI - planning + control-plane observability |
 | **CLI** | `apps/cli/` | TypeScript | Command-line interface (`mc`) over API contracts |
-| **API** | `services/api/` | FastAPI (Python) | REST API - planning, observability, orchestration |
+| **API** | `services/api/` | FastAPI (Python) | REST API - planning, observability, control-plane |
 
 ---
 
@@ -52,7 +52,7 @@ FastAPI REST service with three domain modules:
 |---|---|---|
 | **planning** | `/v1/planning` | Projects, epics, stories, tasks, backlogs, assignments, labels |
 | **observability** | `/v1/observability` | LLM costs, requests, Langfuse import |
-| **orchestration** | `/v1/orchestration` | Command intake, timeline read model, watchdog, runtime metrics |
+| **control_plane** | `/v1/control-plane` | Command intake, timeline read model, watchdog, runtime metrics |
 
 | Item | Detail |
 |---|---|

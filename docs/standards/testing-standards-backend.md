@@ -51,7 +51,7 @@ tests/
 ├── planning/
 │   ├── conftest.py          # Seed data: projects, backlogs, stories, tasks, agents
 │   └── test_<entity>_routes.py
-├── orchestration/
+├── control_plane/
 │   ├── conftest.py          # db_path fixture (alias for database_url)
 │   └── test_<feature>_routes.py
 ├── observability/

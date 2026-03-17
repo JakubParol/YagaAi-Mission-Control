@@ -652,7 +652,7 @@ def test_unassign_agent(client) -> None:
 
 
 def test_assign_agent_rolls_back_without_activity_log_table(
-    client, _setup_test_db, restore_schema
+    client, _setup_test_db, _restore_schema
 ) -> None:
     task_id = client.post(
         "/v1/planning/tasks",

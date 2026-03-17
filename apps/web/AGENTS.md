@@ -31,7 +31,7 @@ Before making changes, read:
 
 ## Data Sources
 
-1. **FastAPI** (`services/api/`) - planning, observability, and orchestration data via REST
+1. **FastAPI** (`services/api/`) - planning, observability, and control-plane data via REST
 
 ## Navigation
 

@@ -333,7 +333,7 @@ def test_list_backlogs_default_backlog_is_pinned_to_bottom(client):
 
 
 def test_list_backlogs_repairs_multiple_active_sprints_and_creates_index(
-    client, _setup_test_db, restore_schema
+    client, _setup_test_db, _restore_schema
 ):
     from tests.support.postgres_compat import pg_connect
 
