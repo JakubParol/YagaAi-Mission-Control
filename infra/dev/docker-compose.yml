@@ -53,24 +53,21 @@ services:
       start_period: 10s
 
   web:
-    image: node:22-alpine
-    working_dir: /workspace/apps/web
+    image: mission-control/web:${MC_IMAGE_TAG:-latest}
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+      args:
+        API_URL: http://api:5100
+        NEXT_PUBLIC_API_URL: /api
     env_file:
       - .env
     environment:
-      NEXT_PUBLIC_API_URL: /api
-      API_URL: http://api:5100
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
       PORT: 3000
-    command:
-      - /bin/sh
-      - -lc
-      - |
-        npm ci
-        npx next dev --hostname 0.0.0.0 --port 3000
-    volumes:
-      - ../../:/workspace
-      - web-node-modules:/workspace/apps/web/node_modules
-      - web-next-cache:/workspace/apps/web/.next
+      API_URL: http://api:5100
+      NEXT_PUBLIC_API_URL: /api
     ports:
       - "${MC_WEB_PORT:-3000}:3000"
     depends_on:
@@ -196,5 +193,3 @@ services:
 
 volumes:
   postgres-data:
-  web-node-modules:
-  web-next-cache:

@@ -113,8 +113,8 @@ deploy_dev() {
   previous_sha="$(previous_sha)"
 
   log_info "Deploying DEV commit $current_sha"
-  log_info "Building DEV API image..."
-  DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" build api
+  log_info "Building DEV images (api + web)..."
+  DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" build api web
 
   MC_IMAGE_TAG="$current_sha" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$DEV_COMPOSE_FILE" "$DEV_ENV"
 
