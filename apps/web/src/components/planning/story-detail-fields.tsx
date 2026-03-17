@@ -3,7 +3,7 @@
 import { Calendar, CheckCircle2, Clock, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { StoryLabel } from "./story-label-chips";
+import type { StoryDetail, StoryLabel } from "@/lib/planning/types";
 import { StoryLabelManager } from "./story-detail-label-section";
 import { TaskManager, type TaskManagerProps } from "./story-detail-task-section";
 import {
@@ -13,7 +13,6 @@ import {
   type EpicOption,
   type StoryDraft,
 } from "./story-detail-view-model";
-import type { StoryDetail } from "./story-types";
 
 // ── SidebarField ────────────────────────────────────────────────────────────
 

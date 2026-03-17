@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ItemStatus } from "@/lib/planning/types";
-import { StoryLabelChips, type StoryLabel } from "./story-label-chips";
+import type { StoryLabel } from "@/lib/planning/types";
+import { StoryLabelChips } from "./story-label-chips";
 import { StoryEpicDisplay } from "./story-epic-display";
 import { StoryTaskProgress } from "./story-task-progress";
 import {

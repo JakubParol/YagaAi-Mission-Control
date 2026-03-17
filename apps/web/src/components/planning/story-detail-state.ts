@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ItemStatus } from "@/lib/planning/types";
-import type { StoryLabel } from "./story-label-chips";
+import type { ItemStatus, StoryLabel, TaskItem } from "@/lib/planning/types";
 import {
   addOptimisticTask, applyOptimisticTaskPatch, createOptimisticTask,
   removeTask, replaceTask, rollbackTaskPatch, toTaskStatusDonePatch, type TaskPatch,
 } from "./task-optimistic";
-import type { TaskItem } from "./story-types";
 import { deleteStory } from "@/app/planning/story-actions";
 import {
   toStoryDraft, isStoryDirty, parseNumberOrNull,

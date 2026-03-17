@@ -5,7 +5,7 @@ import type {
   ItemStatus,
   Label,
   Project,
-  StoryLabel,
+  StoryLabelLink,
   StoryStatusHistory,
   TaskLabel,
   TaskStatusHistory,
@@ -30,7 +30,7 @@ export type SettingsAgent = Pick<
 
 export type SettingsLabel = Pick<Label, "id" | "project_id" | "name" | "color">;
 
-export type SettingsStoryLabel = Pick<StoryLabel, "story_id" | "label_id">;
+export type SettingsStoryLabel = Pick<StoryLabelLink, "story_id" | "label_id">;
 
 export type SettingsTaskLabel = Pick<TaskLabel, "task_id" | "label_id">;
 

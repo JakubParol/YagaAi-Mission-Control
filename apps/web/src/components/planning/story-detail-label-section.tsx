@@ -10,7 +10,8 @@ import {
   ThemedSelect,
   type ThemedSelectOption,
 } from "@/components/ui/themed-select";
-import { toLabelChipStyle, type StoryLabel } from "./story-label-chips";
+import type { StoryLabel } from "@/lib/planning/types";
+import { toLabelChipStyle } from "./story-label-chips";
 
 // ── StoryLabelManager ───────────────────────────────────────────────────────
 

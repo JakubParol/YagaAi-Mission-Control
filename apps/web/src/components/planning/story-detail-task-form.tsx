@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { STATUS_LABEL, STATUS_STYLE } from "./story-card";
-import type { TaskItem } from "./story-types";
+import type { TaskItem } from "@/lib/planning/types";
 import { TASK_TYPE_OPTIONS, type TaskDraft } from "./story-detail-view-model";
 
 // ── TaskRow ─────────────────────────────────────────────────────────────────

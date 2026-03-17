@@ -2,7 +2,7 @@
 
 import { ExternalLink, Loader2 } from "lucide-react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { ItemStatus, StoryDetail } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,7 +12,6 @@ import {
   StoryActionsMenu,
 } from "./story-actions-menu";
 import { STATUS_OPTIONS, type StoryDraft } from "./story-detail-view-model";
-import type { StoryDetail } from "./story-types";
 
 export const STORY_DETAIL_HEADER_LAYOUT = {
   actionsGroup: "ml-auto flex items-center gap-1.5",

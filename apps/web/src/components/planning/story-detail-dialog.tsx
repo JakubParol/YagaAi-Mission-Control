@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { StoryLabel } from "./story-label-chips";
+import type { StoryLabel } from "@/lib/planning/types";
 import {
   STORY_DETAIL_HEADER_LAYOUT,
   shouldShowStoryDetailActions,

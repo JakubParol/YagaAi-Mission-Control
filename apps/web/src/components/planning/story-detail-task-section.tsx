@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 
-import type { ItemStatus } from "@/lib/planning/types";
+import type { ItemStatus, TaskItem } from "@/lib/planning/types";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { TaskItem } from "./story-types";
 import type { TaskPatch } from "./task-optimistic";
 import {
   STATUS_OPTIONS,

@@ -3,9 +3,7 @@
  * No React, no side effects.
  */
 
-import type { ItemStatus } from "@/lib/planning/types";
-import type { StoryDetail, TaskItem } from "./story-types";
-import type { StoryLabel } from "./story-label-chips";
+import type { ItemStatus, StoryDetail, StoryLabel, TaskItem } from "@/lib/planning/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

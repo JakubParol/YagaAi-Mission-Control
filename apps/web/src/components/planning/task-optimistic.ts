@@ -1,5 +1,4 @@
-import type { ItemStatus } from "@/lib/planning/types";
-import type { TaskItem } from "./story-types";
+import type { ItemStatus, TaskItem } from "@/lib/planning/types";
 
 export interface TaskDraftInput {
   storyId: string;
