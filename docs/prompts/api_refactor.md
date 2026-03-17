@@ -1,95 +1,107 @@
-You are running a fully autonomous, long-running refactoring session. The user is asleep — do NOT ask for confirmation, approval, or input at any point. Make all decisions yourself. If you encounter a problem you would normally ask about, make the best decision and move on.
+You are running a fully autonomous code quality and architecture enforcement session on `services/api/`. The user is asleep — do NOT ask for confirmation, approval, or input at any point. Make all decisions yourself. If you encounter a problem you would normally ask about, make the best decision and move on.
 
 ## Git Setup
 
 1. You MUST be on `main`. Run `git pull` to get latest.
-2. Create a new branch: `git checkout -b refactor/web-clean-architecture-refactor`
-3. All work happens on this branch. Commit frequently (at minimum after each feature/layer).
+2. Create a new branch: `git checkout -b refactor/api-quality-sweep`
+3. All work happens on this branch. Commit frequently.
+
+## Required Reading (read ALL before doing anything)
+
+Read these in order — they define what "correct" looks like:
+
+1. `AGENTS.md` — repo-level rules
+2. `docs/standards/coding-standards.md` — workspace quality gate, file size limits, general rules
+3. `docs/standards/coding-standards-backend.md` — **your bible** — clean architecture, layers, module structure, DI, ports & adapters, error handling, persistence, import boundaries
+4. `services/api/AGENTS.md` — API-specific rules and tech decisions
+5. `services/api/docs/ARCHITECTURE.md` — current module layout and wiring
+6. `services/api/docs/INDEX.md` — pointers to further API docs
+
+Then read ALL source files in `services/api/app/` and `services/api/tests/` to understand current state.
+
+## What to Check
+
+Scan the entire `services/api/` codebase and fix any deviation from the coding standards. This includes but is not limited to:
+
+### Clean Architecture
+- Dependency rule: Infrastructure → Application → Domain, never reverse
+- Routers never import repositories — always through application services
+- Application owns ports (ABCs/Protocols), infrastructure implements them
+- Domain has zero external dependencies — pure models, enums, invariants
+- No cross-module imports (planning ↛ observability ↛ orchestration), shared code in `shared/`
+
+### File Size & Structure
+- Hard limit: 300 lines per file — split by entity or concern when exceeded
+- One repository class per file, one service class per file
+- Module structure matches the canonical layout from `coding-standards-backend.md`
+- Schemas split into `api/schemas/<entity>.py` subfolder when file grows large
+- God-interface ports split into focused Protocol classes per entity
+- Repositories sub-foldered only when they have private helper files
+
+### Dependency Injection & Wiring
+- Constructor injection for services and repositories
+- One `dependencies.py` per module wiring repos → services → route deps
+- No global singletons, no importing concrete infrastructure in Application/Domain
+- `Depends()` chain: `get_db` → repo factory → service factory → route parameter
+
+### Separation of Concerns
+- API layer: request validation, schema mapping, DI wiring — no business logic, no direct DB
+- Application layer: orchestration, business rules, transactions — no HTTP knowledge, no infrastructure imports
+- Domain layer: invariants, value objects, entity definitions — imports nothing outside domain
+- Infrastructure layer: IO (DB queries, HTTP calls) — no business decisions
+
+### Testability & Test Hygiene
+- Tests updated to match current signatures and imports
+- Port/adapter pattern enables test doubles via DI — no monkey-patching
+- Test files live next to the module they test (in `tests/<module>/`)
+
+### Code Quality
+- Type hints everywhere, strict typing
+- Explicit DTOs for request/response — no leaking internal types
+- Small modules named by intent, not `utils`/`helpers`
+- DRY with judgment — extract when 3+ consumers, not before
+- No magic config — explicit pydantic `BaseSettings`
+
+### Error Handling
+- Single `AppError` hierarchy with standard subtypes
+- Global exception handler converts `AppError` → JSON envelope
+- No per-route try/catch for known errors, no swallowed exceptions
+- All external calls have timeouts
 
 ## Critical Rules
 
-- **NEVER run tests.** Tests are broken and will hang indefinitely. Do NOT run `npm test`, `node --test`, or any test command.
-- **Before EVERY commit**, run the lint script. Due to PATH issues in this environment, run the tools directly:
+- **Zero warnings policy.** Every warning is a bug. Fix at the source like a senior engineer. Understand the root cause, fix it properly.
+- **No suppression hacks.** NEVER use `# noqa`, `# type: ignore`, `# pylint: disable`, `@ts-ignore`, blanket lint config weakening, or any other mechanism to hide issues.
+- **Before EVERY commit**, run:
   ```bash
-  cd /home/kuba/repos/mission-control/apps/web
-  npx eslint --fix
-  npx eslint        # must pass with zero warnings
-  npx tsc --noEmit  # must pass with zero errors
-Zero warnings policy. Every warning is a bug. Fix at source. No eslint-disable, no @ts-ignore, no suppression hacks.
-No test execution, but DO update test files if your refactor changes imports or signatures that test files reference.
-Required Reading (read these BEFORE starting any work)
-docs/standards/coding-standards.md — quality gate, general rules
-docs/standards/coding-standards-frontend.md — full frontend architecture spec (this is your bible)
-docs/INDEX.md → docs/REPO_MAP.md — understand repo structure
-AGENTS.md — agent workflow rules
-Read ALL existing files in apps/web/src/ to understand current state before changing anything
-Reference: Already-completed backend refactor
-PR #147 refactored services/api/ following the same pattern. Look at its commits for the style and approach:
+  cd /home/kuba/repos/mission-control/services/api
+  ./scripts/lint.sh --fix
+  ./scripts/lint.sh
+Both must pass with zero warnings, zero errors.
 
-Split monolithic files into focused modules, check for best pattenrs and practices
-Moved files into proper directory structure
-Updated all imports and wiring
-Fixed all lint warnings
-What to Refactor
-Full refactor of apps/web/ to match docs/standards/coding-standards-frontend.md. The target architecture is:
+Run tests after completing each module: poetry run pytest tests/ -x -q
+Update test files if your changes affect imports or signatures that tests reference.
+Workflow
+For each issue found:
 
-Layer	Location	Responsibility
-Pages	app/<feature>/page.tsx	Layout, data orchestration, route params — NO business logic
-View models	app/<feature>/*-view-model.ts	Transform/filter/sort data for the view — pure functions, no React
-Actions	app/<feature>/*-actions.ts	Server-side mutations, API calls
-Feature components	components/<feature>/	UI + user interaction for one domain
-Shared UI	components/ui/	Pure presentation, zero business logic
-Hooks	hooks/	Reusable stateful logic
-Lib	lib/<feature>/	Types, adapters, API calls, pure functions
-Key rules from the standards:
-
-No cross-feature imports (planning never imports from dashboard)
-Pages are thin (<300 lines) — extract to view models, actions, sub-components
-View models are pure functions (no React, no side effects)
-Shared UI components are pure (no app logic, no auth, no routing, no data fetching)
-Props are explicit interfaces named <Component>Props
-Config objects at module level, not inside render
-cn() for class merging, never manual string concatenation
-Domain types in lib/<feature>/types.ts
-Server Components by default, "use client" only when needed and as low as possible
-Work Order
-Go feature by feature: dashboard → planning → shared/lib. Within each feature, go layer by layer.
-
-For each layer in each feature:
-
-Create a plan in apps/web/docs/tmp/<feature>-<layer>-plan.md
-Read all relevant files
-Execute the plan
-Run lint (npx eslint --fix && npx eslint && npx tsc --noEmit)
+Read all relevant files before changing anything
+Fix at source — proper refactor, not a workaround
+Update all imports (within module AND in tests)
+Run lint and tests
 Commit with descriptive message
-Move to next layer
-Feature: Dashboard
-app/dashboard/ — pages
-components/dashboard/ — feature components
-lib/dashboard-types.ts — types
-Feature: Planning
-app/planning/ — pages, view models, actions, filters
-components/planning/ — feature components (large — ~30 files)
-lib/planning/ — types, adapters, settings
-Shared
-components/ui/ — shared UI primitives
-components/ (root level) — app shell, sidebar, etc.
-hooks/ — shared hooks
-lib/ — api client, utils, errors, navigation, types
+Move to next issue
 Commit Convention
 
-refactor(web): <what changed>
-Example: refactor(web): extract dashboard page into view model and feature components
-
+refactor(api): <what changed>
 End every commit message with:
 
 
 Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 When Done
-Verify full lint passes one final time
-Push the branch: git push -u origin refactor/web-clean-architecture
+Verify full lint passes: ./scripts/lint.sh
+Verify all tests pass: poetry run pytest tests/ -x -q
+Verify no file in services/api/app/ exceeds 300 lines
+Push the branch: git push -u origin refactor/api-quality-sweep
 Create a PR with gh pr create summarizing all changes
-Working Directory
-You can create apps/web/docs/tmp/ for plans and notes.
-
+If nothing needed fixing — do not create empty commits or PRs. Just stop.
 BEGIN WORK NOW.
