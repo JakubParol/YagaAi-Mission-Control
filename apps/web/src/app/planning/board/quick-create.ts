@@ -185,27 +185,6 @@ async function resolveProductBacklogId(projectId: string): Promise<string> {
   return backlogId
 }
 
-async function ensureProductBacklogMembership(
-  productBacklogId: string,
-  storyId: string,
-): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/backlogs/${productBacklogId}/items`), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ work_item_id: storyId }),
-  })
-  if (response.ok) return
-
-  const payload = await parseApiError(response.clone())
-  const code = payload.error?.code
-  const message = payload.error?.message ?? ""
-  if (code === "CONFLICT" && message.includes("already belongs to backlog")) {
-    return
-  }
-
-  throw new Error(await toQuickCreateErrorMessage(response, "prepare"))
-}
-
 interface StoryCreateResponse {
   id?: string;
   key?: string | null;

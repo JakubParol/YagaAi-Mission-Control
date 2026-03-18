@@ -150,7 +150,7 @@ class WorkItemService:
         self._validate_type(type)
 
         if parent_id:
-            parent = await self._repo.parent_exists(parent_id)
+            parent = await self._repo.get_by_id(parent_id)
             if not parent:
                 raise ValidationError(f"Parent {parent_id} does not exist")
             if project_id is None:
@@ -228,7 +228,7 @@ class WorkItemService:
             await self._apply_status_transition(work_item_id, data, existing, now)
 
         if "parent_id" in data and data["parent_id"] is not None:
-            parent = await self._repo.parent_exists(data["parent_id"])
+            parent = await self._repo.get_by_id(data["parent_id"])
             if not parent:
                 raise ValidationError(f"Parent {data['parent_id']} does not exist")
             if existing.project_id and parent.project_id:

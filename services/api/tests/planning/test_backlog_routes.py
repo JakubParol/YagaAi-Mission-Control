@@ -302,5 +302,3 @@ def test_list_backlogs_default_backlog_is_pinned_to_bottom(client):
     assert list_resp.status_code == 200
     items = list_resp.json()["data"]
     assert items[-1]["is_default"] is True
-
-

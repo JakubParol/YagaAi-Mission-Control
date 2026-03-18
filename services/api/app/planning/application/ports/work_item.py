@@ -128,9 +128,6 @@ class WorkItemRepository(ABC):
     @abstractmethod
     async def backlog_exists(self, backlog_id: str) -> bool: ...
 
-    @abstractmethod
-    async def parent_exists(self, parent_id: str) -> WorkItem | None: ...
-
     # ------------------------------------------------------------------
     # Labels
     # ------------------------------------------------------------------

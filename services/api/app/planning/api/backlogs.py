@@ -20,7 +20,7 @@ from app.planning.application.backlog_service import BacklogService
 from app.planning.dependencies import get_backlog_service, resolve_project_key
 from app.planning.domain.models import BacklogKind
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
-from app.shared.api.errors import ValidationError
+from app.shared.api.errors import AppError, ValidationError
 
 router = APIRouter(prefix="/backlogs", tags=["planning/backlogs"])
 
@@ -258,7 +258,7 @@ async def bulk_add_items_to_backlog(
         try:
             await service.add_item_to_backlog(backlog_id, work_item_id)
             results.append({"work_item_id": work_item_id, "success": True})
-        except Exception as exc:
+        except AppError as exc:
             results.append(
                 {
                     "work_item_id": work_item_id,
