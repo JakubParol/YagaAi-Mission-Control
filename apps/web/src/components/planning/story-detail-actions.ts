@@ -12,7 +12,6 @@ import {
   normalizeStoryDraftForSave,
   parseApiMessage,
   parseNumberOrNull,
-  type BacklogOption,
   type StoryDraft,
   type TaskDraft,
 } from "./story-detail-view-model";
@@ -53,40 +52,6 @@ export async function fetchStoryAndTasks(storyId: string): Promise<FetchStoryRes
 }
 
 // ── Label fetching ──────────────────────────────────────────────────────────
-
-export async function fetchStoryLabelsFromBacklogs(
-  storyId: string,
-  projectId: string,
-): Promise<{ found: boolean; labels: WorkItemLabel[] }> {
-  const backlogsResponse = await fetch(
-    apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100`),
-  );
-  if (!backlogsResponse.ok) {
-    throw new Error(await parseApiMessage(backlogsResponse));
-  }
-
-  const backlogsJson = (await backlogsResponse.json()) as {
-    data?: BacklogOption[];
-  };
-  const backlogs = backlogsJson.data ?? [];
-  if (backlogs.length === 0) return { found: false, labels: [] };
-
-  const sections = await Promise.all(
-    backlogs.map(async (backlog) => {
-      const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/items`));
-      if (!response.ok) return null;
-      const json = (await response.json()) as {
-        data?: Array<{ id?: unknown; labels?: unknown }>;
-      };
-      const stories = json.data ?? [];
-      const story = stories.find((item) => item.id === storyId);
-      if (!story) return null;
-      return { found: true, labels: mapStoryLabelsFromUnknown(story.labels) };
-    }),
-  );
-
-  return sections.find((result) => result !== null) ?? { found: false, labels: [] };
-}
 
 export async function fetchAvailableLabels(projectId: string): Promise<WorkItemLabel[]> {
   const response = await fetch(

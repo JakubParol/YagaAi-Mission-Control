@@ -309,6 +309,19 @@ class DbWorkItemRepository(WorkItemRepository):
     # Labels
     # ------------------------------------------------------------------
 
+    async def get_labels(self, work_item_id: str) -> list[dict[str, Any]]:
+        q = (
+            select(
+                labels.c.id.label("label_id"),
+                labels.c.name,
+                labels.c.color,
+            )
+            .select_from(work_item_labels.join(labels, work_item_labels.c.label_id == labels.c.id))
+            .where(work_item_labels.c.work_item_id == work_item_id)
+        )
+        rows = (await self._db.execute(q)).mappings().all()
+        return [{"id": r["label_id"], "name": r["name"], "color": r["color"]} for r in rows]
+
     async def label_attached(self, work_item_id: str, label_id: str) -> bool:
         row = await self._db.execute(
             select(func.count())

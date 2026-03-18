@@ -4,6 +4,7 @@ from app.planning.api.schemas.backlog import (
     ActiveSprintItemResponse,
     ActiveSprintResponse,
     BacklogAddItem,
+    BacklogBulkAddItemsRequest,
     BacklogCreate,
     BacklogItemRankUpdateRequest,
     BacklogItemResponse,
@@ -242,6 +243,22 @@ async def add_item_to_backlog(
 ) -> Envelope[BacklogItemResponse]:
     result = await service.add_item_to_backlog(backlog_id, body.work_item_id, body.rank)
     return Envelope(data=BacklogItemResponse(**result))
+
+
+@router.post("/{backlog_id}/items/bulk", status_code=201)
+async def bulk_add_items_to_backlog(
+    backlog_id: str,
+    body: BacklogBulkAddItemsRequest,
+    service: BacklogService = Depends(get_backlog_service),
+) -> Envelope[dict]:
+    added = 0
+    for work_item_id in body.work_item_ids:
+        try:
+            await service.add_item_to_backlog(backlog_id, work_item_id)
+            added += 1
+        except Exception:
+            pass
+    return Envelope(data={"added": added, "total": len(body.work_item_ids)})
 
 
 @router.get("/{backlog_id}/items")

@@ -63,6 +63,10 @@ class BacklogItemResponse(BaseModel):
     added_at: str
 
 
+class BacklogBulkAddItemsRequest(BaseModel):
+    work_item_ids: list[str] = Field(..., min_length=1)
+
+
 class BacklogItemRankUpdateRequest(BaseModel):
     rank: str = Field(..., min_length=1)
 

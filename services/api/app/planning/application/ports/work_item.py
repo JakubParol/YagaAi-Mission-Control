@@ -130,6 +130,9 @@ class WorkItemRepository(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
+    async def get_labels(self, work_item_id: str) -> list[dict[str, Any]]: ...
+
+    @abstractmethod
     async def label_attached(self, work_item_id: str, label_id: str) -> bool: ...
 
     @abstractmethod

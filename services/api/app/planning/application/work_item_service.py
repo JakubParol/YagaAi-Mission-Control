@@ -71,6 +71,9 @@ class WorkItemService:
         children_count = await self._repo.get_children_count(item.id)
         return item, children_count
 
+    async def get_work_item_by_key_or_none(self, key: str) -> WorkItem | None:
+        return await self._repo.get_by_key(key)
+
     async def list_children(
         self,
         work_item_id: str,
@@ -276,6 +279,9 @@ class WorkItemService:
     # ------------------------------------------------------------------
     # Labels
     # ------------------------------------------------------------------
+
+    async def get_labels(self, work_item_id: str) -> list[dict[str, Any]]:
+        return await self._repo.get_labels(work_item_id)
 
     async def attach_label(self, work_item_id: str, label_id: str) -> None:
         if not await self._repo.get_by_id(work_item_id):
