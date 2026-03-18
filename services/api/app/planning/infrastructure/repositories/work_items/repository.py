@@ -16,6 +16,7 @@ from app.planning.infrastructure.repositories.work_items._overview import (
 )
 from app.planning.infrastructure.shared.mappers import _row_to_work_item
 from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.shared.sql import affected_rows
 from app.planning.infrastructure.tables import (
     agents,
     labels,
@@ -192,7 +193,7 @@ class DbWorkItemRepository(WorkItemRepository):
     async def delete(self, work_item_id: str) -> bool:
         result = await self._db.execute(delete(work_items).where(work_items.c.id == work_item_id))
         await self._db.commit()
-        return result.rowcount > 0
+        return affected_rows(result) > 0
 
     # ------------------------------------------------------------------
     # Hierarchy
@@ -337,7 +338,7 @@ class DbWorkItemRepository(WorkItemRepository):
             )
         )
         await self._db.commit()
-        return result.rowcount > 0
+        return affected_rows(result) > 0
 
     # ------------------------------------------------------------------
     # Assignments (delegates)
@@ -355,11 +356,45 @@ class DbWorkItemRepository(WorkItemRepository):
     async def close_assignment(self, work_item_id: str, unassigned_at: str) -> bool:
         return await _assignments.close_assignment(self._db, work_item_id, unassigned_at)
 
-    async def assign_agent_with_event(self, **kwargs: Any) -> WorkItemAssignment:
-        return await _assignments.assign_agent_with_event(self._db, **kwargs)
+    async def assign_agent_with_event(
+        self,
+        *,
+        work_item_id: str,
+        agent_id: str,
+        previous_assignee_agent_id: str | None,
+        assigned_by: str | None,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> WorkItemAssignment:
+        return await _assignments.assign_agent_with_event(
+            self._db,
+            work_item_id=work_item_id,
+            agent_id=agent_id,
+            previous_assignee_agent_id=previous_assignee_agent_id,
+            assigned_by=assigned_by,
+            occurred_at=occurred_at,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+        )
 
-    async def unassign_agent_with_event(self, **kwargs: Any) -> bool:
-        return await _assignments.unassign_agent_with_event(self._db, **kwargs)
+    async def unassign_agent_with_event(
+        self,
+        *,
+        work_item_id: str,
+        previous_assignee_agent_id: str,
+        occurred_at: str,
+        correlation_id: str,
+        causation_id: str,
+    ) -> bool:
+        return await _assignments.unassign_agent_with_event(
+            self._db,
+            work_item_id=work_item_id,
+            previous_assignee_agent_id=previous_assignee_agent_id,
+            occurred_at=occurred_at,
+            correlation_id=correlation_id,
+            causation_id=causation_id,
+        )
 
     async def update_assignee_with_event(
         self,

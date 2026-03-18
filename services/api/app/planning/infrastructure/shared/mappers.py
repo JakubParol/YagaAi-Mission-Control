@@ -55,9 +55,7 @@ def _row_to_work_item(m: RowMapping) -> WorkItem:
         estimate_points=m["estimate_points"],
         due_at=m["due_at"],
         current_assignee_agent_id=(
-            m["current_assignee_agent_id"]
-            if "current_assignee_agent_id" in m
-            else None
+            m["current_assignee_agent_id"] if "current_assignee_agent_id" in m else None
         ),
         metadata_json=m["metadata_json"],
         created_by=m["created_by"],

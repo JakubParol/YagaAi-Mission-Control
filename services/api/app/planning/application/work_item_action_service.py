@@ -96,9 +96,7 @@ class WorkItemActionService:
         actor_type: str | None,
     ) -> BulkActionResult:
         if not work_item_ids:
-            raise ValidationError(
-                "work_item_ids must contain at least one id"
-            )
+            raise ValidationError("work_item_ids must contain at least one id")
 
         results: list[BulkItemResult] = []
         for wid in work_item_ids:
@@ -110,9 +108,7 @@ class WorkItemActionService:
                     actor_id=actor_id,
                     actor_type=actor_type,
                 )
-                results.append(
-                    BulkItemResult(entity_id=wid, success=True, timestamp=stamp)
-                )
+                results.append(BulkItemResult(entity_id=wid, success=True, timestamp=stamp))
             except AppError as exc:
                 results.append(
                     BulkItemResult(
@@ -175,9 +171,7 @@ class WorkItemActionService:
         direction: str,
     ) -> BulkActionResult:
         if not work_item_ids:
-            raise ValidationError(
-                "work_item_ids must contain at least one id"
-            )
+            raise ValidationError("work_item_ids must contain at least one id")
 
         results: list[BulkItemResult] = []
         for wid in work_item_ids:
@@ -209,9 +203,7 @@ class WorkItemActionService:
                     metadata={"moved": move["moved"], "bulk": True},
                     occurred_at=stamp,
                 )
-                results.append(
-                    BulkItemResult(entity_id=wid, success=True, timestamp=stamp)
-                )
+                results.append(BulkItemResult(entity_id=wid, success=True, timestamp=stamp))
             except AppError as exc:
                 error_code = exc.code
                 if "No active sprint found" in exc.message:

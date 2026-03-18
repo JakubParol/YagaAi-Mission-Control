@@ -3,9 +3,7 @@ from pydantic import BaseModel, Field
 
 class BulkStatusUpdateRequest(BaseModel):
     work_item_ids: list[str] = Field(..., min_length=1)
-    status: str = Field(
-        ..., pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$"
-    )
+    status: str = Field(..., pattern=r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$")
 
 
 class BulkSprintMembershipRequest(BaseModel):

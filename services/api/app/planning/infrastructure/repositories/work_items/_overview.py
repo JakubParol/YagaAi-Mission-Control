@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.planning.domain.models import WorkItemOverview, WorkItemStatus, WorkItemType
 from app.planning.infrastructure.shared.sorting import parse_sort
-from app.planning.infrastructure.tables import work_items
+from app.planning.infrastructure.tables import work_item_labels, work_items
 
 # Alias for self-join (children).
 _children = work_items.alias("children")
@@ -92,7 +92,31 @@ async def list_overview(
         0,
     ).label("stale_days")
 
-    cols = [
+    conditions = []
+    if type:
+        conditions.append(work_items.c.type == type)
+    if project_id:
+        conditions.append(work_items.c.project_id == project_id)
+    if status:
+        conditions.append(work_items.c.status == status)
+    if assignee_id:
+        conditions.append(work_items.c.current_assignee_agent_id == assignee_id)
+    if is_blocked is not None:
+        conditions.append(work_items.c.is_blocked == (1 if is_blocked else 0))
+    if text_search:
+        conditions.append(
+            work_items.c.title.ilike(f"%{text_search}%")
+            | work_items.c.key.ilike(f"%{text_search}%")
+        )
+    if label:
+        conditions.append(
+            work_items.c.id.in_(
+                select(work_item_labels.c.work_item_id).where(work_item_labels.c.label_id == label)
+            )
+        )
+
+    count_q = select(func.count()).select_from(work_items)
+    select_q = select(
         work_items.c.key.label("work_item_key"),
         work_items.c.title,
         work_items.c.type,
@@ -106,25 +130,7 @@ async def list_overview(
         stale_days,
         work_items.c.priority,
         work_items.c.updated_at,
-    ]
-
-    conditions = []
-    if type:
-        conditions.append(work_items.c.type == type)
-    if project_id:
-        conditions.append(work_items.c.project_id == project_id)
-    if status:
-        conditions.append(work_items.c.status == status)
-    if assignee_id:
-        conditions.append(work_items.c.current_assignee_agent_id == assignee_id)
-    if is_blocked is not None:
-        conditions.append(work_items.c.is_blocked == (1 if is_blocked else 0))
-    if text_search:
-        pattern = f"%{text_search}%"
-        conditions.append(work_items.c.title.ilike(pattern) | work_items.c.key.ilike(pattern))
-
-    count_q = select(func.count()).select_from(work_items)
-    select_q = select(*cols)
+    )
     for cond in conditions:
         count_q = count_q.where(cond)
         select_q = select_q.where(cond)
