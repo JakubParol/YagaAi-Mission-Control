@@ -1,23 +1,15 @@
-from collections.abc import Iterator
-
-import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _configure_database() -> Iterator[None]:  # type: ignore[override]
-    yield
-
-
-@pytest.fixture(autouse=True)
-def _reset_database() -> Iterator[None]:  # type: ignore[override]
-    yield
+from app.shared.api.health import router
 
 
 def test_healthz() -> None:
-    with TestClient(app, raise_server_exceptions=False) as client:
+    """Smoke-test /healthz without booting the full app (no DB, no lifespan)."""
+    test_app = FastAPI()
+    test_app.include_router(router)
+
+    with TestClient(test_app) as client:
         response = client.get("/healthz")
 
     assert response.status_code == 200
