@@ -5,9 +5,12 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import type { WorkItemStatus } from "@/lib/planning/types";
 
@@ -83,6 +86,8 @@ export interface EpicRowProps {
   onPreviewFilterChange: (epicKey: string, patch: Partial<EpicOverviewStoryPreviewFilters>) => void;
   onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
   onAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
+  onEdit?: (epicId: string) => void;
+  onDelete?: (epicId: string) => void;
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -98,6 +103,8 @@ export function EpicRow({
   onPreviewFilterChange,
   onChangeStoryStatus,
   onAddStoryToSprint,
+  onEdit,
+  onDelete,
 }: EpicRowProps) {
   const stories = previewState.kind === "ready"
     ? applyStoryPreviewFilters(previewState.stories, previewFilters)
@@ -105,7 +112,7 @@ export function EpicRow({
 
   return (
     <article className="px-3 py-2.5">
-      <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2">
+      <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px_64px] gap-2">
         <button
           type="button"
           aria-label={isExpanded ? `Collapse ${item.work_item_key}` : `Expand ${item.work_item_key}`}
@@ -143,6 +150,33 @@ export function EpicRow({
               {item.stale_days}d
             </span>
           ) : null}
+        </div>
+
+        <div className="flex items-center justify-end gap-0.5">
+          {onEdit && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Edit ${item.work_item_key}`}
+              className="text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); onEdit(item.work_item_id); }}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Delete ${item.work_item_key}`}
+              className="text-muted-foreground hover:text-destructive"
+              onClick={(e) => { e.stopPropagation(); onDelete(item.work_item_id); }}
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 

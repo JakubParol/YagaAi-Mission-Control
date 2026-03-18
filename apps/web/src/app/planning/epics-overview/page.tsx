@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, Loader2, Radar, Search, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
+import { Filter, Loader2, Plus, Radar, Search, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { RefreshControl } from "@/components/refresh-control";
@@ -11,9 +11,14 @@ import { Button } from "@/components/ui/button";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import { cn } from "@/lib/utils";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { EpicDeleteConfirmDialog } from "@/components/planning/epic-delete-confirm-dialog";
+import { EpicFormDialog, type EpicFormValues } from "@/components/planning/epic-form-dialog";
+import {
+  type DeleteConfirmPhase,
+} from "@/components/planning/story-actions-menu-types";
 
 import { EpicRow, type PreviewState } from "./epic-row";
-import { fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
+import { deleteEpic, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,
   EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS,
@@ -49,6 +54,18 @@ type PageState =
   | { kind: "error"; message: string }
   | { kind: "ok"; rows: EpicOverviewItem[]; agents: EpicOverviewAgent[]; labels: EpicOverviewLabel[] };
 
+interface DeleteDialogState {
+  epicId: string;
+  epicTitle: string;
+  phase: DeleteConfirmPhase;
+}
+
+interface EditDialogState {
+  open: boolean;
+  epicId: string;
+  initialValues?: Partial<EpicFormValues>;
+}
+
 function EpicOverviewPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
   const searchParams = useSearchParams();
@@ -59,6 +76,10 @@ function EpicOverviewPageContent() {
   const previewByKeyRef = useRef<Record<string, PreviewState>>({});
   const previewFetchInFlightRef = useRef<Set<string>>(new Set());
   const activeProjectIdRef = useRef<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editDialogState, setEditDialogState] = useState<EditDialogState | null>(null);
+  const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState | null>(null);
+  const [epicActionError, setEpicActionError] = useState<string | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0] : null;
@@ -145,6 +166,52 @@ function EpicOverviewPageContent() {
     setState({ kind: "ok", ...result });
   }, [doFetchOverview, singleProjectId]);
 
+  const handleEditEpic = useCallback((epicId: string) => {
+    if (state.kind !== "ok") return;
+    const item = state.rows.find((r) => r.work_item_id === epicId);
+    setEditDialogState({
+      open: true,
+      epicId,
+      initialValues: item ? { title: item.title, status: item.status } : undefined,
+    });
+  }, [state]);
+
+  const handleDeleteEpic = useCallback((epicId: string) => {
+    if (state.kind !== "ok") return;
+    const item = state.rows.find((r) => r.work_item_id === epicId);
+    if (!item) return;
+    setDeleteDialogState({ epicId, epicTitle: item.title, phase: "open" });
+  }, [state]);
+
+  const handleCreateSaved = useCallback(async (_epicId: string) => {
+    setEpicActionError(null);
+    try { await refreshCurrentView(); } catch (err) {
+      setEpicActionError(err instanceof Error ? err.message : "Failed to refresh after creating epic.");
+    }
+  }, [refreshCurrentView]);
+
+  const handleEditSaved = useCallback(async () => {
+    setEpicActionError(null);
+    try { await refreshCurrentView(); } catch (err) {
+      setEpicActionError(err instanceof Error ? err.message : "Failed to refresh after updating epic.");
+    }
+  }, [refreshCurrentView]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteDialogState) return;
+    const { epicId } = deleteDialogState;
+    setDeleteDialogState((s) => s ? { ...s, phase: "submitting" } : null);
+    setEpicActionError(null);
+    try {
+      await deleteEpic(epicId);
+      setDeleteDialogState(null);
+      await refreshCurrentView();
+    } catch (err) {
+      setDeleteDialogState((s) => s ? { ...s, phase: "open" } : null);
+      setEpicActionError(err instanceof Error ? err.message : "Failed to delete epic.");
+    }
+  }, [deleteDialogState, refreshCurrentView]);
+
   useEffect(() => {
     if (!singleProjectId) return;
     let cancelled = false;
@@ -187,8 +254,41 @@ function EpicOverviewPageContent() {
     for (const k of keys) void ensurePreviewLoaded(k);
   }, [ensurePreviewLoaded, sa.expandedByKey]);
 
+  const createDialogNode = singleProjectId ? (
+    <EpicFormDialog
+      mode="create"
+      projectId={singleProjectId}
+      open={createOpen}
+      onOpenChange={setCreateOpen}
+      onSaved={handleCreateSaved}
+    />
+  ) : null;
+
+  const editDialogNode = editDialogState ? (
+    <EpicFormDialog
+      mode="edit"
+      epicId={editDialogState.epicId}
+      initialValues={editDialogState.initialValues}
+      open={editDialogState.open}
+      onOpenChange={(open) => setEditDialogState((s) => s ? { ...s, open } : null)}
+      onSaved={handleEditSaved}
+    />
+  ) : null;
+
+  const deleteDialogNode = deleteDialogState ? (
+    <EpicDeleteConfirmDialog
+      epicTitle={deleteDialogState.epicTitle}
+      confirmPhase={deleteDialogState.phase}
+      onPhaseChange={(next) => setDeleteDialogState((s) => s ? { ...s, phase: next } : null)}
+      onConfirmDelete={handleConfirmDelete}
+    />
+  ) : null;
+
   return (
     <>
+      {createDialogNode}
+      {editDialogNode}
+      {deleteDialogNode}
       <PageShell
         icon={Radar}
         title="Epics Overview"
@@ -222,7 +322,21 @@ function EpicOverviewPageContent() {
             </div>
           </div>
         ) : null}
-        actions={<RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
+        actions={(
+          <div className="flex items-center gap-2">
+            {singleProjectId && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => { setEpicActionError(null); setCreateOpen(true); }}
+              >
+                <Plus className="mr-1.5 size-3.5" />
+                Create Epic
+              </Button>
+            )}
+            <RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />
+          </div>
+        )}
       />
 
       {pageState.kind === "no-project" && (
@@ -233,6 +347,12 @@ function EpicOverviewPageContent() {
       )}
       {pageState.kind === "error" && (
         <EmptyState icon="default" title="Failed to load epic overview" description={pageState.message} />
+      )}
+
+      {pageState.kind === "ok" && epicActionError && (
+        <p className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          {epicActionError}
+        </p>
       )}
 
       {pageState.kind === "ok" && (
@@ -251,8 +371,8 @@ function EpicOverviewPageContent() {
             <section className="overflow-hidden rounded-lg border border-border/60 bg-card/20">
               <div className="overflow-x-auto">
                 <div className="min-w-[860px]">
-                  <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2 border-b border-border/30 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <span aria-hidden="true" /><span>Epic</span><span>Title</span><span>Status</span><span>Progress</span><span>Stories</span><span>Risk</span>
+                  <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px_64px] gap-2 border-b border-border/30 px-3 py-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <span aria-hidden="true" /><span>Epic</span><span>Title</span><span>Status</span><span>Progress</span><span>Stories</span><span>Risk</span><span aria-hidden="true" />
                   </div>
                   <div className="divide-y divide-border/20">
                     {rows.map((item) => (
@@ -268,6 +388,8 @@ function EpicOverviewPageContent() {
                         onPreviewFilterChange={sa.handlePreviewFilterChange}
                         onChangeStoryStatus={sa.handleChangeStoryStatus}
                         onAddStoryToSprint={sa.handleAddStoryToSprint}
+                        onEdit={handleEditEpic}
+                        onDelete={handleDeleteEpic}
                       />
                     ))}
                   </div>
