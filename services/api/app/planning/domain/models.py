@@ -156,6 +156,7 @@ class WorkItemAssignment:
 
 @dataclass
 class WorkItemOverview:
+    work_item_id: str
     work_item_key: str
     title: str
     type: WorkItemType

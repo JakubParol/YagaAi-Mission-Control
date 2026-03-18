@@ -117,6 +117,7 @@ async def list_overview(
 
     count_q = select(func.count()).select_from(work_items)
     select_q = select(
+        work_items.c.id.label("work_item_id"),
         work_items.c.key.label("work_item_key"),
         work_items.c.title,
         work_items.c.type,
@@ -145,6 +146,7 @@ async def list_overview(
 
     items = [
         WorkItemOverview(
+            work_item_id=r["work_item_id"],
             work_item_key=r["work_item_key"] or "",
             title=r["title"],
             type=WorkItemType(r["type"]),

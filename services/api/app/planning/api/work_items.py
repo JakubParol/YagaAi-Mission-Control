@@ -434,6 +434,7 @@ def _to_dict(item):
 
 def _overview_to_dict(item):
     return {
+        "work_item_id": item.work_item_id,
         "work_item_key": item.work_item_key,
         "title": item.title,
         "type": item.type.value,

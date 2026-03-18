@@ -108,7 +108,7 @@ function EpicOverviewPageContent() {
     [filters],
   );
   const doFetchStoriesPreview = useCallback(
-    (epicKey: string) => fetchStoriesPreview(epicKey, singleProjectId, agentLabelById),
+    (epicId: string) => fetchStoriesPreview(epicId, singleProjectId, agentLabelById),
     [agentLabelById, singleProjectId],
   );
 
@@ -117,10 +117,15 @@ function EpicOverviewPageContent() {
     const scopeKey = `${reqProjectId ?? "none"}:${epicKey}`;
     if (previewByKeyRef.current[epicKey]?.kind === "ready") return;
     if (previewFetchInFlightRef.current.has(scopeKey)) return;
+
+    const rows = state.kind === "ok" ? state.rows : [];
+    const epic = rows.find((r) => r.work_item_key === epicKey);
+    if (!epic?.work_item_id) return;
+
     previewFetchInFlightRef.current.add(scopeKey);
     setPreviewByKey((c) => ({ ...c, [epicKey]: { kind: "loading" } }));
     try {
-      const stories = await doFetchStoriesPreview(epicKey);
+      const stories = await doFetchStoriesPreview(epic.work_item_id);
       if (activeProjectIdRef.current !== reqProjectId) return;
       setPreviewByKey((c) => ({ ...c, [epicKey]: { kind: "ready", stories } }));
     } catch (error) {
@@ -132,7 +137,7 @@ function EpicOverviewPageContent() {
     } finally {
       previewFetchInFlightRef.current.delete(scopeKey);
     }
-  }, [doFetchStoriesPreview]);
+  }, [doFetchStoriesPreview, state]);
 
   const refreshCurrentView = useCallback(async () => {
     if (!singleProjectId) throw new Error("Select a single project before refreshing.");

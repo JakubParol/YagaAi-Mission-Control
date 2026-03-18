@@ -12,6 +12,7 @@ export interface EpicOverviewStoryPreview {
 }
 
 export interface EpicOverviewItem {
+  work_item_id: string;
   work_item_key: string;
   title: string;
   status: WorkItemStatus;

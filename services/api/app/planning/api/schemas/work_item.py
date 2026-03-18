@@ -75,6 +75,7 @@ class WorkItemDetailResponse(WorkItemResponse):
 
 
 class WorkItemOverviewResponse(BaseModel):
+    work_item_id: str
     work_item_key: str
     title: str
     type: str
