@@ -233,7 +233,7 @@ Default limit: `100`.
 
 #### `PATCH /v1/planning/work-items/{id}` — Update work item
 
-Updatable: `title`, `summary`, `description`, `sub_type`, `status`, `parent_id`, `project_id`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `current_assignee_agent_id`, `metadata_json`, `status_mode`, `status_override`.
+Updatable: `title`, `summary`, `description`, `sub_type`, `status`, `parent_id`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `current_assignee_agent_id`, `metadata_json`.
 
 Side effects:
 - Status change to `DONE` auto-closes active assignment.
