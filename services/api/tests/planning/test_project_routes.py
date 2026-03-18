@@ -57,15 +57,17 @@ def test_create_project_creates_default_backlog(client):
 
 def test_create_project_creates_counter(client):
     client.post(PREFIX, json={"key": "CTR", "name": "Counter Test"})
-    project_id = client.get(PREFIX).json()["data"]
-    proj = [p for p in project_id if p["key"] == "CTR"][0]
+    projects = client.get(PREFIX).json()["data"]
+    proj = [p for p in projects if p["key"] == "CTR"][0]
 
-    epic_resp = client.post(
-        "/v1/planning/epics",
-        json={"project_id": proj["id"], "title": "E1"},
+    item_resp = client.post(
+        "/v1/planning/work-items",
+        json={"project_id": proj["id"], "title": "E1", "type": "EPIC"},
     )
-    assert epic_resp.status_code == 201
-    assert epic_resp.json()["data"]["key"] == "CTR-1"
+    assert item_resp.status_code == 201, item_resp.json()
+    body = item_resp.json()
+    data = body.get("data") or body
+    assert data["key"] == "CTR-1"
 
 
 def test_create_project_duplicate_key_conflict(client):
@@ -258,16 +260,19 @@ def test_delete_project_not_found(client):
     assert resp.status_code == 404
 
 
-def test_delete_project_cascades_epics(client):
-    epic_resp = client.post(
-        "/v1/planning/epics",
-        json={"project_id": "p1", "title": "Will cascade"},
+def test_delete_project_cascades_work_items(client):
+    item_resp = client.post(
+        "/v1/planning/work-items",
+        json={"project_id": "p1", "title": "Will cascade", "type": "EPIC"},
     )
-    epic_id = epic_resp.json()["data"]["id"]
+    assert item_resp.status_code == 201
+    body = item_resp.json()
+    data = body.get("data") or body
+    item_id = data["id"]
 
     client.delete(f"{PREFIX}/p1")
 
-    get_resp = client.get(f"/v1/planning/epics/{epic_id}")
+    get_resp = client.get(f"/v1/planning/work-items/{item_id}")
     assert get_resp.status_code == 404
 
 

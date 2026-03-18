@@ -1,305 +1,147 @@
 """
-Integration tests for backlog item management (stories + tasks in backlogs).
+Integration tests for backlog item management (unified work items in backlogs).
 
 Coverage:
-- POST /v1/planning/backlogs/{id}/stories — add story (position normalization,
-  project scope validation, global backlog rules, conflict on duplicate)
-- DELETE /v1/planning/backlogs/{id}/stories/{story_id} — remove with position shift
-- POST /v1/planning/backlogs/{id}/tasks — add task (scope validation, conflict)
-- DELETE /v1/planning/backlogs/{id}/tasks/{task_id} — remove task
-- PATCH /v1/planning/backlogs/{id}/reorder — reorder stories/tasks (validation:
-  membership, duplicates, contiguous positions, partial lists)
+- POST /v1/planning/backlogs/{id}/items — add item (scope validation,
+  global backlog rules, conflict on duplicate)
+- DELETE /v1/planning/backlogs/{id}/items/{work_item_id} — remove item
+- GET /v1/planning/backlogs/{id}/items — list items
+- PATCH /v1/planning/backlogs/{id}/items/{work_item_id}/rank — update rank
+- POST /v1/planning/backlogs/{id}/items/bulk — bulk add
 
 Fixtures:
 - client — FastAPI TestClient (from conftest)
-- _setup_test_db — in-memory SQLite with schema + seed data (from conftest)
+- _setup_test_db — PostgreSQL with schema + seed data (from conftest)
 """
 
-# ── Add story ────────────────────────────────────────────────────────────
+PREFIX = "/v1/planning/backlogs"
 
 
-def test_add_story_to_backlog(client) -> None:
-    resp = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    assert resp.status_code == 200
+# ── Add item ─────────────────────────────────────────────────────────────
+
+
+def test_add_item_to_backlog(client) -> None:
+    resp = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    assert resp.status_code == 201
     data = resp.json()["data"]
     assert data["backlog_id"] == "b1"
-    assert data["story_id"] == "s1"
-    assert data["position"] == 0
+    assert data["work_item_id"] == "s1"
+    assert "rank" in data
     assert "added_at" in data
 
 
-def test_add_story_without_position_defaults_to_first_free(client) -> None:
-    resp_first = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1"})
-    assert resp_first.status_code == 200
-    assert resp_first.json()["data"]["position"] == 0
-
-    resp_second = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2"})
-    assert resp_second.status_code == 200
-    assert resp_second.json()["data"]["position"] == 1
+def test_add_item_with_explicit_rank(client) -> None:
+    resp = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1", "rank": "aaa"})
+    assert resp.status_code == 201
+    assert resp.json()["data"]["rank"] == "aaa"
 
 
-def test_add_story_position_normalized(client) -> None:
-    """Position beyond current count is clamped to append."""
-    resp = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 999})
-    assert resp.status_code == 200
-    assert resp.json()["data"]["position"] == 0  # first item → clamped to 0
+def test_add_two_items_get_distinct_ranks(client) -> None:
+    resp1 = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    assert resp1.status_code == 201
+    resp2 = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s2"})
+    assert resp2.status_code == 201
+    assert resp1.json()["data"]["rank"] != resp2.json()["data"]["rank"]
 
 
-def test_add_story_insert_at_front_shifts_others(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    resp = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2", "position": 0})
-    assert resp.status_code == 200
-    assert resp.json()["data"]["position"] == 0
-
-
-def test_add_story_nonexistent_backlog(client) -> None:
-    resp = client.post("/v1/planning/backlogs/nope/stories", json={"story_id": "s1", "position": 0})
+def test_add_item_nonexistent_backlog(client) -> None:
+    resp = client.post(f"{PREFIX}/nope/items", json={"work_item_id": "s1"})
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "NOT_FOUND"
 
 
-def test_add_nonexistent_story(client) -> None:
-    resp = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "nope", "position": 0})
+def test_add_nonexistent_item(client) -> None:
+    resp = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "nope"})
     assert resp.status_code == 404
 
 
-def test_add_story_conflict_already_in_backlog(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    resp = client.post("/v1/planning/backlogs/b2/stories", json={"story_id": "s1", "position": 0})
+def test_add_item_conflict_already_in_backlog(client) -> None:
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    resp = client.post(f"{PREFIX}/b2/items", json={"work_item_id": "s1"})
     assert resp.status_code == 409
     assert resp.json()["error"]["code"] == "CONFLICT"
 
 
-def test_global_backlog_rejects_project_story(client) -> None:
-    resp = client.post("/v1/planning/backlogs/bg/stories", json={"story_id": "s1", "position": 0})
+def test_global_backlog_rejects_project_item(client) -> None:
+    resp = client.post(f"{PREFIX}/bg/items", json={"work_item_id": "s1"})
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
 
 
-def test_global_backlog_accepts_global_story(client) -> None:
-    resp = client.post("/v1/planning/backlogs/bg/stories", json={"story_id": "sg", "position": 0})
-    assert resp.status_code == 200
-    assert resp.json()["data"]["story_id"] == "sg"
+def test_global_backlog_accepts_global_item(client) -> None:
+    resp = client.post(f"{PREFIX}/bg/items", json={"work_item_id": "sg"})
+    assert resp.status_code == 201
+    assert resp.json()["data"]["work_item_id"] == "sg"
 
 
-def test_project_backlog_rejects_other_project_story(client) -> None:
-    resp = client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "sp2", "position": 0})
+def test_project_backlog_rejects_other_project_item(client) -> None:
+    resp = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "sp2"})
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-# ── Remove story ─────────────────────────────────────────────────────────
-
-
-def test_remove_story_from_backlog(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    resp = client.delete("/v1/planning/backlogs/b1/stories/s1")
-    assert resp.status_code == 204
-
-    resp_again = client.delete("/v1/planning/backlogs/b1/stories/s1")
-    assert resp_again.status_code == 404
-
-
-def test_remove_story_shifts_positions(client) -> None:
-    """After removing position 0, remaining items shift down."""
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2", "position": 1})
-    client.delete("/v1/planning/backlogs/b1/stories/s1")
-
-    # s2 should now be at position 0 — verify via reorder with position 0
-    reorder = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={"stories": [{"story_id": "s2", "position": 0}], "tasks": []},
-    )
-    assert reorder.status_code == 200
-
-
-# ── Add task ─────────────────────────────────────────────────────────────
 
 
 def test_add_task_to_backlog(client) -> None:
-    resp = client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "t1", "position": 0})
-    assert resp.status_code == 200
+    resp = client.post(f"{PREFIX}/b1/items", json={"work_item_id": "t1"})
+    assert resp.status_code == 201
     data = resp.json()["data"]
-    assert data["backlog_id"] == "b1"
-    assert data["task_id"] == "t1"
-    assert data["position"] == 0
-    assert "added_at" in data
+    assert data["work_item_id"] == "t1"
 
 
-def test_add_task_nonexistent_backlog(client) -> None:
-    resp = client.post("/v1/planning/backlogs/nope/tasks", json={"task_id": "t1", "position": 0})
-    assert resp.status_code == 404
+# ── Remove item ──────────────────────────────────────────────────────────
 
 
-def test_add_nonexistent_task(client) -> None:
-    resp = client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "nope", "position": 0})
-    assert resp.status_code == 404
-
-
-def test_add_task_conflict_already_in_backlog(client) -> None:
-    client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "t1", "position": 0})
-    resp = client.post("/v1/planning/backlogs/b2/tasks", json={"task_id": "t1", "position": 0})
-    assert resp.status_code == 409
-    assert resp.json()["error"]["code"] == "CONFLICT"
-
-
-def test_project_backlog_rejects_other_project_task(client) -> None:
-    resp = client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "tp2", "position": 0})
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-def test_global_backlog_rejects_project_task(client) -> None:
-    resp = client.post("/v1/planning/backlogs/bg/tasks", json={"task_id": "t1", "position": 0})
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-def test_global_backlog_accepts_global_task(client) -> None:
-    resp = client.post("/v1/planning/backlogs/bg/tasks", json={"task_id": "tg", "position": 0})
-    assert resp.status_code == 200
-    assert resp.json()["data"]["task_id"] == "tg"
-
-
-# ── Remove task ──────────────────────────────────────────────────────────
-
-
-def test_remove_task_from_backlog(client) -> None:
-    client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "t1", "position": 0})
-    resp = client.delete("/v1/planning/backlogs/b1/tasks/t1")
+def test_remove_item_from_backlog(client) -> None:
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    resp = client.delete(f"{PREFIX}/b1/items/s1")
     assert resp.status_code == 204
 
-    resp_again = client.delete("/v1/planning/backlogs/b1/tasks/t1")
+    resp_again = client.delete(f"{PREFIX}/b1/items/s1")
     assert resp_again.status_code == 404
 
 
-# ── Reorder ──────────────────────────────────────────────────────────────
+# ── List items ───────────────────────────────────────────────────────────
 
 
-def test_reorder_stories(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2", "position": 1})
+def test_list_backlog_items(client) -> None:
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s2"})
 
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={
-            "stories": [
-                {"story_id": "s2", "position": 0},
-                {"story_id": "s1", "position": 1},
-            ],
-            "tasks": [],
-        },
-    )
+    resp = client.get(f"{PREFIX}/b1/items")
     assert resp.status_code == 200
-    assert resp.json()["data"] == {"updated_story_count": 2, "updated_task_count": 0}
+    items = resp.json()["data"]
+    assert len(items) == 2
+    ids = [i["id"] for i in items]
+    assert "s1" in ids
+    assert "s2" in ids
 
 
-def test_reorder_tasks(client) -> None:
-    client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "t1", "position": 0})
-    client.post("/v1/planning/backlogs/b1/tasks", json={"task_id": "t2", "position": 1})
-
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={
-            "stories": [],
-            "tasks": [
-                {"task_id": "t2", "position": 0},
-                {"task_id": "t1", "position": 1},
-            ],
-        },
-    )
+def test_list_backlog_items_empty(client) -> None:
+    resp = client.get(f"{PREFIX}/b1/items")
     assert resp.status_code == 200
-    assert resp.json()["data"] == {"updated_story_count": 0, "updated_task_count": 2}
+    assert resp.json()["data"] == []
 
 
-def test_reorder_requires_membership(client) -> None:
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={"stories": [{"story_id": "s1", "position": 0}], "tasks": []},
-    )
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
+# ── Update rank ──────────────────────────────────────────────────────────
 
 
-def test_reorder_nonexistent_backlog(client) -> None:
-    resp = client.patch(
-        "/v1/planning/backlogs/nope/reorder",
-        json={"stories": [], "tasks": []},
-    )
-    assert resp.status_code == 404
-
-
-def test_reorder_rejects_duplicate_ids(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={
-            "stories": [
-                {"story_id": "s1", "position": 0},
-                {"story_id": "s1", "position": 1},
-            ],
-            "tasks": [],
-        },
-    )
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-def test_reorder_rejects_duplicate_positions(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2", "position": 1})
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={
-            "stories": [
-                {"story_id": "s1", "position": 0},
-                {"story_id": "s2", "position": 0},
-            ],
-            "tasks": [],
-        },
-    )
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-def test_reorder_rejects_non_contiguous_positions(client) -> None:
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2", "position": 1})
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={
-            "stories": [
-                {"story_id": "s1", "position": 0},
-                {"story_id": "s2", "position": 5},
-            ],
-            "tasks": [],
-        },
-    )
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-def test_reorder_rejects_partial_story_list(client) -> None:
-    """Reorder must include ALL stories in the backlog."""
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s1", "position": 0})
-    client.post("/v1/planning/backlogs/b1/stories", json={"story_id": "s2", "position": 1})
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={
-            "stories": [{"story_id": "s1", "position": 0}],
-            "tasks": [],
-        },
-    )
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-
-
-def test_reorder_empty_backlog(client) -> None:
-    """Reorder with empty payload on empty backlog succeeds."""
-    resp = client.patch(
-        "/v1/planning/backlogs/b1/reorder",
-        json={"stories": [], "tasks": []},
-    )
+def test_update_item_rank(client) -> None:
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    resp = client.patch(f"{PREFIX}/b1/items/s1/rank", json={"rank": "zzz"})
     assert resp.status_code == 200
-    assert resp.json()["data"] == {"updated_story_count": 0, "updated_task_count": 0}
+
+
+# ── Bulk add ─────────────────────────────────────────────────────────────
+
+
+def test_bulk_add_items(client) -> None:
+    resp = client.post(
+        f"{PREFIX}/b1/items/bulk",
+        json={"work_item_ids": ["s1", "s2"]},
+    )
+    assert resp.status_code == 201
+
+    list_resp = client.get(f"{PREFIX}/b1/items")
+    items = list_resp.json()["data"]
+    ids = [i["id"] for i in items]
+    assert "s1" in ids
+    assert "s2" in ids
