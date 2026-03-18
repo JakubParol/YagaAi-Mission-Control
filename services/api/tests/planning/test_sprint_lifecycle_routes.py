@@ -91,6 +91,8 @@ def test_start_sprint_by_project_key(client) -> None:
 
 
 def test_complete_sprint_happy_path(client) -> None:
+    # Add an unfinished item so we can verify it moves to target backlog
+    _add_item_to_backlog(client, backlog_id="b2", work_item_id="s1")
     target_id = _ensure_product_backlog(client, "p1")
 
     resp = client.post(
@@ -103,6 +105,14 @@ def test_complete_sprint_happy_path(client) -> None:
     assert body["meta"]["transition"] == "COMPLETE_SPRINT"
     assert body["meta"]["from_status"] == "ACTIVE"
     assert body["meta"]["to_status"] == "CLOSED"
+    assert body["meta"]["moved_item_count"] == 1
+    assert body["meta"]["target_backlog_id"] == target_id
+
+    # Verify the unfinished item landed in the target backlog
+    target_items = client.get(f"{PREFIX}/{target_id}/items")
+    assert target_items.status_code == 200
+    ids = [i["id"] for i in target_items.json()["data"]]
+    assert "s1" in ids
 
 
 def test_complete_sprint_rejects_not_active(client) -> None:

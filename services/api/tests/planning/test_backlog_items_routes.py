@@ -129,6 +129,12 @@ def test_update_item_rank(client) -> None:
     resp = client.patch(f"{PREFIX}/b1/items/s1/rank", json={"rank": "zzz"})
     assert resp.status_code == 200
 
+    # Verify the rank persisted
+    items_resp = client.get(f"{PREFIX}/b1/items")
+    assert items_resp.status_code == 200
+    item = next(i for i in items_resp.json()["data"] if i["id"] == "s1")
+    assert item["rank"] == "zzz"
+
 
 # ── Bulk add ─────────────────────────────────────────────────────────────
 

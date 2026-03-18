@@ -83,8 +83,8 @@ def test_active_sprint_returns_seeded_sprint(client):
     assert data["items"] == []
 
 
-def test_active_sprint_with_items(client):
-    """Add items to seeded sprint b2 and verify they appear."""
+def test_active_sprint_with_items_ordered_by_rank(client):
+    """Add items to seeded sprint b2 and verify they appear ordered by rank."""
     _add_item(client, "b2", "s1")
     _add_item(client, "b2", "s2")
 
@@ -93,9 +93,10 @@ def test_active_sprint_with_items(client):
 
     items = resp.json()["data"]["items"]
     assert len(items) == 2
-    ids = [i["id"] for i in items]
-    assert "s1" in ids
-    assert "s2" in ids
+    assert items[0]["id"] == "s1"
+    assert items[1]["id"] == "s2"
+    # Items must be sorted by rank (lexicographic ascending)
+    assert items[0]["rank"] < items[1]["rank"]
 
 
 def test_active_sprint_item_fields(client):
@@ -212,6 +213,10 @@ def test_active_sprint_shows_current_assignee(client, _setup_test_db):
     assert resp.status_code == 200
     item = resp.json()["data"]["items"][0]
     assert item["assignee_agent_id"] == "a1"
+    assert item["assignee_name"] == "Agent"
+    assert item["assignee_last_name"] == "Alpha"
+    assert item["assignee_initials"] == "AA"
+    assert item["assignee_avatar"] == "https://cdn.example.com/agent-1.png"
 
 
 def test_active_sprint_assignee_null_when_unset(client):

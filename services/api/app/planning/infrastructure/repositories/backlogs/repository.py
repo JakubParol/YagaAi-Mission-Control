@@ -9,6 +9,7 @@ from app.planning.infrastructure.shared.mappers import _row_to_backlog
 from app.planning.infrastructure.shared.sorting import parse_sort
 from app.planning.infrastructure.shared.sql import affected_rows
 from app.planning.infrastructure.tables import (
+    agents,
     backlog_items,
     backlogs,
     labels,
@@ -243,6 +244,7 @@ class DbBacklogRepository(BacklogRepository):
     async def list_items(self, backlog_id: str) -> list[dict[str, Any]]:
         parent = work_items.alias("parent")
         children = work_items.alias("children")
+        assignee = agents.alias("assignee")
 
         children_count = (
             select(func.count())
@@ -279,6 +281,10 @@ class DbBacklogRepository(BacklogRepository):
                 parent.c.key.label("parent_key"),
                 parent.c.title.label("parent_title"),
                 work_items.c.current_assignee_agent_id,
+                assignee.c.name.label("assignee_name"),
+                assignee.c.last_name.label("assignee_last_name"),
+                assignee.c.initials.label("assignee_initials"),
+                assignee.c.avatar.label("assignee_avatar"),
                 work_items.c.is_blocked,
                 children_count,
                 done_children_count,
@@ -287,9 +293,14 @@ class DbBacklogRepository(BacklogRepository):
                 backlog_items.join(
                     work_items,
                     backlog_items.c.work_item_id == work_items.c.id,
-                ).outerjoin(
+                )
+                .outerjoin(
                     parent,
                     work_items.c.parent_id == parent.c.id,
+                )
+                .outerjoin(
+                    assignee,
+                    work_items.c.current_assignee_agent_id == assignee.c.id,
                 )
             )
             .where(backlog_items.c.backlog_id == backlog_id)
@@ -340,6 +351,7 @@ class DbBacklogRepository(BacklogRepository):
 
         parent = work_items.alias("parent")
         children = work_items.alias("children")
+        assignee = agents.alias("assignee")
 
         children_count = (
             select(func.count())
@@ -376,6 +388,10 @@ class DbBacklogRepository(BacklogRepository):
                 parent.c.key.label("parent_key"),
                 parent.c.title.label("parent_title"),
                 work_items.c.current_assignee_agent_id,
+                assignee.c.name.label("assignee_name"),
+                assignee.c.last_name.label("assignee_last_name"),
+                assignee.c.initials.label("assignee_initials"),
+                assignee.c.avatar.label("assignee_avatar"),
                 work_items.c.is_blocked,
                 children_count,
                 done_children_count,
@@ -384,9 +400,14 @@ class DbBacklogRepository(BacklogRepository):
                 backlog_items.join(
                     work_items,
                     backlog_items.c.work_item_id == work_items.c.id,
-                ).outerjoin(
+                )
+                .outerjoin(
                     parent,
                     work_items.c.parent_id == parent.c.id,
+                )
+                .outerjoin(
+                    assignee,
+                    work_items.c.current_assignee_agent_id == assignee.c.id,
                 )
             )
             .where(backlog_items.c.backlog_id.in_(backlog_ids))
