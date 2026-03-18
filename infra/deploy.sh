@@ -84,6 +84,11 @@ deploy_prod() {
   log_info "Building production images..."
   DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV" build
 
+  log_info "Tagging images as :latest for systemd reboot..."
+  for svc in api web worker; do
+    docker tag "mission-control/$svc:$current_sha" "mission-control/$svc:latest" 2>/dev/null || true
+  done
+
   MC_IMAGE_TAG="$current_sha" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$PROD_COMPOSE_FILE" "$PROD_ENV"
 
   log_info "Starting/updating production stack..."
@@ -124,6 +129,11 @@ deploy_dev() {
   log_info "Deploying DEV commit $current_sha"
   log_info "Building DEV images (api + web)..."
   DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" build api web
+
+  log_info "Tagging images as :latest for systemd reboot..."
+  for svc in api web; do
+    docker tag "mission-control/$svc:$current_sha" "mission-control/$svc:latest" 2>/dev/null || true
+  done
 
   MC_IMAGE_TAG="$current_sha" bash "$REPO_ROOT/infra/scripts/run-api-migrations.sh" "$DEV_COMPOSE_FILE" "$DEV_ENV"
 
