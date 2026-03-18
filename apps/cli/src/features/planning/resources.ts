@@ -19,6 +19,8 @@ export interface PlanningResourceSpec {
   itemPath: (id: string, ctx: PathContext) => string;
   requiredContext: Array<"projectId">;
   defaultSort?: string;
+  /** Merged into query for list and into body for create. */
+  defaultQuery?: Record<string, string>;
 }
 
 const PATHS = {
@@ -67,23 +69,26 @@ export const PLANNING_RESOURCES: Record<PlanningResourceName, PlanningResourceSp
   // Legacy aliases: point to work-items with type query param
   story: {
     name: "story",
-    listPath: () => `${PATHS["work-item"]}?type=STORY`,
+    listPath: () => PATHS["work-item"],
     itemPath: (id) => `${PATHS["work-item"]}/${id}`,
     requiredContext: [],
     defaultSort: "-created_at",
+    defaultQuery: { type: "STORY" },
   },
   task: {
     name: "task",
-    listPath: () => `${PATHS["work-item"]}?type=TASK`,
+    listPath: () => PATHS["work-item"],
     itemPath: (id) => `${PATHS["work-item"]}/${id}`,
     requiredContext: [],
     defaultSort: "-created_at",
+    defaultQuery: { type: "TASK" },
   },
   epic: {
     name: "epic",
-    listPath: () => `${PATHS["work-item"]}?type=EPIC`,
+    listPath: () => PATHS["work-item"],
     itemPath: (id) => `${PATHS["work-item"]}/${id}`,
     requiredContext: [],
     defaultSort: "-created_at",
+    defaultQuery: { type: "EPIC" },
   },
 };

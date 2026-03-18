@@ -12,7 +12,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 
 | Document | Description |
 |---|---|
-| [ENTITY_MODEL_V1.md](./ENTITY_MODEL_V1.md) | V1 entity model — projects, epics, stories, tasks, backlogs, agents |
+| [ENTITY_MODEL_V1.md](./ENTITY_MODEL_V1.md) | V2 entity model — projects, work items (epic/story/task/bug), backlogs, agents |
 | [WORKFLOW_LOGIC_V1.md](./WORKFLOW_LOGIC_V1.md) | V1 workflow logic — status derivation, blocking, assignments, backlogs |
 
 ## System Design

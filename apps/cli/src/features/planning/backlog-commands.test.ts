@@ -97,6 +97,8 @@ test("backlog complete posts lifecycle request with project_id scope", async () 
     "complete",
     "--id",
     "b-2",
+    "--target-backlog-id",
+    "bl-target",
     "--project-id",
     "p-1",
   ]);
@@ -105,7 +107,10 @@ test("backlog complete posts lifecycle request with project_id scope", async () 
     {
       method: "POST",
       path: "/v1/planning/backlogs/b-2/complete",
-      options: { query: { project_id: "p-1" } },
+      options: {
+        query: { project_id: "p-1" },
+        body: { target_backlog_id: "bl-target" },
+      },
     },
   ]);
 });

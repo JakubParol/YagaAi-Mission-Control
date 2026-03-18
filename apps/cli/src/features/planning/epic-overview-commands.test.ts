@@ -21,16 +21,16 @@ class FakeApiClient {
 
   async get(path: string, options?: RequestOptions): Promise<unknown> {
     this.calls.push({ method: "GET", path, options });
-    if (path === "/v1/planning/epics/overview") {
+    if (path === "/v1/planning/work-items/overview") {
       return {
         data: [
           {
-            epic_key: "MC-380",
+            key: "MC-380",
             title: "Epic overview",
             status: "IN_PROGRESS",
             progress_pct: 50,
-            stories_done: 2,
-            stories_total: 4,
+            children_done: 2,
+            children_total: 4,
             blocked_count: 1,
             stale_days: 3,
           },
@@ -107,13 +107,14 @@ test("epic overview maps sort aliases to API fields", async () => {
   assert.deepEqual(client.calls, [
     {
       method: "GET",
-      path: "/v1/planning/epics/overview",
+      path: "/v1/planning/work-items/overview",
       options: {
         query: {
           project_key: "MC",
           status: "IN_PROGRESS",
           is_blocked: "true",
           sort: "-progress_pct,updated_at,blocked_count",
+          type: "EPIC",
         },
       },
     },
@@ -153,14 +154,14 @@ test("epic overview table output projects metric columns", async () => {
   assert.match(output, /2\/4/i);
 });
 
-test("epic stories uses stories list with epic scope", async () => {
+test("epic stories uses work-items list with parent scope", async () => {
   const client = new FakeApiClient();
   const program = createProgram(client);
 
   await run(program, [
     "epic",
     "stories",
-    "--epic-key",
+    "--parent-key",
     "MC-380",
     "--project-key",
     "MC",
@@ -175,21 +176,22 @@ test("epic stories uses stories list with epic scope", async () => {
   assert.deepEqual(client.calls, [
     {
       method: "GET",
-      path: "/v1/planning/stories",
+      path: "/v1/planning/work-items",
       options: {
         query: {
-          epic_key: "MC-380",
+          parent_key: "MC-380",
           project_key: "MC",
           status: "TODO,IN_PROGRESS",
           sort: "-updated_at",
           limit: 10,
+          type: "STORY",
         },
       },
     },
   ]);
 });
 
-test("epic stories requires epic identifier", async () => {
+test("epic stories requires parent identifier", async () => {
   const client = new FakeApiClient();
   const program = createProgram(client);
 
@@ -197,7 +199,7 @@ test("epic stories requires epic identifier", async () => {
     run(program, ["epic", "stories", "--project-key", "MC"]),
     (error: unknown) => {
       assert.ok(error instanceof CliUsageError);
-      assert.match(error.message, /provide --epic-id or --epic-key/i);
+      assert.match(error.message, /provide --parent-id or --parent-key/i);
       return true;
     },
   );

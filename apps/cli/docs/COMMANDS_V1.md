@@ -8,7 +8,7 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 - Resource-first command groups: `project`, `epic`, `story`, `task`, `backlog`, `label`, `obs`
 - Verb set (preferred): `list`, `get`, `create`, `update`, `delete`
 - Mutations that represent workflow actions use explicit verbs:
-  - `task assign`, `task unassign`, `backlog add-story`, `backlog reorder`
+  - `task assign`, `task unassign`, `backlog add-item`, `backlog remove-item`
 
 ## Global Flags
 
@@ -23,12 +23,12 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 | Group | Core Commands |
 |---|---|
 | `project` | `list`, `get`, `create`, `update`, `delete` |
-| `epic` | `list`, `get`, `create`, `update`, `delete`, `overview`, `stories` |
-| `story` | `list`, `get`, `create`, `update`, `delete` |
-| `task` | `list`, `get`, `create`, `update`, `delete`, `assign`, `unassign`, `assignments` |
-| `backlog` | `list`, `get`, `create`, `update`, `delete`, `start`, `complete`, `transition-kind`, `add-story`, `remove-story`, `add-task`, `remove-task`, `reorder`, `active-sprint` |
+| `epic` | `list`, `get`, `create`, `update`, `delete`, `overview`, `stories`, `children` |
+| `story` | `list`, `get`, `create`, `update`, `delete`, `children` |
+| `task` | `list`, `get`, `create`, `update`, `delete`, `assign`, `unassign`, `assignments`, `children` |
+| `backlog` | `list`, `get`, `create`, `update`, `delete`, `start`, `complete`, `transition-kind`, `add-item`, `remove-item`, `active-sprint` |
 | `agent` | `list`, `get`, `create`, `update`, `delete`, `sync` |
-| `label` | `list`, `get`, `create`, `update`, `delete`, `attach-story`, `detach-story`, `attach-task`, `detach-task` |
+| `label` | `list`, `get`, `create`, `update`, `delete`, `attach`, `detach` |
 
 ## Control Plane Commands
 
@@ -46,13 +46,13 @@ Defines command taxonomy and naming conventions for Mission Control CLI.
 
 ## Key-Based Filtering
 
-All commands that accept `--project-id`, `--epic-id`, or `--story-id` also accept key-based alternatives:
+All commands that accept `--project-id` also accept key-based alternatives.
+Parent filtering uses unified `--parent-id` / `--parent-key`.
 
 | UUID option | Key option | Example |
 |---|---|---|
 | `--project-id <uuid>` | `--project-key <key>` | `--project-key MC` |
-| `--epic-id <uuid>` | `--epic-key <key>` | `--epic-key MC-1` |
-| `--story-id <uuid>` | `--story-key <key>` | `--story-key MC-42` |
+| `--parent-id <uuid>` | `--parent-key <key>` | `--parent-key MC-1` |
 
 - The CLI sends the key directly to the API, which resolves it server-side.
 - `--*-id` and `--*-key` for the same entity are mutually exclusive.
@@ -68,14 +68,17 @@ mc project get --by key=MC
 mc project update --by key=MC --set is_default=true
 mc project update --by key=MC --set is_default=false
 mc task list --project-key MC --status TODO,IN_PROGRESS --sort priority,-updated_at
-mc story list --project-key MC --epic-key MC-1
+mc story list --project-key MC --parent-key MC-1
 mc epic overview --project-key MC --sort -progress --output table
 mc epic overview --project-key MC --label CLI --sort updated --output json
-mc epic stories --epic-key MC-380 --status TODO,IN_PROGRESS --sort -updated_at
-mc epic stories --epic-key MC-380 --output json
+mc epic stories --parent-key MC-380 --status TODO,IN_PROGRESS --sort -updated_at
+mc epic stories --parent-key MC-380 --output json
+mc epic children --id <uuid>
+mc story children --id <uuid>
+mc task children --id <uuid>
 mc task assign --id <uuid> --agent-id <uuid> --reason "handoff"
 mc task assignments --id <uuid>
-mc backlog add-story --backlog-id <uuid> --story-id <uuid> --position 0
+mc backlog add-item --backlog-id <uuid> --work-item-id <uuid> --rank aaa
 mc backlog start --id <uuid> --project-key MC
 mc backlog complete --id <uuid> --project-key MC
 mc backlog transition-kind --id <uuid> --kind SPRINT --project-key MC
@@ -88,7 +91,8 @@ mc agent update --by key=codex --set last_name=
 mc agent update --by key=codex --set initials=
 mc agent update --by key=codex --set avatar=
 mc agent sync
-mc label attach-task --task-id <uuid> --label-id <uuid>
+mc label attach --work-item-id <uuid> --label-id <uuid>
+mc label detach --work-item-id <uuid> --label-id <uuid>
 mc obs costs --days 7
 mc obs requests list --model claude-sonnet-4-20250514 --limit 50
 mc obs import run
