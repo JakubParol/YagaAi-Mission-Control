@@ -92,6 +92,7 @@ class ActiveSprintItemResponse(BaseModel):
     rank: str
     children_count: int = 0
     done_children_count: int = 0
+    current_assignee_agent_id: str | None = None
     assignee_agent_id: str | None = None
     assignee_name: str | None = None
     assignee_last_name: str | None = None
