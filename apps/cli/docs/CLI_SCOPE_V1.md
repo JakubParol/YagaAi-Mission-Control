@@ -15,9 +15,7 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 ### Planning (`/v1/planning`)
 
 - Projects
-- Epics
-- Stories
-- Tasks
+- Work Items (unified: epics, stories, tasks, bugs via `type` discriminator)
 - Backlogs (+ backlog item attach/detach/reorder)
 - Assignments
 - Labels
@@ -40,13 +38,14 @@ Source of truth for API behavior: `services/api/docs/API_CONTRACTS.md`.
 | API Resource | Example CLI Group |
 |---|---|
 | `/v1/planning/projects` | `mc project ...` |
-| `/v1/planning/projects/{id}/epics` | `mc epic ... --project <id>` |
-| `/v1/planning/epics/overview` | `mc epic overview ...` |
-| `/v1/planning/stories?epic_key=<key>` | `mc epic stories --epic-key <key> ...` |
-| `/v1/planning/stories` | `mc story ...` |
-| `/v1/planning/tasks` | `mc task ...` |
+| `/v1/planning/work-items?type=EPIC` | `mc epic ...` |
+| `/v1/planning/work-items/overview` | `mc epic overview ...` |
+| `/v1/planning/work-items?type=STORY&parent_key=<key>` | `mc epic stories --parent-key <key> ...` |
+| `/v1/planning/work-items?type=STORY` | `mc story ...` |
+| `/v1/planning/work-items?type=TASK` | `mc task ...` |
+| `/v1/planning/work-items/{id}/children` | `mc epic children --id <id>`, `mc story children --id <id>`, `mc task children --id <id>` |
 | `/v1/planning/backlogs` | `mc backlog ...` |
-| `/v1/planning/tasks/{task_id}/assignments` | `mc task assign ...` |
+| `/v1/planning/work-items/{id}/assignments` | `mc task assign ...` |
 | `/v1/planning/labels` | `mc label ...` |
 | `/v1/observability/costs` | `mc obs costs ...` |
 | `/v1/observability/requests` | `mc obs requests ...` |

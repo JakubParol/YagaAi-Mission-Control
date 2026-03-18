@@ -19,21 +19,17 @@ interface CommonFilterOptions {
   filter?: string[];
   projectId?: string;
   projectKey?: string;
-  epicId?: string;
-  epicKey?: string;
-  storyId?: string;
-  storyKey?: string;
+  parentId?: string;
+  parentKey?: string;
   status?: string;
   kind?: string;
   source?: string;
   isActive?: string;
   isBlocked?: string;
-  taskType?: string;
-  storyType?: string;
-  currentAssigneeAgentId?: string;
+  subType?: string;
+  assigneeId?: string;
+  textSearch?: string;
   key?: string;
-  name?: string;
-  title?: string;
   openclawKey?: string;
 }
 
@@ -86,8 +82,8 @@ interface EpicOverviewOptions {
   status?: string;
   isBlocked?: string;
   label?: string;
-  owner?: string;
-  text?: string;
+  assigneeId?: string;
+  textSearch?: string;
   sort?: string;
   limit?: number;
   offset?: number;
@@ -112,21 +108,17 @@ function addSelectConvenienceOptions(command: Command): Command {
   return command
     .option("--project-id <id>", "filter by project UUID")
     .option("--project-key <key>", "filter by project key (e.g. MC)")
-    .option("--epic-id <id>", "filter by epic UUID")
-    .option("--epic-key <key>", "filter by epic key (e.g. MC-1)")
-    .option("--story-id <id>", "filter by story UUID")
-    .option("--story-key <key>", "filter by story key (e.g. MC-42)")
+    .option("--parent-id <id>", "filter by parent work item UUID")
+    .option("--parent-key <key>", "filter by parent work item key (e.g. MC-1)")
     .option("--status <status>", "status filter")
     .option("--kind <kind>", "kind filter")
     .option("--source <source>", "source filter")
     .option("--is-active <true|false>", "is_active filter")
     .option("--is-blocked <true|false>", "is_blocked filter")
-    .option("--task-type <type>", "task_type filter")
-    .option("--story-type <type>", "story_type filter")
-    .option("--current-assignee-agent-id <id>", "current_assignee_agent_id filter")
+    .option("--sub-type <type>", "sub_type filter (e.g. USER_STORY, SPIKE)")
+    .option("--assignee-id <id>", "assignee agent id filter")
+    .option("--text-search <text>", "text search filter")
     .option("--key <key>", "key filter")
-    .option("--name <name>", "name filter")
-    .option("--title <title>", "title filter")
     .option("--openclaw-key <key>", "openclaw_key filter");
 }
 
@@ -170,8 +162,7 @@ function validateMutuallyExclusive(
 
 function buildConvenienceQuery(opts: CommonFilterOptions): Record<string, string> {
   validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
-  validateMutuallyExclusive(opts.epicId, opts.epicKey, "--epic-id", "--epic-key");
-  validateMutuallyExclusive(opts.storyId, opts.storyKey, "--story-id", "--story-key");
+  validateMutuallyExclusive(opts.parentId, opts.parentKey, "--parent-id", "--parent-key");
 
   const query: Record<string, string> = {};
 
@@ -186,21 +177,17 @@ function buildConvenienceQuery(opts: CommonFilterOptions): Record<string, string
 
   assign("project_id", opts.projectId);
   assign("project_key", opts.projectKey);
-  assign("epic_id", opts.epicId);
-  assign("epic_key", opts.epicKey);
-  assign("story_id", opts.storyId);
-  assign("story_key", opts.storyKey);
+  assign("parent_id", opts.parentId);
+  assign("parent_key", opts.parentKey);
   assign("status", opts.status);
   assign("kind", opts.kind);
   assign("source", opts.source);
   assign("is_active", opts.isActive);
   assign("is_blocked", opts.isBlocked);
-  assign("task_type", opts.taskType);
-  assign("story_type", opts.storyType);
-  assign("current_assignee_agent_id", opts.currentAssigneeAgentId);
+  assign("sub_type", opts.subType);
+  assign("assignee_id", opts.assigneeId);
+  assign("text_search", opts.textSearch);
   assign("key", opts.key);
-  assign("name", opts.name);
-  assign("title", opts.title);
   assign("openclaw_key", opts.openclawKey);
 
   return query;
@@ -281,7 +268,7 @@ function projectEpicOverviewTablePayload(payload: unknown): unknown {
     const staleDays = Number(item.stale_days ?? 0);
 
     return {
-      work_item_key: item.work_item_key ?? "",
+      key: item.key ?? "",
       title: item.title ?? "",
       status: item.status ?? "",
       progress: `${progressPct.toFixed(2)}%`,
@@ -325,6 +312,14 @@ function buildListQuery(spec: PlanningResourceSpec, opts: ListOptions): {
 } {
   const query = mergeQuery({}, parseKeyValueList(opts.filter));
   mergeQuery(query, buildConvenienceQuery(opts));
+
+  if (spec.defaultQuery) {
+    for (const [key, value] of Object.entries(spec.defaultQuery)) {
+      if (query[key] === undefined) {
+        query[key] = value;
+      }
+    }
+  }
 
   if (opts.sort) {
     query.sort = opts.sort;
@@ -413,6 +408,7 @@ async function resolveTargetId(
   const listPath = spec.listPath(ctx);
   const payload = await client.get(listPath, {
     query: {
+      ...spec.defaultQuery,
       ...selectors,
       limit: 2,
       offset: 0,
@@ -489,6 +485,10 @@ function registerStandardResourceCommands(
       file: opts.file,
       sets: opts.set,
     });
+
+    if (spec.defaultQuery?.type && !Object.hasOwn(payloadBody, "type")) {
+      payloadBody.type = spec.defaultQuery.type;
+    }
 
     const pathCtx = resolvePathContext(spec, {}, opts.projectId);
     const payload = await ctx.client.post(spec.listPath(pathCtx), {
@@ -693,7 +693,7 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
 
   resource
     .command("active-sprint")
-    .description("Get active sprint board for a project with stories")
+    .description("Get active sprint board for a project with work items")
     .option("--project-id <id>", "project UUID")
     .option("--project-key <key>", "project key (e.g. MC)")
     .action(async (opts: { projectId?: string; projectKey?: string }, command: Command) => {
@@ -749,8 +749,8 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
     .option("--status <status>", "status filter")
     .option("--is-blocked <true|false>", "is_blocked filter")
     .option("--label <label>", "label filter")
-    .option("--owner <id>", "owner (agent id) filter")
-    .option("--text <text>", "search text filter")
+    .option("--assignee-id <id>", "assignee agent id filter")
+    .option("--text-search <text>", "text search filter")
     .option(
       "--sort <sort>",
       "sort aliases: priority,progress,updated,blocked (supports '-' prefix)",
@@ -773,8 +773,8 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
       if (opts.status) query.status = opts.status;
       if (opts.isBlocked) query.is_blocked = opts.isBlocked;
       if (opts.label) query.label = opts.label;
-      if (opts.owner) query.owner = opts.owner;
-      if (opts.text) query.text = opts.text;
+      if (opts.assigneeId) query.assignee_id = opts.assigneeId;
+      if (opts.textSearch) query.text_search = opts.textSearch;
       if (opts.sort) query.sort = normalizeEpicOverviewSort(opts.sort);
       if (opts.limit !== undefined) query.limit = opts.limit;
       if (opts.offset !== undefined) query.offset = opts.offset;
@@ -801,15 +801,15 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
     .addHelpText(
       "after",
       "\nExamples:\n" +
-        "  mc epic stories --epic-key MC-380 --project-key MC\n" +
-        "  mc epic stories --epic-key MC-380 --status TODO,IN_PROGRESS --sort -updated_at\n" +
-        "  mc epic stories --epic-id <uuid> --output json",
+        "  mc epic stories --parent-key MC-380 --project-key MC\n" +
+        "  mc epic stories --parent-key MC-380 --status TODO,IN_PROGRESS --sort -updated_at\n" +
+        "  mc epic stories --parent-id <uuid> --output json",
     )
     .action(async (opts: EpicStoriesOptions, command: Command) => {
       validateMutuallyExclusive(opts.projectId, opts.projectKey, "--project-id", "--project-key");
-      validateMutuallyExclusive(opts.epicId, opts.epicKey, "--epic-id", "--epic-key");
-      if (!opts.epicId && !opts.epicKey) {
-        throw new CliUsageError("Provide --epic-id or --epic-key for epic drill-down.");
+      validateMutuallyExclusive(opts.parentId, opts.parentKey, "--parent-id", "--parent-key");
+      if (!opts.parentId && !opts.parentKey) {
+        throw new CliUsageError("Provide --parent-id or --parent-key for epic drill-down.");
       }
 
       const ctx = getContext(command);
@@ -822,6 +822,35 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
       const payload = await ctx.client.get("/v1/planning/work-items", { query: { ...query, type: "STORY" } });
       printPayload(payload, opts.output ?? ctx.config.output);
     });
+
+  resource
+    .command("children")
+    .description("List children of an epic")
+    .requiredOption("--id <id>", "epic UUID")
+    .option("--type <type>", "child type filter (STORY, TASK, BUG)")
+    .option("--status <status>", "status filter")
+    .option("--sort <sort>", "sort spec")
+    .option("--limit <n>", "page size", (raw) => parseIntegerOption(raw, "limit"))
+    .option("--offset <n>", "offset", (raw) => parseIntegerOption(raw, "offset"))
+    .action(
+      async (
+        opts: { id: string; type?: string; status?: string; sort?: string; limit?: number; offset?: number },
+        command: Command,
+      ) => {
+        const ctx = getContext(command);
+        const query: Record<string, string | number> = {};
+        if (opts.type) query.type = opts.type;
+        if (opts.status) query.status = opts.status;
+        if (opts.sort) query.sort = opts.sort;
+        if (opts.limit !== undefined) query.limit = opts.limit;
+        if (opts.offset !== undefined) query.offset = opts.offset;
+        const payload = await ctx.client.get(
+          `/v1/planning/work-items/${opts.id}/children`,
+          { query },
+        );
+        printPayload(payload, ctx.config.output);
+      },
+    );
 }
 
 
@@ -891,6 +920,66 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
     );
     printPayload(payload, ctx.config.output);
   });
+
+  resource
+    .command("children")
+    .description("List children of a task (sub-tasks)")
+    .requiredOption("--id <id>", "task UUID")
+    .option("--type <type>", "child type filter")
+    .option("--status <status>", "status filter")
+    .option("--sort <sort>", "sort spec")
+    .option("--limit <n>", "page size", (raw) => parseIntegerOption(raw, "limit"))
+    .option("--offset <n>", "offset", (raw) => parseIntegerOption(raw, "offset"))
+    .action(
+      async (
+        opts: { id: string; type?: string; status?: string; sort?: string; limit?: number; offset?: number },
+        command: Command,
+      ) => {
+        const ctx = getContext(command);
+        const query: Record<string, string | number> = {};
+        if (opts.type) query.type = opts.type;
+        if (opts.status) query.status = opts.status;
+        if (opts.sort) query.sort = opts.sort;
+        if (opts.limit !== undefined) query.limit = opts.limit;
+        if (opts.offset !== undefined) query.offset = opts.offset;
+        const payload = await ctx.client.get(
+          `/v1/planning/work-items/${opts.id}/children`,
+          { query },
+        );
+        printPayload(payload, ctx.config.output);
+      },
+    );
+}
+
+function registerStoryCommands(resource: Command, getContext: ContextFactory): void {
+  resource
+    .command("children")
+    .description("List children of a story (tasks)")
+    .requiredOption("--id <id>", "story UUID")
+    .option("--type <type>", "child type filter")
+    .option("--status <status>", "status filter")
+    .option("--sort <sort>", "sort spec")
+    .option("--limit <n>", "page size", (raw) => parseIntegerOption(raw, "limit"))
+    .option("--offset <n>", "offset", (raw) => parseIntegerOption(raw, "offset"))
+    .action(
+      async (
+        opts: { id: string; type?: string; status?: string; sort?: string; limit?: number; offset?: number },
+        command: Command,
+      ) => {
+        const ctx = getContext(command);
+        const query: Record<string, string | number> = {};
+        if (opts.type) query.type = opts.type;
+        if (opts.status) query.status = opts.status;
+        if (opts.sort) query.sort = opts.sort;
+        if (opts.limit !== undefined) query.limit = opts.limit;
+        if (opts.offset !== undefined) query.offset = opts.offset;
+        const payload = await ctx.client.get(
+          `/v1/planning/work-items/${opts.id}/children`,
+          { query },
+        );
+        printPayload(payload, ctx.config.output);
+      },
+    );
 }
 
 export function registerPlanningCommands(program: Command, getContext: ContextFactory): void {
@@ -923,6 +1012,10 @@ export function registerPlanningCommands(program: Command, getContext: ContextFa
 
     if (name === "epic") {
       registerEpicCommands(resource, getContext);
+    }
+
+    if (name === "story") {
+      registerStoryCommands(resource, getContext);
     }
 
     if (name === "agent") {

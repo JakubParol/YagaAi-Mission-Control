@@ -1,7 +1,7 @@
 # API Contracts — Mission Control v1
 
-**Status:** Draft v1.3
-**Date:** 2026-03-08
+**Status:** Draft v1.4
+**Date:** 2026-03-18
 **Applies to:** `services/api` — all `/v1` module endpoints
 
 ---
@@ -207,13 +207,29 @@ Request:
 
 #### `GET /v1/planning/work-items` — List work items
 
-Query: `type`, `project_id`, `project_key`, `parent_id`, `status`, `is_blocked`, `sub_type`, `current_assignee_agent_id`, `sort`, `limit`, `offset`.
+Query: `type`, `project_id`, `project_key`, `parent_id`, `parent_key`, `key`, `status`, `is_blocked`, `sub_type`, `assignee_id`, `text_search`, `sort`, `limit`, `offset`.
 
 `type` filter returns only items of that type (e.g. `?type=STORY`).
 
+#### `GET /v1/planning/work-items/by-key/{key}` — Get work item by key
+
+Returns full detail response for a work item resolved by human-readable key (e.g. `MC-42`).
+
+Response includes: `assignments`, `labels`, `parent_key`, `parent_title`, `project_key`.
+
 #### `GET /v1/planning/work-items/{id}` — Get work item
 
-Includes: `children_count`, assignments.
+Returns full detail response.
+
+Includes: `children_count`, `assignments`, `labels`, `parent_key`, `parent_title`, `project_key`.
+
+#### `GET /v1/planning/work-items/{id}/children` — List children
+
+Returns child work items of the given parent.
+
+Query: `type`, `status`, `sort`, `limit`, `offset`.
+
+Default limit: `100`.
 
 #### `PATCH /v1/planning/work-items/{id}` — Update work item
 
@@ -251,9 +267,11 @@ Request: `{ "agent_id": "...", "reason": "..." }`
 
 #### `GET /v1/planning/work-items/overview` — Work item overview aggregate
 
-Query: `type=EPIC`, plus filters `project_id`, `project_key`, `status`, `owner`, `is_blocked`, `label`, `text`, `sort`, `limit`, `offset`.
+Query: `type` (optional, e.g. `EPIC`), plus filters `project_id`, `project_key`, `status`, `assignee_id`, `is_blocked`, `label`, `text_search`, `sort`, `limit`, `offset`.
 
-Response item fields: `work_item_key`, `title`, `type`, `status`, `progress_pct`, `progress_trend_7d`, `children_total`, `children_done`, `children_in_progress`, `blocked_count`, `stale_days`, `priority`, `updated_at`.
+Default limit: `50`.
+
+Response item fields: `id`, `key`, `title`, `type`, `sub_type`, `status`, `is_blocked`, `priority`, `progress_pct`, `progress_trend_7d`, `children_total`, `children_done`, `children_in_progress`, `blocked_count`, `stale_days`, `updated_at`, `parent_id`, `parent_key`, `parent_title`, `current_assignee_agent_id`, `assignee_name`, `assignee_initials`, `assignee_avatar`, `labels`.
 
 #### `POST /v1/planning/work-items/bulk/status` — Bulk update status
 
@@ -263,7 +281,13 @@ Response: per-record outcome with `operation`, `total`, `succeeded`, `failed`, `
 
 #### `POST /v1/planning/work-items/bulk/active-sprint/add` — Bulk add to active sprint
 
-Query: `project_id` or `project_key` (required).
+Query: `project_id` (required).
+
+Request: `{ "work_item_ids": ["id1", "id2"] }`
+
+#### `POST /v1/planning/work-items/bulk/active-sprint/remove` — Bulk remove from active sprint
+
+Query: `project_id` (required).
 
 Request: `{ "work_item_ids": ["id1", "id2"] }`
 
@@ -304,8 +328,12 @@ Request:
 
 #### `GET /v1/planning/backlogs` — List backlogs
 
-Query: `project_id`, `project_key`, `status`, `kind`, `sort`, `limit`, `offset`.
-Use `project_id=null` to list global backlogs. `project_key` — same behavior as stories (see above).
+Query: `project_id`, `project_key`, `status`, `kind`, `include`, `sort`, `limit`, `offset`.
+Use `project_id=null` to list global backlogs. `project_key` — same behavior as work items (see above).
+
+`include=items` returns `BacklogWithItemsResponse` (backlog fields + embedded `items` list). Default returns `BacklogResponse`.
+
+Backlog response includes computed fields: `item_count`, `story_count`, `task_count`.
 
 Default order when `sort` is omitted:
 - active sprint first (`kind=SPRINT` and `status=ACTIVE`)
@@ -436,6 +464,12 @@ Hard delete. Items in the backlog are detached (not deleted). Returns `204`.
 
 Enforces: work item can be in max one backlog. Global backlog only accepts project-less items.
 Returns `200`.
+
+#### `POST /v1/planning/backlogs/{id}/items/bulk` — Bulk add items to backlog
+
+```jsonc
+{ "work_item_ids": ["id1", "id2"] }
+```
 
 #### `DELETE /v1/planning/backlogs/{id}/items/{work_item_id}` — Remove work item from backlog
 
@@ -862,7 +896,17 @@ Transactional guarantee:
 - command and outbox inserts are performed in one DB transaction,
 - on outbox insert failure, command insert is rolled back (no partial write).
 
-### 6.2) Run read model (timeline/attempts/state)
+### 6.2) Watchdog
+
+#### `POST /v1/control-plane/watchdog/sweep` — Trigger watchdog sweep
+
+Runs a watchdog sweep over stale/timed-out runs. Accepts configuration in request body.
+
+Response `200`: sweep results.
+
+---
+
+### 6.3) Run read model (timeline/attempts/state)
 
 Read endpoints for operational triage and UI/CLI diagnostics.
 
@@ -961,7 +1005,7 @@ Field semantics:
 - `watchdog_interventions`: accepted timeline entries of `control-plane.watchdog.action`.
 - `run_latency_*`: latency distribution over terminal runs (`terminal_at - created_at`, milliseconds).
 
-### 6.3) Dapr bridge endpoints (local runtime)
+### 6.4) Dapr bridge endpoints (local runtime)
 
 These endpoints support local runtime event exchange between worker and API via Dapr pub/sub + service invocation.
 
