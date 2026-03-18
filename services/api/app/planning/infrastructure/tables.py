@@ -278,9 +278,7 @@ Index(
     "idx_backlogs_one_active_sprint_per_project",
     backlogs.c.project_id,
     unique=True,
-    postgresql_where=text(
-        "project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'"
-    ),
+    postgresql_where=text("project_id IS NOT NULL AND kind = 'SPRINT' AND status = 'ACTIVE'"),
 )
 
 # Assignments

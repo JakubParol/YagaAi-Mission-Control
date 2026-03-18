@@ -12,7 +12,7 @@ import {
   type DialogState, type TaskDraft, type StoryDraft, type EpicOption,
 } from "./story-detail-view-model";
 import {
-  fetchStoryAndTasks, fetchStoryLabelsFromBacklogs, fetchAvailableLabels, fetchEpics,
+  fetchStoryAndTasks, fetchAvailableLabels, fetchEpics,
   patchStoryFields, patchStoryStatus, createTaskApi, patchTaskApi, deleteTaskApi,
   attachLabelApi, detachLabelApi,
 } from "./story-detail-actions";
@@ -100,12 +100,11 @@ export function useStoryDetailState(p: UseStoryDetailParams) {
   useEffect(() => {
     if (!p.isActive || !p.storyId || !activeStory?.project_id) { setAvailableLabels([]); setIsLoadingLabels(false); return; }
     let cancelled = false; setIsLoadingLabels(true);
-    Promise.all([fetchAvailableLabels(activeStory.project_id), fetchStoryLabelsFromBacklogs(p.storyId, activeStory.project_id)])
-      .then(([all, attached]) => {
+    fetchAvailableLabels(activeStory.project_id)
+      .then((all) => {
         if (cancelled) return;
         setAvailableLabels(all);
-        if (attached.found) setStoryLabels(attached.labels);
-        else if (activeStory.labels) setStoryLabels(activeStory.labels);
+        if (activeStory.labels) setStoryLabels(activeStory.labels);
       })
       .catch(() => { if (!cancelled) setAvailableLabels([]); })
       .finally(() => { if (!cancelled) setIsLoadingLabels(false); });

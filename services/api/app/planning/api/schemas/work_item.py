@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 _STATUS_PATTERN = r"^(TODO|IN_PROGRESS|CODE_REVIEW|VERIFY|DONE)$"
@@ -16,6 +18,7 @@ class WorkItemCreate(BaseModel):
     estimate_points: float | None = None
     due_at: str | None = None
     current_assignee_agent_id: str | None = None
+    backlog_id: str | None = None
 
 
 class WorkItemUpdate(BaseModel):
@@ -60,16 +63,20 @@ class WorkItemResponse(BaseModel):
     updated_at: str
     started_at: str | None
     completed_at: str | None
+    parent_key: str | None = None
+    parent_title: str | None = None
+    children_count: int = 0
+    done_children_count: int = 0
+    labels: list[dict[str, Any]] = Field(default_factory=list)
+    label_ids: list[str] = Field(default_factory=list)
 
 
 class WorkItemDetailResponse(WorkItemResponse):
-    children_count: int = 0
-    assignments: list["WorkItemAssignmentResponse"] = Field(
-        default_factory=list
-    )
+    assignments: list["WorkItemAssignmentResponse"] = Field(default_factory=list)
 
 
 class WorkItemOverviewResponse(BaseModel):
+    work_item_id: str
     work_item_key: str
     title: str
     type: str

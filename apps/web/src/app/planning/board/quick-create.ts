@@ -220,7 +220,12 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
   const validationError = validateQuickCreateSubject(input.subject)
   if (validationError) throw new Error(validationError)
 
-  const payload = buildStoryCreatePayload(input)
+  const productBacklogId = await resolveProductBacklogId(input.projectId)
+
+  const payload = {
+    ...buildStoryCreatePayload(input),
+    backlog_id: productBacklogId,
+  }
   const createResponse = await fetch(apiUrl("/v1/planning/work-items"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -234,9 +239,6 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
   if (!createdStory?.id) {
     throw new Error("Work item was created but response has no story id.")
   }
-
-  const productBacklogId = await resolveProductBacklogId(input.projectId)
-  await ensureProductBacklogMembership(productBacklogId, createdStory.id)
 
   const attachResponse = await fetch(
     apiUrl(`/v1/planning/backlogs/active-sprint/items?project_id=${input.projectId}`),

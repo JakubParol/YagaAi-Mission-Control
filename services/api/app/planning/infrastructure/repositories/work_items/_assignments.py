@@ -6,13 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.planning.domain.models import WorkItemAssignment
 from app.planning.infrastructure.shared.events import insert_assignment_event
 from app.planning.infrastructure.shared.mappers import _row_to_work_item_assignment
+from app.planning.infrastructure.shared.sql import affected_rows
 from app.planning.infrastructure.tables import work_item_assignments, work_items
-from app.shared.utils import new_uuid, utc_now
+from app.shared.utils import new_uuid
 
 
-async def get_active_assignment(
-    db: AsyncSession, work_item_id: str
-) -> WorkItemAssignment | None:
+async def get_active_assignment(db: AsyncSession, work_item_id: str) -> WorkItemAssignment | None:
     row = (
         (
             await db.execute(
@@ -28,9 +27,7 @@ async def get_active_assignment(
     return _row_to_work_item_assignment(row) if row else None
 
 
-async def get_assignments(
-    db: AsyncSession, work_item_id: str
-) -> list[WorkItemAssignment]:
+async def get_assignments(db: AsyncSession, work_item_id: str) -> list[WorkItemAssignment]:
     rows = (
         (
             await db.execute(
@@ -45,9 +42,7 @@ async def get_assignments(
     return [_row_to_work_item_assignment(r) for r in rows]
 
 
-async def create_assignment(
-    db: AsyncSession, assignment: WorkItemAssignment
-) -> WorkItemAssignment:
+async def create_assignment(db: AsyncSession, assignment: WorkItemAssignment) -> WorkItemAssignment:
     await db.execute(
         insert(work_item_assignments).values(
             id=assignment.id,
@@ -63,9 +58,7 @@ async def create_assignment(
     return assignment
 
 
-async def close_assignment(
-    db: AsyncSession, work_item_id: str, unassigned_at: str
-) -> bool:
+async def close_assignment(db: AsyncSession, work_item_id: str, unassigned_at: str) -> bool:
     result = await db.execute(
         update(work_item_assignments)
         .where(
@@ -75,7 +68,7 @@ async def close_assignment(
         .values(unassigned_at=unassigned_at)
     )
     await db.commit()
-    return result.rowcount > 0
+    return affected_rows(result) > 0
 
 
 async def assign_agent_with_event(
@@ -126,11 +119,7 @@ async def assign_agent_with_event(
 
     # Get item key for event.
     item_row = (
-        (
-            await db.execute(
-                select(work_items.c.key).where(work_items.c.id == work_item_id)
-            )
-        )
+        (await db.execute(select(work_items.c.key).where(work_items.c.id == work_item_id)))
         .mappings()
         .first()
     )
@@ -172,11 +161,7 @@ async def unassign_agent_with_event(
     )
 
     item_row = (
-        (
-            await db.execute(
-                select(work_items.c.key).where(work_items.c.id == work_item_id)
-            )
-        )
+        (await db.execute(select(work_items.c.key).where(work_items.c.id == work_item_id)))
         .mappings()
         .first()
     )

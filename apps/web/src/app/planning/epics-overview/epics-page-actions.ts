@@ -171,21 +171,10 @@ export async function fetchOverview(
 // ─── Fetch stories preview for a single epic ────────────────────────
 
 export async function fetchStoriesPreview(
-  epicKey: string,
+  epicId: string,
   projectId: string | null,
   agentLabelById: Map<string, string>,
 ): Promise<EpicOverviewStoryPreview[]> {
-  // Resolve epic key to ID via the by-key endpoint
-  const epicRes = await fetch(apiUrl(`/v1/planning/work-items/by-key/${epicKey}`));
-  if (!epicRes.ok) {
-    throw new Error(`Failed to resolve epic key. HTTP ${epicRes.status}.`);
-  }
-  const epicData = (await epicRes.json()) as { id?: string };
-  const epicId = epicData.id;
-  if (!epicId) {
-    throw new Error(`Epic key "${epicKey}" resolved but has no id.`);
-  }
-
   const params = new URLSearchParams();
   if (projectId) {
     params.set("project_id", projectId);

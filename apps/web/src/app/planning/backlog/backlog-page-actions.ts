@@ -20,53 +20,69 @@ import type {
 import { resolveAgentLabel } from "./backlog-view-model";
 import { addStoryToBacklog, removeStoryFromBacklog } from "./board-actions";
 
-export async function fetchBacklogData(projectId: string): Promise<FetchResult> {
-  const response = await fetch(
-    apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100`),
-  );
+interface BacklogWithItemsApiResponse extends BacklogItem {
+  items?: StoryCardStory[];
+}
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`);
+function normalizeItems(rawItems: StoryCardStory[]): StoryCardStory[] {
+  return rawItems.map((item) => ({
+    ...item,
+    children_count: item.children_count ?? 0,
+    done_children_count: item.done_children_count ?? 0,
+    labels: item.labels ?? [],
+    label_ids: item.label_ids ?? [],
+    parent_key: item.parent_key ?? null,
+    parent_title: item.parent_title ?? null,
+    assignee_agent_id: item.assignee_agent_id ?? item.current_assignee_agent_id ?? null,
+  }));
+}
+
+async function fetchItemsForBacklog(backlogId: string): Promise<StoryCardStory[]> {
+  const res = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/items`));
+  if (!res.ok) return [];
+  const body = await res.json();
+  return normalizeItems((body.data ?? []) as StoryCardStory[]);
+}
+
+export async function fetchBacklogData(projectId: string): Promise<FetchResult> {
+  const [backlogsResponse, agentsResponse] = await Promise.all([
+    fetch(apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100&include=items`)),
+    fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name")).catch(() => null),
+  ]);
+
+  if (!backlogsResponse.ok) {
+    throw new Error(`API error: ${backlogsResponse.status}`);
   }
 
-  const json = await response.json();
-  const backlogs: BacklogItem[] = sortBacklogsForPlanning(
+  const json = await backlogsResponse.json();
+  const rawBacklogs: BacklogWithItemsApiResponse[] = sortBacklogsForPlanning(
     excludeClosedSprintBacklogs(json.data ?? []),
   );
 
-  if (backlogs.length === 0) {
+  if (rawBacklogs.length === 0) {
     return { kind: "empty" };
   }
 
-  const sections: BacklogWithItems[] = await Promise.all(
-    backlogs.map(async (backlog) => {
-      const itemsResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/items`));
-      if (!itemsResponse.ok) return { backlog, items: [] };
-      const body = await itemsResponse.json();
-      const rawItems = (body.data ?? []) as StoryCardStory[];
-      return {
-        backlog,
-        items: rawItems.map((item) => ({
-          ...item,
-          children_count: item.children_count ?? 0,
-          done_children_count: item.done_children_count ?? 0,
-          labels: item.labels ?? [],
-          label_ids: item.label_ids ?? [],
-          parent_key: item.parent_key ?? null,
-          parent_title: item.parent_title ?? null,
-          assignee_agent_id: item.assignee_agent_id ?? item.current_assignee_agent_id ?? null,
-        })),
-      };
-    }),
-  );
+  const itemsEmbedded = rawBacklogs.length > 0 && Array.isArray(rawBacklogs[0].items);
 
-  const agents = await fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name"))
-    .then(async (res) => {
-      if (!res.ok) return [] as PlanningAgentApiItem[];
-      const body = (await res.json()) as { data?: PlanningAgentApiItem[] };
-      return body.data ?? [];
-    })
-    .catch(() => [] as PlanningAgentApiItem[]);
+  let sections: BacklogWithItems[];
+  if (itemsEmbedded) {
+    sections = rawBacklogs.map((backlog) => ({
+      backlog,
+      items: normalizeItems((backlog.items ?? []) as StoryCardStory[]),
+    }));
+  } else {
+    sections = await Promise.all(
+      rawBacklogs.map(async (backlog) => ({
+        backlog,
+        items: await fetchItemsForBacklog(backlog.id),
+      })),
+    );
+  }
+
+  const agents: PlanningAgentApiItem[] = agentsResponse?.ok
+    ? ((await agentsResponse.json()) as { data?: PlanningAgentApiItem[] }).data ?? []
+    : [];
 
   const assignees = agents
     .map((agent) => {

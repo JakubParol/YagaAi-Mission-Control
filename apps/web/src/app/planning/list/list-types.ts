@@ -2,10 +2,6 @@ import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
 
 import type { PlanningEpicApiItem, PlanningListLabel, PlanningListRow } from "./list-view-model";
 
-export interface PlanningBacklogApiItem {
-  id: string;
-}
-
 export interface PlanningAgentApiItem {
   id?: string;
   name?: string;

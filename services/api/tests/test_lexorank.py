@@ -84,7 +84,7 @@ class TestRankAfter:
 
 class TestRankBatch:
     def test_empty(self) -> None:
-        assert rank_batch(0) == []
+        assert not rank_batch(0)
 
     def test_single(self) -> None:
         result = rank_batch(1)

@@ -38,6 +38,10 @@ class BacklogResponse(BaseModel):
     updated_at: str
 
 
+class BacklogWithItemsResponse(BacklogResponse):
+    items: list[dict] = Field(default_factory=list)
+
+
 class BacklogKindTransitionRequest(BaseModel):
     kind: str = Field(..., pattern=r"^(BACKLOG|SPRINT|IDEAS)$")
 
@@ -57,6 +61,10 @@ class BacklogItemResponse(BaseModel):
     work_item_id: str
     rank: str
     added_at: str
+
+
+class BacklogBulkAddItemsRequest(BaseModel):
+    work_item_ids: list[str] = Field(..., min_length=1)
 
 
 class BacklogItemRankUpdateRequest(BaseModel):
@@ -88,6 +96,7 @@ class ActiveSprintItemResponse(BaseModel):
     rank: str
     children_count: int = 0
     done_children_count: int = 0
+    current_assignee_agent_id: str | None = None
     assignee_agent_id: str | None = None
     assignee_name: str | None = None
     assignee_last_name: str | None = None

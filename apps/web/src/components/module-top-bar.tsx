@@ -8,7 +8,7 @@ import { FloatingCard } from "@/components/ui/floating-card";
 
 interface ModuleTopBarProps {
   subPages: SubPage[];
-  leftSlot?: React.ReactNode;
+  rightSlot?: React.ReactNode;
 }
 
 function isSubPageActive(pathname: string, subPage: SubPage): boolean {
@@ -16,7 +16,7 @@ function isSubPageActive(pathname: string, subPage: SubPage): boolean {
   return pathname.startsWith(`${subPage.href}/`);
 }
 
-export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
+export function ModuleTopBar({ subPages, rightSlot }: ModuleTopBarProps) {
   const pathname = usePathname();
 
   return (
@@ -27,12 +27,6 @@ export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
         className="mx-auto max-w-7xl border-border bg-card/95 px-3 py-2 shadow-xl shadow-black/10 dark:shadow-black/40 backdrop-blur-xl sm:px-4"
       >
         <div className="flex min-h-11 flex-wrap items-center gap-1">
-          {leftSlot && (
-            <>
-              {leftSlot}
-              <div className="mx-1.5 hidden h-4 w-px bg-border/80 sm:block" />
-            </>
-          )}
           {subPages.map((page) => {
             const active = isSubPageActive(pathname, page);
 
@@ -54,6 +48,13 @@ export function ModuleTopBar({ subPages, leftSlot }: ModuleTopBarProps) {
               </Link>
             );
           })}
+          {rightSlot && (
+            <>
+              <div className="ml-auto" />
+              <div className="mx-1.5 hidden h-4 w-px bg-border/80 sm:block" />
+              {rightSlot}
+            </>
+          )}
         </div>
       </FloatingCard>
     </div>

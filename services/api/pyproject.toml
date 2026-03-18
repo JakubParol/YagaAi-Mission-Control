@@ -75,6 +75,8 @@ disable = [
     "too-many-positional-arguments",
     "too-many-return-statements",
     "duplicate-code",
+    "redefined-builtin",  # FastAPI query params use `type` intentionally
+    "not-callable",  # sqlalchemy func.count/func.cast dispatch via __getattr__
 ]
 
 [tool.pylint.format]
@@ -87,6 +89,13 @@ max-module-lines = 2500
 # without this override.
 generated-members = [
     "sqlalchemy.sql.functions._FunctionGenerator.*",
+    "sqlalchemy.func.*",
+    "func.count",
+    "func.cast",
+    "func.extract",
+    "func.current_timestamp",
+    "func.round",
+    "func.coalesce",
 ]
 
 [tool.pylint.design]

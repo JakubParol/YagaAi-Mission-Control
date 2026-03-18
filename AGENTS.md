@@ -75,7 +75,7 @@ Quality bar is strict: fix issues at source, no hiding warnings unless explicitl
 
 If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one-shot executor inside an automated pipeline. In this mode:
 - **IGNORE "Task Workflow"** - the pipeline manages the workflow
-- **IGNORE "Planning Operations"** - do NOT call `mc` CLI
+- **IGNORE "Planning Operations"** - do NOT do planning
 - **IGNORE "Startup Report"** - do NOT report what you read
 - Focus ONLY on the specific task described in your prompt
 - Read project docs for context (drill-down is still useful), but do NOT execute any workflow steps beyond what your prompt asks

@@ -5,11 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.planning.application.ports.backlog import BacklogRepository
 from app.planning.domain.models import Backlog, BacklogItem
-from app.planning.infrastructure.shared.mappers import (
-    _row_to_backlog,
-    _row_to_backlog_item,
-)
+from app.planning.infrastructure.shared.mappers import _row_to_backlog
 from app.planning.infrastructure.shared.sorting import parse_sort
+from app.planning.infrastructure.shared.sql import affected_rows
 from app.planning.infrastructure.tables import (
     backlog_items,
     backlogs,
@@ -148,7 +146,7 @@ class DbBacklogRepository(BacklogRepository):
     async def delete(self, backlog_id: str) -> bool:
         result = await self._db.execute(delete(backlogs).where(backlogs.c.id == backlog_id))
         await self._db.commit()
-        return result.rowcount > 0
+        return affected_rows(result) > 0
 
     # ------------------------------------------------------------------
     # Metadata
@@ -240,7 +238,7 @@ class DbBacklogRepository(BacklogRepository):
             )
         )
         await self._db.commit()
-        return result.rowcount > 0
+        return affected_rows(result) > 0
 
     async def list_items(self, backlog_id: str) -> list[dict[str, Any]]:
         parent = work_items.alias("parent")
@@ -336,6 +334,108 @@ class DbBacklogRepository(BacklogRepository):
             result.append(d)
         return result
 
+    async def list_items_batch(self, backlog_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+        if not backlog_ids:
+            return {}
+
+        parent = work_items.alias("parent")
+        children = work_items.alias("children")
+
+        children_count = (
+            select(func.count())
+            .where(children.c.parent_id == work_items.c.id)
+            .correlate(work_items)
+            .scalar_subquery()
+            .label("children_count")
+        )
+        done_children_count = (
+            select(func.count())
+            .where(
+                children.c.parent_id == work_items.c.id,
+                children.c.status == "DONE",
+            )
+            .correlate(work_items)
+            .scalar_subquery()
+            .label("done_children_count")
+        )
+
+        q = (
+            select(
+                backlog_items.c.backlog_id,
+                backlog_items.c.work_item_id,
+                backlog_items.c.rank,
+                backlog_items.c.added_at,
+                work_items.c.id,
+                work_items.c.key,
+                work_items.c.title,
+                work_items.c.type,
+                work_items.c.sub_type,
+                work_items.c.status,
+                work_items.c.priority,
+                work_items.c.parent_id,
+                parent.c.key.label("parent_key"),
+                parent.c.title.label("parent_title"),
+                work_items.c.current_assignee_agent_id,
+                work_items.c.is_blocked,
+                children_count,
+                done_children_count,
+            )
+            .select_from(
+                backlog_items.join(
+                    work_items,
+                    backlog_items.c.work_item_id == work_items.c.id,
+                ).outerjoin(
+                    parent,
+                    work_items.c.parent_id == parent.c.id,
+                )
+            )
+            .where(backlog_items.c.backlog_id.in_(backlog_ids))
+            .order_by(
+                backlog_items.c.backlog_id.asc(),
+                backlog_items.c.rank.asc(),
+            )
+        )
+        rows = (await self._db.execute(q)).mappings().all()
+
+        item_ids = [r["id"] for r in rows]
+        labels_by_item: dict[str, list[dict[str, Any]]] = {iid: [] for iid in item_ids}
+        if item_ids:
+            lq = (
+                select(
+                    work_item_labels.c.work_item_id,
+                    labels.c.id.label("label_id"),
+                    labels.c.name,
+                    labels.c.color,
+                )
+                .select_from(
+                    work_item_labels.join(
+                        labels,
+                        work_item_labels.c.label_id == labels.c.id,
+                    )
+                )
+                .where(work_item_labels.c.work_item_id.in_(item_ids))
+            )
+            for lr in (await self._db.execute(lq)).mappings().all():
+                wid = lr["work_item_id"]
+                if wid in labels_by_item:
+                    labels_by_item[wid].append(
+                        {
+                            "id": lr["label_id"],
+                            "name": lr["name"],
+                            "color": lr["color"],
+                        }
+                    )
+
+        grouped: dict[str, list[dict[str, Any]]] = {bid: [] for bid in backlog_ids}
+        for r in rows:
+            d = dict(r)
+            il = labels_by_item.get(d["id"], [])
+            d["labels"] = il
+            d["label_ids"] = [la["id"] for la in il]
+            d["assignee_agent_id"] = d.get("current_assignee_agent_id")
+            grouped[d["backlog_id"]].append(d)
+        return grouped
+
     async def update_item_rank(self, backlog_id: str, work_item_id: str, rank: str) -> bool:
         result = await self._db.execute(
             update(backlog_items)
@@ -346,7 +446,7 @@ class DbBacklogRepository(BacklogRepository):
             .values(rank=rank)
         )
         await self._db.commit()
-        return result.rowcount > 0
+        return affected_rows(result) > 0
 
     # ------------------------------------------------------------------
     # Sprint helpers

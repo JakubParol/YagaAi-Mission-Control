@@ -26,6 +26,7 @@ from app.planning.dependencies import (
     resolve_project_key,
 )
 from app.shared.api.envelope import ListEnvelope, ListMeta
+from app.shared.api.errors import ValidationError
 
 router = APIRouter(prefix="/work-items", tags=["work-items"])
 
@@ -53,6 +54,7 @@ async def create_work_item(
         estimate_points=body.estimate_points,
         due_at=body.due_at,
         current_assignee_agent_id=body.current_assignee_agent_id,
+        backlog_id=body.backlog_id,
         actor=x_actor_id,
     )
     return WorkItemResponse(**_to_dict(item))
@@ -63,6 +65,7 @@ async def list_work_items(
     project_id: str | None = Depends(resolve_project_key),
     type: str | None = Query(None),
     parent_id: str | None = Query(None),
+    parent_key: str | None = Query(None),
     status: str | None = Query(None),
     assignee_id: str | None = Query(None),
     key: str | None = Query(None),
@@ -74,10 +77,17 @@ async def list_work_items(
     offset: int = Query(0, ge=0),
     svc: WorkItemService = Depends(get_work_item_service),
 ):
+    resolved_parent_id = parent_id
+    if parent_key and not parent_id:
+        parent_item = await svc.get_work_item_by_key_or_none(parent_key)
+        if not parent_item:
+            raise ValidationError(f"Work item with key '{parent_key}' not found")
+        resolved_parent_id = parent_item.id
+
     items, total = await svc.list_work_items(
         type=type,
         project_id=project_id,
-        parent_id=parent_id,
+        parent_id=resolved_parent_id,
         status=status,
         assignee_id=assignee_id,
         key=key,
@@ -89,7 +99,7 @@ async def list_work_items(
         offset=offset,
     )
     return ListEnvelope(
-        data=[WorkItemResponse(**_to_dict(i)) for i in items],
+        data=[WorkItemResponse(**i) for i in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 
@@ -133,9 +143,12 @@ async def get_by_key(
 ):
     item, children_count = await svc.get_work_item_by_key(key)
     assignments = await svc.list_assignments(item.id)
+    item_labels = await svc.get_labels(item.id)
     return WorkItemDetailResponse(
         **_to_dict(item),
         children_count=children_count,
+        labels=item_labels,
+        label_ids=[la["id"] for la in item_labels],
         assignments=[WorkItemAssignmentResponse(**_assignment_to_dict(a)) for a in assignments],
     )
 
@@ -147,9 +160,12 @@ async def get_work_item(
 ):
     item, children_count = await svc.get_work_item(work_item_id)
     assignments = await svc.list_assignments(item.id)
+    item_labels = await svc.get_labels(work_item_id)
     return WorkItemDetailResponse(
         **_to_dict(item),
         children_count=children_count,
+        labels=item_labels,
+        label_ids=[la["id"] for la in item_labels],
         assignments=[WorkItemAssignmentResponse(**_assignment_to_dict(a)) for a in assignments],
     )
 
@@ -434,6 +450,7 @@ def _to_dict(item):
 
 def _overview_to_dict(item):
     return {
+        "work_item_id": item.work_item_id,
         "work_item_key": item.work_item_key,
         "title": item.title,
         "type": item.type.value,

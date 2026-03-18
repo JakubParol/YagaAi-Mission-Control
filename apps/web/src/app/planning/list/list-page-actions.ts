@@ -6,7 +6,6 @@ import {
   buildLabelOptions,
   buildPlanningListRows,
   resolveAgentLabel,
-  type PlanningBacklogStoryApiItem,
   type PlanningEpicApiItem,
   type PlanningListLabel,
   type PlanningStoryApiItem,
@@ -15,7 +14,6 @@ import {
 import type {
   FetchResult,
   PlanningAgentApiItem,
-  PlanningBacklogApiItem,
   PlanningListAssigneeOption,
 } from "./list-types";
 
@@ -33,7 +31,7 @@ export async function fetchList<T>(path: string): Promise<T[]> {
 }
 
 export async function fetchListResult(projectId: string): Promise<FetchResult> {
-  const [stories, tasks, epics, backlogs, agents] = await Promise.all([
+  const [stories, tasks, epics, agents] = await Promise.all([
     fetchList<PlanningStoryApiItem>(
       `/v1/planning/work-items?type=STORY&project_id=${projectId}&limit=100&sort=-updated_at`,
     ),
@@ -43,36 +41,14 @@ export async function fetchListResult(projectId: string): Promise<FetchResult> {
     fetchList<PlanningEpicApiItem>(
       `/v1/planning/work-items?type=EPIC&project_id=${projectId}&limit=100`,
     ),
-    fetchList<PlanningBacklogApiItem>(
-      `/v1/planning/backlogs?project_id=${projectId}&limit=100`,
-    ),
     fetchList<PlanningAgentApiItem>(
       "/v1/planning/agents?is_active=true&limit=100&sort=name",
     ).catch(() => []),
   ]);
 
-  const backlogStoryGroups = await Promise.all(
-    backlogs.map((backlog) =>
-      fetchList<PlanningBacklogStoryApiItem>(
-        `/v1/planning/backlogs/${backlog.id}/items`,
-      ).catch(() => []),
-    ),
-  );
-
-  const backlogStoryById = new Map<string, PlanningBacklogStoryApiItem>();
-  for (const group of backlogStoryGroups) {
-    for (const story of group) {
-      if (!backlogStoryById.has(story.id)) {
-        backlogStoryById.set(story.id, story);
-      }
-    }
-  }
-
   const rows = buildPlanningListRows({
     stories,
-    backlogStories: [...backlogStoryById.values()],
     standaloneTaskCandidates: tasks,
-    epics,
   });
 
   if (rows.length === 0) {

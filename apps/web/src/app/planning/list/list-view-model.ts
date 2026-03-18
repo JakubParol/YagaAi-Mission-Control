@@ -22,19 +22,10 @@ export interface PlanningStoryApiItem {
   status: WorkItemStatus;
   priority: number | null;
   updated_at: string;
-}
-
-export interface PlanningBacklogStoryApiItem {
-  id: string;
-  key: string | null;
-  title: string;
-  sub_type: string;
-  status: WorkItemStatus;
-  priority: number | null;
   parent_key: string | null;
   parent_title: string | null;
-  children_count?: number;
-  done_children_count?: number;
+  children_count: number;
+  done_children_count: number;
   labels: PlanningListLabel[];
 }
 
@@ -84,51 +75,26 @@ function asTimestamp(value: string): number {
 
 function toStoryRows(
   stories: PlanningStoryApiItem[],
-  backlogStories: PlanningBacklogStoryApiItem[],
-  allTasks: PlanningTaskApiItem[],
-  epics: PlanningEpicApiItem[],
 ): PlanningListRow[] {
-  const backlogById = new Map(backlogStories.map((story) => [story.id, story]));
-  const epicById = new Map(epics.map((epic) => [epic.id, epic]));
-  const progressByStoryId = new Map<string, { total: number; done: number }>();
-
-  for (const task of allTasks) {
-    if (!task.parent_id) continue;
-    const current = progressByStoryId.get(task.parent_id) ?? { total: 0, done: 0 };
-    current.total += 1;
-    if (task.status === "DONE") {
-      current.done += 1;
-    }
-    progressByStoryId.set(task.parent_id, current);
-  }
-
-  return stories.map((story) => {
-    const backlogStory = backlogById.get(story.id);
-    const epic = story.parent_id ? epicById.get(story.parent_id) : undefined;
-    const progress = progressByStoryId.get(story.id);
-    const taskCount = backlogStory?.children_count ?? progress?.total ?? 0;
-    const doneTaskCount = backlogStory?.done_children_count ?? progress?.done ?? 0;
-
-    return {
-      row_type: "story",
-      id: story.id,
-      key: story.key,
-      title: story.title,
-      status: story.status,
-      priority: story.priority,
-      parent_id: story.parent_id,
-      parent_key: backlogStory?.parent_key ?? epic?.key ?? null,
-      parent_title: backlogStory?.parent_title ?? epic?.title ?? null,
-      labels: backlogStory?.labels ?? [],
-      current_assignee_agent_id: story.current_assignee_agent_id,
-      updated_at: story.updated_at,
-      type: "STORY",
-      sub_type: story.sub_type,
-      summary: null,
-      children_count: taskCount,
-      done_children_count: doneTaskCount,
-    };
-  });
+  return stories.map((story) => ({
+    row_type: "story",
+    id: story.id,
+    key: story.key,
+    title: story.title,
+    status: story.status,
+    priority: story.priority,
+    parent_id: story.parent_id,
+    parent_key: story.parent_key,
+    parent_title: story.parent_title,
+    labels: story.labels ?? [],
+    current_assignee_agent_id: story.current_assignee_agent_id,
+    updated_at: story.updated_at,
+    type: "STORY",
+    sub_type: story.sub_type,
+    summary: null,
+    children_count: story.children_count,
+    done_children_count: story.done_children_count,
+  }));
 }
 
 function toStandaloneTaskRows(tasks: PlanningTaskApiItem[]): PlanningListRow[] {
@@ -157,16 +123,9 @@ function toStandaloneTaskRows(tasks: PlanningTaskApiItem[]): PlanningListRow[] {
 
 export function buildPlanningListRows(input: {
   stories: PlanningStoryApiItem[];
-  backlogStories: PlanningBacklogStoryApiItem[];
   standaloneTaskCandidates: PlanningTaskApiItem[];
-  epics: PlanningEpicApiItem[];
 }): PlanningListRow[] {
-  const storyRows = toStoryRows(
-    input.stories,
-    input.backlogStories,
-    input.standaloneTaskCandidates,
-    input.epics,
-  );
+  const storyRows = toStoryRows(input.stories);
   const standaloneTaskRows = toStandaloneTaskRows(input.standaloneTaskCandidates);
 
   return [...storyRows, ...standaloneTaskRows].sort((a, b) => {

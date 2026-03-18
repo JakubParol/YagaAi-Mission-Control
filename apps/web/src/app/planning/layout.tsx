@@ -14,7 +14,7 @@ export default function PlanningLayout({ children }: { children: React.ReactNode
       {planningModule?.subPages && (
         <ModuleTopBar
           subPages={planningModule.subPages}
-          leftSlot={
+          rightSlot={
             <Suspense>
               <ProjectSelector />
             </Suspense>

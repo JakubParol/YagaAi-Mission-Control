@@ -22,6 +22,7 @@ import type {
 
 const ITEMS: EpicOverviewItem[] = [
   {
+    work_item_id: "id-380",
     work_item_key: "MC-380",
     title: "Epic Overview 2.0",
     status: "IN_PROGRESS",
@@ -34,6 +35,7 @@ const ITEMS: EpicOverviewItem[] = [
     stale_days: 2,
   },
   {
+    work_item_id: "id-390",
     work_item_key: "MC-390",
     title: "CLI Stabilization",
     status: "TODO",
@@ -46,6 +48,7 @@ const ITEMS: EpicOverviewItem[] = [
     stale_days: 9,
   },
   {
+    work_item_id: "id-399",
     work_item_key: "MC-399",
     title: "Web Polish",
     status: "DONE",
