@@ -18,9 +18,11 @@ from app.planning.api.schemas.work_item import (
     WorkItemStatusChangeResponse,
     WorkItemUpdate,
 )
+from app.planning.application.backlog_service import BacklogService
 from app.planning.application.work_item_action_service import WorkItemActionService
 from app.planning.application.work_item_service import WorkItemService
 from app.planning.dependencies import (
+    get_backlog_service,
     get_work_item_action_service,
     get_work_item_service,
     resolve_project_key,
@@ -39,6 +41,7 @@ router = APIRouter(prefix="/work-items", tags=["work-items"])
 async def create_work_item(
     body: WorkItemCreate,
     svc: WorkItemService = Depends(get_work_item_service),
+    backlog_svc: BacklogService = Depends(get_backlog_service),
     x_actor_id: str | None = Header(None),
 ):
     item = await svc.create_work_item(
@@ -55,6 +58,8 @@ async def create_work_item(
         current_assignee_agent_id=body.current_assignee_agent_id,
         actor=x_actor_id,
     )
+    if body.backlog_id:
+        await backlog_svc.add_item_to_backlog(body.backlog_id, item.id)
     return WorkItemResponse(**_to_dict(item))
 
 

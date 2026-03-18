@@ -18,6 +18,7 @@ class WorkItemCreate(BaseModel):
     estimate_points: float | None = None
     due_at: str | None = None
     current_assignee_agent_id: str | None = None
+    backlog_id: str | None = None
 
 
 class WorkItemUpdate(BaseModel):
