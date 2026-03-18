@@ -38,6 +38,10 @@ class BacklogResponse(BaseModel):
     updated_at: str
 
 
+class BacklogWithItemsResponse(BacklogResponse):
+    items: list[dict] = Field(default_factory=list)
+
+
 class BacklogKindTransitionRequest(BaseModel):
     kind: str = Field(..., pattern=r"^(BACKLOG|SPRINT|IDEAS)$")
 

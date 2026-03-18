@@ -67,11 +67,7 @@ class BacklogService:
     ) -> Backlog:
         now = utc_now()
         rank = await self._repo.next_rank(project_id)
-        initial_status = (
-            BacklogStatus.OPEN
-            if kind == BacklogKind.SPRINT
-            else BacklogStatus.ACTIVE
-        )
+        initial_status = BacklogStatus.OPEN if kind == BacklogKind.SPRINT else BacklogStatus.ACTIVE
         backlog = Backlog(
             id=new_uuid(),
             project_id=project_id,
@@ -111,8 +107,7 @@ class BacklogService:
             )
         if "kind" in data and not allow_kind_update:
             raise BusinessRuleError(
-                "Backlog kind changes are lifecycle-managed. "
-                "Use /backlogs/{id}/transition-kind."
+                "Backlog kind changes are lifecycle-managed. Use /backlogs/{id}/transition-kind."
             )
         if "is_default" in data and data["is_default"] and not existing.is_default:
             raise BusinessRuleError("Cannot manually set a backlog as default")
@@ -146,16 +141,10 @@ class BacklogService:
         if backlog.is_default:
             raise BusinessRuleError("Cannot change kind of default backlog")
         if target_kind == BacklogKind.SPRINT and backlog.project_id is None:
+            raise BusinessRuleError("Only project-scoped backlogs can transition to SPRINT")
+        if backlog.kind == BacklogKind.SPRINT and backlog.status == BacklogStatus.ACTIVE:
             raise BusinessRuleError(
-                "Only project-scoped backlogs can transition to SPRINT"
-            )
-        if (
-            backlog.kind == BacklogKind.SPRINT
-            and backlog.status == BacklogStatus.ACTIVE
-        ):
-            raise BusinessRuleError(
-                "Cannot transition kind of an ACTIVE sprint. "
-                "Complete sprint first."
+                "Cannot transition kind of an ACTIVE sprint. Complete sprint first."
             )
 
         target_status = backlog.status
@@ -213,9 +202,7 @@ class BacklogService:
         rank: str | None = None,
     ) -> dict[str, Any]:
         backlog = await self.get_backlog(backlog_id)
-        exists, item_project_id = await self._repo.get_work_item_project_id(
-            work_item_id
-        )
+        exists, item_project_id = await self._repo.get_work_item_project_id(work_item_id)
         if not exists:
             raise NotFoundError(f"Work item {work_item_id} not found")
 
@@ -224,13 +211,10 @@ class BacklogService:
             item_project_id=item_project_id,
         )
 
-        existing_backlog_id = await self._repo.work_item_backlog_id(
-            work_item_id
-        )
+        existing_backlog_id = await self._repo.work_item_backlog_id(work_item_id)
         if existing_backlog_id:
             raise ConflictError(
-                f"Work item {work_item_id} already belongs to "
-                f"backlog {existing_backlog_id}"
+                f"Work item {work_item_id} already belongs to " f"backlog {existing_backlog_id}"
             )
 
         if rank is None:
@@ -249,15 +233,11 @@ class BacklogService:
             "added_at": item.added_at,
         }
 
-    async def remove_item_from_backlog(
-        self, backlog_id: str, work_item_id: str
-    ) -> None:
+    async def remove_item_from_backlog(self, backlog_id: str, work_item_id: str) -> None:
         await self.get_backlog(backlog_id)
         removed = await self._repo.remove_item(backlog_id, work_item_id)
         if not removed:
-            raise NotFoundError(
-                f"Work item {work_item_id} is not in backlog {backlog_id}"
-            )
+            raise NotFoundError(f"Work item {work_item_id} is not in backlog {backlog_id}")
 
     async def update_item_rank(
         self,
@@ -266,34 +246,27 @@ class BacklogService:
         rank: str,
     ) -> None:
         await self.get_backlog(backlog_id)
-        updated = await self._repo.update_item_rank(
-            backlog_id, work_item_id, rank
-        )
+        updated = await self._repo.update_item_rank(backlog_id, work_item_id, rank)
         if not updated:
-            raise NotFoundError(
-                f"Work item {work_item_id} is not in backlog {backlog_id}"
-            )
+            raise NotFoundError(f"Work item {work_item_id} is not in backlog {backlog_id}")
 
-    async def get_backlog_items(
-        self, backlog_id: str
-    ) -> list[dict[str, Any]]:
+    async def get_backlog_items(self, backlog_id: str) -> list[dict[str, Any]]:
         await self.get_backlog(backlog_id)
         return await self._repo.list_items(backlog_id)
+
+    async def get_backlog_items_batch(
+        self, backlog_ids: list[str]
+    ) -> dict[str, list[dict[str, Any]]]:
+        return await self._repo.list_items_batch(backlog_ids)
 
     # ------------------------------------------------------------------
     # Sprint lifecycle
     # ------------------------------------------------------------------
 
-    async def get_active_sprint(
-        self, project_id: str
-    ) -> ActiveSprintResult:
-        backlog, items = await self._repo.get_active_sprint_with_items(
-            project_id
-        )
+    async def get_active_sprint(self, project_id: str) -> ActiveSprintResult:
+        backlog, items = await self._repo.get_active_sprint_with_items(project_id)
         if not backlog:
-            raise NotFoundError(
-                f"No active sprint found for project {project_id}"
-            )
+            raise NotFoundError(f"No active sprint found for project {project_id}")
         return backlog, items
 
     async def start_sprint(
@@ -303,17 +276,14 @@ class BacklogService:
         if backlog.kind != BacklogKind.SPRINT:
             raise BusinessRuleError(f"Backlog {backlog_id} is not a sprint")
         if backlog.project_id is None:
-            raise BusinessRuleError(
-                "Sprint lifecycle transitions require a project-scoped backlog"
-            )
+            raise BusinessRuleError("Sprint lifecycle transitions require a project-scoped backlog")
         if backlog.status == BacklogStatus.ACTIVE:
             raise BusinessRuleError(f"Sprint {backlog_id} is already ACTIVE")
 
         active = await self._repo.get_active_sprint_backlog(backlog.project_id)
         if active and active.id != backlog_id:
             raise ConflictError(
-                f"Project {backlog.project_id} already has active "
-                f"sprint {active.id}"
+                f"Project {backlog.project_id} already has active " f"sprint {active.id}"
             )
 
         updated = await self.update_backlog(
@@ -342,19 +312,13 @@ class BacklogService:
         if backlog.kind != BacklogKind.SPRINT:
             raise BusinessRuleError(f"Backlog {backlog_id} is not a sprint")
         if backlog.project_id is None:
-            raise BusinessRuleError(
-                "Sprint lifecycle transitions require a project-scoped backlog"
-            )
+            raise BusinessRuleError("Sprint lifecycle transitions require a project-scoped backlog")
         if backlog.status != BacklogStatus.ACTIVE:
-            raise BusinessRuleError(
-                f"Sprint {backlog_id} must be ACTIVE to complete"
-            )
+            raise BusinessRuleError(f"Sprint {backlog_id} must be ACTIVE to complete")
 
         target = await self._repo.get_by_id(target_backlog_id)
         if not target:
-            raise NotFoundError(
-                f"Target backlog {target_backlog_id} not found"
-            )
+            raise NotFoundError(f"Target backlog {target_backlog_id} not found")
 
         moved_count = await self._repo.move_non_done_items(
             source_backlog_id=backlog_id,
@@ -388,30 +352,20 @@ class BacklogService:
         project_id: str,
         work_item_id: str,
     ) -> MembershipMoveResult:
-        exists, item_project_id = await self._repo.get_work_item_project_id(
-            work_item_id
-        )
+        exists, item_project_id = await self._repo.get_work_item_project_id(work_item_id)
         if not exists:
             raise NotFoundError(f"Work item {work_item_id} not found")
         if item_project_id != project_id:
-            raise BusinessRuleError(
-                f"Work item {work_item_id} must belong to project {project_id}"
-            )
+            raise BusinessRuleError(f"Work item {work_item_id} must belong to project {project_id}")
 
         sprint = await self._repo.get_active_sprint_backlog(project_id)
         if sprint is None:
-            raise NotFoundError(
-                f"No active sprint found for project {project_id}"
-            )
+            raise NotFoundError(f"No active sprint found for project {project_id}")
         pb = await self._repo.get_product_backlog(project_id)
         if pb is None:
-            raise NotFoundError(
-                f"No product backlog found for project {project_id}"
-            )
+            raise NotFoundError(f"No product backlog found for project {project_id}")
 
-        current_backlog_id, _ = await self._repo.get_item_backlog_info(
-            work_item_id
-        )
+        current_backlog_id, _ = await self._repo.get_item_backlog_info(work_item_id)
         if current_backlog_id == sprint.id:
             return {
                 "work_item_id": work_item_id,
@@ -427,9 +381,7 @@ class BacklogService:
 
         # Compute rank for appending at end of sprint.
         sprint_items = await self._repo.list_items(sprint.id)
-        rank = (
-            lr_after(sprint_items[-1]["rank"]) if sprint_items else "n"
-        )
+        rank = lr_after(sprint_items[-1]["rank"]) if sprint_items else "n"
 
         await self._repo.move_item(
             source_backlog_id=pb.id,
@@ -450,30 +402,20 @@ class BacklogService:
         project_id: str,
         work_item_id: str,
     ) -> MembershipMoveResult:
-        exists, item_project_id = await self._repo.get_work_item_project_id(
-            work_item_id
-        )
+        exists, item_project_id = await self._repo.get_work_item_project_id(work_item_id)
         if not exists:
             raise NotFoundError(f"Work item {work_item_id} not found")
         if item_project_id != project_id:
-            raise BusinessRuleError(
-                f"Work item {work_item_id} must belong to project {project_id}"
-            )
+            raise BusinessRuleError(f"Work item {work_item_id} must belong to project {project_id}")
 
         sprint = await self._repo.get_active_sprint_backlog(project_id)
         if sprint is None:
-            raise NotFoundError(
-                f"No active sprint found for project {project_id}"
-            )
+            raise NotFoundError(f"No active sprint found for project {project_id}")
         pb = await self._repo.get_product_backlog(project_id)
         if pb is None:
-            raise NotFoundError(
-                f"No product backlog found for project {project_id}"
-            )
+            raise NotFoundError(f"No product backlog found for project {project_id}")
 
-        current_backlog_id, _ = await self._repo.get_item_backlog_info(
-            work_item_id
-        )
+        current_backlog_id, _ = await self._repo.get_item_backlog_info(work_item_id)
         if current_backlog_id == pb.id:
             return {
                 "work_item_id": work_item_id,
@@ -514,16 +456,9 @@ class BacklogService:
         item_project_id: str | None,
     ) -> None:
         if backlog_project_id is None and item_project_id is not None:
-            raise BusinessRuleError(
-                "Global backlog accepts only project-less work items"
-            )
-        if (
-            backlog_project_id is not None
-            and item_project_id != backlog_project_id
-        ):
-            raise BusinessRuleError(
-                f"Work item must belong to project {backlog_project_id}"
-            )
+            raise BusinessRuleError("Global backlog accepts only project-less work items")
+        if backlog_project_id is not None and item_project_id != backlog_project_id:
+            raise BusinessRuleError(f"Work item must belong to project {backlog_project_id}")
 
     async def _build_sprint_meta(
         self,

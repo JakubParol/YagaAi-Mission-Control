@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query
 
 from app.planning.api.schemas.backlog import (
+    ActiveSprintItemResponse,
     ActiveSprintResponse,
     BacklogAddItem,
     BacklogCreate,
@@ -9,6 +10,7 @@ from app.planning.api.schemas.backlog import (
     BacklogKindTransitionRequest,
     BacklogResponse,
     BacklogUpdate,
+    BacklogWithItemsResponse,
     SprintCompleteRequest,
     SprintMembershipRequest,
     SprintMembershipResponse,
@@ -53,7 +55,7 @@ async def get_active_sprint(
     return Envelope(
         data=ActiveSprintResponse(
             backlog=_backlog_response(backlog),
-            items=items,
+            items=[ActiveSprintItemResponse(**item) for item in items],
         )
     )
 
@@ -114,13 +116,14 @@ async def list_backlogs(
     status: str | None = Query(None),
     kind: str | None = Query(None),
     sort: str | None = Query(None),
+    include: str | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-) -> ListEnvelope[BacklogResponse]:
+) -> ListEnvelope[BacklogResponse] | ListEnvelope[BacklogWithItemsResponse]:
     filter_global = project_id == "null"
     actual_project_id = None if filter_global else project_id
 
-    items, total = await service.list_backlogs(
+    backlogs, total = await service.list_backlogs(
         project_id=actual_project_id,
         filter_global=filter_global,
         status=status,
@@ -129,8 +132,23 @@ async def list_backlogs(
         offset=offset,
         sort=sort,
     )
+
+    if include == "items":
+        backlog_ids = [b.id for b in backlogs]
+        items_by_backlog = await service.get_backlog_items_batch(backlog_ids)
+        return ListEnvelope(
+            data=[
+                BacklogWithItemsResponse(
+                    **b.__dict__,
+                    items=items_by_backlog.get(b.id, []),
+                )
+                for b in backlogs
+            ],
+            meta=ListMeta(total=total, limit=limit, offset=offset),
+        )
+
     return ListEnvelope(
-        data=[_backlog_response(b) for b in items],
+        data=[_backlog_response(b) for b in backlogs],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 
