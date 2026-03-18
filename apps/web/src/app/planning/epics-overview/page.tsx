@@ -180,6 +180,12 @@ function EpicOverviewPageContent() {
     if (state.kind !== "ok") return;
     const item = state.rows.find((r) => r.work_item_id === epicId);
     if (!item) return;
+    if (item.children_total > 0) {
+      setEpicActionError(
+        `Cannot delete "${item.title}" — it still has ${item.children_total} child ${item.children_total === 1 ? "story" : "stories"}. Move or delete them first.`,
+      );
+      return;
+    }
     setDeleteDialogState({ epicId, epicTitle: item.title, phase: "open" });
   }, [state]);
 
