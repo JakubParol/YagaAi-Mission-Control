@@ -5,6 +5,8 @@ import type { StoryAssigneeSelection } from "@/components/planning/story-assigne
 import type { QuickCreateAssigneeOption, QuickCreateSubmitInput } from "@/app/planning/board/quick-create";
 import { BoardColumn, type DropPlacement } from "./sprint-board-column";
 
+export type { DropPlacement };
+
 // Re-export layout constant so the test import path stays unchanged
 export { TODO_QUICK_CREATE_LAYOUT } from "./sprint-board-quick-create";
 
@@ -46,7 +48,7 @@ const VALID_DROP_STATUSES = new Set<WorkItemStatus>([
 export interface SprintBoardProps {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
-  onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
+  onStoryStatusChange?: (storyId: string, status: WorkItemStatus, placement?: DropPlacement | null) => void;
   onStoryReorder?: (storyId: string, beforeId: string | null, afterId: string | null) => void;
   onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
@@ -144,8 +146,8 @@ export function SprintBoard({
       return;
     }
 
-    // Cross-column status change — existing behavior preserved
-    onStoryStatusChange?.(draggedStoryId, status);
+    // Cross-column status change — forward placement so rank can be honoured
+    onStoryStatusChange?.(draggedStoryId, status, placement);
   };
 
   return (

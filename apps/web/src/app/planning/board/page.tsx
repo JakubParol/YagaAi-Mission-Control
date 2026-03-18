@@ -10,7 +10,7 @@ import { PlanningFilters, type PlanningFiltersValue } from "@/components/plannin
 import { PageShell } from "@/components/page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import { EmptyState } from "@/components/empty-state";
-import { SprintBoard } from "@/components/planning/sprint-board";
+import { SprintBoard, type DropPlacement } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { deleteStory } from "../story-actions";
 import { createTodoQuickItem, type QuickCreateAssigneeOption, type QuickCreateSubmitInput } from "./quick-create";
@@ -117,25 +117,40 @@ function BoardPageContent() {
   }, [refreshCurrentView, singleProjectId]);
 
   const handleStoryStatusChange = useCallback(
-    async (storyId: string, nextStatus: WorkItemStatus) => {
+    async (storyId: string, nextStatus: WorkItemStatus, placement?: DropPlacement | null) => {
       if (state.kind !== "ok") return;
       const existingStory = state.data.items.find((item) => item.id === storyId);
       if (!existingStory || existingStory.status === nextStatus) return;
       const previousStatus: WorkItemStatus = existingStory.status;
+      const previousRank = existingStory.rank;
+      const backlogId = state.data.backlog.id;
+
+      // Compute a new rank when the drop landed at a specific position in the target column.
+      const newRank = placement
+        ? computeReorderRank(state.data.items, storyId, placement.beforeId, placement.afterId)
+        : null;
 
       setState((prev) => {
         if (prev.kind !== "ok") return prev;
-        const result = applyOptimisticStoryStatus(prev.data, storyId, nextStatus);
-        return result.previousStatus ? { ...prev, data: result.data } : prev;
+        const statusResult = applyOptimisticStoryStatus(prev.data, storyId, nextStatus);
+        if (!statusResult.previousStatus) return prev;
+        const afterStatus: BoardState = { ...prev, data: statusResult.data };
+        return newRank ? applyOptimisticStoryRank(afterStatus, storyId, newRank) : afterStatus;
       });
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
 
       try {
-        await patchStoryStatus(storyId, nextStatus);
+        const tasks: Promise<void>[] = [patchStoryStatus(storyId, nextStatus)];
+        if (newRank) {
+          tasks.push(patchStoryRank(backlogId, storyId, newRank));
+        }
+        await Promise.all(tasks);
       } catch {
         setState((prev) => {
           if (prev.kind !== "ok") return prev;
-          return { ...prev, data: rollbackStoryStatus(prev.data, storyId, previousStatus) };
+          const withRestoredRank = newRank ? applyOptimisticStoryRank(prev, storyId, previousRank) : prev;
+          if (withRestoredRank.kind !== "ok") return withRestoredRank;
+          return { ...withRestoredRank, data: rollbackStoryStatus(withRestoredRank.data, storyId, previousStatus) };
         });
         setErrorToast("Failed to update story status. Changes were rolled back.");
       } finally {
