@@ -25,7 +25,7 @@ export interface OptionItem {
 }
 
 function normalizeType(row: PlanningListRow): string {
-  return row.row_type === "task" ? "TASK" : (row.story_type ?? "STORY");
+  return row.row_type === "task" ? "TASK" : (row.sub_type ?? row.type);
 }
 
 export function applyPlanningListFilters(
@@ -38,7 +38,7 @@ export function applyPlanningListFilters(
     status: row.status,
     type: normalizeType(row),
     labelIds: row.labels.map((label) => label.id),
-    epicId: row.epic_id,
+    epicId: row.parent_id,
     assigneeId: row.current_assignee_agent_id,
   }));
 }

@@ -45,7 +45,7 @@ test("deleteStory issues DELETE request and resolves on 204", async () => {
     globalThis.fetch = originalFetch;
   }
 
-  assert.equal(requestUrl.endsWith("/v1/planning/stories/story-1"), true);
+  assert.equal(requestUrl.endsWith("/v1/planning/work-items/story-1"), true);
   assert.equal(requestInit?.method, "DELETE");
 });
 

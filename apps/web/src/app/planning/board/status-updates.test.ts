@@ -16,7 +16,7 @@ type StoryFixture = {
 function makeData(storyStatus: StoryFixture["status"]): ActiveSprintDataLike<StoryFixture> {
   return {
     backlog: { id: "b1" },
-    stories: [
+    items: [
       { id: "s1", status: storyStatus, title: "Primary story" },
       { id: "s2", status: "TODO", title: "Secondary story" },
     ],
@@ -28,8 +28,8 @@ test("applyOptimisticStoryStatus updates matching story and returns previous sta
   const result = applyOptimisticStoryStatus(data, "s1", "IN_PROGRESS");
 
   assert.equal(result.previousStatus, "TODO");
-  assert.equal(result.data.stories[0].status, "IN_PROGRESS");
-  assert.equal(result.data.stories[1].status, "TODO");
+  assert.equal(result.data.items[0].status, "IN_PROGRESS");
+  assert.equal(result.data.items[1].status, "TODO");
 });
 
 test("applyOptimisticStoryStatus is a no-op when status is unchanged", () => {
@@ -44,6 +44,6 @@ test("rollbackStoryStatus restores the prior status", () => {
   const optimistic = makeData("CODE_REVIEW");
   const rolledBack = rollbackStoryStatus(optimistic, "s1", "TODO");
 
-  assert.equal(rolledBack.stories[0].status, "TODO");
-  assert.equal(rolledBack.stories[1].status, "TODO");
+  assert.equal(rolledBack.items[0].status, "TODO");
+  assert.equal(rolledBack.items[1].status, "TODO");
 });

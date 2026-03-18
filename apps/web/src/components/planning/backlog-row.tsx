@@ -46,7 +46,7 @@ export function BacklogRow({
   assigneePending?: boolean;
 }) {
   const statusStyle = STATUS_STYLE[item.status];
-  const typeConf = resolveStoryTypeVisualConfig(item.story_type);
+  const typeConf = resolveStoryTypeVisualConfig(item.sub_type ?? item.type);
   const TypeIcon = typeConf.icon;
   const assignee = item.assignee ?? (
     item.assignee_name || item.assignee_last_name || item.assignee_initials || item.assignee_avatar
@@ -123,8 +123,8 @@ export function BacklogRow({
       {/* Epic */}
       <span className={cn("shrink-0", BACKLOG_ROW_LAYOUT.epic)}>
         <StoryEpicDisplay
-          epicKey={item.epic_key}
-          epicTitle={item.epic_title}
+          epicKey={item.parent_key}
+          epicTitle={item.parent_title}
           className="w-full"
         />
       </span>
@@ -151,8 +151,8 @@ export function BacklogRow({
       {/* Task progress */}
       <span className={cn("shrink-0 text-right", BACKLOG_ROW_LAYOUT.taskProgress)}>
         <StoryTaskProgress
-          doneCount={item.done_task_count}
-          totalCount={item.task_count}
+          doneCount={item.done_children_count}
+          totalCount={item.children_count}
         />
       </span>
 

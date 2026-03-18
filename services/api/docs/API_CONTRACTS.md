@@ -177,321 +177,106 @@ Returns `204`.
 
 ---
 
-### 4.2) Epics
+### 4.2) Work Items
 
-**Base path:** `/v1/planning/projects/{project_id}/epics`
+**Base path:** `/v1/planning/work-items`
 
-Epics always belong to a project (no project-less epics).
+Work items are polymorphic: `type` discriminator is `EPIC`, `STORY`, `TASK`, or `BUG`.
+Work items can be project-less or project-scoped. Hierarchy via `parent_id`.
 
-#### `POST .../epics` — Create epic
-
-Request:
-```jsonc
-{
-  "title": "...",           // required
-  "description": "...",     // optional
-  "priority": 1             // optional
-}
-```
-
-`key` is auto-generated. `status` defaults to `TODO`. `status_mode` defaults to `MANUAL`.
-
-#### `GET /v1/planning/epics` — List epics
-
-Query: `project_id`, `project_key`, `status`, `is_blocked`, `sort`, `limit`, `offset`.
-
-`project_key` — same behavior as stories (see above).
-
-#### `GET /v1/planning/epics/overview` — Epic Overview aggregate
-
-Purpose: return a lightweight, paginated aggregate for Epic health/progress views.
-
-Query:
-- Filters: `project_id`, `project_key`, `status`, `owner`, `is_blocked`, `label`, `text`
-- Sort: `priority`, `progress_pct`, `progress_trend_7d`, `updated_at`, `blocked_count` (supports `-` prefix)
-- Pagination: `limit`, `offset`
-
-Response item fields:
-- `epic_key`
-- `title`
-- `status`
-- `progress_pct`
-- `progress_trend_7d` (percentage-point completion gain in the last 7 days)
-- `stories_total`
-- `stories_done`
-- `stories_in_progress`
-- `blocked_count`
-- `stale_days`
-
-Notes:
-- `owner` filters by assignee agent id found on stories in the epic.
-- `label` matches by label name attached to stories in the epic.
-- `text` performs partial match against epic `title` and `key`.
-
-#### `GET /v1/planning/epics/by-key/{key}` — Get epic by key
-
-Returns the same response as `GET .../epics/{id}`. Key lookup is case-insensitive.
-
-Returns `404` if no epic matches the key.
-
-#### `GET .../epics/{id}` — Get epic
-
-#### `PATCH .../epics/{id}` — Update epic
-
-Updatable: `title`, `description`, `status`, `status_override`, `is_blocked`, `blocked_reason`, `priority`, `metadata_json`.
-
-Setting `status` when `status_mode=DERIVED` sets `status_override` (temporary, clears on next child change).
-
-#### `POST /v1/planning/epics/{id}/status` — Quick action: change epic status
-
-Request:
-```jsonc
-{ "status": "IN_PROGRESS" } // TODO | IN_PROGRESS | DONE
-```
-
-Response `200`:
-```jsonc
-{
-  "data": {
-    "epic_id": "...",
-    "from_status": "TODO",
-    "to_status": "IN_PROGRESS",
-    "changed": true,
-    "actor_id": "agent-1",
-    "timestamp": "2026-03-07T...Z"
-  }
-}
-```
-
-Audit/event trail:
-- emits `epic.status.changed` with `actor_id`, `actor_type`, `timestamp`, and scope (`flow=epic_overview`, `project_id`, `epic_id`).
-
-#### `POST /v1/planning/epics/bulk/story-status` — Bulk update story status
+#### `POST /v1/planning/work-items` — Create work item
 
 Request:
 ```jsonc
 {
-  "story_ids": ["s1", "s2"],
-  "status": "DONE" // TODO | IN_PROGRESS | CODE_REVIEW | VERIFY | DONE
-}
-```
-
-Response `200` (per-record outcome):
-```jsonc
-{
-  "data": {
-    "operation": "BULK_UPDATE_STORY_STATUS",
-    "total": 2,
-    "succeeded": 1,
-    "failed": 1,
-    "results": [
-      { "entity_id": "s1", "success": true, "timestamp": "..." },
-      {
-        "entity_id": "s2",
-        "success": false,
-        "timestamp": "...",
-        "error_code": "NOT_FOUND",
-        "error_message": "Story s2 not found"
-      }
-    ]
-  }
-}
-```
-
-Audit/event trail:
-- each successful record emits `story.status.changed` with actor/timestamp/scope.
-
-#### `POST /v1/planning/epics/bulk/active-sprint/add` — Bulk add stories to active sprint
-
-Moves stories from product backlog to active sprint for a project.
-
-Query: `project_id` or `project_key` (required).
-
-Request:
-```jsonc
-{ "story_ids": ["s1", "s2"] }
-```
-
-Response `200` (per-record outcome): same bulk envelope as above, with `operation="ADD_TO_ACTIVE_SPRINT"`.
-
-Validation/error semantics:
-- Missing project selector → `400 VALIDATION_ERROR`
-- No active sprint for project (per record) → `error_code = "NO_ACTIVE_SPRINT"`
-- Other business/state issues are returned per record with explicit error code/message.
-
-Audit/event trail:
-- each successful record emits `story.sprint_membership.added` with actor/timestamp/scope.
-
-#### `POST /v1/planning/epics/bulk/active-sprint/remove` — Bulk remove stories from active sprint
-
-Moves stories from active sprint back to product backlog.
-
-Query: `project_id` or `project_key` (required).
-
-Request:
-```jsonc
-{ "story_ids": ["s1", "s2"] }
-```
-
-Response `200` (per-record outcome): same bulk envelope, with `operation="REMOVE_FROM_ACTIVE_SPRINT"`.
-
-Audit/event trail:
-- each successful record emits `story.sprint_membership.removed` with actor/timestamp/scope.
-
-#### `DELETE .../epics/{id}` — Delete epic
-
-Hard delete. Returns `204`.
-
----
-
-### 4.3) Stories
-
-**Base path:** `/v1/planning/stories`
-
-Stories can be project-less or project-scoped. Single flat collection, filtered by `project_id` and/or `epic_id`.
-
-#### `POST /v1/planning/stories` — Create story
-
-Request:
-```jsonc
-{
-  "project_id": "...",      // optional (null = project-less)
-  "epic_id": "...",         // optional
-  "title": "...",           // required
-  "intent": "...",          // optional
-  "description": "...",     // optional
-  "story_type": "feature",  // required
-  "priority": 1,            // optional
-  "current_assignee_agent_id": "..." // optional, null to unassign
+  "type": "STORY",            // required: EPIC | STORY | TASK | BUG
+  "project_id": "...",        // optional (null = project-less)
+  "parent_id": "...",         // optional (e.g. epic for story, story for task)
+  "title": "...",             // required
+  "sub_type": "USER_STORY",   // optional
+  "summary": "...",           // optional
+  "description": "...",       // optional
+  "priority": 1,              // optional
+  "estimate_points": 3.0,     // optional
+  "due_at": "2026-03-01T...", // optional
+  "current_assignee_agent_id": "..." // optional
 }
 ```
 
 `status` defaults to `TODO`. `key` auto-generated if `project_id` is set.
 
-Create response `meta` includes story progress counters when `story_id` is set:
-```jsonc
-{
-  "meta": {
-    "story_task_count": 3,
-    "story_done_task_count": 1
-  }
-}
-```
+#### `GET /v1/planning/work-items` — List work items
 
-Validation/conflict semantics:
-- `400 VALIDATION_ERROR` when `project_id` or `story_id` does not exist
-- `409 CONFLICT` when `project_id` conflicts with the story's project
-- When `story_id` is provided without `project_id`, project is inferred from the story
+Query: `type`, `project_id`, `project_key`, `parent_id`, `status`, `is_blocked`, `sub_type`, `current_assignee_agent_id`, `sort`, `limit`, `offset`.
 
-#### `GET /v1/planning/stories` — List stories
+`type` filter returns only items of that type (e.g. `?type=STORY`).
 
-Query: `project_id`, `project_key`, `epic_id`, `status`, `is_blocked`, `story_type`, `sort`, `limit`, `offset`.
+#### `GET /v1/planning/work-items/{id}` — Get work item
 
-`project_key` resolves a human-readable key (e.g. `MC`) to `project_id`. Takes precedence over `project_id` if both provided. Returns 404 if key not found. Case-insensitive.
+Includes: `children_count`, assignments.
 
-#### `GET /v1/planning/stories/by-key/{key}` — Get story by key
+#### `PATCH /v1/planning/work-items/{id}` — Update work item
 
-Returns the same response as `GET /v1/planning/stories/{id}`. Key lookup is case-insensitive.
-
-Returns `404` if no story matches the key.
-
-#### `GET /v1/planning/stories/{id}` — Get story
-
-Includes computed fields: `task_count`.
-
-#### `PATCH /v1/planning/stories/{id}` — Update story
-
-Updatable: `project_id`, `epic_id`, `title`, `intent`, `description`, `story_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `current_assignee_agent_id`, `metadata_json`.
-
-Side effects:
-- Setting `project_id` on a project-less story triggers key generation and removal from global backlog.
-
-#### `DELETE /v1/planning/stories/{id}` — Delete story
-
-Hard delete. Cascades to child tasks. Returns `204`.
-
----
-
-### 4.4) Tasks
-
-**Base path:** `/v1/planning/tasks`
-
-Tasks can be project-less or project-scoped, optionally linked to a story.
-
-#### `POST /v1/planning/tasks` — Create task
-
-Request:
-```jsonc
-{
-  "project_id": "...",         // optional
-  "story_id": "...",           // optional
-  "title": "...",              // required
-  "objective": "...",          // optional
-  "task_type": "coding",       // required
-  "priority": 1,               // optional
-  "estimate_points": 3.0,      // optional
-  "due_at": "2026-03-01T..."   // optional
-}
-```
-
-`status` defaults to `TODO`. `key` auto-generated if `project_id` is set.
-
-#### `GET /v1/planning/tasks` — List tasks
-
-Query: `project_id`, `project_key`, `story_id`, `status`, `is_blocked`, `task_type`, `current_assignee_agent_id`, `sort`, `limit`, `offset`.
-
-`project_key` — same behavior as stories (see above).
-
-#### `GET /v1/planning/tasks/by-key/{key}` — Get task by key
-
-Returns the same response as `GET /v1/planning/tasks/{id}`. Key lookup is case-insensitive.
-
-Returns `404` if no task matches the key.
-
-#### `GET /v1/planning/tasks/{id}` — Get task
-
-Includes: current assignment (if any), labels.
-Response `meta` includes story progress counters when the task belongs to a story.
-
-#### `PATCH /v1/planning/tasks/{id}` — Update task
-
-Updatable: `story_id`, `title`, `objective`, `task_type`, `status`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `current_assignee_agent_id`, `metadata_json`.
+Updatable: `title`, `summary`, `description`, `sub_type`, `status`, `parent_id`, `is_blocked`, `blocked_reason`, `priority`, `estimate_points`, `due_at`, `current_assignee_agent_id`, `metadata_json`.
 
 Side effects:
 - Status change to `DONE` auto-closes active assignment.
-- `completed_at` is set on transition to `DONE` and cleared on transition away from `DONE`.
-- `started_at` is set on first transition to `IN_PROGRESS`.
-- Unblocking (`is_blocked=false`) clears `blocked_reason`.
+- `completed_at` set on `DONE`, cleared on transition away.
+- `started_at` set on first `IN_PROGRESS`.
+- Unblocking clears `blocked_reason`.
 
-Validation/conflict semantics:
-- `400 BUSINESS_RULE_VIOLATION` when setting `blocked_reason` while `is_blocked` is false
-- `400 BUSINESS_RULE_VIOLATION` when moving a blocked task to `DONE`
-- `409 CONFLICT` when changing `story_id` to a story in a different project
+#### `DELETE /v1/planning/work-items/{id}` — Delete work item
 
-Update response `meta` includes story progress counters when the task belongs to a story.
+Hard delete. Cascades to children. Returns `204`.
+
+#### `POST /v1/planning/work-items/{id}/status` — Quick status change
+
+Request: `{ "status": "IN_PROGRESS" }`
+
+Response: `{ work_item_id, from_status, to_status, changed, actor_id, timestamp }`
+
+#### `POST /v1/planning/work-items/{id}/labels` — Attach label
+
+Request: `{ "label_id": "..." }`
+
+#### `DELETE /v1/planning/work-items/{id}/labels/{label_id}` — Detach label
+
+#### `POST /v1/planning/work-items/{id}/assignments` — Assign agent
+
+Request: `{ "agent_id": "...", "reason": "..." }`
+
+#### `DELETE /v1/planning/work-items/{id}/assignments/current` — Unassign
+
+#### `GET /v1/planning/work-items/{id}/assignments` — List assignment history
+
+#### `GET /v1/planning/work-items/overview` — Work item overview aggregate
+
+Query: `type=EPIC`, plus filters `project_id`, `project_key`, `status`, `owner`, `is_blocked`, `label`, `text`, `sort`, `limit`, `offset`.
+
+Response item fields: `work_item_key`, `title`, `type`, `status`, `progress_pct`, `progress_trend_7d`, `children_total`, `children_done`, `children_in_progress`, `blocked_count`, `stale_days`, `priority`, `updated_at`.
+
+#### `POST /v1/planning/work-items/bulk/status` — Bulk update status
+
+Request: `{ "work_item_ids": ["id1", "id2"], "status": "DONE" }`
+
+Response: per-record outcome with `operation`, `total`, `succeeded`, `failed`, `results[]`.
+
+#### `POST /v1/planning/work-items/bulk/active-sprint/add` — Bulk add to active sprint
+
+Query: `project_id` or `project_key` (required).
+
+Request: `{ "work_item_ids": ["id1", "id2"] }`
 
 #### Assignment change event ledger
 
-Story/task assignee changes persist a durable planning event in `activity_log`:
+Work item assignee changes persist a durable planning event in `activity_log`:
 - `event_name`: `planning.assignment.changed`
-- `entity_type`: `story` or `task`
-- `metadata_json` payload contract:
-  - `work_item_key`
-  - `assignee_agent` (`{"id": "<agent_id>"}` or `null`)
-  - `previous_assignee` (`{"id": "<agent_id>"}` or `null`)
-  - `correlation_id`
-  - `causation_id`
-  - `timestamp`
-
-No event is emitted when assignee value is unchanged (semantic no-op). Event persistence is transactional with the source assignee state change.
-
-#### `DELETE /v1/planning/tasks/{id}` — Delete task
-
-Hard delete. Returns `204`.
+- `entity_type`: `work_item`
+- `metadata_json` payload: `work_item_key`, `assignee_agent`, `previous_assignee`, `correlation_id`, `causation_id`, `timestamp`.
 
 ---
 
-### 4.5) Backlogs
+### 4.3) Backlogs
 
 **Base path:** `/v1/planning/backlogs`
 
@@ -505,7 +290,7 @@ Request:
   "project_id": "...",     // optional (null = global)
   "name": "Sprint 1",     // required
   "kind": "SPRINT",       // required: BACKLOG | SPRINT | IDEAS
-  "display_order": 200,    // optional, integer >= 0
+  "rank": "aaa",            // optional, LexoRank string
   "goal": "...",           // optional
   "start_date": "...",     // optional
   "end_date": "..."        // optional
@@ -515,7 +300,7 @@ Request:
 `status` defaults to:
 - `ACTIVE` for `BACKLOG` and `IDEAS`,
 - `OPEN` for `SPRINT` (activate explicitly via `POST /backlogs/{id}/start`).
-`display_order` defaults to next free order bucket for the same scope (`project_id` or global).
+`rank` defaults to a LexoRank value placing it after existing items in the same scope.
 
 #### `GET /v1/planning/backlogs` — List backlogs
 
@@ -525,7 +310,7 @@ Use `project_id=null` to list global backlogs. `project_key` — same behavior a
 Default order when `sort` is omitted:
 - active sprint first (`kind=SPRINT` and `status=ACTIVE`)
 - default backlog last (`is_default=true`)
-- remaining backlogs by `display_order ASC` (then `created_at ASC`)
+- remaining backlogs by `rank ASC` (then `created_at ASC`)
 
 Pinned ordering rules are always applied (active sprint first, default backlog last), even when `sort` is provided.
 
@@ -566,9 +351,14 @@ Uniqueness constraints (project scope):
 
 #### `POST /v1/planning/backlogs/{id}/complete` — Complete sprint
 
-Transitions an active sprint backlog to `CLOSED`.
+Transitions an active sprint backlog to `CLOSED`. Non-DONE items are moved to the target backlog.
 
 Query: optional `project_id` or `project_key` for project-scope validation.
+
+Request:
+```jsonc
+{ "target_backlog_id": "..." } // required: where to move non-DONE items
+```
 
 Response `200`:
 ```jsonc
@@ -578,18 +368,18 @@ Response `200`:
     "transition": "COMPLETE_SPRINT",
     "from_status": "ACTIVE",
     "to_status": "CLOSED",
-    "story_count": 3,
-    "done_story_count": 3,
-    "unfinished_story_count": 0,
+    "item_count": 3,
+    "done_item_count": 1,
+    "moved_item_count": 2,
     "active_sprint_id": null
   }
 }
 ```
 
 Guardrails:
-- `400 BUSINESS_RULE_VIOLATION` when sprint contains unfinished stories (`status != DONE`)
 - `400 BUSINESS_RULE_VIOLATION` when sprint is not active
-- `400 VALIDATION_ERROR` on project-scope mismatch (`project_id`/`project_key`)
+- `400 VALIDATION_ERROR` when `target_backlog_id` is missing or invalid
+- `400 VALIDATION_ERROR` on project-scope mismatch
 
 #### `POST /v1/planning/backlogs/{id}/transition-kind` — Transition backlog kind
 
@@ -627,7 +417,7 @@ Guardrails:
 
 #### `PATCH /v1/planning/backlogs/{id}` — Update backlog
 
-Updatable: `name`, `display_order`, `goal`, `start_date`, `end_date`, `metadata_json`.
+Updatable: `name`, `rank`, `goal`, `start_date`, `end_date`, `metadata_json`.
 
 `status` is lifecycle-managed and cannot be changed via generic `PATCH`.
 Use:
@@ -638,120 +428,64 @@ Use:
 
 Hard delete. Items in the backlog are detached (not deleted). Returns `204`.
 
-#### `POST /v1/planning/backlogs/{id}/stories` — Add story to backlog
+#### `POST /v1/planning/backlogs/{id}/items` — Add work item to backlog
 
 ```jsonc
-{ "story_id": "...", "position": 0 }
+{ "work_item_id": "...", "rank": "aaa" } // rank is optional
 ```
 
-Enforces: story can be in max one backlog. Global backlog only accepts project-less stories.
+Enforces: work item can be in max one backlog. Global backlog only accepts project-less items.
 Returns `200`.
 
-#### `DELETE /v1/planning/backlogs/{id}/stories/{story_id}` — Remove story from backlog
+#### `DELETE /v1/planning/backlogs/{id}/items/{work_item_id}` — Remove work item from backlog
 
 Returns `204`.
 
-#### `POST /v1/planning/backlogs/{id}/tasks` — Add task to backlog
+#### `PATCH /v1/planning/backlogs/{id}/items/{work_item_id}/rank` — Update item rank
 
 ```jsonc
-{ "task_id": "...", "position": 0 }
-```
-
-Same constraints as stories. Returns `200`.
-
-#### `DELETE /v1/planning/backlogs/{id}/tasks/{task_id}` — Remove task from backlog
-
-Returns `204`.
-
-#### `PATCH /v1/planning/backlogs/{id}/reorder` — Reorder items
-
-```jsonc
-{
-  "stories": [{"story_id": "...", "position": 0}, ...],
-  "tasks": [{"task_id": "...", "position": 1}, ...]
-}
+{ "rank": "aab" }
 ```
 
 Returns `200`.
 
-#### `GET /v1/planning/backlogs/{id}/stories` — List stories in a backlog
+#### `GET /v1/planning/backlogs/{id}/items` — List items in a backlog
 
-Returns stories belonging to the given backlog, ordered by `position ASC`.
-Story objects match the active sprint story shape (`id`, `key`, `title`, `status`, `priority`, `story_type`, `position`, `task_count`, `done_task_count`, `assignee_agent_id`, `assignee_name`, `assignee_last_name`, `assignee_initials`, `assignee_avatar`, `labels`, `label_ids`).
-
-Response `200`:
-```jsonc
-{
-  "data": [
-    {
-      "id": "...",
-      "key": "MC-42",
-      "title": "Implement board view",
-      "status": "IN_PROGRESS",
-      "priority": 1,
-      "story_type": "feature",
-      "position": 0,
-      "task_count": 3,
-      "done_task_count": 1,
-      "assignee_agent_id": "a1",
-      "assignee_name": "Agent",
-      "assignee_last_name": "Alpha",
-      "assignee_initials": "AA",
-      "assignee_avatar": "https://cdn.example.com/agent-1.png",
-      "labels": [
-        { "id": "...", "name": "bug", "color": "#ff0000" }
-      ],
-      "label_ids": ["..."]
-    }
-  ]
-}
-```
+Returns work items belonging to the given backlog, ordered by `rank ASC`.
 
 Returns `404` if backlog does not exist.
-Returns empty list when backlog has no stories.
+Returns empty list when backlog has no items.
 
 #### `GET /v1/planning/backlogs/active-sprint` — Get active sprint board
 
-Returns the first active sprint (`kind=SPRINT`, `status=ACTIVE`) for a project, including its stories ordered by backlog position.
+Returns the first active sprint (`kind=SPRINT`, `status=ACTIVE`) for a project, including its items ordered by rank.
 
-Query: `project_id` or `project_key` (at least one required). `project_key` resolves to `project_id` (case-insensitive).
+Query: `project_id` or `project_key` (at least one required).
 
 Response `200`:
 ```jsonc
 {
   "data": {
-    "backlog": {
-      "id": "...",
-      "project_id": "...",
-      "name": "Sprint 1",
-      "kind": "SPRINT",
-      "status": "ACTIVE",
-      "display_order": 100,
-      "is_default": false,
-      "goal": "Ship MVP",
-      "start_date": "2026-03-01",
-      "end_date": "2026-03-15",
-      // ... standard backlog fields
-    },
-    "stories": [
+    "backlog": { "id": "...", "rank": "aaa", "is_default": false, ... },
+    "items": [
       {
         "id": "...",
         "key": "MC-42",
         "title": "Implement board view",
+        "type": "STORY",
+        "sub_type": "USER_STORY",
         "status": "IN_PROGRESS",
         "priority": 1,
-        "story_type": "feature",
-        "position": 0,
-        "task_count": 3,
-        "done_task_count": 1,
+        "parent_id": null,
+        "rank": "aaa",
+        "children_count": 3,
+        "done_children_count": 1,
         "assignee_agent_id": "a1",
         "assignee_name": "Agent",
         "assignee_last_name": "Alpha",
         "assignee_initials": "AA",
         "assignee_avatar": "https://cdn.example.com/agent-1.png",
-        "labels": [
-          { "id": "...", "name": "bug", "color": "#ff0000" }
-        ],
+        "labels": [{ "id": "...", "name": "bug", "color": "#ff0000" }],
         "label_ids": ["..."]
       }
     ]
@@ -760,73 +494,39 @@ Response `200`:
 ```
 
 Returns `404` if no active sprint exists for the given project.
-Returns `422` if `project_id` is missing.
 
-#### `POST /v1/planning/backlogs/active-sprint/stories` — Add story to active sprint
+#### `POST /v1/planning/backlogs/active-sprint/items` — Add work item to active sprint
 
-Moves a story from the project's product backlog (`kind=BACKLOG`) to the active sprint.
-Operation is idempotent when the story is already in the active sprint.
+Moves a work item from the project's product backlog to the active sprint.
 
 Query: `project_id` or `project_key` (at least one required).
 
 Request:
 ```jsonc
-{
-  "story_id": "...",
-  "position": 0 // optional; defaults to first free position in sprint
-}
+{ "work_item_id": "..." }
 ```
 
 Response `200`:
 ```jsonc
 {
   "data": {
-    "story_id": "...",
-    "project_id": "...",
+    "work_item_id": "...",
     "source_backlog_id": "...",
     "target_backlog_id": "...",
-    "source_position": 1,
-    "target_position": 0,
     "moved": true
   }
 }
 ```
 
-Error behavior:
-- `404 NOT_FOUND` when active sprint or story does not exist
-- `400 BUSINESS_RULE_VIOLATION` when story is not in product backlog for the project
-- `400 VALIDATION_ERROR` when project selector is missing
+#### `DELETE /v1/planning/backlogs/active-sprint/items/{work_item_id}` — Remove work item from active sprint
 
-#### `DELETE /v1/planning/backlogs/active-sprint/stories/{story_id}` — Remove story from active sprint
+Moves a work item from active sprint back to product backlog.
 
-Moves a story from active sprint back to product backlog.
-Operation is idempotent when the story is already in product backlog.
-
-Query: `project_id` or `project_key` (at least one required), `position` (optional target position in product backlog).
-
-Response `200`:
-```jsonc
-{
-  "data": {
-    "story_id": "...",
-    "project_id": "...",
-    "source_backlog_id": "...",
-    "target_backlog_id": "...",
-    "source_position": 0,
-    "target_position": 2,
-    "moved": true
-  }
-}
-```
-
-Error behavior:
-- `404 NOT_FOUND` when active sprint or story does not exist
-- `400 BUSINESS_RULE_VIOLATION` when story is not in active sprint for the project
-- `400 VALIDATION_ERROR` when project selector is missing
+Query: `project_id` or `project_key` (at least one required).
 
 ---
 
-### 4.6) Agents
+### 4.4) Agents
 
 **Base path:** `/v1/planning/agents`
 
@@ -884,32 +584,7 @@ Behavior:
 
 ---
 
-### 4.7) Assignments
-
-**Base path:** `/v1/planning/tasks/{task_id}/assignments`
-
-#### `POST .../assignments` — Assign agent to task
-
-```jsonc
-{
-  "agent_id": "...",       // required
-  "reason": "..."          // optional
-}
-```
-
-Auto-closes any existing active assignment on this task (handoff). Returns `201`.
-
-#### `GET .../assignments` — List assignment history
-
-Returns all assignments (active + past) for this task, ordered by `assigned_at` desc.
-
-#### `DELETE .../assignments/current` — Unassign current agent
-
-Sets `unassigned_at` on active assignment. Returns `204`. Returns `404` if no active assignment.
-
----
-
-### 4.8) Labels
+### 4.5) Labels
 
 **Base path:** `/v1/planning/labels`
 
@@ -953,42 +628,11 @@ Errors:
 
 Hard delete. Removes from all story/task associations. Returns `204`.
 
-#### `POST /v1/planning/stories/{id}/labels` — Attach label to story
+Label attachment to work items is managed via the work items endpoints:
+- `POST /v1/planning/work-items/{id}/labels` — Attach label
+- `DELETE /v1/planning/work-items/{id}/labels/{label_id}` — Detach label
 
-```jsonc
-{ "label_id": "..." }
-```
-
-Response `201`:
-```jsonc
-{
-  "data": {
-    "story_id": "...",
-    "label_id": "..."
-  }
-}
-```
-
-Errors:
-- `404 NOT_FOUND` when story does not exist
-- `400 VALIDATION_ERROR` when label does not exist
-- `409 CONFLICT` when label is already attached
-
-#### `DELETE /v1/planning/stories/{id}/labels/{label_id}` — Detach label from story
-
-Returns `204`.
-
-Errors:
-- `404 NOT_FOUND` when story does not exist
-- `404 NOT_FOUND` when label is not attached to the story
-
-#### `POST /v1/planning/tasks/{id}/labels` — Attach label to task
-
-```jsonc
-{ "label_id": "..." }
-```
-
-#### `DELETE /v1/planning/tasks/{id}/labels/{label_id}` — Detach label from task
+See section 4.2 Work Items for details.
 
 ---
 

@@ -127,14 +127,14 @@ export async function fetchOverview(
   overviewParams.set("limit", "100");
   overviewParams.set("sort", filters.sort);
 
-  if (filters.search.trim().length > 0) overviewParams.set("text", filters.search.trim());
+  if (filters.search.trim().length > 0) overviewParams.set("text_search", filters.search.trim());
   if (filters.status.length > 0) overviewParams.set("status", filters.status);
-  if (filters.ownerId.length > 0) overviewParams.set("owner", filters.ownerId);
+  if (filters.ownerId.length > 0) overviewParams.set("assignee_id", filters.ownerId);
   if (filters.label.trim().length > 0) overviewParams.set("label", filters.label.trim());
   if (filters.blocked.length > 0) overviewParams.set("is_blocked", filters.blocked);
 
   const [overviewRes, agentsRes, labelsRes] = await Promise.all([
-    fetch(apiUrl(`/v1/planning/epics/overview?${overviewParams.toString()}`)),
+    fetch(apiUrl(`/v1/planning/work-items/overview?type=EPIC&${overviewParams.toString()}`)),
     fetch(apiUrl("/v1/planning/agents?is_active=true&limit=100&sort=name")),
     fetch(apiUrl(`/v1/planning/labels?project_id=${projectId}&limit=100&sort=name`)),
   ]);
@@ -175,17 +175,28 @@ export async function fetchStoriesPreview(
   projectId: string | null,
   agentLabelById: Map<string, string>,
 ): Promise<EpicOverviewStoryPreview[]> {
+  // Resolve epic key to ID via the by-key endpoint
+  const epicRes = await fetch(apiUrl(`/v1/planning/work-items/by-key/${epicKey}`));
+  if (!epicRes.ok) {
+    throw new Error(`Failed to resolve epic key. HTTP ${epicRes.status}.`);
+  }
+  const epicData = (await epicRes.json()) as { id?: string };
+  const epicId = epicData.id;
+  if (!epicId) {
+    throw new Error(`Epic key "${epicKey}" resolved but has no id.`);
+  }
+
   const params = new URLSearchParams();
   if (projectId) {
     params.set("project_id", projectId);
   }
-  params.set("epic_key", epicKey);
+  params.set("parent_id", epicId);
   params.set("sort", "-updated_at");
   params.set("limit", "100");
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 15000);
-  const response = await fetch(apiUrl(`/v1/planning/stories?${params.toString()}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/?type=STORY&${params.toString()}`), {
     signal: controller.signal,
   }).finally(() => {
     window.clearTimeout(timeoutId);
@@ -204,8 +215,8 @@ export async function fetchStoriesPreview(
     if (!id || !title || !status) return [];
     const assigneeId = row.current_assignee_agent_id ?? null;
     return [{
-      story_id: id,
-      story_key: row.key ?? null,
+      work_item_id: id,
+      work_item_key: row.key ?? null,
       title,
       status,
       current_assignee_agent_id: assigneeId,
@@ -222,11 +233,11 @@ export async function changeStoryStatus(
   storyId: string,
   nextStatus: WorkItemStatus,
 ): Promise<{ timestamp: string | null }> {
-  const response = await fetch(apiUrl("/v1/planning/epics/bulk/story-status"), {
+  const response = await fetch(apiUrl("/v1/planning/work-items/bulk/status"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      story_ids: [storyId],
+      work_item_ids: [storyId],
       status: nextStatus,
     }),
   });
@@ -251,11 +262,11 @@ export async function addStoryToSprint(
   projectId: string,
 ): Promise<{ timestamp: string | null }> {
   const response = await fetch(
-    apiUrl(`/v1/planning/epics/bulk/active-sprint/add?project_id=${projectId}`),
+    apiUrl(`/v1/planning/work-items/bulk/active-sprint/add?project_id=${projectId}`),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story_ids: [storyId] }),
+      body: JSON.stringify({ work_item_ids: [storyId] }),
     },
   );
 

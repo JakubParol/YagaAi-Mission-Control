@@ -19,7 +19,7 @@ function normalizePercent(value: number): number {
 
 function matchesSearch(item: EpicOverviewItem, query: string): boolean {
   if (query.length === 0) return true;
-  return item.epic_key.toLowerCase().includes(query) || item.title.toLowerCase().includes(query);
+  return item.work_item_key.toLowerCase().includes(query) || item.title.toLowerCase().includes(query);
 }
 
 function matchesStatus(item: EpicOverviewItem, status: EpicOverviewFilters["status"]): boolean {
@@ -116,7 +116,7 @@ export function toPercentLabel(value: number): string {
 }
 
 export function toStoriesLabel(item: EpicOverviewItem): string {
-  return `${item.stories_done}/${item.stories_total} done · ${item.stories_in_progress} in progress`;
+  return `${item.children_done}/${item.children_total} done · ${item.children_in_progress} in progress`;
 }
 
 export function getEpicOverviewStoriesPreview(
@@ -139,7 +139,7 @@ export function getEpicOverviewStoriesPreviewOverflow(
 }
 
 export function toStoryPreviewTitle(story: EpicOverviewStoryPreview): string {
-  return story.story_key ? `${story.story_key} ${story.title}` : story.title;
+  return story.work_item_key ? `${story.work_item_key} ${story.title}` : story.title;
 }
 
 export function toStoryPreviewAssignee(story: EpicOverviewStoryPreview): string {

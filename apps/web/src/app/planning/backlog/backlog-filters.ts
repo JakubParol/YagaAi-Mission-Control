@@ -4,7 +4,7 @@ export interface BacklogFilterItem {
   id: string;
   kind: BacklogKind;
   status: BacklogStatus;
-  display_order?: number;
+  rank?: string;
   is_default?: boolean;
   created_at?: string;
 }
@@ -23,17 +23,17 @@ function backlogSortPriority(backlog: BacklogFilterItem): number {
   return 1;
 }
 
-function compareNullableNumber(a: number | undefined, b: number | undefined): number {
+function compareNullableString(a: string | undefined, b: string | undefined): number {
   if (a === b) return 0;
   if (a === undefined) return 1;
   if (b === undefined) return -1;
-  return a - b;
+  return a.localeCompare(b);
 }
 
 /**
  * Planning backlog ordering contract:
  * 1) ACTIVE sprint on top
- * 2) non-default backlogs/sprints in the middle by display_order
+ * 2) non-default backlogs/sprints in the middle by rank
  * 3) default backlog pinned to the very bottom
  */
 export function sortBacklogsForPlanning<T extends BacklogFilterItem>(backlogs: readonly T[]): T[] {
@@ -41,7 +41,7 @@ export function sortBacklogsForPlanning<T extends BacklogFilterItem>(backlogs: r
     const priorityDelta = backlogSortPriority(left) - backlogSortPriority(right);
     if (priorityDelta !== 0) return priorityDelta;
 
-    const displayOrderDelta = compareNullableNumber(left.display_order, right.display_order);
+    const displayOrderDelta = compareNullableString(left.rank, right.rank);
     if (displayOrderDelta !== 0) return displayOrderDelta;
 
     const createdAtDelta = (left.created_at ?? "").localeCompare(right.created_at ?? "");

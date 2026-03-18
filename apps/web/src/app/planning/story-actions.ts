@@ -47,7 +47,7 @@ export async function toStoryDeleteErrorMessage(response: Response): Promise<str
 }
 
 export async function deleteStory(storyId: string): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${storyId}`), {
     method: "DELETE",
   });
 

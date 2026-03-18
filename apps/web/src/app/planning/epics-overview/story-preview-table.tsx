@@ -83,15 +83,15 @@ export function StoryPreviewTable({
           </div>
           <div className="divide-y divide-border/20">
             {stories.map((story) => {
-              const pending = Boolean(storyPendingById[story.story_id]);
+              const pending = Boolean(storyPendingById[story.work_item_id]);
 
               return (
                 <div
-                  key={story.story_id}
+                  key={story.work_item_id}
                   className="grid grid-cols-[120px_minmax(0,1fr)_130px_140px_110px_150px_260px] gap-2 px-2 py-2"
                 >
                   <span className="truncate font-mono text-[11px] text-muted-foreground">
-                    {story.story_key ?? "\u2014"}
+                    {story.work_item_key ?? "\u2014"}
                   </span>
 
                   <span className="truncate text-xs text-foreground" title={toStoryPreviewTitle(story)}>
@@ -114,7 +114,7 @@ export function StoryPreviewTable({
 
                   <div className="flex items-center gap-1.5">
                     <Link
-                      href={`/planning/stories/${story.story_id}`}
+                      href={`/planning/stories/${story.work_item_id}`}
                       className="inline-flex h-7 items-center gap-1 rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border"
                     >
                       Details

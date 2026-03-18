@@ -80,10 +80,18 @@ export async function startSprint(projectId: string, backlogId: string): Promise
   await assertSprintLifecycleResponse(response, "start");
 }
 
-export async function completeSprint(projectId: string, backlogId: string): Promise<void> {
+export async function completeSprint(
+  projectId: string,
+  backlogId: string,
+  targetBacklogId: string,
+): Promise<void> {
   const response = await fetch(
     apiUrl(`/v1/planning/backlogs/${backlogId}/complete?project_id=${projectId}`),
-    { method: "POST" },
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target_backlog_id: targetBacklogId }),
+    },
   );
 
   await assertSprintLifecycleResponse(response, "complete");

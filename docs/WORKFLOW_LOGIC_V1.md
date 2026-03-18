@@ -1,7 +1,7 @@
-# Workflow Logic — Mission Control (v1 agreed rules)
+# Workflow Logic — Mission Control (v2 — WorkItem model)
 
-**Status:** Draft v1.1 (agreed + defaulted decisions)  
-**Date:** 2026-02-26  
+**Status:** Active v2.0
+**Date:** 2026-03-18
 **Scope:** Planning module — application/runtime behavior (entity schema is in `ENTITY_MODEL_V1.md`)
 
 ## Purpose
@@ -12,13 +12,13 @@ This document defines how the app should behave on top of the v1 entity model.
 
 ## 1) Project + Backlog Scope
 
-1. Stories/tasks may exist without project (`project_id = NULL`) permanently.
+1. Work items may exist without project (`project_id = NULL`) permanently.
 2. A project can have multiple backlogs.
 3. Global backlog (`project_id = NULL`) is for project-less ideas.
 4. Global backlog accepts only project-less items.
 5. If a project-less item gets assigned to a project, it is auto-removed from global backlog.
-6. Story/task can be in max one backlog at a time.
-7. Story/task can also be in no backlog.
+6. A work item can be in max one backlog at a time.
+7. A work item can also be in no backlog.
 8. On project creation, create one default backlog automatically.
 
 ---
@@ -27,28 +27,20 @@ This document defines how the app should behave on top of the v1 entity model.
 
 ### Allowed status values
 
-- For tasks/stories: `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE`
-- For epics: `TODO`, `IN_PROGRESS`, `DONE`
+- For all work items: `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE`
 - For backlogs: `OPEN`, `ACTIVE`, `CLOSED`
 
-### Task behavior
+### Work item behavior
 
-- Transitions are permissive in v1 (no strict transition graph yet).
+- Transitions are permissive (no strict transition graph).
+- New work items start as `TODO`.
+- Status is set directly via PATCH.
 
-### Story behavior
+### Epic-type derived status
 
-- New story starts as `TODO`.
-- Story status is always set directly via PATCH — never derived from child tasks.
-
-### Epic behavior
-
-- If epic has no stories: starts manual in `TODO`.
-- If epic has stories: status derived from stories, with manual override allowed.
-
-### Override behavior (Epics only)
-
-- Manual override on epics is temporary.
-- Epic override expires on next child story status change.
+- If epic has no children: stays manual in `TODO`.
+- If epic has children: status derived from children, with manual override allowed.
+- Manual override on epics is temporary; expires on next child status change.
 
 ### Backlog behavior
 
@@ -57,10 +49,10 @@ This document defines how the app should behave on top of the v1 entity model.
 - Backlog list ordering is deterministic:
   - active sprint is always first,
   - default backlog is always last,
-  - remaining backlogs are ordered by `display_order` (ascending).
+  - remaining backlogs are ordered by `rank` (LexoRank, ascending).
 - Sprint lifecycle transitions are explicit:
   - `POST /backlogs/{id}/start` (non-active sprint -> `ACTIVE`)
-  - `POST /backlogs/{id}/complete` (`ACTIVE` sprint -> `CLOSED`)
+  - `POST /backlogs/{id}/complete` (`ACTIVE` sprint -> `CLOSED`, body requires `target_backlog_id` for non-DONE items)
 - Backlog kind transition uses dedicated path (`/backlogs/{id}/transition-kind`) with guardrails.
 - Transitioning to `SPRINT` forces backlog status to `OPEN`; activation must happen explicitly via `start`.
 - A project can have at most one active sprint and at most one default backlog.
@@ -70,27 +62,25 @@ This document defines how the app should behave on top of the v1 entity model.
 ## 3) Blocking Rules (`is_blocked`)
 
 1. `is_blocked` is separate from status.
-2. Propagation rule: if any child is blocked, parent is blocked.
-   - task blocked => story blocked
-   - story blocked => epic blocked
+2. Propagation rule: if any child is blocked, parent is blocked (via `parent_id` hierarchy).
 3. No manual override for parent `is_blocked`.
 
 ---
 
 ## 4) Assignment Rules
 
-1. One active assignee per task at a time.
+1. One active assignee per work item at a time.
 2. Handoff between agents is manual.
-3. On task `DONE`, active assignment is auto-closed (`unassigned_at` set).
+3. On work item `DONE`, active assignment is auto-closed (`unassigned_at` set).
 4. Keep full assignment history.
 
 ---
 
 ## 5) Key Generation Rules
 
-1. Story/task/epic use UUID as primary id + optional human key.
+1. Work items use UUID as primary id + optional human key.
 2. Human key numbering is shared per project (single project counter).
-3. Project-less stories/tasks keep `key = NULL`.
+3. Project-less work items keep `key = NULL`.
 
 ---
 
@@ -98,16 +88,16 @@ This document defines how the app should behave on top of the v1 entity model.
 
 ### Labels
 - Labels exist globally or per project.
-- In v1 labels attach only to stories and tasks.
+- Labels attach to work items of any type.
 
 ### Comments
-- Generic comment target: `project/backlog/epic/story/task`.
+- Generic comment target: `project/backlog/work_item`.
 - Flat comments (no threading).
 - Editable (`edited_at`, `edited_by`).
 - Hard delete.
 
 ### Attachments
-- Generic attachment target: `project/backlog/epic/story/task`.
+- Generic attachment target: `project/backlog/work_item`.
 - One attachment belongs to one entity.
 - Store metadata + path/url only (no binary blob in DB).
 

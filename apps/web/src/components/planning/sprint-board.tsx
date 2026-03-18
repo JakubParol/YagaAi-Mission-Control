@@ -20,7 +20,7 @@ export interface SprintBacklog {
 
 export interface ActiveSprintData {
   backlog: SprintBacklog;
-  stories: StoryCardStory[];
+  items: StoryCardStory[];
 }
 
 // ─── Column config ──────────────────────────────────────────────────
@@ -72,7 +72,7 @@ export function SprintBoard({
   const pendingSet = useMemo(() => new Set(pendingStoryIds ?? []), [pendingStoryIds]);
 
   const handleStoryAssigneeChange = (storyId: string, assignee: StoryAssigneeSelection) => {
-    const story = data.stories.find((item) => item.id === storyId);
+    const story = data.items.find((item) => item.id === storyId);
     const previousAssignee = assigneeOverrides[storyId] ?? {
       assignee_agent_id: story?.assignee_agent_id ?? null,
       assignee_name: story?.assignee_name ?? null,
@@ -94,14 +94,14 @@ export function SprintBoard({
     for (const col of COLUMNS) {
       grouped.set(col.status, []);
     }
-    for (const story of data.stories) {
+    for (const story of data.items) {
       const bucket = grouped.get(story.status);
       if (bucket) {
         bucket.push(story);
       }
     }
     return grouped;
-  }, [data.stories]);
+  }, [data.items]);
 
   const handleCardDragStart = (storyId: string) => {
     setDraggingStoryId(storyId);
@@ -131,7 +131,7 @@ export function SprintBoard({
       return;
     }
 
-    const draggedStory = data.stories.find((story) => story.id === draggedStoryId);
+    const draggedStory = data.items.find((story) => story.id === draggedStoryId);
     if (!draggedStory || draggedStory.status === status) {
       return;
     }

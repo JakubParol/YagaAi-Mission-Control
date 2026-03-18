@@ -108,14 +108,14 @@ export function EpicRow({
       <div className="grid grid-cols-[40px_120px_minmax(0,1fr)_90px_160px_130px_90px] gap-2">
         <button
           type="button"
-          aria-label={isExpanded ? `Collapse ${item.epic_key}` : `Expand ${item.epic_key}`}
-          onClick={() => onToggleExpand(item.epic_key)}
+          aria-label={isExpanded ? `Collapse ${item.work_item_key}` : `Expand ${item.work_item_key}`}
+          onClick={() => onToggleExpand(item.work_item_key)}
           className="inline-flex size-7 items-center justify-center rounded border border-border/60 text-muted-foreground transition-colors hover:border-border hover:text-foreground"
         >
           {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         </button>
 
-        <p className="pt-1 font-mono text-xs text-muted-foreground">{item.epic_key}</p>
+        <p className="pt-1 font-mono text-xs text-muted-foreground">{item.work_item_key}</p>
         <p className="truncate pt-1 text-sm text-foreground" title={item.title}>{item.title}</p>
 
         <Badge variant={statusVariant(item.status)} className="h-fit w-fit text-[11px]">
@@ -153,7 +153,7 @@ export function EpicRow({
               value={previewFilters.status}
               options={PREVIEW_STATUS_OPTIONS}
               placeholder="Story status"
-              onValueChange={(value) => onPreviewFilterChange(item.epic_key, {
+              onValueChange={(value) => onPreviewFilterChange(item.work_item_key, {
                 status: value as WorkItemStatus | "",
               })}
               triggerClassName="h-8 min-w-[170px] bg-background/80 text-xs"
@@ -163,7 +163,7 @@ export function EpicRow({
               value={previewFilters.blocked}
               options={PREVIEW_BLOCKED_OPTIONS}
               placeholder="Blocked"
-              onValueChange={(value) => onPreviewFilterChange(item.epic_key, {
+              onValueChange={(value) => onPreviewFilterChange(item.work_item_key, {
                 blocked: value as "" | "true" | "false",
               })}
               triggerClassName="h-8 min-w-[160px] bg-background/80 text-xs"
@@ -198,7 +198,7 @@ export function EpicRow({
             ) : (
               <StoryPreviewTable
                 stories={stories}
-                epicKey={item.epic_key}
+                epicKey={item.work_item_key}
                 storyPendingById={storyPendingById}
                 onChangeStoryStatus={onChangeStoryStatus}
                 onAddStoryToSprint={onAddStoryToSprint}

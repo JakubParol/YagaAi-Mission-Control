@@ -14,11 +14,11 @@ export interface PlanningListLabel {
 
 export interface PlanningStoryApiItem {
   id: string;
-  epic_id: string | null;
+  parent_id: string | null;
   current_assignee_agent_id: string | null;
   key: string | null;
   title: string;
-  story_type: string;
+  sub_type: string;
   status: WorkItemStatus;
   priority: number | null;
   updated_at: string;
@@ -28,24 +28,24 @@ export interface PlanningBacklogStoryApiItem {
   id: string;
   key: string | null;
   title: string;
-  story_type: string;
+  sub_type: string;
   status: WorkItemStatus;
   priority: number | null;
-  epic_key: string | null;
-  epic_title: string | null;
-  task_count?: number;
-  done_task_count?: number;
+  parent_key: string | null;
+  parent_title: string | null;
+  children_count?: number;
+  done_children_count?: number;
   labels: PlanningListLabel[];
 }
 
 export interface PlanningTaskApiItem {
   id: string;
-  story_id: string | null;
+  parent_id: string | null;
   current_assignee_agent_id: string | null;
   key: string | null;
   title: string;
-  objective: string | null;
-  task_type: string;
+  summary: string | null;
+  sub_type: string;
   status: WorkItemStatus;
   priority: number | null;
   updated_at: string;
@@ -64,17 +64,17 @@ export interface PlanningListRow {
   title: string;
   status: WorkItemStatus;
   priority: number | null;
-  epic_id: string | null;
-  epic_key: string | null;
-  epic_title: string | null;
+  parent_id: string | null;
+  parent_key: string | null;
+  parent_title: string | null;
   labels: PlanningListLabel[];
   current_assignee_agent_id: string | null;
   updated_at: string;
-  story_type: string | null;
-  task_type: string | null;
-  objective: string | null;
-  task_count: number;
-  done_task_count: number;
+  type: string;
+  sub_type: string | null;
+  summary: string | null;
+  children_count: number;
+  done_children_count: number;
 }
 
 function asTimestamp(value: string): number {
@@ -93,21 +93,21 @@ function toStoryRows(
   const progressByStoryId = new Map<string, { total: number; done: number }>();
 
   for (const task of allTasks) {
-    if (!task.story_id) continue;
-    const current = progressByStoryId.get(task.story_id) ?? { total: 0, done: 0 };
+    if (!task.parent_id) continue;
+    const current = progressByStoryId.get(task.parent_id) ?? { total: 0, done: 0 };
     current.total += 1;
     if (task.status === "DONE") {
       current.done += 1;
     }
-    progressByStoryId.set(task.story_id, current);
+    progressByStoryId.set(task.parent_id, current);
   }
 
   return stories.map((story) => {
     const backlogStory = backlogById.get(story.id);
-    const epic = story.epic_id ? epicById.get(story.epic_id) : undefined;
+    const epic = story.parent_id ? epicById.get(story.parent_id) : undefined;
     const progress = progressByStoryId.get(story.id);
-    const taskCount = backlogStory?.task_count ?? progress?.total ?? 0;
-    const doneTaskCount = backlogStory?.done_task_count ?? progress?.done ?? 0;
+    const taskCount = backlogStory?.children_count ?? progress?.total ?? 0;
+    const doneTaskCount = backlogStory?.done_children_count ?? progress?.done ?? 0;
 
     return {
       row_type: "story",
@@ -116,24 +116,24 @@ function toStoryRows(
       title: story.title,
       status: story.status,
       priority: story.priority,
-      epic_id: story.epic_id,
-      epic_key: backlogStory?.epic_key ?? epic?.key ?? null,
-      epic_title: backlogStory?.epic_title ?? epic?.title ?? null,
+      parent_id: story.parent_id,
+      parent_key: backlogStory?.parent_key ?? epic?.key ?? null,
+      parent_title: backlogStory?.parent_title ?? epic?.title ?? null,
       labels: backlogStory?.labels ?? [],
       current_assignee_agent_id: story.current_assignee_agent_id,
       updated_at: story.updated_at,
-      story_type: story.story_type,
-      task_type: null,
-      objective: null,
-      task_count: taskCount,
-      done_task_count: doneTaskCount,
+      type: "STORY",
+      sub_type: story.sub_type,
+      summary: null,
+      children_count: taskCount,
+      done_children_count: doneTaskCount,
     };
   });
 }
 
 function toStandaloneTaskRows(tasks: PlanningTaskApiItem[]): PlanningListRow[] {
   return tasks
-    .filter((task) => task.story_id === null)
+    .filter((task) => task.parent_id === null)
     .map((task) => ({
       row_type: "task",
       id: task.id,
@@ -141,17 +141,17 @@ function toStandaloneTaskRows(tasks: PlanningTaskApiItem[]): PlanningListRow[] {
       title: task.title,
       status: task.status,
       priority: task.priority,
-      epic_id: null,
-      epic_key: null,
-      epic_title: null,
+      parent_id: null,
+      parent_key: null,
+      parent_title: null,
       labels: [],
       current_assignee_agent_id: task.current_assignee_agent_id,
       updated_at: task.updated_at,
-      story_type: null,
-      task_type: task.task_type,
-      objective: task.objective,
-      task_count: 0,
-      done_task_count: 0,
+      type: "TASK",
+      sub_type: task.sub_type,
+      summary: task.summary,
+      children_count: 0,
+      done_children_count: 0,
     }));
 }
 
@@ -224,12 +224,13 @@ export function toBacklogRowStory(
     title: row.title,
     status: row.status,
     priority: row.priority,
-    story_type: row.story_type ?? row.task_type ?? "TASK",
-    epic_key: row.epic_key,
-    epic_title: row.epic_title,
-    position: 0,
-    task_count: row.task_count,
-    done_task_count: row.done_task_count,
+    type: row.type,
+    sub_type: row.sub_type,
+    parent_key: row.parent_key,
+    parent_title: row.parent_title,
+    rank: "",
+    children_count: row.children_count,
+    done_children_count: row.done_children_count,
     labels: row.labels,
     assignee_agent_id: row.current_assignee_agent_id,
     current_assignee_agent_id: row.current_assignee_agent_id,

@@ -40,8 +40,9 @@ test("buildStoryCreatePayload trims subject and includes assignee metadata", () 
   })
 
   assert.deepEqual(payload, {
+    type: "STORY",
     title: "Add sprint goal copy",
-    story_type: "TASK",
+    sub_type: "TASK",
     project_id: "p1",
     current_assignee_agent_id: "agent-1",
     metadata_json: JSON.stringify({
@@ -62,14 +63,12 @@ test("createTodoQuickItem performs create + product backlog + sprint attach flow
 
     if (requestUrls.length === 1) {
       return jsonResponse(201, {
-        data: {
-          id: "s-1",
-          key: "MC-999",
-          title: "Fix flaky board refresh",
-          status: "TODO",
-          story_type: "BUG",
-          priority: 1,
-        },
+        id: "s-1",
+        key: "MC-999",
+        title: "Fix flaky board refresh",
+        status: "TODO",
+        sub_type: "BUG",
+        priority: 1,
       })
     }
 
@@ -79,7 +78,7 @@ test("createTodoQuickItem performs create + product backlog + sprint attach flow
       })
     }
 
-    return jsonResponse(200, { data: { story_id: "s-1", backlog_id: "b-1", position: 0 } })
+    return jsonResponse(200, { data: { work_item_id: "s-1", backlog_id: "b-1" } })
   }) as typeof fetch
 
   try {
@@ -91,23 +90,24 @@ test("createTodoQuickItem performs create + product backlog + sprint attach flow
     })
 
     assert.equal(requestUrls.length, 4)
-    assert.equal(requestUrls[0].endsWith("/v1/planning/stories"), true)
+    assert.equal(requestUrls[0].endsWith("/v1/planning/work-items"), true)
     assert.equal(requestUrls[1].includes("/v1/planning/backlogs?project_id=p1"), true)
     assert.equal(
-      requestUrls[2].includes("/v1/planning/backlogs/b-product/stories"),
+      requestUrls[2].includes("/v1/planning/backlogs/b-product/items"),
       true,
     )
     assert.equal(
-      requestUrls[3].includes("/v1/planning/backlogs/active-sprint/stories?project_id=p1"),
+      requestUrls[3].includes("/v1/planning/backlogs/active-sprint/items?project_id=p1"),
       true,
     )
-    assert.deepEqual(requestBodies[2], { story_id: "s-1" })
-    assert.deepEqual(requestBodies[3], { story_id: "s-1", position: 0 })
+    assert.deepEqual(requestBodies[2], { work_item_id: "s-1" })
+    assert.deepEqual(requestBodies[3], { work_item_id: "s-1" })
     assert.equal(created.id, "s-1")
     assert.equal(created.status, "TODO")
-    assert.equal(created.story_type, "BUG")
+    assert.equal(created.sub_type, "BUG")
     assert.equal(created.assignee_agent_id, "agent-2")
-    assert.equal(created.task_count, 0)
+    assert.equal(created.children_count, 0)
+    assert.equal(typeof created.rank, "string")
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -159,14 +159,14 @@ test("maps attach not-found errors to active sprint guidance", async () => {
 
   globalThis.fetch = (async () => {
     callCount += 1
-    if (callCount === 1) return jsonResponse(201, { data: { id: "s-2", title: "Task 2" } })
+    if (callCount === 1) return jsonResponse(201, { id: "s-2", title: "Task 2" })
     if (callCount === 2) {
       return jsonResponse(200, {
         data: [{ id: "b-product", is_default: true, created_at: "2026-03-01T00:00:00Z" }],
       })
     }
     if (callCount === 3) {
-      return jsonResponse(200, { data: { story_id: "s-2", backlog_id: "b-product", position: 0 } })
+      return jsonResponse(200, { data: { work_item_id: "s-2", backlog_id: "b-product" } })
     }
     return jsonResponse(404, { error: { code: "NOT_FOUND", message: "No active sprint" } })
   }) as typeof fetch
@@ -205,7 +205,7 @@ test("quick-add create flow order supports USER_STORY, TASK and BUG without spri
 
         if (callIndex === 1) {
           return jsonResponse(201, {
-            data: { id: `s-${workType}`, title: `${workType} item`, story_type: workType },
+            id: `s-${workType}`, title: `${workType} item`, sub_type: workType,
           })
         }
         if (callIndex === 2) {
@@ -223,25 +223,26 @@ test("quick-add create flow order supports USER_STORY, TASK and BUG without spri
         assigneeAgentId: null,
       })
 
-      assert.equal(created.story_type, workType)
+      assert.equal(created.sub_type, workType)
       assert.equal(requestUrls.length, 4)
       assert.equal(requestUrls[1].includes("/v1/planning/backlogs?project_id=p1"), true)
-      assert.equal(requestUrls[2].includes("/v1/planning/backlogs/b-product/stories"), true)
+      assert.equal(requestUrls[2].includes("/v1/planning/backlogs/b-product/items"), true)
       assert.equal(
-        requestUrls[3].includes("/v1/planning/backlogs/active-sprint/stories?project_id=p1"),
+        requestUrls[3].includes("/v1/planning/backlogs/active-sprint/items?project_id=p1"),
         true,
       )
       assert.deepEqual(
         requestBodies[0],
         {
+          type: "STORY",
           title: `${workType} title`,
-          story_type: workType,
+          sub_type: workType,
           project_id: "p1",
           current_assignee_agent_id: null,
           metadata_json: null,
         },
       )
-      assert.deepEqual(requestBodies[2], { story_id: `s-${workType}` })
+      assert.deepEqual(requestBodies[2], { work_item_id: `s-${workType}` })
     }
   } finally {
     globalThis.fetch = originalFetch

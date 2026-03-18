@@ -13,7 +13,7 @@ import {
 import { excludeClosedSprintBacklogs, sortBacklogsForPlanning } from "./backlog-filters";
 import type {
   BacklogItem,
-  BacklogWithStories,
+  BacklogWithItems,
   FetchResult,
   PlanningAgentApiItem,
 } from "./backlog-types";
@@ -38,12 +38,25 @@ export async function fetchBacklogData(projectId: string): Promise<FetchResult> 
     return { kind: "empty" };
   }
 
-  const sections: BacklogWithStories[] = await Promise.all(
+  const sections: BacklogWithItems[] = await Promise.all(
     backlogs.map(async (backlog) => {
-      const storiesResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/stories`));
-      if (!storiesResponse.ok) return { backlog, stories: [] };
-      const body = await storiesResponse.json();
-      return { backlog, stories: body.data ?? [] };
+      const itemsResponse = await fetch(apiUrl(`/v1/planning/backlogs/${backlog.id}/items`));
+      if (!itemsResponse.ok) return { backlog, items: [] };
+      const body = await itemsResponse.json();
+      const rawItems = (body.data ?? []) as StoryCardStory[];
+      return {
+        backlog,
+        items: rawItems.map((item) => ({
+          ...item,
+          children_count: item.children_count ?? 0,
+          done_children_count: item.done_children_count ?? 0,
+          labels: item.labels ?? [],
+          label_ids: item.label_ids ?? [],
+          parent_key: item.parent_key ?? null,
+          parent_title: item.parent_title ?? null,
+          assignee_agent_id: item.assignee_agent_id ?? item.current_assignee_agent_id ?? null,
+        })),
+      };
     }),
   );
 
@@ -87,7 +100,7 @@ export async function patchStoryStatus(
   storyId: string,
   status: WorkItemStatus,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -101,7 +114,7 @@ export async function patchStoryAssignee(
   storyId: string,
   nextAssigneeAgentId: string | null,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ current_assignee_agent_id: nextAssigneeAgentId }),
@@ -114,21 +127,21 @@ export async function patchStoryAssignee(
 export async function swapBoardOrder(
   boardAId: string,
   boardBId: string,
-  orderA: number,
-  orderB: number,
+  rankA: string,
+  rankB: string,
 ): Promise<void> {
   await Promise.all([
     fetch(apiUrl(`/v1/planning/backlogs/${boardAId}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_order: orderB }),
+      body: JSON.stringify({ rank: rankB }),
     }).then((res) => {
       if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
     }),
     fetch(apiUrl(`/v1/planning/backlogs/${boardBId}`), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ display_order: orderA }),
+      body: JSON.stringify({ rank: rankA }),
     }).then((res) => {
       if (!res.ok) throw new Error(`Failed to reorder board. HTTP ${res.status}.`);
     }),

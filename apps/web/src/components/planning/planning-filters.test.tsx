@@ -22,11 +22,12 @@ const STORIES = [
     key: "MC-1",
     title: "Unify planning filters",
     status: "TODO",
-    story_type: "USER_STORY",
+    type: "STORY",
+    sub_type: "USER_STORY",
     labels: [{ id: "l-web", name: "WEB" }],
-    epic_id: "e-1",
-    epic_key: "MC-44",
-    epic_title: "Web Early Access",
+    parent_id: "e-1",
+    parent_key: "MC-44",
+    parent_title: "Web Early Access",
     current_assignee_agent_id: "a-1",
   },
   {
@@ -34,11 +35,12 @@ const STORIES = [
     key: "MC-2",
     title: "Fix board bug",
     status: "IN_PROGRESS",
-    story_type: "BUG",
+    type: "STORY",
+    sub_type: "BUG",
     labels: [{ id: "l-api", name: "API" }],
-    epic_id: "e-2",
-    epic_key: "MC-50",
-    epic_title: "API hardening",
+    parent_id: "e-2",
+    parent_key: "MC-50",
+    parent_title: "API hardening",
     current_assignee_agent_id: null,
   },
 ] as const;
@@ -135,8 +137,8 @@ test("story option builders emit unique sorted values", () => {
   ]);
 
   assert.deepEqual(buildStoryEpicOptions(STORIES), [
-    { value: "e-2", label: "MC-50 API hardening" },
     { value: "e-1", label: "MC-44 Web Early Access" },
+    { value: "e-2", label: "MC-50 API hardening" },
   ]);
 });
 

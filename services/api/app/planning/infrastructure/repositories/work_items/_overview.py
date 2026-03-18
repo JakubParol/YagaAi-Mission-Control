@@ -1,6 +1,7 @@
 """Work item overview / progress aggregate queries."""
 
-from sqlalchemy import case, func, literal, select
+from sqlalchemy import Integer, Numeric, case, func, literal, select
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.planning.domain.models import WorkItemOverview, WorkItemStatus, WorkItemType
@@ -72,14 +73,21 @@ async def list_overview(
     )
     progress_pct = case(
         (children_total == 0, literal(0.0)),
-        else_=func.round(children_done * 100.0 / children_total, 1),
+        else_=func.round(
+            func.cast(children_done * 100.0 / children_total, Numeric),
+            1,
+        ),
     ).label("progress_pct")
 
     stale_days = func.coalesce(
         func.cast(
-            func.julianday(func.current_timestamp())
-            - func.julianday(work_items.c.updated_at),
-            type_=func.integer.__class__,
+            func.extract(
+                "epoch",
+                func.current_timestamp()
+                - func.cast(work_items.c.updated_at, TIMESTAMP(timezone=True)),
+            )
+            / 86400,
+            Integer,
         ),
         0,
     ).label("stale_days")
@@ -108,19 +116,12 @@ async def list_overview(
     if status:
         conditions.append(work_items.c.status == status)
     if assignee_id:
-        conditions.append(
-            work_items.c.current_assignee_agent_id == assignee_id
-        )
+        conditions.append(work_items.c.current_assignee_agent_id == assignee_id)
     if is_blocked is not None:
-        conditions.append(
-            work_items.c.is_blocked == (1 if is_blocked else 0)
-        )
+        conditions.append(work_items.c.is_blocked == (1 if is_blocked else 0))
     if text_search:
         pattern = f"%{text_search}%"
-        conditions.append(
-            work_items.c.title.ilike(pattern)
-            | work_items.c.key.ilike(pattern)
-        )
+        conditions.append(work_items.c.title.ilike(pattern) | work_items.c.key.ilike(pattern))
 
     count_q = select(func.count()).select_from(work_items)
     select_q = select(*cols)

@@ -22,38 +22,38 @@ import type {
 
 const ITEMS: EpicOverviewItem[] = [
   {
-    epic_key: "MC-380",
+    work_item_key: "MC-380",
     title: "Epic Overview 2.0",
     status: "IN_PROGRESS",
     progress_pct: 72.4,
     progress_trend_7d: 10,
-    stories_total: 10,
-    stories_done: 7,
-    stories_in_progress: 2,
+    children_total: 10,
+    children_done: 7,
+    children_in_progress: 2,
     blocked_count: 1,
     stale_days: 2,
   },
   {
-    epic_key: "MC-390",
+    work_item_key: "MC-390",
     title: "CLI Stabilization",
     status: "TODO",
     progress_pct: 10,
     progress_trend_7d: 0,
-    stories_total: 8,
-    stories_done: 1,
-    stories_in_progress: 1,
+    children_total: 8,
+    children_done: 1,
+    children_in_progress: 1,
     blocked_count: 0,
     stale_days: 9,
   },
   {
-    epic_key: "MC-399",
+    work_item_key: "MC-399",
     title: "Web Polish",
     status: "DONE",
     progress_pct: 100,
     progress_trend_7d: 20,
-    stories_total: 5,
-    stories_done: 5,
-    stories_in_progress: 0,
+    children_total: 5,
+    children_done: 5,
+    children_in_progress: 0,
     blocked_count: 0,
     stale_days: 0,
   },
@@ -104,18 +104,18 @@ test("applyClientEpicOverviewFilters matches search, status and blocked", () => 
     "all",
   );
 
-  assert.deepEqual(result.map((item) => item.epic_key), ["MC-380"]);
+  assert.deepEqual(result.map((item) => item.work_item_key), ["MC-380"]);
 });
 
 test("near-done preset keeps only high-progress unblocked epics", () => {
   const result = applyClientEpicOverviewFilters(ITEMS, filters(), "near-done");
-  assert.deepEqual(result.map((item) => item.epic_key), ["MC-399"]);
+  assert.deepEqual(result.map((item) => item.work_item_key), ["MC-399"]);
 });
 
 test("story preview helpers format title/assignee/updated_at", () => {
   const story: EpicOverviewStoryPreview = {
-    story_id: "s-1",
-    story_key: "MC-401",
+    work_item_id: "s-1",
+    work_item_key: "MC-401",
     title: "Inline preview",
     status: "TODO",
     current_assignee_agent_id: "a-1",
@@ -131,8 +131,8 @@ test("story preview helpers format title/assignee/updated_at", () => {
 
 test("story preview helpers use fallbacks for missing data", () => {
   const story: EpicOverviewStoryPreview = {
-    story_id: "s-2",
-    story_key: null,
+    work_item_id: "s-2",
+    work_item_key: null,
     title: "No key",
     status: "TODO",
     current_assignee_agent_id: null,
@@ -149,8 +149,8 @@ test("story preview helpers use fallbacks for missing data", () => {
 test("applyStoryPreviewFilters filters by status and blocked", () => {
   const stories: EpicOverviewStoryPreview[] = [
     {
-      story_id: "s-1",
-      story_key: "MC-401",
+      work_item_id: "s-1",
+      work_item_key: "MC-401",
       title: "One",
       status: "TODO",
       current_assignee_agent_id: null,
@@ -159,8 +159,8 @@ test("applyStoryPreviewFilters filters by status and blocked", () => {
       updated_at: "2026-03-07T10:30:00Z",
     },
     {
-      story_id: "s-2",
-      story_key: "MC-402",
+      work_item_id: "s-2",
+      work_item_key: "MC-402",
       title: "Two",
       status: "IN_PROGRESS",
       current_assignee_agent_id: null,
@@ -171,10 +171,10 @@ test("applyStoryPreviewFilters filters by status and blocked", () => {
   ];
 
   const byStatus = applyStoryPreviewFilters(stories, previewFilters({ status: "TODO" }));
-  assert.deepEqual(byStatus.map((story) => story.story_id), ["s-1"]);
+  assert.deepEqual(byStatus.map((story) => story.work_item_id), ["s-1"]);
 
   const byBlocked = applyStoryPreviewFilters(stories, previewFilters({ blocked: "true" }));
-  assert.deepEqual(byBlocked.map((story) => story.story_id), ["s-2"]);
+  assert.deepEqual(byBlocked.map((story) => story.work_item_id), ["s-2"]);
 });
 
 test("preview helpers return limited rows and overflow count", () => {
@@ -183,8 +183,8 @@ test("preview helpers return limited rows and overflow count", () => {
     stories_preview_total: 5,
     stories_preview: [
       {
-        story_id: "s-1",
-        story_key: "MC-401",
+        work_item_id: "s-1",
+        work_item_key: "MC-401",
         title: "One",
         status: "TODO",
         current_assignee_agent_id: null,
@@ -193,8 +193,8 @@ test("preview helpers return limited rows and overflow count", () => {
         updated_at: "2026-03-07T10:30:00Z",
       },
       {
-        story_id: "s-2",
-        story_key: "MC-402",
+        work_item_id: "s-2",
+        work_item_key: "MC-402",
         title: "Two",
         status: "TODO",
         current_assignee_agent_id: null,
@@ -203,8 +203,8 @@ test("preview helpers return limited rows and overflow count", () => {
         updated_at: "2026-03-07T10:30:00Z",
       },
       {
-        story_id: "s-3",
-        story_key: "MC-403",
+        work_item_id: "s-3",
+        work_item_key: "MC-403",
         title: "Three",
         status: "TODO",
         current_assignee_agent_id: null,
@@ -213,8 +213,8 @@ test("preview helpers return limited rows and overflow count", () => {
         updated_at: "2026-03-07T10:30:00Z",
       },
       {
-        story_id: "s-4",
-        story_key: "MC-404",
+        work_item_id: "s-4",
+        work_item_key: "MC-404",
         title: "Four",
         status: "TODO",
         current_assignee_agent_id: null,

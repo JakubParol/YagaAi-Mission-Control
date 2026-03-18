@@ -11,7 +11,7 @@ import { completeSprint, startSprint, type SprintLifecycleOperation } from "../s
 import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
 import { addStoryToActiveSprint, removeStoryFromActiveSprint } from "../sprint-membership-actions";
 import { deleteBoard } from "./board-actions";
-import { moveOpenStoriesToTarget, swapBoardOrder } from "./backlog-page-actions";
+import { swapBoardOrder } from "./backlog-page-actions";
 import { computeBoardSwapTarget, prepareSprintCompletion, removePendingId } from "./backlog-page-derived";
 import type { PageState, SprintCompleteDialogState } from "./backlog-types";
 
@@ -55,13 +55,13 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
       setPendingSprintIds((prev) => ({ ...prev, [backlogId]: true }));
       try {
         if (op === "start") await startSprint(singleProjectId, backlogId);
-        else await completeSprint(singleProjectId, backlogId);
+        else await completeSprint(singleProjectId, backlogId, defaultBacklogId ?? backlogId);
         emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId, operation: op });
         await refreshCurrentView();
       } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to update sprint status."); }
       finally { setPendingSprintIds((prev) => removePendingId(prev, backlogId)); }
     },
-    [refreshCurrentView, showErrorToast, singleProjectId, setPendingSprintIds],
+    [defaultBacklogId, refreshCurrentView, showErrorToast, singleProjectId, setPendingSprintIds],
   );
 
   const handleCompleteSprint = useCallback(
@@ -82,8 +82,7 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
       setError(null);
       setPendingSprintIds((prev) => ({ ...prev, [completeDialog.backlogId]: true }));
       try {
-        await moveOpenStoriesToTarget(singleProjectId, completeDialog.backlogId, completeTargetBacklogId, defaultBacklogId, completeDialog.openStories);
-        await completeSprint(singleProjectId, completeDialog.backlogId);
+        await completeSprint(singleProjectId, completeDialog.backlogId, completeTargetBacklogId);
         emitSprintLifecycleChanged({ projectId: singleProjectId, backlogId: completeDialog.backlogId, operation: "complete" });
         await refreshCurrentView();
         return true;
@@ -98,7 +97,7 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
       const swap = computeBoardSwapTarget(state, backlogId, direction);
       if (!swap) return;
       setPendingBoardIds((prev) => ({ ...prev, [backlogId]: true }));
-      try { await swapBoardOrder(swap.currentId, swap.swapWithId, swap.currentOrder, swap.swapWithOrder); await refreshCurrentView(); }
+      try { await swapBoardOrder(swap.currentId, swap.swapWithId, swap.currentRank, swap.swapWithRank); await refreshCurrentView(); }
       catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to reorder board."); }
       finally { setPendingBoardIds((prev) => removePendingId(prev, backlogId)); }
     },

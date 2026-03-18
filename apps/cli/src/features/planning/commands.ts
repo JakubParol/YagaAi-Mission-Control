@@ -274,18 +274,18 @@ function projectEpicOverviewTablePayload(payload: unknown): unknown {
     }
 
     const item = row as Record<string, unknown>;
-    const storiesDone = Number(item.stories_done ?? 0);
-    const storiesTotal = Number(item.stories_total ?? 0);
+    const childrenDone = Number(item.children_done ?? 0);
+    const childrenTotal = Number(item.children_total ?? 0);
     const blockedCount = Number(item.blocked_count ?? 0);
     const progressPct = Number(item.progress_pct ?? 0);
     const staleDays = Number(item.stale_days ?? 0);
 
     return {
-      epic_key: item.epic_key ?? "",
+      work_item_key: item.work_item_key ?? "",
       title: item.title ?? "",
       status: item.status ?? "",
       progress: `${progressPct.toFixed(2)}%`,
-      done_total: `${storiesDone}/${storiesTotal}`,
+      done_total: `${childrenDone}/${childrenTotal}`,
       blocked: blockedCount,
       stale_days: staleDays,
     };
@@ -612,16 +612,18 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
     .command("complete")
     .description("Complete sprint lifecycle for a backlog")
     .requiredOption("--id <id>", "backlog id")
+    .requiredOption("--target-backlog-id <id>", "target backlog for non-DONE items")
     .option("--project-id <id>", "project UUID for scope validation")
     .option("--project-key <key>", "project key (e.g. MC) for scope validation")
     .action(
       async (
-        opts: { id: string; projectId?: string; projectKey?: string },
+        opts: { id: string; targetBacklogId: string; projectId?: string; projectKey?: string },
         command: Command,
       ) => {
         const ctx = getContext(command);
         const payload = await ctx.client.post(`/v1/planning/backlogs/${opts.id}/complete`, {
           query: buildBacklogProjectScopeQuery(opts),
+          body: { target_backlog_id: opts.targetBacklogId },
         });
         printPayload(payload, ctx.config.output);
       },
@@ -652,23 +654,23 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
     );
 
   resource
-    .command("add-story")
-    .description("Add story to backlog")
+    .command("add-item")
+    .description("Add work item to backlog")
     .requiredOption("--backlog-id <id>", "backlog id")
-    .requiredOption("--story-id <id>", "story id")
-    .option("--position <n>", "position", (raw) => parseIntegerOption(raw, "position"))
+    .requiredOption("--work-item-id <id>", "work item id")
+    .option("--rank <rank>", "rank (LexoRank string)")
     .action(
       async (
-        opts: { backlogId: string; storyId: string; position?: number },
+        opts: { backlogId: string; workItemId: string; rank?: string },
         command: Command,
       ) => {
         const ctx = getContext(command);
         const payload = await ctx.client.post(
-          `/v1/planning/backlogs/${opts.backlogId}/stories`,
+          `/v1/planning/backlogs/${opts.backlogId}/items`,
           {
             body: {
-              story_id: opts.storyId,
-              ...(opts.position !== undefined ? { position: opts.position } : {}),
+              work_item_id: opts.workItemId,
+              ...(opts.rank !== undefined ? { rank: opts.rank } : {}),
             },
           },
         );
@@ -677,73 +679,17 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
     );
 
   resource
-    .command("remove-story")
-    .description("Remove story from backlog")
+    .command("remove-item")
+    .description("Remove work item from backlog")
     .requiredOption("--backlog-id <id>", "backlog id")
-    .requiredOption("--story-id <id>", "story id")
-    .action(async (opts: { backlogId: string; storyId: string }, command: Command) => {
+    .requiredOption("--work-item-id <id>", "work item id")
+    .action(async (opts: { backlogId: string; workItemId: string }, command: Command) => {
       const ctx = getContext(command);
       const payload = await ctx.client.delete(
-        `/v1/planning/backlogs/${opts.backlogId}/stories/${opts.storyId}`,
+        `/v1/planning/backlogs/${opts.backlogId}/items/${opts.workItemId}`,
       );
       printPayload(payload, ctx.config.output);
     });
-
-  resource
-    .command("add-task")
-    .description("Add task to backlog")
-    .requiredOption("--backlog-id <id>", "backlog id")
-    .requiredOption("--task-id <id>", "task id")
-    .requiredOption("--position <n>", "position", (raw) => parseIntegerOption(raw, "position"))
-    .action(
-      async (
-        opts: { backlogId: string; taskId: string; position: number },
-        command: Command,
-      ) => {
-        const ctx = getContext(command);
-        const payload = await ctx.client.post(`/v1/planning/backlogs/${opts.backlogId}/tasks`, {
-          body: { task_id: opts.taskId, position: opts.position },
-        });
-        printPayload(payload, ctx.config.output);
-      },
-    );
-
-  resource
-    .command("remove-task")
-    .description("Remove task from backlog")
-    .requiredOption("--backlog-id <id>", "backlog id")
-    .requiredOption("--task-id <id>", "task id")
-    .action(async (opts: { backlogId: string; taskId: string }, command: Command) => {
-      const ctx = getContext(command);
-      const payload = await ctx.client.delete(
-        `/v1/planning/backlogs/${opts.backlogId}/tasks/${opts.taskId}`,
-      );
-      printPayload(payload, ctx.config.output);
-    });
-
-  addPayloadOptions(
-    resource
-      .command("reorder")
-      .description("Reorder backlog stories/tasks")
-      .requiredOption("--backlog-id <id>", "backlog id"),
-  ).action(
-    async (
-      opts: { backlogId: string; json?: string; file?: string; set?: string[] },
-      command: Command,
-    ) => {
-      const ctx = getContext(command);
-      const payloadBody = buildPayload({
-        json: opts.json,
-        file: opts.file,
-        sets: opts.set,
-      });
-
-      const payload = await ctx.client.patch(`/v1/planning/backlogs/${opts.backlogId}/reorder`, {
-        body: payloadBody,
-      });
-      printPayload(payload, ctx.config.output);
-    },
-  );
 
   resource
     .command("active-sprint")
@@ -766,55 +712,28 @@ function registerBacklogCommands(resource: Command, getContext: ContextFactory):
 
 function registerLabelCommands(resource: Command, getContext: ContextFactory): void {
   resource
-    .command("attach-story")
-    .description("Attach label to a story")
-    .requiredOption("--story-id <id>", "story UUID")
+    .command("attach")
+    .description("Attach label to a work item")
+    .requiredOption("--work-item-id <id>", "work item UUID")
     .requiredOption("--label-id <id>", "label UUID")
-    .action(async (opts: { storyId: string; labelId: string }, command: Command) => {
+    .action(async (opts: { workItemId: string; labelId: string }, command: Command) => {
       const ctx = getContext(command);
       const payload = await ctx.client.post(
-        `/v1/planning/stories/${opts.storyId}/labels`,
+        `/v1/planning/work-items/${opts.workItemId}/labels`,
         { body: { label_id: opts.labelId } },
       );
       printPayload(payload, ctx.config.output);
     });
 
   resource
-    .command("detach-story")
-    .description("Detach label from a story")
-    .requiredOption("--story-id <id>", "story UUID")
+    .command("detach")
+    .description("Detach label from a work item")
+    .requiredOption("--work-item-id <id>", "work item UUID")
     .requiredOption("--label-id <id>", "label UUID")
-    .action(async (opts: { storyId: string; labelId: string }, command: Command) => {
+    .action(async (opts: { workItemId: string; labelId: string }, command: Command) => {
       const ctx = getContext(command);
       const payload = await ctx.client.delete(
-        `/v1/planning/stories/${opts.storyId}/labels/${opts.labelId}`,
-      );
-      printPayload(payload, ctx.config.output);
-    });
-
-  resource
-    .command("attach-task")
-    .description("Attach label to a task")
-    .requiredOption("--task-id <id>", "task UUID")
-    .requiredOption("--label-id <id>", "label UUID")
-    .action(async (opts: { taskId: string; labelId: string }, command: Command) => {
-      const ctx = getContext(command);
-      const payload = await ctx.client.post(
-        `/v1/planning/tasks/${opts.taskId}/labels`,
-        { body: { label_id: opts.labelId } },
-      );
-      printPayload(payload, ctx.config.output);
-    });
-
-  resource
-    .command("detach-task")
-    .description("Detach label from a task")
-    .requiredOption("--task-id <id>", "task UUID")
-    .requiredOption("--label-id <id>", "label UUID")
-    .action(async (opts: { taskId: string; labelId: string }, command: Command) => {
-      const ctx = getContext(command);
-      const payload = await ctx.client.delete(
-        `/v1/planning/tasks/${opts.taskId}/labels/${opts.labelId}`,
+        `/v1/planning/work-items/${opts.workItemId}/labels/${opts.labelId}`,
       );
       printPayload(payload, ctx.config.output);
     });
@@ -860,7 +779,7 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
       if (opts.limit !== undefined) query.limit = opts.limit;
       if (opts.offset !== undefined) query.offset = opts.offset;
 
-      const payload = await ctx.client.get("/v1/planning/epics/overview", { query });
+      const payload = await ctx.client.get("/v1/planning/work-items/overview", { query: { ...query, type: "EPIC" } });
       const outputMode = opts.output ?? ctx.config.output;
       if (outputMode === "table") {
         printPayload(projectEpicOverviewTablePayload(payload), outputMode);
@@ -900,7 +819,7 @@ function registerEpicCommands(resource: Command, getContext: ContextFactory): vo
       if (opts.limit !== undefined) query.limit = opts.limit;
       if (opts.offset !== undefined) query.offset = opts.offset;
 
-      const payload = await ctx.client.get("/v1/planning/stories", { query });
+      const payload = await ctx.client.get("/v1/planning/work-items", { query: { ...query, type: "STORY" } });
       printPayload(payload, opts.output ?? ctx.config.output);
     });
 }
@@ -932,7 +851,7 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
     const ctx = getContext(command);
     const target = await resolveTargetId(taskSpec, opts, ctx.client);
     const payload = await ctx.client.post(
-      `/v1/planning/tasks/${target.id}/assignments`,
+      `/v1/planning/work-items/${target.id}/assignments`,
       {
         body: {
           agent_id: opts.agentId,
@@ -953,7 +872,7 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
     const ctx = getContext(command);
     const target = await resolveTargetId(taskSpec, opts, ctx.client);
     const payload = await ctx.client.delete(
-      `/v1/planning/tasks/${target.id}/assignments/current`,
+      `/v1/planning/work-items/${target.id}/assignments/current`,
     );
     printPayload(payload, ctx.config.output);
   });
@@ -968,7 +887,7 @@ function registerTaskCommands(resource: Command, getContext: ContextFactory): vo
     const ctx = getContext(command);
     const target = await resolveTargetId(taskSpec, opts, ctx.client);
     const payload = await ctx.client.get(
-      `/v1/planning/tasks/${target.id}/assignments`,
+      `/v1/planning/work-items/${target.id}/assignments`,
     );
     printPayload(payload, ctx.config.output);
   });

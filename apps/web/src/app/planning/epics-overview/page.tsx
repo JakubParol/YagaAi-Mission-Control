@@ -55,22 +55,22 @@ function EpicOverviewPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const [state, setState] = useState<PageState>({ kind: "no-project" });
-  const [previewByEpicKey, setPreviewByEpicKey] = useState<Record<string, PreviewState>>({});
-  const previewByEpicKeyRef = useRef<Record<string, PreviewState>>({});
+  const [previewByKey, setPreviewByKey] = useState<Record<string, PreviewState>>({});
+  const previewByKeyRef = useRef<Record<string, PreviewState>>({});
   const previewFetchInFlightRef = useRef<Set<string>>(new Set());
   const activeProjectIdRef = useRef<string | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0] : null;
 
-  const sa = useStoryActions(singleProjectId, setPreviewByEpicKey);
+  const sa = useStoryActions(singleProjectId, setPreviewByKey);
   const { resetAll } = sa;
 
   useEffect(() => {
     activeProjectIdRef.current = singleProjectId;
     previewFetchInFlightRef.current.clear();
-    previewByEpicKeyRef.current = {};
-    setPreviewByEpicKey({});
+    previewByKeyRef.current = {};
+    setPreviewByKey({});
     resetAll();
     setState(singleProjectId ? { kind: "loading" } : { kind: "no-project" });
   }, [singleProjectId, resetAll]);
@@ -115,17 +115,17 @@ function EpicOverviewPageContent() {
   const ensurePreviewLoaded = useCallback(async (epicKey: string) => {
     const reqProjectId = activeProjectIdRef.current;
     const scopeKey = `${reqProjectId ?? "none"}:${epicKey}`;
-    if (previewByEpicKeyRef.current[epicKey]?.kind === "ready") return;
+    if (previewByKeyRef.current[epicKey]?.kind === "ready") return;
     if (previewFetchInFlightRef.current.has(scopeKey)) return;
     previewFetchInFlightRef.current.add(scopeKey);
-    setPreviewByEpicKey((c) => ({ ...c, [epicKey]: { kind: "loading" } }));
+    setPreviewByKey((c) => ({ ...c, [epicKey]: { kind: "loading" } }));
     try {
       const stories = await doFetchStoriesPreview(epicKey);
       if (activeProjectIdRef.current !== reqProjectId) return;
-      setPreviewByEpicKey((c) => ({ ...c, [epicKey]: { kind: "ready", stories } }));
+      setPreviewByKey((c) => ({ ...c, [epicKey]: { kind: "ready", stories } }));
     } catch (error) {
       if (activeProjectIdRef.current !== reqProjectId) return;
-      setPreviewByEpicKey((c) => ({
+      setPreviewByKey((c) => ({
         ...c,
         [epicKey]: { kind: "error", message: error instanceof Error ? error.message : "Failed to load story preview." },
       }));
@@ -175,12 +175,12 @@ function EpicOverviewPageContent() {
     ? { kind: "no-project" as const }
     : state.kind === "no-project" ? { kind: "loading" as const } : state;
 
-  useEffect(() => { previewByEpicKeyRef.current = previewByEpicKey; }, [previewByEpicKey]);
+  useEffect(() => { previewByKeyRef.current = previewByKey; }, [previewByKey]);
 
   useEffect(() => {
-    const keys = Object.entries(sa.expandedByEpicKey).filter(([, v]) => v).map(([k]) => k);
+    const keys = Object.entries(sa.expandedByKey).filter(([, v]) => v).map(([k]) => k);
     for (const k of keys) void ensurePreviewLoaded(k);
-  }, [ensurePreviewLoaded, sa.expandedByEpicKey]);
+  }, [ensurePreviewLoaded, sa.expandedByKey]);
 
   return (
     <>
@@ -252,13 +252,13 @@ function EpicOverviewPageContent() {
                   <div className="divide-y divide-border/20">
                     {rows.map((item) => (
                       <EpicRow
-                        key={item.epic_key}
+                        key={item.work_item_key}
                         item={item}
-                        isExpanded={sa.expandedByEpicKey[item.epic_key] ?? false}
-                        previewState={previewByEpicKey[item.epic_key] ?? { kind: "idle" as const }}
-                        previewFilters={sa.previewFiltersByEpicKey[item.epic_key] ?? EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS}
+                        isExpanded={sa.expandedByKey[item.work_item_key] ?? false}
+                        previewState={previewByKey[item.work_item_key] ?? { kind: "idle" as const }}
+                        previewFilters={sa.previewFiltersByKey[item.work_item_key] ?? EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS}
                         storyPendingById={sa.storyPendingById}
-                        actionError={sa.storyErrorByEpicKey[item.epic_key]}
+                        actionError={sa.storyErrorByKey[item.work_item_key]}
                         onToggleExpand={sa.handleToggleExpand}
                         onPreviewFilterChange={sa.handlePreviewFilterChange}
                         onChangeStoryStatus={sa.handleChangeStoryStatus}

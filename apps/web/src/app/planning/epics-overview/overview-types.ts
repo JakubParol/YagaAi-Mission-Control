@@ -1,8 +1,8 @@
 import type { WorkItemStatus } from "@/lib/planning/types";
 
 export interface EpicOverviewStoryPreview {
-  story_id: string;
-  story_key: string | null;
+  work_item_id: string;
+  work_item_key: string | null;
   title: string;
   status: WorkItemStatus;
   current_assignee_agent_id: string | null;
@@ -12,14 +12,14 @@ export interface EpicOverviewStoryPreview {
 }
 
 export interface EpicOverviewItem {
-  epic_key: string;
+  work_item_key: string;
   title: string;
   status: WorkItemStatus;
   progress_pct: number;
   progress_trend_7d: number;
-  stories_total: number;
-  stories_done: number;
-  stories_in_progress: number;
+  children_total: number;
+  children_done: number;
+  children_in_progress: number;
   blocked_count: number;
   stale_days: number;
   stories_preview?: EpicOverviewStoryPreview[];

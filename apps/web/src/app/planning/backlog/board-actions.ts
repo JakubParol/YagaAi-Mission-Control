@@ -122,10 +122,10 @@ export async function addStoryToBacklog(
   backlogId: string,
   storyId: string,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories`), {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/items`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ story_id: storyId }),
+    body: JSON.stringify({ work_item_id: storyId }),
   });
   if (response.ok) return;
   throw new Error(
@@ -137,7 +137,7 @@ export async function removeStoryFromBacklog(
   backlogId: string,
   storyId: string,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${backlogId}/items/${storyId}`), {
     method: "DELETE",
   });
   if (response.ok) return;

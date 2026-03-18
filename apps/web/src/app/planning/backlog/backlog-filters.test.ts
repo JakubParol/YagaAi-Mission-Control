@@ -19,13 +19,13 @@ test("excludeClosedSprintBacklogs removes CLOSED sprint sections only", () => {
   );
 });
 
-test("sortBacklogsForPlanning keeps active sprint first, default backlog last, middle by display_order", () => {
+test("sortBacklogsForPlanning keeps active sprint first, default backlog last, middle by rank", () => {
   const backlogs = [
     {
       id: "default-backlog",
       kind: "BACKLOG",
       status: "ACTIVE",
-      display_order: 10,
+      rank: "aaa",
       is_default: true,
       created_at: "2026-03-01T00:00:00Z",
     },
@@ -33,7 +33,7 @@ test("sortBacklogsForPlanning keeps active sprint first, default backlog last, m
       id: "open-sprint",
       kind: "SPRINT",
       status: "OPEN",
-      display_order: 100,
+      rank: "ccc",
       is_default: false,
       created_at: "2026-03-01T00:00:00Z",
     },
@@ -41,7 +41,7 @@ test("sortBacklogsForPlanning keeps active sprint first, default backlog last, m
       id: "active-sprint",
       kind: "SPRINT",
       status: "ACTIVE",
-      display_order: 300,
+      rank: "eee",
       is_default: false,
       created_at: "2026-03-01T00:00:00Z",
     },
@@ -49,7 +49,7 @@ test("sortBacklogsForPlanning keeps active sprint first, default backlog last, m
       id: "ideas",
       kind: "IDEAS",
       status: "ACTIVE",
-      display_order: 20,
+      rank: "aab",
       is_default: false,
       created_at: "2026-03-01T00:00:00Z",
     },
@@ -57,7 +57,7 @@ test("sortBacklogsForPlanning keeps active sprint first, default backlog last, m
       id: "backlog-b",
       kind: "BACKLOG",
       status: "ACTIVE",
-      display_order: 40,
+      rank: "bbb",
       is_default: false,
       created_at: "2026-03-01T00:00:00Z",
     },

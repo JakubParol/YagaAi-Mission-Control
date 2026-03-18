@@ -13,6 +13,8 @@ from app.planning.infrastructure.shared.sorting import parse_sort
 from app.planning.infrastructure.tables import (
     backlog_items,
     backlogs,
+    labels,
+    work_item_labels,
     work_items,
 )
 from app.shared.lexorank import rank_after as lr_after
@@ -89,11 +91,7 @@ class DbBacklogRepository(BacklogRepository):
 
     async def get_by_id(self, backlog_id: str) -> Backlog | None:
         row = (
-            (
-                await self._db.execute(
-                    select(backlogs).where(backlogs.c.id == backlog_id)
-                )
-            )
+            (await self._db.execute(select(backlogs).where(backlogs.c.id == backlog_id)))
             .mappings()
             .first()
         )
@@ -122,13 +120,19 @@ class DbBacklogRepository(BacklogRepository):
         await self._db.commit()
         return backlog
 
-    async def update(
-        self, backlog_id: str, data: dict[str, Any]
-    ) -> Backlog | None:
+    async def update(self, backlog_id: str, data: dict[str, Any]) -> Backlog | None:
         allowed = {
-            "name", "kind", "status", "rank", "is_default",
-            "goal", "start_date", "end_date", "metadata_json",
-            "updated_by", "updated_at",
+            "name",
+            "kind",
+            "status",
+            "rank",
+            "is_default",
+            "goal",
+            "start_date",
+            "end_date",
+            "metadata_json",
+            "updated_by",
+            "updated_at",
         }
         values = {k: v for k, v in data.items() if k in allowed}
         if not values:
@@ -137,18 +141,12 @@ class DbBacklogRepository(BacklogRepository):
         if "is_default" in values:
             values["is_default"] = 1 if values["is_default"] else 0
 
-        await self._db.execute(
-            update(backlogs)
-            .where(backlogs.c.id == backlog_id)
-            .values(**values)
-        )
+        await self._db.execute(update(backlogs).where(backlogs.c.id == backlog_id).values(**values))
         await self._db.commit()
         return await self.get_by_id(backlog_id)
 
     async def delete(self, backlog_id: str) -> bool:
-        result = await self._db.execute(
-            delete(backlogs).where(backlogs.c.id == backlog_id)
-        )
+        result = await self._db.execute(delete(backlogs).where(backlogs.c.id == backlog_id))
         await self._db.commit()
         return result.rowcount > 0
 
@@ -157,9 +155,7 @@ class DbBacklogRepository(BacklogRepository):
     # ------------------------------------------------------------------
 
     async def has_default(self, project_id: str | None) -> bool:
-        q = select(func.count()).select_from(backlogs).where(
-            backlogs.c.is_default == 1
-        )
+        q = select(func.count()).select_from(backlogs).where(backlogs.c.is_default == 1)
         if project_id:
             q = q.where(backlogs.c.project_id == project_id)
         else:
@@ -190,9 +186,7 @@ class DbBacklogRepository(BacklogRepository):
     # Item membership
     # ------------------------------------------------------------------
 
-    async def work_item_backlog_id(
-        self, work_item_id: str
-    ) -> str | None:
+    async def work_item_backlog_id(self, work_item_id: str) -> str | None:
         row = (
             (
                 await self._db.execute(
@@ -206,15 +200,11 @@ class DbBacklogRepository(BacklogRepository):
         )
         return row
 
-    async def get_work_item_project_id(
-        self, work_item_id: str
-    ) -> tuple[bool, str | None]:
+    async def get_work_item_project_id(self, work_item_id: str) -> tuple[bool, str | None]:
         row = (
             (
                 await self._db.execute(
-                    select(work_items.c.project_id).where(
-                        work_items.c.id == work_item_id
-                    )
+                    select(work_items.c.project_id).where(work_items.c.id == work_item_id)
                 )
             )
             .mappings()
@@ -224,9 +214,7 @@ class DbBacklogRepository(BacklogRepository):
             return False, None
         return True, row["project_id"]
 
-    async def add_item(
-        self, backlog_id: str, work_item_id: str, rank: str
-    ) -> BacklogItem:
+    async def add_item(self, backlog_id: str, work_item_id: str, rank: str) -> BacklogItem:
         now = utc_now()
         await self._db.execute(
             insert(backlog_items).values(
@@ -244,9 +232,7 @@ class DbBacklogRepository(BacklogRepository):
             added_at=now,
         )
 
-    async def remove_item(
-        self, backlog_id: str, work_item_id: str
-    ) -> bool:
+    async def remove_item(self, backlog_id: str, work_item_id: str) -> bool:
         result = await self._db.execute(
             delete(backlog_items).where(
                 backlog_items.c.backlog_id == backlog_id,
@@ -256,9 +242,28 @@ class DbBacklogRepository(BacklogRepository):
         await self._db.commit()
         return result.rowcount > 0
 
-    async def list_items(
-        self, backlog_id: str
-    ) -> list[dict[str, Any]]:
+    async def list_items(self, backlog_id: str) -> list[dict[str, Any]]:
+        parent = work_items.alias("parent")
+        children = work_items.alias("children")
+
+        children_count = (
+            select(func.count())
+            .where(children.c.parent_id == work_items.c.id)
+            .correlate(work_items)
+            .scalar_subquery()
+            .label("children_count")
+        )
+        done_children_count = (
+            select(func.count())
+            .where(
+                children.c.parent_id == work_items.c.id,
+                children.c.status == "DONE",
+            )
+            .correlate(work_items)
+            .scalar_subquery()
+            .label("done_children_count")
+        )
+
         q = (
             select(
                 backlog_items.c.backlog_id,
@@ -273,24 +278,65 @@ class DbBacklogRepository(BacklogRepository):
                 work_items.c.status,
                 work_items.c.priority,
                 work_items.c.parent_id,
+                parent.c.key.label("parent_key"),
+                parent.c.title.label("parent_title"),
                 work_items.c.current_assignee_agent_id,
                 work_items.c.is_blocked,
+                children_count,
+                done_children_count,
             )
             .select_from(
                 backlog_items.join(
                     work_items,
                     backlog_items.c.work_item_id == work_items.c.id,
+                ).outerjoin(
+                    parent,
+                    work_items.c.parent_id == parent.c.id,
                 )
             )
             .where(backlog_items.c.backlog_id == backlog_id)
             .order_by(backlog_items.c.rank.asc())
         )
         rows = (await self._db.execute(q)).mappings().all()
-        return [dict(r) for r in rows]
 
-    async def update_item_rank(
-        self, backlog_id: str, work_item_id: str, rank: str
-    ) -> bool:
+        # Enrich with labels
+        item_ids = [r["id"] for r in rows]
+        labels_by_item: dict[str, list[dict[str, Any]]] = {item_id: [] for item_id in item_ids}
+        if item_ids:
+            lq = (
+                select(
+                    work_item_labels.c.work_item_id,
+                    labels.c.id.label("label_id"),
+                    labels.c.name,
+                    labels.c.color,
+                )
+                .select_from(
+                    work_item_labels.join(
+                        labels,
+                        work_item_labels.c.label_id == labels.c.id,
+                    )
+                )
+                .where(work_item_labels.c.work_item_id.in_(item_ids))
+            )
+            label_rows = (await self._db.execute(lq)).mappings().all()
+            for lr in label_rows:
+                wid = lr["work_item_id"]
+                if wid in labels_by_item:
+                    labels_by_item[wid].append(
+                        {"id": lr["label_id"], "name": lr["name"], "color": lr["color"]}
+                    )
+
+        result = []
+        for r in rows:
+            d = dict(r)
+            item_labels = labels_by_item.get(d["id"], [])
+            d["labels"] = item_labels
+            d["label_ids"] = [l["id"] for l in item_labels]
+            d["assignee_agent_id"] = d.get("current_assignee_agent_id")
+            result.append(d)
+        return result
+
+    async def update_item_rank(self, backlog_id: str, work_item_id: str, rank: str) -> bool:
         result = await self._db.execute(
             update(backlog_items)
             .where(
@@ -315,9 +361,7 @@ class DbBacklogRepository(BacklogRepository):
         items = await self.list_items(backlog.id)
         return backlog, items
 
-    async def get_active_sprint_backlog(
-        self, project_id: str
-    ) -> Backlog | None:
+    async def get_active_sprint_backlog(self, project_id: str) -> Backlog | None:
         row = (
             (
                 await self._db.execute(
@@ -333,9 +377,7 @@ class DbBacklogRepository(BacklogRepository):
         )
         return _row_to_backlog(row) if row else None
 
-    async def get_product_backlog(
-        self, project_id: str
-    ) -> Backlog | None:
+    async def get_product_backlog(self, project_id: str) -> Backlog | None:
         row = (
             (
                 await self._db.execute(
@@ -354,9 +396,7 @@ class DbBacklogRepository(BacklogRepository):
     # Item movement
     # ------------------------------------------------------------------
 
-    async def get_item_backlog_info(
-        self, work_item_id: str
-    ) -> tuple[str | None, str | None]:
+    async def get_item_backlog_info(self, work_item_id: str) -> tuple[str | None, str | None]:
         row = (
             (
                 await self._db.execute(
@@ -430,9 +470,7 @@ class DbBacklogRepository(BacklogRepository):
 
         # Get last rank in target for appending.
         target_items = await self.list_items(target_backlog_id)
-        current_rank = (
-            target_items[-1]["rank"] if target_items else "m"
-        )
+        current_rank = target_items[-1]["rank"] if target_items else "m"
 
         now = utc_now()
         for wid in rows:

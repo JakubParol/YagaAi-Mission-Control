@@ -70,11 +70,11 @@ async function assertSprintMembershipResponse(
 
 export async function addStoryToActiveSprint(projectId: string, storyId: string): Promise<void> {
   const response = await fetch(
-    apiUrl(`/v1/planning/backlogs/active-sprint/stories?project_id=${projectId}`),
+    apiUrl(`/v1/planning/backlogs/active-sprint/items?project_id=${projectId}`),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story_id: storyId, position: 0 }),
+      body: JSON.stringify({ work_item_id: storyId }),
     },
   );
 
@@ -83,7 +83,7 @@ export async function addStoryToActiveSprint(projectId: string, storyId: string)
 
 export async function removeStoryFromActiveSprint(projectId: string, storyId: string): Promise<void> {
   const response = await fetch(
-    apiUrl(`/v1/planning/backlogs/active-sprint/stories/${storyId}?project_id=${projectId}&position=0`),
+    apiUrl(`/v1/planning/backlogs/active-sprint/items/${storyId}?project_id=${projectId}`),
     {
       method: "DELETE",
     },

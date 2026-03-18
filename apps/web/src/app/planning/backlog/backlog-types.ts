@@ -13,16 +13,16 @@ export interface BacklogItem {
   name: string;
   kind: BacklogKind;
   status: BacklogStatus;
-  display_order?: number;
+  rank: string;
   is_default: boolean;
   goal: string | null;
   start_date: string | null;
   end_date: string | null;
 }
 
-export interface BacklogWithStories {
+export interface BacklogWithItems {
   backlog: BacklogItem;
-  stories: StoryCardStory[];
+  items: StoryCardStory[];
 }
 
 export type PageState =
@@ -32,7 +32,7 @@ export type PageState =
   | { kind: "error"; message: string }
   | {
       kind: "ok";
-      sections: BacklogWithStories[];
+      sections: BacklogWithItems[];
       assignees: PlanningFilterOption[];
       assignableAgents: BacklogAssigneeOption[];
     };
@@ -42,7 +42,7 @@ export type FetchResult =
   | { kind: "error"; message: string }
   | {
       kind: "ok";
-      sections: BacklogWithStories[];
+      sections: BacklogWithItems[];
       assignees: PlanningFilterOption[];
       assignableAgents: BacklogAssigneeOption[];
     };

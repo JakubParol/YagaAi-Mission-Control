@@ -59,8 +59,9 @@ function buildMetadataJson(assigneeAgentId: string | null): string | null {
 
 export function buildStoryCreatePayload(input: QuickCreateSubmitInput): Record<string, unknown> {
   return {
+    type: "STORY",
     title: input.subject.trim(),
-    story_type: input.workType,
+    sub_type: input.workType,
     project_id: input.projectId,
     current_assignee_agent_id: input.assigneeAgentId,
     metadata_json: buildMetadataJson(input.assigneeAgentId),
@@ -188,10 +189,10 @@ async function ensureProductBacklogMembership(
   productBacklogId: string,
   storyId: string,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/backlogs/${productBacklogId}/stories`), {
+  const response = await fetch(apiUrl(`/v1/planning/backlogs/${productBacklogId}/items`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ story_id: storyId }),
+    body: JSON.stringify({ work_item_id: storyId }),
   })
   if (response.ok) return
 
@@ -205,15 +206,14 @@ async function ensureProductBacklogMembership(
   throw new Error(await toQuickCreateErrorMessage(response, "prepare"))
 }
 
-interface StoryCreateEnvelope {
-  data?: {
-    id?: string;
-    key?: string | null;
-    title?: string;
-    status?: StoryCardStory["status"];
-    priority?: number | null;
-    story_type?: string;
-  };
+interface StoryCreateResponse {
+  id?: string;
+  key?: string | null;
+  title?: string;
+  status?: StoryCardStory["status"];
+  priority?: number | null;
+  sub_type?: string;
+  rank?: string;
 }
 
 export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promise<StoryCardStory> {
@@ -221,7 +221,7 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
   if (validationError) throw new Error(validationError)
 
   const payload = buildStoryCreatePayload(input)
-  const createResponse = await fetch(apiUrl("/v1/planning/stories"), {
+  const createResponse = await fetch(apiUrl("/v1/planning/work-items"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -230,8 +230,7 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
     throw new Error(await toQuickCreateErrorMessage(createResponse, "create"))
   }
 
-  const createBody = (await createResponse.json()) as StoryCreateEnvelope
-  const createdStory = createBody.data
+  const createdStory = (await createResponse.json()) as StoryCreateResponse
   if (!createdStory?.id) {
     throw new Error("Work item was created but response has no story id.")
   }
@@ -240,11 +239,11 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
   await ensureProductBacklogMembership(productBacklogId, createdStory.id)
 
   const attachResponse = await fetch(
-    apiUrl(`/v1/planning/backlogs/active-sprint/stories?project_id=${input.projectId}`),
+    apiUrl(`/v1/planning/backlogs/active-sprint/items?project_id=${input.projectId}`),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story_id: createdStory.id, position: 0 }),
+      body: JSON.stringify({ work_item_id: createdStory.id }),
     },
   )
   if (!attachResponse.ok) {
@@ -257,10 +256,11 @@ export async function createTodoQuickItem(input: QuickCreateSubmitInput): Promis
     title: createdStory.title ?? input.subject.trim(),
     status: createdStory.status ?? "TODO",
     priority: createdStory.priority ?? null,
-    story_type: createdStory.story_type ?? input.workType,
-    position: 0,
-    task_count: 0,
-    done_task_count: 0,
+    type: "STORY",
+    sub_type: createdStory.sub_type ?? input.workType,
+    rank: createdStory.rank ?? "",
+    children_count: 0,
+    done_children_count: 0,
     assignee_agent_id: input.assigneeAgentId,
     labels: [],
     label_ids: [],

@@ -15,10 +15,10 @@ import { StoryActionsMenu } from "@/components/planning/story-actions-menu";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import type { BacklogWithStories } from "./backlog-types";
+import type { BacklogWithItems } from "./backlog-types";
 
 export interface BacklogSectionProps {
-  section: BacklogWithStories;
+  section: BacklogWithItems;
   isActiveSprint: boolean;
   hasAnyActiveSprint: boolean;
   siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
@@ -65,7 +65,7 @@ export function BacklogSection({
   pendingBoardIds,
 }: BacklogSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const { backlog, stories } = section;
+  const { backlog, items } = section;
 
   const canAddToActiveSprint = backlog.kind === "BACKLOG";
   const canRemoveFromActiveSprint = isActiveSprint;
@@ -81,7 +81,7 @@ export function BacklogSection({
       <BacklogSectionHeader
         backlog={backlog}
         collapsed={collapsed}
-        stories={stories}
+        stories={items}
         hasAnyActiveSprint={hasAnyActiveSprint}
         isSprintPending={isSprintPending}
         isBoardDeletePending={isBoardDeletePending}
@@ -100,13 +100,13 @@ export function BacklogSection({
         <div className="border-t border-border/30">
           <BacklogRowsHeader />
 
-          {stories.length === 0 ? (
+          {items.length === 0 ? (
             <p className="px-4 py-6 text-center text-[11px] text-muted-foreground/50">
               No stories in this backlog
             </p>
           ) : (
             <div className="divide-y divide-border/25">
-              {stories.map((story) => (
+              {items.map((story) => (
                 <BacklogRow
                   key={story.id}
                   item={story}
@@ -118,7 +118,7 @@ export function BacklogSection({
                     <div className="flex items-center justify-end gap-1">
                       <StoryActionsMenu
                         storyId={story.id}
-                        storyType={story.story_type}
+                        storyType={story.sub_type ?? story.type}
                         storyKey={story.key}
                         storyTitle={story.title}
                         storyStatus={story.status}

@@ -80,7 +80,7 @@ export async function patchStoryStatus(
   storyId: string,
   nextStatus: WorkItemStatus,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status: nextStatus }),
@@ -95,7 +95,7 @@ export async function patchStoryAssignee(
   storyId: string,
   assigneeAgentId: string | null,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ current_assignee_agent_id: assigneeAgentId }),

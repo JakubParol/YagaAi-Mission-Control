@@ -116,7 +116,7 @@ function BoardPageContent() {
   const handleStoryStatusChange = useCallback(
     async (storyId: string, nextStatus: WorkItemStatus) => {
       if (state.kind !== "ok") return;
-      const existingStory = state.data.stories.find((item) => item.id === storyId);
+      const existingStory = state.data.items.find((item) => item.id === storyId);
       if (!existingStory || existingStory.status === nextStatus) return;
       const previousStatus: WorkItemStatus = existingStory.status;
 

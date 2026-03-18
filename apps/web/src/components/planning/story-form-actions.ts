@@ -151,13 +151,14 @@ function buildPayload(
 
   const payload: Record<string, unknown> = {
     title: normalizedTitle,
-    story_type: values.story_type,
+    sub_type: values.story_type,
     description: normalizedDescription === "" ? null : normalizedDescription,
     priority: Number.isFinite(parsedPriority) ? parsedPriority : null,
-    epic_id: values.epic_id === "" ? null : values.epic_id,
+    parent_id: values.epic_id === "" ? null : values.epic_id,
   };
 
   if (mode === "create") {
+    payload.type = "STORY";
     payload.project_id = projectId!;
   } else {
     payload.is_blocked = normalizedBlockedReason.length > 0;
@@ -187,7 +188,7 @@ export async function createStory(
 ): Promise<SubmitResult> {
   const payload = buildPayload("create", values, projectId);
 
-  const createResponse = await fetch(apiUrl("/v1/planning/stories"), {
+  const createResponse = await fetch(apiUrl("/v1/planning/work-items"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -196,7 +197,7 @@ export async function createStory(
   if (!createResponse.ok) return handleErrorResponse(createResponse);
 
   const createBody = await createResponse.json();
-  const createdStoryId: string | undefined = createBody?.data?.id;
+  const createdStoryId: string | undefined = createBody?.id;
   if (!createdStoryId) {
     return {
       ok: false,
@@ -205,11 +206,11 @@ export async function createStory(
   }
 
   const attachResponse = await fetch(
-    apiUrl(`/v1/planning/backlogs/${backlogId}/stories`),
+    apiUrl(`/v1/planning/backlogs/${backlogId}/items`),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story_id: createdStoryId, position: 0 }),
+      body: JSON.stringify({ work_item_id: createdStoryId }),
     },
   );
 
@@ -234,7 +235,7 @@ export async function updateStory(
   const payload = buildPayload("edit", values, null);
 
   const updateResponse = await fetch(
-    apiUrl(`/v1/planning/stories/${storyId}`),
+    apiUrl(`/v1/planning/work-items/${storyId}`),
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

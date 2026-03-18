@@ -85,7 +85,7 @@ export function ListRowsSection({
                   {isStoryRow ? (
                     <StoryActionsMenu
                       storyId={row.id}
-                      storyType={row.story_type}
+                      storyType={row.sub_type ?? row.type}
                       storyKey={row.key}
                       storyTitle={row.title}
                       storyStatus={row.status}

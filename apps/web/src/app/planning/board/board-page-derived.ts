@@ -92,7 +92,7 @@ export function applyBoardFilters(
     ...viewState,
     data: {
       ...viewState.data,
-      stories: applyPlanningStoryFilters(viewState.data.stories, filters),
+      items: applyPlanningStoryFilters(viewState.data.items, filters),
     },
   };
 }
@@ -113,7 +113,7 @@ export function buildBoardFilterOptions(
   viewState: BoardState,
   assigneeOptions: QuickCreateAssigneeOption[],
 ): BoardFilterOptions {
-  const allStories = viewState.kind === "ok" ? viewState.data.stories : [];
+  const allStories = viewState.kind === "ok" ? viewState.data.items : [];
   return {
     statusOptions: buildStoryStatusOptions(allStories),
     typeOptions: buildStoryTypeOptions(allStories),
@@ -144,8 +144,8 @@ export function computeBoardSummary(
   visibleState: BoardState,
 ): BoardSummary | null {
   if (visibleState.kind !== "ok") return null;
-  const total = visibleState.data.stories.length;
-  const done = visibleState.data.stories.filter(
+  const total = visibleState.data.items.length;
+  const done = visibleState.data.items.filter(
     (story) => story.status === "DONE",
   ).length;
   const pctDone = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -166,7 +166,7 @@ export function findSelectedStoryLabels(
   selectedStoryId: string | null,
 ): undefined | Array<{ id: string; name: string; color: string | null }> {
   if (state.kind !== "ok" || !selectedStoryId) return undefined;
-  return state.data.stories.find((story) => story.id === selectedStoryId)
+  return state.data.items.find((story) => story.id === selectedStoryId)
     ?.labels;
 }
 
@@ -209,8 +209,5 @@ export function insertCreatedStory(
   story: StoryCardStory,
 ): BoardState {
   if (prev.kind !== "ok" || prev.projectId !== projectId) return prev;
-  const shiftedStories = prev.data.stories.map((s) =>
-    s.status === "TODO" ? { ...s, position: s.position + 1 } : s,
-  );
-  return { ...prev, data: { ...prev.data, stories: [story, ...shiftedStories] } };
+  return { ...prev, data: { ...prev.data, items: [story, ...prev.data.items] } };
 }

@@ -30,11 +30,12 @@ export interface PlanningStoryFilterItem {
   key: string | null;
   title: string;
   status: WorkItemStatus;
-  story_type: string;
+  type: string;
+  sub_type: string | null;
   labels?: readonly { id: string; name?: string | null }[];
-  epic_id?: string | null;
-  epic_key?: string | null;
-  epic_title?: string | null;
+  parent_id?: string | null;
+  parent_key?: string | null;
+  parent_title?: string | null;
   current_assignee_agent_id?: string | null;
   assignee_agent_id?: string | null;
 }
@@ -127,9 +128,9 @@ export function applyPlanningStoryFilters<T extends PlanningStoryFilterItem>(
     key: story.key,
     title: story.title,
     status: story.status,
-    type: story.story_type,
+    type: story.sub_type ?? story.type,
     labelIds: (story.labels ?? []).map((label) => label.id),
-    epicId: story.epic_id ?? null,
+    epicId: story.parent_id ?? null,
     assigneeId: normalizeAssigneeId(story),
   }));
 }
@@ -143,9 +144,9 @@ export function buildStoryStatusOptions(
 }
 
 export function buildStoryTypeOptions(
-  stories: readonly Pick<PlanningStoryFilterItem, "story_type">[],
+  stories: readonly Pick<PlanningStoryFilterItem, "type" | "sub_type">[],
 ): PlanningFilterOption[] {
-  return [...new Set(stories.map((story) => story.story_type))]
+  return [...new Set(stories.map((story) => story.sub_type ?? story.type))]
     .sort((a, b) => a.localeCompare(b))
     .map((type) => ({ value: type, label: normalizeLabel(type) }));
 }
@@ -168,33 +169,33 @@ export function buildStoryLabelOptions(
 }
 
 export function buildStoryEpicOptions(
-  stories: readonly Pick<PlanningStoryFilterItem, "epic_id" | "epic_key" | "epic_title">[],
+  stories: readonly Pick<PlanningStoryFilterItem, "parent_id" | "parent_key" | "parent_title">[],
 ): PlanningFilterOption[] {
   const epicsById = new Map<string, string>();
 
   for (const story of stories) {
-    if (!story.epic_id) {
+    if (!story.parent_id) {
       continue;
     }
 
-    const key = story.epic_key?.trim();
-    const title = story.epic_title?.trim();
+    const key = story.parent_key?.trim();
+    const title = story.parent_title?.trim();
     if (key && title) {
-      epicsById.set(story.epic_id, `${key} ${title}`);
+      epicsById.set(story.parent_id, `${key} ${title}`);
       continue;
     }
 
     if (key) {
-      epicsById.set(story.epic_id, key);
+      epicsById.set(story.parent_id, key);
       continue;
     }
 
     if (title) {
-      epicsById.set(story.epic_id, title);
+      epicsById.set(story.parent_id, title);
       continue;
     }
 
-    epicsById.set(story.epic_id, story.epic_id);
+    epicsById.set(story.parent_id, story.parent_id);
   }
 
   return [...epicsById.entries()]

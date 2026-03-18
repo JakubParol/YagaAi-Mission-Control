@@ -26,7 +26,7 @@ interface BacklogSectionHeaderProps {
     is_default: boolean;
   };
   collapsed: boolean;
-  stories: ReadonlyArray<{ status: string; task_count: number }>;
+  stories: ReadonlyArray<{ status: string; children_count: number }>;
   hasAnyActiveSprint: boolean;
   isSprintPending: boolean;
   isBoardDeletePending: boolean;
@@ -115,7 +115,7 @@ export function BacklogSectionHeader({
 }: BacklogSectionHeaderProps) {
   const Chevron = collapsed ? ChevronRight : ChevronDown;
   const isSprint = backlog.kind === "SPRINT";
-  const workItemCount = stories.length + stories.reduce((acc, story) => acc + story.task_count, 0);
+  const workItemCount = stories.length + stories.reduce((acc, story) => acc + story.children_count, 0);
   const todoCount = getStatusCount(stories, "TODO");
   const inProgressCount = getStatusCount(stories, "IN_PROGRESS");
   const doneCount = getStatusCount(stories, "DONE");

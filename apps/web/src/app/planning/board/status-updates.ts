@@ -7,7 +7,7 @@ export interface StoryWithStatus {
 
 export interface ActiveSprintDataLike<TStory extends StoryWithStatus = StoryWithStatus> {
   backlog: unknown;
-  stories: TStory[];
+  items: TStory[];
 }
 
 export function applyOptimisticStoryStatus<
@@ -18,7 +18,7 @@ export function applyOptimisticStoryStatus<
   storyId: string,
   nextStatus: WorkItemStatus,
 ): { data: TData; previousStatus: WorkItemStatus | null } {
-  const story = data.stories.find((item) => item.id === storyId);
+  const story = data.items.find((item) => item.id === storyId);
   if (!story || story.status === nextStatus) {
     return { data, previousStatus: null };
   }
@@ -27,7 +27,7 @@ export function applyOptimisticStoryStatus<
     previousStatus: story.status,
     data: {
       ...data,
-      stories: data.stories.map((item) =>
+      items: data.items.map((item) =>
         item.id === storyId ? { ...item, status: nextStatus } : item,
       ),
     },
@@ -44,7 +44,7 @@ export function rollbackStoryStatus<
 ): TData {
   return {
     ...data,
-    stories: data.stories.map((item) =>
+    items: data.items.map((item) =>
       item.id === storyId ? { ...item, status: previousStatus } : item,
     ),
   } as TData;

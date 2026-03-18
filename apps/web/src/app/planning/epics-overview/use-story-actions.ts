@@ -20,9 +20,9 @@ import {
 
 export interface StoryActionsState {
   storyPendingById: Record<string, boolean>;
-  storyErrorByEpicKey: Record<string, string>;
-  previewFiltersByEpicKey: Record<string, EpicOverviewStoryPreviewFilters>;
-  expandedByEpicKey: Record<string, boolean>;
+  storyErrorByKey: Record<string, string>;
+  previewFiltersByKey: Record<string, EpicOverviewStoryPreviewFilters>;
+  expandedByKey: Record<string, boolean>;
 }
 
 export interface StoryActionsCallbacks {
@@ -35,14 +35,14 @@ export interface StoryActionsCallbacks {
 
 export function useStoryActions(
   singleProjectId: string | null,
-  setPreviewByEpicKey: React.Dispatch<React.SetStateAction<Record<string, PreviewState>>>,
+  setPreviewByKey: React.Dispatch<React.SetStateAction<Record<string, PreviewState>>>,
 ): StoryActionsState & StoryActionsCallbacks {
   const [storyPendingById, setStoryPendingById] = useState<Record<string, boolean>>({});
-  const [storyErrorByEpicKey, setStoryErrorByEpicKey] = useState<Record<string, string>>({});
-  const [previewFiltersByEpicKey, setPreviewFiltersByEpicKey] = useState<
+  const [storyErrorByKey, setStoryErrorByEpicKey] = useState<Record<string, string>>({});
+  const [previewFiltersByKey, setPreviewFiltersByEpicKey] = useState<
     Record<string, EpicOverviewStoryPreviewFilters>
   >({});
-  const [expandedByEpicKey, setExpandedByEpicKey] = useState<Record<string, boolean>>({});
+  const [expandedByKey, setExpandedByEpicKey] = useState<Record<string, boolean>>({});
 
   const resetAll = useCallback(() => {
     setStoryPendingById({});
@@ -66,18 +66,18 @@ export function useStoryActions(
     storyId: string,
     patch: Partial<EpicOverviewStoryPreview>,
   ) => {
-    setPreviewByEpicKey((current) => {
+    setPreviewByKey((current) => {
       const entry = current[epicKey];
       if (!entry || entry.kind !== "ready") return current;
       return {
         ...current,
         [epicKey]: {
           kind: "ready",
-          stories: entry.stories.map((s) => (s.story_id === storyId ? { ...s, ...patch } : s)),
+          stories: entry.stories.map((s) => (s.work_item_id === storyId ? { ...s, ...patch } : s)),
         },
       };
     });
-  }, [setPreviewByEpicKey]);
+  }, [setPreviewByKey]);
 
   const clearStoryError = useCallback((epicKey: string) => {
     setStoryErrorByEpicKey((current) => {
@@ -111,13 +111,13 @@ export function useStoryActions(
     story: EpicOverviewStoryPreview,
     nextStatus: WorkItemStatus,
   ) => {
-    if (storyPendingById[story.story_id]) return;
-    markStoryPending(story.story_id, true);
+    if (storyPendingById[story.work_item_id]) return;
+    markStoryPending(story.work_item_id, true);
     clearStoryError(epicKey);
 
-    void changeStoryStatusAction(story.story_id, nextStatus)
+    void changeStoryStatusAction(story.work_item_id, nextStatus)
       .then(({ timestamp }) => {
-        updateCachedStory(epicKey, story.story_id, {
+        updateCachedStory(epicKey, story.work_item_id, {
           status: nextStatus,
           updated_at: timestamp ?? story.updated_at,
         });
@@ -125,7 +125,7 @@ export function useStoryActions(
       .catch((error: unknown) => {
         setStoryError(epicKey, error instanceof Error ? error.message : "Failed to update story status.");
       })
-      .finally(() => { markStoryPending(story.story_id, false); });
+      .finally(() => { markStoryPending(story.work_item_id, false); });
   }, [clearStoryError, markStoryPending, setStoryError, storyPendingById, updateCachedStory]);
 
   const handleAddStoryToSprint = useCallback((
@@ -136,25 +136,25 @@ export function useStoryActions(
       setStoryError(epicKey, "Select a single project before adding a story to sprint.");
       return;
     }
-    if (storyPendingById[story.story_id]) return;
-    markStoryPending(story.story_id, true);
+    if (storyPendingById[story.work_item_id]) return;
+    markStoryPending(story.work_item_id, true);
     clearStoryError(epicKey);
 
-    void addStoryToSprintAction(story.story_id, singleProjectId)
+    void addStoryToSprintAction(story.work_item_id, singleProjectId)
       .then(({ timestamp }) => {
-        updateCachedStory(epicKey, story.story_id, { updated_at: timestamp ?? story.updated_at });
+        updateCachedStory(epicKey, story.work_item_id, { updated_at: timestamp ?? story.updated_at });
       })
       .catch((error: unknown) => {
         setStoryError(epicKey, error instanceof Error ? error.message : "Failed to add story to sprint.");
       })
-      .finally(() => { markStoryPending(story.story_id, false); });
+      .finally(() => { markStoryPending(story.work_item_id, false); });
   }, [clearStoryError, markStoryPending, setStoryError, singleProjectId, storyPendingById, updateCachedStory]);
 
   return {
     storyPendingById,
-    storyErrorByEpicKey,
-    previewFiltersByEpicKey,
-    expandedByEpicKey,
+    storyErrorByKey,
+    previewFiltersByKey,
+    expandedByKey,
     handleToggleExpand,
     handlePreviewFilterChange,
     handleChangeStoryStatus,

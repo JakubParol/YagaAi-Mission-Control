@@ -11,15 +11,13 @@
 |---|---|
 | Project | `ACTIVE`, `ARCHIVED` |
 | Backlog | `OPEN`, `ACTIVE`, `CLOSED` |
-| Story | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
-| Task | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
-| Epic | `TODO`, `IN_PROGRESS`, `DONE` |
+| Work Item (all types) | `TODO`, `IN_PROGRESS`, `CODE_REVIEW`, `VERIFY`, `DONE` |
 
 ---
 
-## 2) Tasks
+## 2) Work Items
 
-Current task lifecycle behavior:
+All work item types (`EPIC`, `STORY`, `TASK`, `BUG`) share the same lifecycle:
 - status is set explicitly
 - transition to `IN_PROGRESS` sets `started_at` on first start
 - transition to `DONE` sets `completed_at`
@@ -27,35 +25,19 @@ Current task lifecycle behavior:
 - transition to `DONE` closes active assignment state
 
 Guardrails currently enforced:
-- blocked task cannot be moved to `DONE`
+- blocked work item cannot be moved to `DONE`
 - `blocked_reason` can only be set when `is_blocked = true`
 - clearing `is_blocked` clears `blocked_reason`
 
----
+## 3) Epic-type derived status
 
-## 3) Stories
+Epic-type work items support derived status from children:
+- no children → stays manual
+- all children `TODO` → `TODO`
+- all children `DONE` → `DONE`
+- mixed → `IN_PROGRESS`
 
-Story status is currently **manual**.
-It is not derived from child tasks.
-
-Story write model also supports:
-- `is_blocked`
-- `blocked_reason`
-- assignee change tracking / assignment event emission
-
----
-
-## 4) Epics
-
-Epic status supports derived behavior from child stories.
-
-Current rule of thumb:
-- no child stories → epic can stay effectively manual
-- all child stories `TODO` → epic `TODO`
-- all child stories `DONE` → epic `DONE`
-- mixed child story states → epic `IN_PROGRESS`
-
-Epic records also support manual/blocking metadata on the entity itself, while overview/read models additionally surface child-story blockage signals.
+Manual override is temporary; expires on next child status change.
 
 ---
 
@@ -70,6 +52,7 @@ Important current behavior:
 - creating or converting a backlog to `SPRINT` puts it into `OPEN`
 - an active sprint uses `ACTIVE`
 - completed sprint uses `CLOSED`
+- sprint completion requires `target_backlog_id` body — non-DONE items are moved to that backlog
 - only one active sprint is allowed per project
 - only project-scoped backlogs can become sprints
 - active sprint membership is managed through dedicated endpoints, not raw backlog patching
@@ -80,12 +63,12 @@ Important current behavior:
 
 | Trigger | Side effect |
 |---|---|
-| Task → `IN_PROGRESS` first time | sets `started_at` |
-| Task → `DONE` | sets `completed_at`, closes active assignment |
-| Task away from `DONE` | clears `completed_at` |
-| Story/task assignee change | writes durable assignment-change event ledger entry |
+| Work item → `IN_PROGRESS` first time | sets `started_at` |
+| Work item → `DONE` | sets `completed_at`, closes active assignment |
+| Work item away from `DONE` | clears `completed_at` |
+| Work item assignee change | writes durable assignment-change event ledger entry |
 | Sprint start | activates the sprint and establishes active-sprint context for the project |
-| Sprint complete | closes the sprint, but only when completion rules pass |
+| Sprint complete | moves non-DONE items to target backlog, closes the sprint |
 
 ---
 

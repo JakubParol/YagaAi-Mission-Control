@@ -35,13 +35,13 @@ export async function fetchList<T>(path: string): Promise<T[]> {
 export async function fetchListResult(projectId: string): Promise<FetchResult> {
   const [stories, tasks, epics, backlogs, agents] = await Promise.all([
     fetchList<PlanningStoryApiItem>(
-      `/v1/planning/stories?project_id=${projectId}&limit=100&sort=-updated_at`,
+      `/v1/planning/work-items?type=STORY&project_id=${projectId}&limit=100&sort=-updated_at`,
     ),
     fetchList<PlanningTaskApiItem>(
-      `/v1/planning/tasks?project_id=${projectId}&limit=100&sort=-updated_at`,
+      `/v1/planning/work-items?type=TASK&project_id=${projectId}&limit=100&sort=-updated_at`,
     ),
     fetchList<PlanningEpicApiItem>(
-      `/v1/planning/epics?project_id=${projectId}&limit=100`,
+      `/v1/planning/work-items?type=EPIC&project_id=${projectId}&limit=100`,
     ),
     fetchList<PlanningBacklogApiItem>(
       `/v1/planning/backlogs?project_id=${projectId}&limit=100`,
@@ -54,7 +54,7 @@ export async function fetchListResult(projectId: string): Promise<FetchResult> {
   const backlogStoryGroups = await Promise.all(
     backlogs.map((backlog) =>
       fetchList<PlanningBacklogStoryApiItem>(
-        `/v1/planning/backlogs/${backlog.id}/stories`,
+        `/v1/planning/backlogs/${backlog.id}/items`,
       ).catch(() => []),
     ),
   );
@@ -119,7 +119,7 @@ export async function patchStoryStatus(
   storyId: string,
   status: WorkItemStatus,
 ): Promise<void> {
-  const response = await fetch(apiUrl(`/v1/planning/stories/${storyId}`), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${storyId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
@@ -130,15 +130,11 @@ export async function patchStoryStatus(
 }
 
 export async function patchRowAssignee(
-  rowType: "story" | "task",
+  _rowType: "story" | "task",
   rowId: string,
   assigneeId: string | null,
 ): Promise<void> {
-  const endpoint =
-    rowType === "story"
-      ? `/v1/planning/stories/${rowId}`
-      : `/v1/planning/tasks/${rowId}`;
-  const response = await fetch(apiUrl(endpoint), {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${rowId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ current_assignee_agent_id: assigneeId }),

@@ -19,7 +19,7 @@ import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
 import type { StoryCardStory } from "@/components/planning/story-card";
 
-import type { BacklogItem, BacklogWithStories, PageState, SprintCompleteDialogState } from "./backlog-types";
+import type { BacklogItem, BacklogWithItems, PageState, SprintCompleteDialogState } from "./backlog-types";
 import { isCompleteSprintTarget } from "./backlog-view-model";
 
 // ── URL filter helpers ───────────────────────────────────────────────
@@ -66,11 +66,11 @@ export function buildClearFiltersUrl(
 export function computeFilteredSections(
   state: PageState,
   filters: PlanningFiltersValue,
-): BacklogWithStories[] {
+): BacklogWithItems[] {
   if (state.kind !== "ok") return [];
   return state.sections.map((section) => ({
     ...section,
-    stories: applyPlanningStoryFilters(section.stories, filters),
+    items: applyPlanningStoryFilters(section.items, filters),
   }));
 }
 
@@ -88,7 +88,7 @@ export function buildBacklogFilterOptions(
   state: PageState,
 ): BacklogFilterOptions {
   const allStories: StoryCardStory[] =
-    state.kind === "ok" ? state.sections.flatMap((s) => s.stories) : [];
+    state.kind === "ok" ? state.sections.flatMap((s) => s.items) : [];
   return {
     statusOptions: buildStoryStatusOptions(allStories),
     typeOptions: buildStoryTypeOptions(allStories),
@@ -114,12 +114,12 @@ export interface WorkItemStats {
 
 export function computeWorkItemStats(
   state: PageState,
-  filteredSections: readonly BacklogWithStories[],
+  filteredSections: readonly BacklogWithItems[],
 ): WorkItemStats {
   if (state.kind !== "ok") return { total: 0, visible: 0 };
-  const countItems = (sections: readonly BacklogWithStories[]) =>
+  const countItems = (sections: readonly BacklogWithItems[]) =>
     sections.reduce(
-      (acc, s) => acc + s.stories.length + s.stories.reduce((t, st) => t + st.task_count, 0),
+      (acc, s) => acc + s.items.length + s.items.reduce((t, st) => t + st.children_count, 0),
       0,
     );
   return {
@@ -161,7 +161,7 @@ export function resolveActiveSelectedStoryId(
   selectedStoryId: string | null,
 ): string | null {
   if (state.kind !== "ok" || !selectedStoryId) return null;
-  return state.sections.some((s) => s.stories.some((st) => st.id === selectedStoryId))
+  return state.sections.some((s) => s.items.some((st) => st.id === selectedStoryId))
     ? selectedStoryId
     : null;
 }
@@ -172,7 +172,7 @@ export function resolveSelectedStoryLabels(
 ): Array<{ id: string; name: string; color: string | null }> | undefined {
   if (state.kind !== "ok" || !activeSelectedStoryId) return undefined;
   return state.sections
-    .flatMap((s) => s.stories)
+    .flatMap((s) => s.items)
     .find((st) => st.id === activeSelectedStoryId)?.labels;
 }
 
@@ -191,9 +191,9 @@ export function removePendingId(
 
 export interface BoardSwapTarget {
   currentId: string;
-  currentOrder: number;
+  currentRank: string;
   swapWithId: string;
-  swapWithOrder: number;
+  swapWithRank: string;
 }
 
 export type MoveDirection = "top" | "up" | "down" | "bottom";
@@ -222,9 +222,9 @@ export function computeBoardSwapTarget(
   const swapWith = moveable[swapIndex];
   return {
     currentId: current.id,
-    currentOrder: current.display_order ?? (currentIndex + 1) * 100,
+    currentRank: current.rank,
     swapWithId: swapWith.id,
-    swapWithOrder: swapWith.display_order ?? (swapIndex + 1) * 100,
+    swapWithRank: swapWith.rank,
   };
 }
 
@@ -251,7 +251,7 @@ export function prepareSprintCompletion(
   if (!section) {
     return { outcome: "error", message: "Sprint was not found in current view. Refresh and try again." };
   }
-  const openStories: StoryCardStory[] = section.stories.filter((s) => s.status !== "DONE");
+  const openStories: StoryCardStory[] = section.items.filter((s) => s.status !== "DONE");
   if (openStories.length === 0) {
     return { outcome: "no-open-stories", backlogId, backlogName };
   }
@@ -267,7 +267,7 @@ export function prepareSprintCompletion(
     dialog: {
       backlogId,
       backlogName,
-      completedCount: section.stories.filter((s) => s.status === "DONE").length,
+      completedCount: section.items.filter((s) => s.status === "DONE").length,
       openStories,
     },
     defaultTargetId,

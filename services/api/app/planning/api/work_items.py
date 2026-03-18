@@ -35,7 +35,7 @@ router = APIRouter(prefix="/work-items", tags=["work-items"])
 # ------------------------------------------------------------------
 
 
-@router.post("/", status_code=201, response_model=WorkItemResponse)
+@router.post("", status_code=201, response_model=WorkItemResponse)
 async def create_work_item(
     body: WorkItemCreate,
     svc: WorkItemService = Depends(get_work_item_service),
@@ -58,7 +58,7 @@ async def create_work_item(
     return WorkItemResponse(**_to_dict(item))
 
 
-@router.get("/", response_model=ListEnvelope[WorkItemResponse])
+@router.get("", response_model=ListEnvelope[WorkItemResponse])
 async def list_work_items(
     project_id: str | None = Depends(resolve_project_key),
     type: str | None = Query(None),
@@ -136,10 +136,7 @@ async def get_by_key(
     return WorkItemDetailResponse(
         **_to_dict(item),
         children_count=children_count,
-        assignments=[
-            WorkItemAssignmentResponse(**_assignment_to_dict(a))
-            for a in assignments
-        ],
+        assignments=[WorkItemAssignmentResponse(**_assignment_to_dict(a)) for a in assignments],
     )
 
 
@@ -153,10 +150,7 @@ async def get_work_item(
     return WorkItemDetailResponse(
         **_to_dict(item),
         children_count=children_count,
-        assignments=[
-            WorkItemAssignmentResponse(**_assignment_to_dict(a))
-            for a in assignments
-        ],
+        assignments=[WorkItemAssignmentResponse(**_assignment_to_dict(a)) for a in assignments],
     )
 
 
@@ -246,9 +240,7 @@ async def assign_agent(
     svc: WorkItemService = Depends(get_work_item_service),
     x_actor_id: str | None = Header(None),
 ):
-    assignment = await svc.assign_agent(
-        work_item_id, body.agent_id, assigned_by=x_actor_id
-    )
+    assignment = await svc.assign_agent(work_item_id, body.agent_id, assigned_by=x_actor_id)
     return WorkItemAssignmentResponse(**_assignment_to_dict(assignment))
 
 
@@ -261,10 +253,7 @@ async def list_assignments(
     svc: WorkItemService = Depends(get_work_item_service),
 ):
     assignments = await svc.list_assignments(work_item_id)
-    return [
-        WorkItemAssignmentResponse(**_assignment_to_dict(a))
-        for a in assignments
-    ]
+    return [WorkItemAssignmentResponse(**_assignment_to_dict(a)) for a in assignments]
 
 
 @router.delete("/{work_item_id}/assignments/current", status_code=204)

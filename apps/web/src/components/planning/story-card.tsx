@@ -22,15 +22,16 @@ export interface StoryCardStory {
   id: string;
   key: string | null;
   title: string;
+  type: string;
+  sub_type: string | null;
   status: WorkItemStatus;
   priority: number | null;
-  story_type: string;
-  epic_id?: string | null;
-  epic_key?: string | null;
-  epic_title?: string | null;
-  position: number;
-  task_count: number;
-  done_task_count: number;
+  parent_id?: string | null;
+  parent_key?: string | null;
+  parent_title?: string | null;
+  rank: string;
+  children_count: number;
+  done_children_count: number;
   labels?: WorkItemLabel[];
   label_ids?: string[];
   assignee?: {
@@ -163,7 +164,7 @@ export function StoryCard({
   actions?: ReactNode;
   assigneeControl?: ReactNode;
 }) {
-  const typeConfig = resolveStoryTypeVisualConfig(story.story_type);
+  const typeConfig = resolveStoryTypeVisualConfig(story.sub_type ?? story.type);
   const TypeIcon = typeConfig.icon;
   const assignee = resolveStoryAssignee(story);
   const assigneeName = assignee?.name?.trim() ?? "Unassigned";
@@ -212,8 +213,8 @@ export function StoryCard({
       {/* Epic */}
       <div className="mb-1.5 min-h-4">
         <StoryEpicDisplay
-          epicKey={story.epic_key}
-          epicTitle={story.epic_title}
+          epicKey={story.parent_key}
+          epicTitle={story.parent_title}
           emptyLabel="No epic"
           className="w-full"
         />
@@ -230,8 +231,8 @@ export function StoryCard({
 
         <div className={STORY_CARD_LAYOUT.metadataRight}>
           <StoryTaskProgress
-            doneCount={story.done_task_count}
-            totalCount={story.task_count}
+            doneCount={story.done_children_count}
+            totalCount={story.children_count}
           />
           <PriorityIndicator priority={story.priority} />
           <Tooltip>

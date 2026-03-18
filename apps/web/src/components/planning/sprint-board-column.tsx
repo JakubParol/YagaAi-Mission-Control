@@ -122,7 +122,7 @@ export function BoardColumn({
                   onStoryDelete ? (
                     <StoryActionsMenu
                       storyId={story.id}
-                      storyType={story.story_type}
+                      storyType={story.sub_type ?? story.type}
                       storyKey={story.key}
                       storyTitle={story.title}
                       storyStatus={story.status}

@@ -32,11 +32,11 @@ export function TaskDetailDialog({ row, open, onOpenChange }: TaskDetailDialogPr
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{row.key ?? "No key"}</Badge>
               <Badge variant="secondary">{STATUS_LABEL[row.status]}</Badge>
-              <Badge variant="outline">{row.task_type ?? "Task"}</Badge>
+              <Badge variant="outline">{row.sub_type ?? "Task"}</Badge>
             </div>
             <p className="text-muted-foreground">
-              {row.objective?.trim()
-                ? row.objective
+              {row.summary?.trim()
+                ? row.summary
                 : "No task objective provided."}
             </p>
             <p className="text-xs text-muted-foreground">
