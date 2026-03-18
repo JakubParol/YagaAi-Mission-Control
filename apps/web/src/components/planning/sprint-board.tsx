@@ -3,7 +3,7 @@ import type { WorkItemStatus } from "@/lib/planning/types";
 import type { StoryCardStory } from "./story-card";
 import type { StoryAssigneeSelection } from "@/components/planning/story-assignee-control";
 import type { QuickCreateAssigneeOption, QuickCreateSubmitInput } from "@/app/planning/board/quick-create";
-import { BoardColumn } from "./sprint-board-column";
+import { BoardColumn, type DropPlacement } from "./sprint-board-column";
 
 // Re-export layout constant so the test import path stays unchanged
 export { TODO_QUICK_CREATE_LAYOUT } from "./sprint-board-quick-create";
@@ -47,6 +47,7 @@ export interface SprintBoardProps {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
   onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
+  onStoryReorder?: (storyId: string, beforeId: string | null, afterId: string | null) => void;
   onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   pendingStoryIds?: ReadonlySet<string>;
@@ -60,6 +61,7 @@ export function SprintBoard({
   data,
   onStoryClick,
   onStoryStatusChange,
+  onStoryReorder,
   onStoryAssigneeChange,
   onStoryDelete,
   pendingStoryIds,
@@ -121,7 +123,7 @@ export function SprintBoard({
     }
   };
 
-  const handleDrop = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>, placement: DropPlacement | null) => {
     event.preventDefault();
     const draggedStoryId = event.dataTransfer.getData("text/plain") || draggingStoryId;
     setDropTargetStatus(null);
@@ -132,10 +134,17 @@ export function SprintBoard({
     }
 
     const draggedStory = data.items.find((story) => story.id === draggedStoryId);
-    if (!draggedStory || draggedStory.status === status) {
+    if (!draggedStory) return;
+
+    if (draggedStory.status === status) {
+      // Same-column reorder: forward placement info if available
+      if (placement) {
+        onStoryReorder?.(draggedStoryId, placement.beforeId, placement.afterId);
+      }
       return;
     }
 
+    // Cross-column status change — existing behavior preserved
     onStoryStatusChange?.(draggedStoryId, status);
   };
 

@@ -21,14 +21,17 @@ import {
   fetchAssigneeOptions,
   patchStoryStatus,
   patchStoryAssignee,
+  patchStoryRank,
   type BoardState,
 } from "./board-page-actions";
 import {
   applyBoardFilters,
+  applyOptimisticStoryRank,
   buildBoardFilterOptions,
   buildClearFiltersUrl,
   buildFilterUrl,
   computeBoardSummary,
+  computeReorderRank,
   deriveViewState,
   enrichCreatedStory,
   findSelectedStoryLabels,
@@ -140,6 +143,33 @@ function BoardPageContent() {
       }
     },
     [setErrorToast, state],
+  );
+
+  const handleStoryReorder = useCallback(
+    async (storyId: string, beforeId: string | null, afterId: string | null) => {
+      if (state.kind !== "ok") return;
+      const existingStory = state.data.items.find((item) => item.id === storyId);
+      if (!existingStory) return;
+
+      const newRank = computeReorderRank(state.data.items, storyId, beforeId, afterId);
+      if (newRank === null) return; // no-op: dropped onto itself
+
+      const previousRank = existingStory.rank;
+      const backlogId = state.data.backlog.id;
+
+      setState((prev) => applyOptimisticStoryRank(prev, storyId, newRank));
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+
+      try {
+        await patchStoryRank(backlogId, storyId, newRank);
+      } catch {
+        setState((prev) => applyOptimisticStoryRank(prev, storyId, previousRank));
+        setErrorToast("Failed to reorder story. Changes were rolled back.");
+      } finally {
+        setPendingStoryIds((prev) => removePendingId(prev, storyId));
+      }
+    },
+    [state],
   );
 
   const handleTodoQuickCreate = useCallback(
@@ -256,6 +286,7 @@ function BoardPageContent() {
           data={visibleState.data}
           onStoryClick={setSelectedStoryId}
           onStoryStatusChange={handleStoryStatusChange}
+          onStoryReorder={handleStoryReorder}
           onStoryAssigneeChange={handleStoryAssigneeChange}
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
