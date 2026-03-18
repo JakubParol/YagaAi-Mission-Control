@@ -90,6 +90,12 @@ deploy_prod() {
   MC_IMAGE_TAG="$current_sha" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV" up -d --remove-orphans --wait
 
   smoke_check "http://127.0.0.1:5100/healthz" "http://127.0.0.1:3100/dashboard"
+
+  log_info "Tagging images as :latest for systemd reboot..."
+  for svc in api web worker; do
+    docker tag "mission-control/$svc:$current_sha" "mission-control/$svc:latest" 2>/dev/null || true
+  done
+  log_ok "Images tagged as :latest ($current_sha)"
   show_runtime_status "$PROD_COMPOSE_FILE" "$PROD_ENV" "$current_sha"
 
   log_info "API /healthz response:"
@@ -131,6 +137,12 @@ deploy_dev() {
   MC_IMAGE_TAG="$current_sha" docker compose -f "$DEV_COMPOSE_FILE" --env-file "$DEV_ENV" up -d --remove-orphans --wait
 
   smoke_check "http://127.0.0.1:5000/healthz" "http://127.0.0.1:3000/dashboard"
+
+  log_info "Tagging images as :latest for systemd reboot..."
+  for svc in api web; do
+    docker tag "mission-control/$svc:$current_sha" "mission-control/$svc:latest" 2>/dev/null || true
+  done
+  log_ok "Images tagged as :latest ($current_sha)"
   show_runtime_status "$DEV_COMPOSE_FILE" "$DEV_ENV" "$current_sha"
 
   log_info "API /healthz response:"

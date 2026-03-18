@@ -177,7 +177,7 @@ export function StoryCard({
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
-      draggable={!disabled}
+      draggable={!disabled && !!onDragStart}
       onClick={() => onClick?.(story.id)}
       onKeyDown={(event) => {
         if (disabled) return;

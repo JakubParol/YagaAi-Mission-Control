@@ -10,7 +10,7 @@ import { PlanningFilters, type PlanningFiltersValue } from "@/components/plannin
 import { PageShell } from "@/components/page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import { EmptyState } from "@/components/empty-state";
-import { SprintBoard } from "@/components/planning/sprint-board";
+import { SprintBoard, type DropPlacement } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { deleteStory } from "../story-actions";
 import { createTodoQuickItem, type QuickCreateAssigneeOption, type QuickCreateSubmitInput } from "./quick-create";
@@ -21,17 +21,21 @@ import {
   fetchAssigneeOptions,
   patchStoryStatus,
   patchStoryAssignee,
+  patchStoryRank,
   type BoardState,
 } from "./board-page-actions";
 import {
   applyBoardFilters,
+  applyOptimisticStoryRank,
   buildBoardFilterOptions,
   buildClearFiltersUrl,
   buildFilterUrl,
   computeBoardSummary,
+  computeReorderRank,
   deriveViewState,
   enrichCreatedStory,
   findSelectedStoryLabels,
+  hasActiveFilters,
   insertCreatedStory,
   readFiltersFromSearchParams,
   removePendingId,
@@ -57,6 +61,7 @@ function BoardPageContent() {
   const { singleProjectId, viewState } = deriveViewState(allSelected, selectedProjectIds, state);
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
+  const filtersActive = hasActiveFilters(filters);
   const filterOptions = buildBoardFilterOptions(viewState, assigneeOptions);
   const boardSummary = computeBoardSummary(visibleState);
   const selectedStoryLabels = findSelectedStoryLabels(state, selectedStoryId);
@@ -114,32 +119,87 @@ function BoardPageContent() {
   }, [refreshCurrentView, singleProjectId]);
 
   const handleStoryStatusChange = useCallback(
-    async (storyId: string, nextStatus: WorkItemStatus) => {
+    async (storyId: string, nextStatus: WorkItemStatus, placement?: DropPlacement | null) => {
       if (state.kind !== "ok") return;
       const existingStory = state.data.items.find((item) => item.id === storyId);
       if (!existingStory || existingStory.status === nextStatus) return;
       const previousStatus: WorkItemStatus = existingStory.status;
+      const previousRank = existingStory.rank;
+      const backlogId = state.data.backlog.id;
+
+      // Compute a new rank when the drop landed at a specific position in the target column.
+      const newRank = placement
+        ? computeReorderRank(state.data.items, storyId, placement.beforeId, placement.afterId)
+        : null;
 
       setState((prev) => {
         if (prev.kind !== "ok") return prev;
-        const result = applyOptimisticStoryStatus(prev.data, storyId, nextStatus);
-        return result.previousStatus ? { ...prev, data: result.data } : prev;
+        const statusResult = applyOptimisticStoryStatus(prev.data, storyId, nextStatus);
+        if (!statusResult.previousStatus) return prev;
+        const afterStatus: BoardState = { ...prev, data: statusResult.data };
+        return newRank ? applyOptimisticStoryRank(afterStatus, storyId, newRank) : afterStatus;
       });
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
 
       try {
         await patchStoryStatus(storyId, nextStatus);
+        // Status is now persisted on the server. Any failure from here on cannot
+        // be cleanly rolled back locally — we must refresh from server instead.
+        if (newRank) {
+          try {
+            await patchStoryRank(backlogId, storyId, newRank);
+          } catch {
+            // Rank update failed but status update already succeeded on the server.
+            // Refresh from server so the UI reflects the actual persisted state.
+            try {
+              await refreshCurrentView();
+            } catch {
+              // If the refresh also fails, leave the optimistic state visible.
+            }
+            setErrorToast("Story moved but position could not be saved. Board refreshed.");
+          }
+        }
       } catch {
+        // patchStoryStatus failed — nothing was persisted yet, safe to roll back locally.
         setState((prev) => {
           if (prev.kind !== "ok") return prev;
-          return { ...prev, data: rollbackStoryStatus(prev.data, storyId, previousStatus) };
+          const withRestoredRank = newRank ? applyOptimisticStoryRank(prev, storyId, previousRank) : prev;
+          if (withRestoredRank.kind !== "ok") return withRestoredRank;
+          return { ...withRestoredRank, data: rollbackStoryStatus(withRestoredRank.data, storyId, previousStatus) };
         });
         setErrorToast("Failed to update story status. Changes were rolled back.");
       } finally {
         setPendingStoryIds((prev) => removePendingId(prev, storyId));
       }
     },
-    [setErrorToast, state],
+    [refreshCurrentView, setErrorToast, state],
+  );
+
+  const handleStoryReorder = useCallback(
+    async (storyId: string, beforeId: string | null, afterId: string | null) => {
+      if (state.kind !== "ok") return;
+      const existingStory = state.data.items.find((item) => item.id === storyId);
+      if (!existingStory) return;
+
+      const newRank = computeReorderRank(state.data.items, storyId, beforeId, afterId);
+      if (newRank === null) return; // no-op: dropped onto itself
+
+      const previousRank = existingStory.rank;
+      const backlogId = state.data.backlog.id;
+
+      setState((prev) => applyOptimisticStoryRank(prev, storyId, newRank));
+      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
+
+      try {
+        await patchStoryRank(backlogId, storyId, newRank);
+      } catch {
+        setState((prev) => applyOptimisticStoryRank(prev, storyId, previousRank));
+        setErrorToast("Failed to reorder story. Changes were rolled back.");
+      } finally {
+        setPendingStoryIds((prev) => removePendingId(prev, storyId));
+      }
+    },
+    [state],
   );
 
   const handleTodoQuickCreate = useCallback(
@@ -255,12 +315,14 @@ function BoardPageContent() {
         <SprintBoard
           data={visibleState.data}
           onStoryClick={setSelectedStoryId}
-          onStoryStatusChange={handleStoryStatusChange}
+          onStoryStatusChange={filtersActive ? undefined : handleStoryStatusChange}
+          onStoryReorder={filtersActive ? undefined : handleStoryReorder}
           onStoryAssigneeChange={handleStoryAssigneeChange}
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           onTodoQuickCreate={handleTodoQuickCreate}
           assigneeOptions={assigneeOptions}
+          dragDisabled={filtersActive}
         />
       )}
 

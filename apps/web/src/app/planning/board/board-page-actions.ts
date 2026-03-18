@@ -105,3 +105,22 @@ export async function patchStoryAssignee(
     throw new Error(await response.text());
   }
 }
+
+export async function patchStoryRank(
+  backlogId: string,
+  storyId: string,
+  rank: string,
+): Promise<void> {
+  const response = await fetch(
+    apiUrl(`/v1/planning/backlogs/${backlogId}/items/${storyId}/rank`),
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rank }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+}

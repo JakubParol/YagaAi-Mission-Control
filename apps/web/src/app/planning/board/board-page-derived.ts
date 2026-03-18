@@ -12,6 +12,7 @@ import {
 } from "@/components/planning/planning-filters";
 
 import type { StoryCardStory } from "@/components/planning/story-card";
+import { rankAfter, rankBefore, rankBetween } from "@/lib/lexorank";
 
 import type { BoardState } from "./board-page-actions";
 import type { QuickCreateAssigneeOption } from "./quick-create";
@@ -48,6 +49,10 @@ export function buildFilterUrl(
   }
   const qs = params.toString();
   return qs.length > 0 ? `${pathname}?${qs}` : pathname;
+}
+
+export function hasActiveFilters(filters: PlanningFiltersValue): boolean {
+  return Object.values(filters).some((v) => v !== "");
 }
 
 export function buildClearFiltersUrl(
@@ -88,11 +93,13 @@ export function applyBoardFilters(
   filters: PlanningFiltersValue,
 ): BoardState {
   if (viewState.kind !== "ok") return viewState;
+  const filtered = applyPlanningStoryFilters(viewState.data.items, filters);
+  const sorted = [...filtered].sort((a, b) => a.rank.localeCompare(b.rank));
   return {
     ...viewState,
     data: {
       ...viewState.data,
-      items: applyPlanningStoryFilters(viewState.data.items, filters),
+      items: sorted,
     },
   };
 }
@@ -210,4 +217,64 @@ export function insertCreatedStory(
 ): BoardState {
   if (prev.kind !== "ok" || prev.projectId !== projectId) return prev;
   return { ...prev, data: { ...prev.data, items: [story, ...prev.data.items] } };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Rank computation (pure)                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Computes the new rank string for a story being reordered within a column.
+ * Returns null when the operation is a no-op (story dropped onto itself).
+ *
+ * @param items   All sprint items (used to look up neighbour ranks).
+ * @param storyId The story being moved.
+ * @param beforeId The story that will come immediately after the moved story, or null.
+ * @param afterId  The story that will come immediately before the moved story, or null.
+ */
+export function computeReorderRank(
+  items: StoryCardStory[],
+  storyId: string,
+  beforeId: string | null,
+  afterId: string | null,
+): string | null {
+  // Dropping directly onto itself is a no-op.
+  if (beforeId === storyId || afterId === storyId) return null;
+
+  const afterStory = afterId ? items.find((s) => s.id === afterId) : null;
+  const beforeStory = beforeId ? items.find((s) => s.id === beforeId) : null;
+
+  if (afterStory && beforeStory) {
+    try {
+      return rankBetween(afterStory.rank, beforeStory.rank);
+    } catch {
+      // Data inconsistency (equal/inverted ranks) — fall back to append after lower neighbour.
+      return rankAfter(afterStory.rank);
+    }
+  }
+  if (afterStory) return rankAfter(afterStory.rank);
+  if (beforeStory) return rankBefore(beforeStory.rank);
+  // Empty column — use alphabetic midpoint as initial rank.
+  return "n";
+}
+
+/* ------------------------------------------------------------------ */
+/*  Optimistic rank update (pure)                                      */
+/* ------------------------------------------------------------------ */
+
+export function applyOptimisticStoryRank(
+  prev: BoardState,
+  storyId: string,
+  newRank: string,
+): BoardState {
+  if (prev.kind !== "ok") return prev;
+  return {
+    ...prev,
+    data: {
+      ...prev.data,
+      items: prev.data.items.map((item) =>
+        item.id === storyId ? { ...item, rank: newRank } : item,
+      ),
+    },
+  };
 }

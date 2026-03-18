@@ -3,7 +3,9 @@ import type { WorkItemStatus } from "@/lib/planning/types";
 import type { StoryCardStory } from "./story-card";
 import type { StoryAssigneeSelection } from "@/components/planning/story-assignee-control";
 import type { QuickCreateAssigneeOption, QuickCreateSubmitInput } from "@/app/planning/board/quick-create";
-import { BoardColumn } from "./sprint-board-column";
+import { BoardColumn, type DropPlacement } from "./sprint-board-column";
+
+export type { DropPlacement };
 
 // Re-export layout constant so the test import path stays unchanged
 export { TODO_QUICK_CREATE_LAYOUT } from "./sprint-board-quick-create";
@@ -46,12 +48,15 @@ const VALID_DROP_STATUSES = new Set<WorkItemStatus>([
 export interface SprintBoardProps {
   data: ActiveSprintData;
   onStoryClick?: (storyId: string) => void;
-  onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
+  onStoryStatusChange?: (storyId: string, status: WorkItemStatus, placement?: DropPlacement | null) => void;
+  onStoryReorder?: (storyId: string, beforeId: string | null, afterId: string | null) => void;
   onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   pendingStoryIds?: ReadonlySet<string>;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions?: readonly QuickCreateAssigneeOption[];
+  /** When true, disables all drag-and-drop reordering (e.g. when filters may hide cards). */
+  dragDisabled?: boolean;
 }
 
 // ─── Main Board ─────────────────────────────────────────────────────
@@ -60,11 +65,13 @@ export function SprintBoard({
   data,
   onStoryClick,
   onStoryStatusChange,
+  onStoryReorder,
   onStoryAssigneeChange,
   onStoryDelete,
   pendingStoryIds,
   onTodoQuickCreate,
   assigneeOptions = [],
+  dragDisabled = false,
 }: SprintBoardProps) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
   const [dropTargetStatus, setDropTargetStatus] = useState<WorkItemStatus | null>(null);
@@ -104,6 +111,7 @@ export function SprintBoard({
   }, [data.items]);
 
   const handleCardDragStart = (storyId: string) => {
+    if (dragDisabled) return;
     setDraggingStoryId(storyId);
   };
 
@@ -113,7 +121,7 @@ export function SprintBoard({
   };
 
   const handleDragOver = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => {
-    if (!draggingStoryId || pendingSet.has(draggingStoryId)) return;
+    if (dragDisabled || !draggingStoryId || pendingSet.has(draggingStoryId)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     if (dropTargetStatus !== status) {
@@ -121,8 +129,9 @@ export function SprintBoard({
     }
   };
 
-  const handleDrop = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>, placement: DropPlacement | null) => {
     event.preventDefault();
+    if (dragDisabled) return;
     const draggedStoryId = event.dataTransfer.getData("text/plain") || draggingStoryId;
     setDropTargetStatus(null);
     setDraggingStoryId(null);
@@ -132,11 +141,18 @@ export function SprintBoard({
     }
 
     const draggedStory = data.items.find((story) => story.id === draggedStoryId);
-    if (!draggedStory || draggedStory.status === status) {
+    if (!draggedStory) return;
+
+    if (draggedStory.status === status) {
+      // Same-column reorder: forward placement info if available
+      if (placement) {
+        onStoryReorder?.(draggedStoryId, placement.beforeId, placement.afterId);
+      }
       return;
     }
 
-    onStoryStatusChange?.(draggedStoryId, status);
+    // Cross-column status change — forward placement so rank can be honoured
+    onStoryStatusChange?.(draggedStoryId, status, placement);
   };
 
   return (
@@ -150,6 +166,7 @@ export function SprintBoard({
             accent={col.accent}
             stories={byStatus.get(col.status) ?? []}
             isDropTarget={dropTargetStatus === col.status}
+            dragDisabled={dragDisabled}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onStoryClick={onStoryClick}

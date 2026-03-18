@@ -18,9 +18,7 @@
         "**/.import_linter_cache": true,
         "**/.venv": true,
         "**/node_modules": true,
-        "**/.next": true,
-        "**/.next-local": true,
-        "**/.next-vscode": true,
+        "**/.next*": true,
         "apps/cli/dist": true
     }
 }
