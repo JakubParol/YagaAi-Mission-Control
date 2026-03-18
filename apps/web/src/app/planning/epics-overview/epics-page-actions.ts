@@ -293,6 +293,32 @@ async function toEpicDeleteErrorMessage(response: Response): Promise<string> {
   return `Failed to delete epic. HTTP ${response.status}.`;
 }
 
+export interface EpicDetailFields {
+  title: string;
+  status: WorkItemStatus;
+  description: string | null;
+  priority: number | null;
+}
+
+export async function fetchEpicDetail(epicId: string): Promise<EpicDetailFields> {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${epicId}`));
+  if (!response.ok) {
+    throw new Error(`Failed to load epic details. HTTP ${response.status}.`);
+  }
+  const body = (await response.json()) as {
+    title?: string;
+    status?: string;
+    description?: string | null;
+    priority?: number | null;
+  };
+  return {
+    title: body.title ?? "",
+    status: parseItemStatus(body.status) ?? "TODO",
+    description: body.description ?? null,
+    priority: body.priority ?? null,
+  };
+}
+
 export interface EpicCreatePayload {
   title: string;
   projectId: string;

@@ -18,7 +18,7 @@ import {
 } from "@/components/planning/story-actions-menu-types";
 
 import { EpicRow, type PreviewState } from "./epic-row";
-import { deleteEpic, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
+import { deleteEpic, fetchEpicDetail, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,
   EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS,
@@ -93,6 +93,10 @@ function EpicOverviewPageContent() {
     previewByKeyRef.current = {};
     setPreviewByKey({});
     resetAll();
+    setCreateOpen(false);
+    setEditDialogState(null);
+    setDeleteDialogState(null);
+    setEpicActionError(null);
     setState(singleProjectId ? { kind: "loading" } : { kind: "no-project" });
   }, [singleProjectId, resetAll]);
 
@@ -166,15 +170,24 @@ function EpicOverviewPageContent() {
     setState({ kind: "ok", ...result });
   }, [doFetchOverview, singleProjectId]);
 
-  const handleEditEpic = useCallback((epicId: string) => {
-    if (state.kind !== "ok") return;
-    const item = state.rows.find((r) => r.work_item_id === epicId);
-    setEditDialogState({
-      open: true,
-      epicId,
-      initialValues: item ? { title: item.title, status: item.status } : undefined,
-    });
-  }, [state]);
+  const handleEditEpic = useCallback(async (epicId: string) => {
+    setEpicActionError(null);
+    try {
+      const detail = await fetchEpicDetail(epicId);
+      setEditDialogState({
+        open: true,
+        epicId,
+        initialValues: {
+          title: detail.title,
+          status: detail.status,
+          description: detail.description ?? "",
+          priority: detail.priority !== null ? String(detail.priority) : "",
+        },
+      });
+    } catch (err) {
+      setEpicActionError(err instanceof Error ? err.message : "Failed to load epic details for editing.");
+    }
+  }, []);
 
   const handleDeleteEpic = useCallback((epicId: string) => {
     if (state.kind !== "ok") return;
