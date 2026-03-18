@@ -352,9 +352,6 @@ class DbWorkItemRepository(WorkItemRepository):
         )
         return row.scalar_one() > 0
 
-    async def parent_exists(self, parent_id: str) -> WorkItem | None:
-        return await self.get_by_id(parent_id)
-
     # ------------------------------------------------------------------
     # Labels
     # ------------------------------------------------------------------

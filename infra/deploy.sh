@@ -76,6 +76,11 @@ deploy_prod() {
   previous_sha="$(previous_sha)"
 
   log_info "Deploying PROD commit $current_sha"
+
+  log_info "Building CLI (mc)..."
+  (cd "$REPO_ROOT/apps/cli" && npm ci --ignore-scripts && npm run build)
+  log_ok "CLI built: $REPO_ROOT/apps/cli/dist/index.js"
+
   log_info "Building production images..."
   DOCKER_BUILDKIT=1 MC_IMAGE_TAG="$current_sha" docker compose -f "$PROD_COMPOSE_FILE" --env-file "$PROD_ENV" build
 
@@ -95,10 +100,14 @@ deploy_prod() {
   curl -fsS -I http://127.0.0.1:3100/dashboard
   echo
 
+  log_info "CLI (mc) version check:"
+  mc --help >/dev/null 2>&1 && log_ok "mc CLI operational" || log_error "mc CLI failed"
+
   log_ok "PROD deploy complete"
   echo "      project: $PROD_PROJECT_NAME"
   echo "      web: http://127.0.0.1:3100"
   echo "      api: http://127.0.0.1:5100"
+  echo "      cli: mc ($(which mc))"
   echo "      image_tag: $current_sha"
   echo "      previous_sha: $previous_sha"
 }
