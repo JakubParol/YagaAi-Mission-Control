@@ -3,6 +3,21 @@
 PREFIX = "/v1/planning/backlogs"
 
 
+def _ensure_product_backlog(client, project_id):
+    """Return the product backlog id for a project, creating one if needed."""
+    resp = client.get(f"{PREFIX}?project_id={project_id}&kind=BACKLOG")
+    if resp.status_code == 200:
+        backlogs = resp.json()["data"]
+        if backlogs:
+            return backlogs[0]["id"]
+    create_resp = client.post(
+        PREFIX,
+        json={"project_id": project_id, "name": "Product Backlog", "kind": "BACKLOG"},
+    )
+    assert create_resp.status_code == 201
+    return create_resp.json()["data"]["id"]
+
+
 def _create_sprint(client, project_id: str, name: str = "Sprint X", status: str = "ACTIVE") -> str:
     create_resp = client.post(
         PREFIX,
@@ -11,26 +26,27 @@ def _create_sprint(client, project_id: str, name: str = "Sprint X", status: str 
     assert create_resp.status_code == 201
     backlog_id = create_resp.json()["data"]["id"]
 
-    if status == "ACTIVE":
+    if status in ("ACTIVE", "CLOSED"):
         start_resp = client.post(f"{PREFIX}/{backlog_id}/start?project_id={project_id}")
         assert start_resp.status_code == 200
-        return backlog_id
 
     if status == "CLOSED":
-        start_resp = client.post(f"{PREFIX}/{backlog_id}/start?project_id={project_id}")
-        assert start_resp.status_code == 200
-        complete_resp = client.post(f"{PREFIX}/{backlog_id}/complete?project_id={project_id}")
+        target_id = _ensure_product_backlog(client, project_id)
+        complete_resp = client.post(
+            f"{PREFIX}/{backlog_id}/complete?project_id={project_id}",
+            json={"target_backlog_id": target_id},
+        )
         assert complete_resp.status_code == 200
 
     return backlog_id
 
 
-def _add_story_to_backlog(client, backlog_id: str, story_id: str, position: int = 0) -> None:
+def _add_item_to_backlog(client, backlog_id: str, work_item_id: str) -> None:
     resp = client.post(
-        f"{PREFIX}/{backlog_id}/stories",
-        json={"story_id": story_id, "position": position},
+        f"{PREFIX}/{backlog_id}/items",
+        json={"work_item_id": work_item_id},
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 201
 
 
 def test_start_sprint_happy_path(client) -> None:
@@ -75,50 +91,57 @@ def test_start_sprint_by_project_key(client) -> None:
 
 
 def test_complete_sprint_happy_path(client) -> None:
-    _add_story_to_backlog(client, backlog_id="b2", story_id="s1")
-    done_resp = client.patch("/v1/planning/stories/s1", json={"status": "DONE"})
-    assert done_resp.status_code == 200
+    # Add an unfinished item so we can verify it moves to target backlog
+    _add_item_to_backlog(client, backlog_id="b2", work_item_id="s1")
+    target_id = _ensure_product_backlog(client, "p1")
 
-    resp = client.post(f"{PREFIX}/b2/complete?project_id=p1")
+    resp = client.post(
+        f"{PREFIX}/b2/complete?project_id=p1",
+        json={"target_backlog_id": target_id},
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["status"] == "CLOSED"
     assert body["meta"]["transition"] == "COMPLETE_SPRINT"
     assert body["meta"]["from_status"] == "ACTIVE"
     assert body["meta"]["to_status"] == "CLOSED"
-    assert body["meta"]["story_count"] == 1
-    assert body["meta"]["done_story_count"] == 1
-    assert body["meta"]["unfinished_story_count"] == 0
-    assert body["meta"]["active_sprint_id"] is None
+    assert body["meta"]["moved_item_count"] == 1
+    assert body["meta"]["target_backlog_id"] == target_id
 
-
-def test_complete_sprint_rejects_unfinished_stories(client) -> None:
-    _add_story_to_backlog(client, backlog_id="b2", story_id="s1")
-
-    resp = client.post(f"{PREFIX}/b2/complete?project_id=p1")
-    assert resp.status_code == 400
-    assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
-    assert "unfinished stories" in resp.json()["error"]["message"]
+    # Verify the unfinished item landed in the target backlog
+    target_items = client.get(f"{PREFIX}/{target_id}/items")
+    assert target_items.status_code == 200
+    ids = [i["id"] for i in target_items.json()["data"]]
+    assert "s1" in ids
 
 
 def test_complete_sprint_rejects_not_active(client) -> None:
     sprint_id = _create_sprint(client, project_id="p2", status="OPEN")
+    target_id = _ensure_product_backlog(client, "p2")
 
-    resp = client.post(f"{PREFIX}/{sprint_id}/complete?project_id=p2")
+    resp = client.post(
+        f"{PREFIX}/{sprint_id}/complete?project_id=p2",
+        json={"target_backlog_id": target_id},
+    )
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
 
 
 def test_complete_sprint_rejects_non_sprint_backlog(client) -> None:
-    resp = client.post(f"{PREFIX}/b1/complete?project_id=p1")
+    resp = client.post(
+        f"{PREFIX}/b1/complete?project_id=p1",
+        json={"target_backlog_id": "b1"},
+    )
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "BUSINESS_RULE_VIOLATION"
 
 
 def test_complete_sprint_project_scope_validation(client) -> None:
-    _add_story_to_backlog(client, backlog_id="b2", story_id="s1")
-    client.patch("/v1/planning/stories/s1", json={"status": "DONE"})
+    target_id = _ensure_product_backlog(client, "p1")
 
-    resp = client.post(f"{PREFIX}/b2/complete?project_id=p2")
+    resp = client.post(
+        f"{PREFIX}/b2/complete?project_id=p2",
+        json={"target_backlog_id": target_id},
+    )
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "VALIDATION_ERROR"

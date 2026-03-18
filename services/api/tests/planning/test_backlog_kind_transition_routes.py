@@ -4,7 +4,17 @@ PREFIX = "/v1/planning/backlogs"
 
 
 def test_transition_backlog_kind_backlog_to_ideas(client) -> None:
-    resp = client.post(f"{PREFIX}/b1/transition-kind", json={"kind": "IDEAS"})
+    create_resp = client.post(
+        PREFIX,
+        json={"project_id": "p2", "name": "Non-default BL", "kind": "BACKLOG"},
+    )
+    assert create_resp.status_code == 201
+    backlog_id = create_resp.json()["data"]["id"]
+
+    resp = client.post(
+        f"{PREFIX}/{backlog_id}/transition-kind?project_id=p2",
+        json={"kind": "IDEAS"},
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["kind"] == "IDEAS"

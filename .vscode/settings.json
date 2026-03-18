@@ -1,7 +1,6 @@
 {
-    "python.testing.pytestArgs": [
-        "services"
-    ],
+    "python.testing.pytestArgs": [],
+    "python.testing.cwd": "${workspaceFolder}/services/api",
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "chatgpt.openOnStartup": true,

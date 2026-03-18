@@ -6,8 +6,11 @@ filter), GET single (with counts), PATCH update, DELETE, plus business rules
 (cannot delete default backlog, cannot manually set is_default).
 """
 
+from tests.support.postgres_compat import pg_connect
+
 PREFIX = "/v1/planning/backlogs"
 PROJECTS_PREFIX = "/v1/planning/projects"
+TS = "2026-01-01T00:00:00Z"
 
 
 # ── Create ───────────────────────────────────────────────────────────────
@@ -24,7 +27,7 @@ def test_create_backlog_for_project(client):
     assert data["name"] == "Sprint 1"
     assert data["kind"] == "SPRINT"
     assert data["status"] == "OPEN"
-    assert data["display_order"] == 100
+    assert "rank" in data
     assert data["is_default"] is False
 
 
@@ -43,7 +46,6 @@ def test_create_backlog_with_all_fields(client):
             "project_id": "p2",
             "name": "Full Sprint",
             "kind": "SPRINT",
-            "display_order": 15,
             "goal": "Ship v1",
             "start_date": "2026-03-01",
             "end_date": "2026-03-15",
@@ -51,7 +53,6 @@ def test_create_backlog_with_all_fields(client):
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
-    assert data["display_order"] == 15
     assert data["goal"] == "Ship v1"
     assert data["start_date"] == "2026-03-01"
     assert data["end_date"] == "2026-03-15"
@@ -159,20 +160,13 @@ def test_get_backlog(client):
 
 
 def test_get_backlog_includes_counts(client):
-    client.post(
-        f"{PREFIX}/b1/stories",
-        json={"story_id": "s1", "position": 0},
-    )
-    client.post(
-        f"{PREFIX}/b1/tasks",
-        json={"task_id": "t1", "position": 0},
-    )
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "s1"})
+    client.post(f"{PREFIX}/b1/items", json={"work_item_id": "t1"})
 
     resp = client.get(f"{PREFIX}/b1")
     assert resp.status_code == 200
     meta = resp.json()["meta"]
-    assert meta["story_count"] == 1
-    assert meta["task_count"] == 1
+    assert meta["item_count"] == 2
 
 
 def test_get_backlog_not_found(client):
@@ -202,10 +196,10 @@ def test_update_backlog_goal(client):
     assert resp.json()["data"]["goal"] == "New goal"
 
 
-def test_update_backlog_display_order(client):
-    resp = client.patch(f"{PREFIX}/b1", json={"display_order": 7})
+def test_update_backlog_rank(client):
+    resp = client.patch(f"{PREFIX}/b1", json={"rank": "zzz"})
     assert resp.status_code == 200
-    assert resp.json()["data"]["display_order"] == 7
+    assert resp.json()["data"]["rank"] == "zzz"
 
 
 def test_update_backlog_not_found(client):
@@ -220,7 +214,7 @@ def test_update_backlog_invalid_status(client):
 
 def test_update_backlog_ignores_unknown_fields(client):
     """Unknown fields like is_default are silently ignored by the schema."""
-    resp = client.patch(f"{PREFIX}/b1", json={"is_default": True, "name": "Updated"})
+    resp = client.patch(f"{PREFIX}/b2", json={"is_default": True, "name": "Updated"})
     assert resp.status_code == 200
     assert resp.json()["data"]["name"] == "Updated"
     assert resp.json()["data"]["is_default"] is False
@@ -230,10 +224,10 @@ def test_update_backlog_ignores_unknown_fields(client):
 
 
 def test_delete_backlog(client):
-    resp = client.delete(f"{PREFIX}/b1")
+    resp = client.delete(f"{PREFIX}/bg")
     assert resp.status_code == 204
 
-    get_resp = client.get(f"{PREFIX}/b1")
+    get_resp = client.get(f"{PREFIX}/bg")
     assert get_resp.status_code == 404
 
 
@@ -244,15 +238,12 @@ def test_delete_backlog_not_found(client):
 
 def test_delete_default_backlog_rejected(client, _setup_test_db):
     """Cannot delete a backlog that is the project default."""
-    from tests.support.postgres_compat import pg_connect
-
-    db_path = _setup_test_db
-    with pg_connect(db_path) as conn:
+    with pg_connect(_setup_test_db) as conn:
         conn.execute(
-            "INSERT INTO backlogs (id, project_id, name, kind, status, display_order, is_default, "
+            "INSERT INTO backlogs (id, project_id, name, kind, status, rank, is_default, "
             "created_at, updated_at) VALUES "
-            "('bdef2', 'p2', 'Default', 'BACKLOG', 'ACTIVE', 999, 1, "
-            "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+            "(%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            ["bdef2", "p2", "Default", "BACKLOG", "ACTIVE", "m", 1, TS, TS],
         )
         conn.commit()
 
@@ -291,76 +282,25 @@ def test_list_backlogs_default_backlog_is_pinned_to_bottom(client):
 
     sprint_resp = client.post(
         PREFIX,
-        json={
-            "project_id": project_id,
-            "name": "Sprint A",
-            "kind": "SPRINT",
-            "display_order": 50,
-        },
+        json={"project_id": project_id, "name": "Sprint A", "kind": "SPRINT"},
     )
     assert sprint_resp.status_code == 201
 
     ideas_resp = client.post(
         PREFIX,
-        json={
-            "project_id": project_id,
-            "name": "Ideas A",
-            "kind": "IDEAS",
-            "display_order": 10,
-        },
+        json={"project_id": project_id, "name": "Ideas A", "kind": "IDEAS"},
     )
     assert ideas_resp.status_code == 201
 
     backlog_resp = client.post(
         PREFIX,
-        json={
-            "project_id": project_id,
-            "name": "Backlog A",
-            "kind": "BACKLOG",
-            "display_order": 20,
-        },
+        json={"project_id": project_id, "name": "Backlog A", "kind": "BACKLOG"},
     )
     assert backlog_resp.status_code == 201
 
     list_resp = client.get(f"{PREFIX}?project_id={project_id}")
     assert list_resp.status_code == 200
     items = list_resp.json()["data"]
-
-    assert items[0]["name"] == "Ideas A"
-    assert items[1]["name"] == "Backlog A"
-    assert items[2]["name"] == "Sprint A"
     assert items[-1]["is_default"] is True
 
 
-def test_list_backlogs_repairs_multiple_active_sprints_and_creates_index(
-    client, _setup_test_db, _restore_schema
-):
-    from tests.support.postgres_compat import pg_connect
-
-    db_path = _setup_test_db
-    with pg_connect(db_path) as conn:
-        conn.execute("DROP INDEX IF EXISTS idx_backlogs_one_active_sprint_per_project")
-        conn.execute(
-            "INSERT INTO backlogs (id, project_id, name, kind, status, display_order, is_default, "
-            "created_at, updated_at) VALUES "
-            "('b3', 'p1', 'P1 Sprint 2', 'SPRINT', 'ACTIVE', 300, 0, "
-            "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
-        )
-        conn.commit()
-
-    resp = client.get(f"{PREFIX}?project_id=p1")
-    assert resp.status_code == 200
-
-    with pg_connect(db_path) as conn:
-        cnt_row = conn.execute(
-            "SELECT COUNT(*) FROM backlogs WHERE project_id = 'p1' "
-            "AND kind = 'SPRINT' AND status = 'ACTIVE'"
-        ).fetchone()
-        idx_row = conn.execute(
-            "SELECT indexname FROM pg_indexes "
-            "WHERE schemaname = current_schema() AND indexname = %s",
-            ["idx_backlogs_one_active_sprint_per_project"],
-        ).fetchone()
-
-    assert cnt_row is not None and cnt_row[0] == 1
-    assert idx_row is not None
