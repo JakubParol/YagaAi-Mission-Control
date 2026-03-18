@@ -19,6 +19,8 @@ from app.planning.infrastructure.shared.sorting import parse_sort
 from app.planning.infrastructure.shared.sql import affected_rows
 from app.planning.infrastructure.tables import (
     agents,
+    backlog_items,
+    backlogs,
     labels,
     project_counters,
     projects,
@@ -149,6 +151,48 @@ class DbWorkItemRepository(WorkItemRepository):
                 updated_at=work_item.updated_at,
                 started_at=work_item.started_at,
                 completed_at=work_item.completed_at,
+            )
+        )
+        await self._db.commit()
+        return work_item
+
+    async def create_in_backlog(self, work_item: WorkItem, backlog_id: str) -> WorkItem:
+        await self._db.execute(
+            insert(work_items).values(
+                id=work_item.id,
+                project_id=work_item.project_id,
+                parent_id=work_item.parent_id,
+                key=work_item.key,
+                type=work_item.type.value,
+                sub_type=work_item.sub_type,
+                title=work_item.title,
+                summary=work_item.summary,
+                description=work_item.description,
+                status=work_item.status.value,
+                status_mode=work_item.status_mode.value,
+                status_override=work_item.status_override,
+                status_override_set_at=work_item.status_override_set_at,
+                is_blocked=1 if work_item.is_blocked else 0,
+                blocked_reason=work_item.blocked_reason,
+                priority=work_item.priority,
+                estimate_points=work_item.estimate_points,
+                due_at=work_item.due_at,
+                current_assignee_agent_id=work_item.current_assignee_agent_id,
+                metadata_json=work_item.metadata_json,
+                created_by=work_item.created_by,
+                updated_by=work_item.updated_by,
+                created_at=work_item.created_at,
+                updated_at=work_item.updated_at,
+                started_at=work_item.started_at,
+                completed_at=work_item.completed_at,
+            )
+        )
+        await self._db.execute(
+            insert(backlog_items).values(
+                backlog_id=backlog_id,
+                work_item_id=work_item.id,
+                rank="n",
+                added_at=work_item.created_at,
             )
         )
         await self._db.commit()
@@ -299,6 +343,12 @@ class DbWorkItemRepository(WorkItemRepository):
     async def label_exists(self, label_id: str) -> bool:
         row = await self._db.execute(
             select(func.count()).select_from(labels).where(labels.c.id == label_id)
+        )
+        return row.scalar_one() > 0
+
+    async def backlog_exists(self, backlog_id: str) -> bool:
+        row = await self._db.execute(
+            select(func.count()).select_from(backlogs).where(backlogs.c.id == backlog_id)
         )
         return row.scalar_one() > 0
 

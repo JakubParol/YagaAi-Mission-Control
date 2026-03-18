@@ -18,16 +18,15 @@ from app.planning.api.schemas.work_item import (
     WorkItemStatusChangeResponse,
     WorkItemUpdate,
 )
-from app.planning.application.backlog_service import BacklogService
 from app.planning.application.work_item_action_service import WorkItemActionService
 from app.planning.application.work_item_service import WorkItemService
 from app.planning.dependencies import (
-    get_backlog_service,
     get_work_item_action_service,
     get_work_item_service,
     resolve_project_key,
 )
 from app.shared.api.envelope import ListEnvelope, ListMeta
+from app.shared.api.errors import ValidationError
 
 router = APIRouter(prefix="/work-items", tags=["work-items"])
 
@@ -41,7 +40,6 @@ router = APIRouter(prefix="/work-items", tags=["work-items"])
 async def create_work_item(
     body: WorkItemCreate,
     svc: WorkItemService = Depends(get_work_item_service),
-    backlog_svc: BacklogService = Depends(get_backlog_service),
     x_actor_id: str | None = Header(None),
 ):
     item = await svc.create_work_item(
@@ -56,10 +54,9 @@ async def create_work_item(
         estimate_points=body.estimate_points,
         due_at=body.due_at,
         current_assignee_agent_id=body.current_assignee_agent_id,
+        backlog_id=body.backlog_id,
         actor=x_actor_id,
     )
-    if body.backlog_id:
-        await backlog_svc.add_item_to_backlog(body.backlog_id, item.id)
     return WorkItemResponse(**_to_dict(item))
 
 
@@ -83,8 +80,9 @@ async def list_work_items(
     resolved_parent_id = parent_id
     if parent_key and not parent_id:
         parent_item = await svc.get_work_item_by_key_or_none(parent_key)
-        if parent_item:
-            resolved_parent_id = parent_item.id
+        if not parent_item:
+            raise ValidationError(f"Work item with key '{parent_key}' not found")
+        resolved_parent_id = parent_item.id
 
     items, total = await svc.list_work_items(
         type=type,

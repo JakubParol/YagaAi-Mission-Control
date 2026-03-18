@@ -251,14 +251,31 @@ async def bulk_add_items_to_backlog(
     body: BacklogBulkAddItemsRequest,
     service: BacklogService = Depends(get_backlog_service),
 ) -> Envelope[dict]:
-    added = 0
+    await service.get_backlog(backlog_id)
+
+    results: list[dict] = []
     for work_item_id in body.work_item_ids:
         try:
             await service.add_item_to_backlog(backlog_id, work_item_id)
-            added += 1
-        except Exception:
-            pass
-    return Envelope(data={"added": added, "total": len(body.work_item_ids)})
+            results.append({"work_item_id": work_item_id, "success": True})
+        except Exception as exc:
+            results.append(
+                {
+                    "work_item_id": work_item_id,
+                    "success": False,
+                    "error": str(exc),
+                }
+            )
+
+    succeeded = sum(1 for r in results if r["success"])
+    return Envelope(
+        data={
+            "total": len(body.work_item_ids),
+            "succeeded": succeeded,
+            "failed": len(body.work_item_ids) - succeeded,
+            "results": results,
+        }
+    )
 
 
 @router.get("/{backlog_id}/items")

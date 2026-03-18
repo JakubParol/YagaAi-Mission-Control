@@ -144,6 +144,7 @@ class WorkItemService:
         estimate_points: float | None = None,
         due_at: str | None = None,
         current_assignee_agent_id: str | None = None,
+        backlog_id: str | None = None,
         actor: str | None = None,
     ) -> WorkItem:
         self._validate_type(type)
@@ -168,6 +169,10 @@ class WorkItemService:
         if current_assignee_agent_id is not None:
             if not await self._repo.agent_exists(current_assignee_agent_id):
                 raise ValidationError(f"Agent {current_assignee_agent_id} does not exist")
+
+        if backlog_id is not None:
+            if not await self._repo.backlog_exists(backlog_id):
+                raise ValidationError(f"Backlog {backlog_id} does not exist")
 
         now = utc_now()
         item = WorkItem(
@@ -198,6 +203,8 @@ class WorkItemService:
             started_at=None,
             completed_at=None,
         )
+        if backlog_id:
+            return await self._repo.create_in_backlog(item, backlog_id)
         return await self._repo.create(item)
 
     # ------------------------------------------------------------------

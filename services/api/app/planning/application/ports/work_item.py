@@ -55,6 +55,9 @@ class WorkItemRepository(ABC):
     async def create(self, work_item: WorkItem) -> WorkItem: ...
 
     @abstractmethod
+    async def create_in_backlog(self, work_item: WorkItem, backlog_id: str) -> WorkItem: ...
+
+    @abstractmethod
     async def update(self, work_item_id: str, data: dict[str, Any]) -> WorkItem | None: ...
 
     @abstractmethod
@@ -121,6 +124,9 @@ class WorkItemRepository(ABC):
 
     @abstractmethod
     async def label_exists(self, label_id: str) -> bool: ...
+
+    @abstractmethod
+    async def backlog_exists(self, backlog_id: str) -> bool: ...
 
     @abstractmethod
     async def parent_exists(self, parent_id: str) -> WorkItem | None: ...
