@@ -51,6 +51,10 @@ export function buildFilterUrl(
   return qs.length > 0 ? `${pathname}?${qs}` : pathname;
 }
 
+export function hasActiveFilters(filters: PlanningFiltersValue): boolean {
+  return Object.values(filters).some((v) => v !== "");
+}
+
 export function buildClearFiltersUrl(
   pathname: string,
   searchParams: URLSearchParams,

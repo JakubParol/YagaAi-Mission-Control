@@ -35,6 +35,7 @@ import {
   deriveViewState,
   enrichCreatedStory,
   findSelectedStoryLabels,
+  hasActiveFilters,
   insertCreatedStory,
   readFiltersFromSearchParams,
   removePendingId,
@@ -60,6 +61,7 @@ function BoardPageContent() {
   const { singleProjectId, viewState } = deriveViewState(allSelected, selectedProjectIds, state);
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
+  const filtersActive = hasActiveFilters(filters);
   const filterOptions = buildBoardFilterOptions(viewState, assigneeOptions);
   const boardSummary = computeBoardSummary(visibleState);
   const selectedStoryLabels = findSelectedStoryLabels(state, selectedStoryId);
@@ -140,12 +142,25 @@ function BoardPageContent() {
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
 
       try {
-        const tasks: Promise<void>[] = [patchStoryStatus(storyId, nextStatus)];
+        await patchStoryStatus(storyId, nextStatus);
+        // Status is now persisted on the server. Any failure from here on cannot
+        // be cleanly rolled back locally — we must refresh from server instead.
         if (newRank) {
-          tasks.push(patchStoryRank(backlogId, storyId, newRank));
+          try {
+            await patchStoryRank(backlogId, storyId, newRank);
+          } catch {
+            // Rank update failed but status update already succeeded on the server.
+            // Refresh from server so the UI reflects the actual persisted state.
+            try {
+              await refreshCurrentView();
+            } catch {
+              // If the refresh also fails, leave the optimistic state visible.
+            }
+            setErrorToast("Story moved but position could not be saved. Board refreshed.");
+          }
         }
-        await Promise.all(tasks);
       } catch {
+        // patchStoryStatus failed — nothing was persisted yet, safe to roll back locally.
         setState((prev) => {
           if (prev.kind !== "ok") return prev;
           const withRestoredRank = newRank ? applyOptimisticStoryRank(prev, storyId, previousRank) : prev;
@@ -157,7 +172,7 @@ function BoardPageContent() {
         setPendingStoryIds((prev) => removePendingId(prev, storyId));
       }
     },
-    [setErrorToast, state],
+    [refreshCurrentView, setErrorToast, state],
   );
 
   const handleStoryReorder = useCallback(
@@ -300,13 +315,14 @@ function BoardPageContent() {
         <SprintBoard
           data={visibleState.data}
           onStoryClick={setSelectedStoryId}
-          onStoryStatusChange={handleStoryStatusChange}
-          onStoryReorder={handleStoryReorder}
+          onStoryStatusChange={filtersActive ? undefined : handleStoryStatusChange}
+          onStoryReorder={filtersActive ? undefined : handleStoryReorder}
           onStoryAssigneeChange={handleStoryAssigneeChange}
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           onTodoQuickCreate={handleTodoQuickCreate}
           assigneeOptions={assigneeOptions}
+          dragDisabled={filtersActive}
         />
       )}
 

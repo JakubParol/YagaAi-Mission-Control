@@ -31,10 +31,11 @@ export interface BoardColumnProps {
   accent: string;
   stories: StoryCardStory[];
   isDropTarget: boolean;
+  dragDisabled?: boolean;
   onDragOver: (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => void;
   onDrop: (status: WorkItemStatus, event: DragEvent<HTMLDivElement>, placement: DropPlacement | null) => void;
   onStoryClick?: (storyId: string) => void;
-  onCardDragStart: (storyId: string) => void;
+  onCardDragStart?: (storyId: string) => void;
   onCardDragEnd: () => void;
   pendingStoryIds: Set<string>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
@@ -53,6 +54,7 @@ export function BoardColumn({
   accent,
   stories,
   isDropTarget,
+  dragDisabled = false,
   onDragOver,
   onDrop,
   onStoryClick,
@@ -73,18 +75,21 @@ export function BoardColumn({
   const [dropSlot, setDropSlot] = useState<number | null>(null);
 
   const handleCardDragOver = (event: DragEvent<HTMLDivElement>, index: number) => {
+    if (dragDisabled) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const newSlot = event.clientY - rect.top < rect.height / 2 ? index : index + 1;
     if (dropSlot !== newSlot) setDropSlot(newSlot);
   };
 
   const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (dragDisabled) return;
     if (!event.currentTarget.contains(event.relatedTarget as Node)) {
       setDropSlot(null);
     }
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (dragDisabled) return;
     const placement: DropPlacement | null =
       dropSlot !== null
         ? {
@@ -155,7 +160,7 @@ export function BoardColumn({
                         assignee_avatar: assignee.assignee_avatar,
                       }}
                       onClick={onStoryClick}
-                      onDragStart={onCardDragStart}
+                      onDragStart={dragDisabled ? undefined : onCardDragStart}
                       onDragEnd={() => { setDropSlot(null); onCardDragEnd(); }}
                       disabled={isPending}
                       assigneeControl={(

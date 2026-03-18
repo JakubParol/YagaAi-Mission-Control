@@ -55,6 +55,8 @@ export interface SprintBoardProps {
   pendingStoryIds?: ReadonlySet<string>;
   onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions?: readonly QuickCreateAssigneeOption[];
+  /** When true, disables all drag-and-drop reordering (e.g. when filters may hide cards). */
+  dragDisabled?: boolean;
 }
 
 // ─── Main Board ─────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ export function SprintBoard({
   pendingStoryIds,
   onTodoQuickCreate,
   assigneeOptions = [],
+  dragDisabled = false,
 }: SprintBoardProps) {
   const [draggingStoryId, setDraggingStoryId] = useState<string | null>(null);
   const [dropTargetStatus, setDropTargetStatus] = useState<WorkItemStatus | null>(null);
@@ -108,6 +111,7 @@ export function SprintBoard({
   }, [data.items]);
 
   const handleCardDragStart = (storyId: string) => {
+    if (dragDisabled) return;
     setDraggingStoryId(storyId);
   };
 
@@ -117,7 +121,7 @@ export function SprintBoard({
   };
 
   const handleDragOver = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>) => {
-    if (!draggingStoryId || pendingSet.has(draggingStoryId)) return;
+    if (dragDisabled || !draggingStoryId || pendingSet.has(draggingStoryId)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     if (dropTargetStatus !== status) {
@@ -127,6 +131,7 @@ export function SprintBoard({
 
   const handleDrop = (status: WorkItemStatus, event: DragEvent<HTMLDivElement>, placement: DropPlacement | null) => {
     event.preventDefault();
+    if (dragDisabled) return;
     const draggedStoryId = event.dataTransfer.getData("text/plain") || draggingStoryId;
     setDropTargetStatus(null);
     setDraggingStoryId(null);
@@ -161,6 +166,7 @@ export function SprintBoard({
             accent={col.accent}
             stories={byStatus.get(col.status) ?? []}
             isDropTarget={dropTargetStatus === col.status}
+            dragDisabled={dragDisabled}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onStoryClick={onStoryClick}
