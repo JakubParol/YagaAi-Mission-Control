@@ -244,6 +244,142 @@ export async function changeStoryStatus(
   return { timestamp: result.timestamp ?? null };
 }
 
+// ─── Epic CRUD ───────────────────────────────────────────────────────
+
+async function parseEpicApiErrorPayload(
+  response: Response,
+): Promise<{ code?: string; message?: string }> {
+  try {
+    const payload = (await response.json()) as { error?: { code?: string; message?: string } };
+    return { code: payload.error?.code, message: payload.error?.message };
+  } catch {
+    return {};
+  }
+}
+
+async function toEpicCreateErrorMessage(response: Response): Promise<string> {
+  const { code, message } = await parseEpicApiErrorPayload(response);
+  if (code === "UNAUTHORIZED") return "Authentication is required to create epics.";
+  if (code === "FORBIDDEN") return "You do not have permission to create epics.";
+  if (code === "VALIDATION_ERROR" || response.status === 422) {
+    return "Epic creation request is invalid. Check the fields and try again.";
+  }
+  if (message && message.trim().length > 0) return message;
+  return `Failed to create epic. HTTP ${response.status}.`;
+}
+
+async function toEpicUpdateErrorMessage(response: Response): Promise<string> {
+  const { code, message } = await parseEpicApiErrorPayload(response);
+  if (code === "UNAUTHORIZED") return "Authentication is required to update epics.";
+  if (code === "FORBIDDEN") return "You do not have permission to update this epic.";
+  if (code === "NOT_FOUND") return "Epic was not found. Refresh and try again.";
+  if (code === "VALIDATION_ERROR" || response.status === 422) {
+    return "Epic update request is invalid. Check the fields and try again.";
+  }
+  if (message && message.trim().length > 0) return message;
+  return `Failed to update epic. HTTP ${response.status}.`;
+}
+
+async function toEpicDeleteErrorMessage(response: Response): Promise<string> {
+  const { code, message } = await parseEpicApiErrorPayload(response);
+  if (code === "UNAUTHORIZED") return "Authentication is required to delete epics.";
+  if (code === "FORBIDDEN") return "You do not have permission to delete this epic.";
+  if (code === "NOT_FOUND") return "Epic was not found. Refresh and try again.";
+  if (code === "BUSINESS_RULE_VIOLATION") {
+    if (message && message.trim().length > 0) return message;
+    return "This epic cannot be deleted.";
+  }
+  if (message && message.trim().length > 0) return message;
+  return `Failed to delete epic. HTTP ${response.status}.`;
+}
+
+export interface EpicDetailFields {
+  title: string;
+  status: WorkItemStatus;
+  description: string | null;
+  priority: number | null;
+}
+
+export async function fetchEpicDetail(epicId: string): Promise<EpicDetailFields> {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${epicId}`));
+  if (!response.ok) {
+    throw new Error(`Failed to load epic details. HTTP ${response.status}.`);
+  }
+  const body = (await response.json()) as {
+    title?: string;
+    status?: string;
+    description?: string | null;
+    priority?: number | null;
+  };
+  return {
+    title: body.title ?? "",
+    status: parseItemStatus(body.status) ?? "TODO",
+    description: body.description ?? null,
+    priority: body.priority ?? null,
+  };
+}
+
+export interface EpicCreatePayload {
+  title: string;
+  projectId: string;
+  description?: string | null;
+  priority?: number | null;
+}
+
+export interface EpicUpdatePayload {
+  title?: string;
+  status?: WorkItemStatus;
+  description?: string | null;
+  priority?: number | null;
+  current_assignee_agent_id?: string | null;
+}
+
+export async function createEpic(payload: EpicCreatePayload): Promise<{ epicId: string }> {
+  const response = await fetch(apiUrl("/v1/planning/work-items"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "EPIC",
+      project_id: payload.projectId,
+      title: payload.title,
+      ...(payload.description !== undefined && { description: payload.description }),
+      ...(payload.priority !== undefined && { priority: payload.priority }),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await toEpicCreateErrorMessage(response));
+  }
+
+  const body = (await response.json()) as { id?: string };
+  if (!body.id) {
+    throw new Error("Epic creation succeeded but response has no epic id.");
+  }
+
+  return { epicId: body.id };
+}
+
+export async function updateEpic(epicId: string, patch: EpicUpdatePayload): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${epicId}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+
+  if (!response.ok) {
+    throw new Error(await toEpicUpdateErrorMessage(response));
+  }
+}
+
+export async function deleteEpic(epicId: string): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${epicId}`), {
+    method: "DELETE",
+  });
+
+  if (response.ok) return;
+  throw new Error(await toEpicDeleteErrorMessage(response));
+}
+
 // ─── Add story to active sprint (bulk endpoint, single story) ───────
 
 export async function addStoryToSprint(
