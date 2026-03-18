@@ -28,6 +28,24 @@ class WorkItemRepository(ABC):
     ) -> tuple[list[WorkItem], int]: ...
 
     @abstractmethod
+    async def list_enriched(
+        self,
+        *,
+        type: str | None = None,
+        project_id: str | None = None,
+        parent_id: str | None = None,
+        status: str | None = None,
+        assignee_id: str | None = None,
+        key: str | None = None,
+        sub_type: str | None = None,
+        is_blocked: bool | None = None,
+        text_search: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[dict[str, Any]], int]: ...
+
+    @abstractmethod
     async def get_by_id(self, work_item_id: str) -> WorkItem | None: ...
 
     @abstractmethod
@@ -37,9 +55,7 @@ class WorkItemRepository(ABC):
     async def create(self, work_item: WorkItem) -> WorkItem: ...
 
     @abstractmethod
-    async def update(
-        self, work_item_id: str, data: dict[str, Any]
-    ) -> WorkItem | None: ...
+    async def update(self, work_item_id: str, data: dict[str, Any]) -> WorkItem | None: ...
 
     @abstractmethod
     async def delete(self, work_item_id: str) -> bool: ...
@@ -64,9 +80,7 @@ class WorkItemRepository(ABC):
     async def get_children_count(self, work_item_id: str) -> int: ...
 
     @abstractmethod
-    async def get_children_progress(
-        self, parent_id: str
-    ) -> tuple[int, int]: ...
+    async def get_children_progress(self, parent_id: str) -> tuple[int, int]: ...
 
     # ------------------------------------------------------------------
     # Overview / aggregates
@@ -116,43 +130,29 @@ class WorkItemRepository(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def label_attached(
-        self, work_item_id: str, label_id: str
-    ) -> bool: ...
+    async def label_attached(self, work_item_id: str, label_id: str) -> bool: ...
 
     @abstractmethod
-    async def attach_label(
-        self, work_item_id: str, label_id: str
-    ) -> None: ...
+    async def attach_label(self, work_item_id: str, label_id: str) -> None: ...
 
     @abstractmethod
-    async def detach_label(
-        self, work_item_id: str, label_id: str
-    ) -> bool: ...
+    async def detach_label(self, work_item_id: str, label_id: str) -> bool: ...
 
     # ------------------------------------------------------------------
     # Assignments
     # ------------------------------------------------------------------
 
     @abstractmethod
-    async def get_active_assignment(
-        self, work_item_id: str
-    ) -> WorkItemAssignment | None: ...
+    async def get_active_assignment(self, work_item_id: str) -> WorkItemAssignment | None: ...
 
     @abstractmethod
-    async def get_assignments(
-        self, work_item_id: str
-    ) -> list[WorkItemAssignment]: ...
+    async def get_assignments(self, work_item_id: str) -> list[WorkItemAssignment]: ...
 
     @abstractmethod
-    async def create_assignment(
-        self, assignment: WorkItemAssignment
-    ) -> WorkItemAssignment: ...
+    async def create_assignment(self, assignment: WorkItemAssignment) -> WorkItemAssignment: ...
 
     @abstractmethod
-    async def close_assignment(
-        self, work_item_id: str, unassigned_at: str
-    ) -> bool: ...
+    async def close_assignment(self, work_item_id: str, unassigned_at: str) -> bool: ...
 
     @abstractmethod
     async def assign_agent_with_event(

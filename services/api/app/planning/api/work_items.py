@@ -89,7 +89,7 @@ async def list_work_items(
         offset=offset,
     )
     return ListEnvelope(
-        data=[WorkItemResponse(**_to_dict(i)) for i in items],
+        data=[WorkItemResponse(**i) for i in items],
         meta=ListMeta(total=total, limit=limit, offset=offset),
     )
 

@@ -74,13 +74,38 @@ class DbWorkItemRepository(WorkItemRepository):
         )
         return await self._query_list(conditions, limit, offset, sort)
 
+    async def list_enriched(
+        self,
+        *,
+        type: str | None = None,
+        project_id: str | None = None,
+        parent_id: str | None = None,
+        status: str | None = None,
+        assignee_id: str | None = None,
+        key: str | None = None,
+        sub_type: str | None = None,
+        is_blocked: bool | None = None,
+        text_search: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "-created_at",
+    ) -> tuple[list[dict[str, Any]], int]:
+        conditions = self._build_conditions(
+            type=type,
+            project_id=project_id,
+            parent_id=parent_id,
+            status=status,
+            assignee_id=assignee_id,
+            key=key,
+            sub_type=sub_type,
+            is_blocked=is_blocked,
+            text_search=text_search,
+        )
+        return await self._query_list_enriched(conditions, limit, offset, sort)
+
     async def get_by_id(self, work_item_id: str) -> WorkItem | None:
         row = (
-            (
-                await self._db.execute(
-                    select(work_items).where(work_items.c.id == work_item_id)
-                )
-            )
+            (await self._db.execute(select(work_items).where(work_items.c.id == work_item_id)))
             .mappings()
             .first()
         )
@@ -88,13 +113,7 @@ class DbWorkItemRepository(WorkItemRepository):
 
     async def get_by_key(self, key: str) -> WorkItem | None:
         row = (
-            (
-                await self._db.execute(
-                    select(work_items).where(
-                        work_items.c.key == key.upper()
-                    )
-                )
-            )
+            (await self._db.execute(select(work_items).where(work_items.c.key == key.upper())))
             .mappings()
             .first()
         )
@@ -134,16 +153,28 @@ class DbWorkItemRepository(WorkItemRepository):
         await self._db.commit()
         return work_item
 
-    async def update(
-        self, work_item_id: str, data: dict[str, Any]
-    ) -> WorkItem | None:
+    async def update(self, work_item_id: str, data: dict[str, Any]) -> WorkItem | None:
         allowed = {
-            "title", "summary", "description", "sub_type", "status",
-            "status_mode", "status_override", "status_override_set_at",
-            "parent_id", "is_blocked", "blocked_reason", "priority",
-            "estimate_points", "due_at", "current_assignee_agent_id",
-            "metadata_json", "updated_by", "updated_at",
-            "started_at", "completed_at",
+            "title",
+            "summary",
+            "description",
+            "sub_type",
+            "status",
+            "status_mode",
+            "status_override",
+            "status_override_set_at",
+            "parent_id",
+            "is_blocked",
+            "blocked_reason",
+            "priority",
+            "estimate_points",
+            "due_at",
+            "current_assignee_agent_id",
+            "metadata_json",
+            "updated_by",
+            "updated_at",
+            "started_at",
+            "completed_at",
         }
         values = {k: v for k, v in data.items() if k in allowed}
         if not values:
@@ -153,17 +184,13 @@ class DbWorkItemRepository(WorkItemRepository):
             values["is_blocked"] = 1 if values["is_blocked"] else 0
 
         await self._db.execute(
-            update(work_items)
-            .where(work_items.c.id == work_item_id)
-            .values(**values)
+            update(work_items).where(work_items.c.id == work_item_id).values(**values)
         )
         await self._db.commit()
         return await self.get_by_id(work_item_id)
 
     async def delete(self, work_item_id: str) -> bool:
-        result = await self._db.execute(
-            delete(work_items).where(work_items.c.id == work_item_id)
-        )
+        result = await self._db.execute(delete(work_items).where(work_items.c.id == work_item_id))
         await self._db.commit()
         return result.rowcount > 0
 
@@ -190,22 +217,20 @@ class DbWorkItemRepository(WorkItemRepository):
 
     async def get_children_count(self, work_item_id: str) -> int:
         result = await self._db.execute(
-            select(func.count()).select_from(work_items).where(
-                work_items.c.parent_id == work_item_id
-            )
+            select(func.count())
+            .select_from(work_items)
+            .where(work_items.c.parent_id == work_item_id)
         )
         return result.scalar_one()
 
-    async def get_children_progress(
-        self, parent_id: str
-    ) -> tuple[int, int]:
+    async def get_children_progress(self, parent_id: str) -> tuple[int, int]:
         total = await self._db.execute(
-            select(func.count()).select_from(work_items).where(
-                work_items.c.parent_id == parent_id
-            )
+            select(func.count()).select_from(work_items).where(work_items.c.parent_id == parent_id)
         )
         done = await self._db.execute(
-            select(func.count()).select_from(work_items).where(
+            select(func.count())
+            .select_from(work_items)
+            .where(
                 work_items.c.parent_id == parent_id,
                 work_items.c.status == WorkItemStatus.DONE.value,
             )
@@ -216,9 +241,7 @@ class DbWorkItemRepository(WorkItemRepository):
     # Overview
     # ------------------------------------------------------------------
 
-    async def list_overview(
-        self, **kwargs: Any
-    ) -> tuple[list[WorkItemOverview], int]:
+    async def list_overview(self, **kwargs: Any) -> tuple[list[WorkItemOverview], int]:
         return await _list_overview(self._db, **kwargs)
 
     # ------------------------------------------------------------------
@@ -227,13 +250,7 @@ class DbWorkItemRepository(WorkItemRepository):
 
     async def allocate_key(self, project_id: str) -> str:
         proj_row = (
-            (
-                await self._db.execute(
-                    select(projects.c.key).where(
-                        projects.c.id == project_id
-                    )
-                )
-            )
+            (await self._db.execute(select(projects.c.key).where(projects.c.id == project_id)))
             .mappings()
             .first()
         )
@@ -244,9 +261,7 @@ class DbWorkItemRepository(WorkItemRepository):
         counter_row = (
             (
                 await self._db.execute(
-                    select(project_counters).where(
-                        project_counters.c.project_id == project_id
-                    )
+                    select(project_counters).where(project_counters.c.project_id == project_id)
                 )
             )
             .mappings()
@@ -270,25 +285,19 @@ class DbWorkItemRepository(WorkItemRepository):
 
     async def project_exists(self, project_id: str) -> bool:
         row = await self._db.execute(
-            select(func.count()).select_from(projects).where(
-                projects.c.id == project_id
-            )
+            select(func.count()).select_from(projects).where(projects.c.id == project_id)
         )
         return row.scalar_one() > 0
 
     async def agent_exists(self, agent_id: str) -> bool:
         row = await self._db.execute(
-            select(func.count()).select_from(agents).where(
-                agents.c.id == agent_id
-            )
+            select(func.count()).select_from(agents).where(agents.c.id == agent_id)
         )
         return row.scalar_one() > 0
 
     async def label_exists(self, label_id: str) -> bool:
         row = await self._db.execute(
-            select(func.count()).select_from(labels).where(
-                labels.c.id == label_id
-            )
+            select(func.count()).select_from(labels).where(labels.c.id == label_id)
         )
         return row.scalar_one() > 0
 
@@ -299,9 +308,7 @@ class DbWorkItemRepository(WorkItemRepository):
     # Labels
     # ------------------------------------------------------------------
 
-    async def label_attached(
-        self, work_item_id: str, label_id: str
-    ) -> bool:
+    async def label_attached(self, work_item_id: str, label_id: str) -> bool:
         row = await self._db.execute(
             select(func.count())
             .select_from(work_item_labels)
@@ -312,9 +319,7 @@ class DbWorkItemRepository(WorkItemRepository):
         )
         return row.scalar_one() > 0
 
-    async def attach_label(
-        self, work_item_id: str, label_id: str
-    ) -> None:
+    async def attach_label(self, work_item_id: str, label_id: str) -> None:
         await self._db.execute(
             insert(work_item_labels).values(
                 work_item_id=work_item_id,
@@ -324,9 +329,7 @@ class DbWorkItemRepository(WorkItemRepository):
         )
         await self._db.commit()
 
-    async def detach_label(
-        self, work_item_id: str, label_id: str
-    ) -> bool:
+    async def detach_label(self, work_item_id: str, label_id: str) -> bool:
         result = await self._db.execute(
             delete(work_item_labels).where(
                 work_item_labels.c.work_item_id == work_item_id,
@@ -340,41 +343,23 @@ class DbWorkItemRepository(WorkItemRepository):
     # Assignments (delegates)
     # ------------------------------------------------------------------
 
-    async def get_active_assignment(
-        self, work_item_id: str
-    ) -> WorkItemAssignment | None:
-        return await _assignments.get_active_assignment(
-            self._db, work_item_id
-        )
+    async def get_active_assignment(self, work_item_id: str) -> WorkItemAssignment | None:
+        return await _assignments.get_active_assignment(self._db, work_item_id)
 
-    async def get_assignments(
-        self, work_item_id: str
-    ) -> list[WorkItemAssignment]:
+    async def get_assignments(self, work_item_id: str) -> list[WorkItemAssignment]:
         return await _assignments.get_assignments(self._db, work_item_id)
 
-    async def create_assignment(
-        self, assignment: WorkItemAssignment
-    ) -> WorkItemAssignment:
+    async def create_assignment(self, assignment: WorkItemAssignment) -> WorkItemAssignment:
         return await _assignments.create_assignment(self._db, assignment)
 
-    async def close_assignment(
-        self, work_item_id: str, unassigned_at: str
-    ) -> bool:
-        return await _assignments.close_assignment(
-            self._db, work_item_id, unassigned_at
-        )
+    async def close_assignment(self, work_item_id: str, unassigned_at: str) -> bool:
+        return await _assignments.close_assignment(self._db, work_item_id, unassigned_at)
 
-    async def assign_agent_with_event(
-        self, **kwargs: Any
-    ) -> WorkItemAssignment:
-        return await _assignments.assign_agent_with_event(
-            self._db, **kwargs
-        )
+    async def assign_agent_with_event(self, **kwargs: Any) -> WorkItemAssignment:
+        return await _assignments.assign_agent_with_event(self._db, **kwargs)
 
     async def unassign_agent_with_event(self, **kwargs: Any) -> bool:
-        return await _assignments.unassign_agent_with_event(
-            self._db, **kwargs
-        )
+        return await _assignments.unassign_agent_with_event(self._db, **kwargs)
 
     async def update_assignee_with_event(
         self,
@@ -420,9 +405,7 @@ class DbWorkItemRepository(WorkItemRepository):
         row = (
             (
                 await self._db.execute(
-                    select(work_items.c.parent_id).where(
-                        work_items.c.id == work_item_id
-                    )
+                    select(work_items.c.parent_id).where(work_items.c.id == work_item_id)
                 )
             )
             .mappings()
@@ -498,23 +481,16 @@ class DbWorkItemRepository(WorkItemRepository):
         if status:
             conditions.append(work_items.c.status == status)
         if assignee_id:
-            conditions.append(
-                work_items.c.current_assignee_agent_id == assignee_id
-            )
+            conditions.append(work_items.c.current_assignee_agent_id == assignee_id)
         if key:
             conditions.append(work_items.c.key == key)
         if sub_type:
             conditions.append(work_items.c.sub_type == sub_type)
         if is_blocked is not None:
-            conditions.append(
-                work_items.c.is_blocked == (1 if is_blocked else 0)
-            )
+            conditions.append(work_items.c.is_blocked == (1 if is_blocked else 0))
         if text_search:
             pattern = f"%{text_search}%"
-            conditions.append(
-                work_items.c.title.ilike(pattern)
-                | work_items.c.key.ilike(pattern)
-            )
+            conditions.append(work_items.c.title.ilike(pattern) | work_items.c.key.ilike(pattern))
         return conditions
 
     async def _query_list(
@@ -538,3 +514,124 @@ class DbWorkItemRepository(WorkItemRepository):
         total = (await self._db.execute(count_q)).scalar_one()
         rows = (await self._db.execute(select_q)).mappings().all()
         return [_row_to_work_item(r) for r in rows], total
+
+    async def _query_list_enriched(
+        self,
+        conditions: list[Any],
+        limit: int,
+        offset: int,
+        sort: str,
+    ) -> tuple[list[dict[str, Any]], int]:
+        order = parse_sort(sort, _SORT_ALLOWED)
+        if not order:
+            order = [work_items.c.created_at.desc()]
+
+        parent = work_items.alias("parent")
+        children = work_items.alias("children")
+
+        children_count = (
+            select(func.count())
+            .where(children.c.parent_id == work_items.c.id)
+            .correlate(work_items)
+            .scalar_subquery()
+            .label("children_count")
+        )
+        done_children_count = (
+            select(func.count())
+            .where(
+                children.c.parent_id == work_items.c.id,
+                children.c.status == "DONE",
+            )
+            .correlate(work_items)
+            .scalar_subquery()
+            .label("done_children_count")
+        )
+
+        count_q = select(func.count()).select_from(work_items)
+        select_q = select(
+            work_items,
+            parent.c.key.label("parent_key"),
+            parent.c.title.label("parent_title"),
+            children_count,
+            done_children_count,
+        ).select_from(work_items.outerjoin(parent, work_items.c.parent_id == parent.c.id))
+        for cond in conditions:
+            count_q = count_q.where(cond)
+            select_q = select_q.where(cond)
+        select_q = select_q.order_by(*order).limit(limit).offset(offset)
+
+        total = (await self._db.execute(count_q)).scalar_one()
+        rows = (await self._db.execute(select_q)).mappings().all()
+
+        item_ids = [r["id"] for r in rows]
+        labels_by_item: dict[str, list[dict[str, Any]]] = {iid: [] for iid in item_ids}
+        if item_ids:
+            lq = (
+                select(
+                    work_item_labels.c.work_item_id,
+                    labels.c.id.label("label_id"),
+                    labels.c.name,
+                    labels.c.color,
+                )
+                .select_from(
+                    work_item_labels.join(
+                        labels,
+                        work_item_labels.c.label_id == labels.c.id,
+                    )
+                )
+                .where(work_item_labels.c.work_item_id.in_(item_ids))
+            )
+            for lr in (await self._db.execute(lq)).mappings().all():
+                wid = lr["work_item_id"]
+                if wid in labels_by_item:
+                    labels_by_item[wid].append(
+                        {
+                            "id": lr["label_id"],
+                            "name": lr["name"],
+                            "color": lr["color"],
+                        }
+                    )
+
+        result = []
+        for r in rows:
+            item = _row_to_work_item(r)
+            d = _to_enriched_dict(item)
+            d["parent_key"] = r["parent_key"]
+            d["parent_title"] = r["parent_title"]
+            d["children_count"] = r["children_count"]
+            d["done_children_count"] = r["done_children_count"]
+            item_labels = labels_by_item.get(d["id"], [])
+            d["labels"] = item_labels
+            d["label_ids"] = [la["id"] for la in item_labels]
+            result.append(d)
+        return result, total
+
+
+def _to_enriched_dict(item: WorkItem) -> dict[str, Any]:
+    return {
+        "id": item.id,
+        "type": item.type.value,
+        "project_id": item.project_id,
+        "parent_id": item.parent_id,
+        "key": item.key,
+        "title": item.title,
+        "sub_type": item.sub_type,
+        "summary": item.summary,
+        "description": item.description,
+        "status": item.status.value,
+        "status_mode": item.status_mode.value,
+        "status_override": item.status_override,
+        "is_blocked": item.is_blocked,
+        "blocked_reason": item.blocked_reason,
+        "priority": item.priority,
+        "estimate_points": item.estimate_points,
+        "due_at": item.due_at,
+        "current_assignee_agent_id": item.current_assignee_agent_id,
+        "metadata_json": item.metadata_json,
+        "created_by": item.created_by,
+        "updated_by": item.updated_by,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+        "started_at": item.started_at,
+        "completed_at": item.completed_at,
+    }

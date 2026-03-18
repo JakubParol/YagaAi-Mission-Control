@@ -19,6 +19,11 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
         status: "TODO",
         priority: 2,
         updated_at: "2026-03-01T10:00:00Z",
+        parent_key: "MC-1",
+        parent_title: "Platform",
+        children_count: 1,
+        done_children_count: 0,
+        labels: [{ id: "label-1", name: "frontend", color: "#22c55e" }],
       },
       {
         id: "story-2",
@@ -30,19 +35,11 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
         status: "IN_PROGRESS",
         priority: 1,
         updated_at: "2026-03-01T09:00:00Z",
-      },
-    ],
-    backlogStories: [
-      {
-        id: "story-1",
-        key: "MC-10",
-        title: "Story one",
-        sub_type: "USER_STORY",
-        status: "TODO",
-        priority: 2,
-        parent_key: "MC-1",
-        parent_title: "Platform",
-        labels: [{ id: "label-1", name: "frontend", color: "#22c55e" }],
+        parent_key: null,
+        parent_title: null,
+        children_count: 0,
+        done_children_count: 0,
+        labels: [],
       },
     ],
     standaloneTaskCandidates: [
@@ -71,7 +68,6 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
         updated_at: "2026-03-01T12:00:00Z",
       },
     ],
-    epics: [{ id: "epic-1", key: "MC-1", title: "Platform" }],
   });
 
   assert.deepEqual(

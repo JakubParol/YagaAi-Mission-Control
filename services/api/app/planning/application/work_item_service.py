@@ -41,8 +41,8 @@ class WorkItemService:
         limit: int = 20,
         offset: int = 0,
         sort: str = "-created_at",
-    ) -> tuple[list[WorkItem], int]:
-        return await self._repo.list_all(
+    ) -> tuple[list[dict[str, Any]], int]:
+        return await self._repo.list_enriched(
             type=type,
             project_id=project_id,
             parent_id=parent_id,
@@ -57,18 +57,14 @@ class WorkItemService:
             sort=sort,
         )
 
-    async def get_work_item(
-        self, work_item_id: str
-    ) -> tuple[WorkItem, int]:
+    async def get_work_item(self, work_item_id: str) -> tuple[WorkItem, int]:
         item = await self._repo.get_by_id(work_item_id)
         if not item:
             raise NotFoundError(f"Work item {work_item_id} not found")
         children_count = await self._repo.get_children_count(work_item_id)
         return item, children_count
 
-    async def get_work_item_by_key(
-        self, key: str
-    ) -> tuple[WorkItem, int]:
+    async def get_work_item_by_key(self, key: str) -> tuple[WorkItem, int]:
         item = await self._repo.get_by_key(key)
         if not item:
             raise NotFoundError(f"Work item with key '{key}' not found")
@@ -157,8 +153,7 @@ class WorkItemService:
                 project_id = parent.project_id
             elif parent.project_id and project_id != parent.project_id:
                 raise ConflictError(
-                    f"Project {project_id} conflicts with parent project "
-                    f"{parent.project_id}"
+                    f"Project {project_id} conflicts with parent project " f"{parent.project_id}"
                 )
 
         key: str | None = None
@@ -169,9 +164,7 @@ class WorkItemService:
 
         if current_assignee_agent_id is not None:
             if not await self._repo.agent_exists(current_assignee_agent_id):
-                raise ValidationError(
-                    f"Agent {current_assignee_agent_id} does not exist"
-                )
+                raise ValidationError(f"Agent {current_assignee_agent_id} does not exist")
 
         now = utc_now()
         item = WorkItem(
@@ -222,16 +215,12 @@ class WorkItemService:
         now = utc_now()
 
         if "status" in data:
-            await self._apply_status_transition(
-                work_item_id, data, existing, now
-            )
+            await self._apply_status_transition(work_item_id, data, existing, now)
 
         if "parent_id" in data and data["parent_id"] is not None:
             parent = await self._repo.parent_exists(data["parent_id"])
             if not parent:
-                raise ValidationError(
-                    f"Parent {data['parent_id']} does not exist"
-                )
+                raise ValidationError(f"Parent {data['parent_id']} does not exist")
             if existing.project_id and parent.project_id:
                 if existing.project_id != parent.project_id:
                     raise ConflictError(
@@ -239,23 +228,15 @@ class WorkItemService:
                         f"project {parent.project_id}"
                     )
 
-        if (
-            "current_assignee_agent_id" in data
-            and data["current_assignee_agent_id"] is not None
-        ):
-            if not await self._repo.agent_exists(
-                data["current_assignee_agent_id"]
-            ):
-                raise ValidationError(
-                    f"Agent {data['current_assignee_agent_id']} does not exist"
-                )
+        if "current_assignee_agent_id" in data and data["current_assignee_agent_id"] is not None:
+            if not await self._repo.agent_exists(data["current_assignee_agent_id"]):
+                raise ValidationError(f"Agent {data['current_assignee_agent_id']} does not exist")
 
         self._validate_blocked_reason(data, existing)
 
         assignee_changed = (
             "current_assignee_agent_id" in data
-            and data["current_assignee_agent_id"]
-            != existing.current_assignee_agent_id
+            and data["current_assignee_agent_id"] != existing.current_assignee_agent_id
         )
         data["updated_by"] = actor
         data["updated_at"] = now
@@ -296,29 +277,21 @@ class WorkItemService:
     # Labels
     # ------------------------------------------------------------------
 
-    async def attach_label(
-        self, work_item_id: str, label_id: str
-    ) -> None:
+    async def attach_label(self, work_item_id: str, label_id: str) -> None:
         if not await self._repo.get_by_id(work_item_id):
             raise NotFoundError(f"Work item {work_item_id} not found")
         if not await self._repo.label_exists(label_id):
             raise ValidationError(f"Label {label_id} does not exist")
         if await self._repo.label_attached(work_item_id, label_id):
-            raise ConflictError(
-                f"Label {label_id} already attached to {work_item_id}"
-            )
+            raise ConflictError(f"Label {label_id} already attached to {work_item_id}")
         await self._repo.attach_label(work_item_id, label_id)
 
-    async def detach_label(
-        self, work_item_id: str, label_id: str
-    ) -> None:
+    async def detach_label(self, work_item_id: str, label_id: str) -> None:
         if not await self._repo.get_by_id(work_item_id):
             raise NotFoundError(f"Work item {work_item_id} not found")
         removed = await self._repo.detach_label(work_item_id, label_id)
         if not removed:
-            raise NotFoundError(
-                f"Label {label_id} not attached to {work_item_id}"
-            )
+            raise NotFoundError(f"Label {label_id} not attached to {work_item_id}")
 
     # ------------------------------------------------------------------
     # Assignments
@@ -339,9 +312,7 @@ class WorkItemService:
 
         active = await self._repo.get_active_assignment(work_item_id)
         if active and active.agent_id == agent_id:
-            raise ConflictError(
-                f"Agent {agent_id} already assigned to {work_item_id}"
-            )
+            raise ConflictError(f"Agent {agent_id} already assigned to {work_item_id}")
         now = utc_now()
         return await self._repo.assign_agent_with_event(
             work_item_id=work_item_id,
@@ -353,18 +324,14 @@ class WorkItemService:
             causation_id=work_item_id,
         )
 
-    async def unassign_current_agent(
-        self, work_item_id: str
-    ) -> None:
+    async def unassign_current_agent(self, work_item_id: str) -> None:
         item = await self._repo.get_by_id(work_item_id)
         if not item:
             raise NotFoundError(f"Work item {work_item_id} not found")
 
         active = await self._repo.get_active_assignment(work_item_id)
         if not active:
-            raise NotFoundError(
-                f"No active assignment on {work_item_id}"
-            )
+            raise NotFoundError(f"No active assignment on {work_item_id}")
 
         await self._repo.unassign_agent_with_event(
             work_item_id=work_item_id,
@@ -374,9 +341,7 @@ class WorkItemService:
             causation_id=work_item_id,
         )
 
-    async def list_assignments(
-        self, work_item_id: str
-    ) -> list[WorkItemAssignment]:
+    async def list_assignments(self, work_item_id: str) -> list[WorkItemAssignment]:
         if not await self._repo.get_by_id(work_item_id):
             raise NotFoundError(f"Work item {work_item_id} not found")
         return await self._repo.get_assignments(work_item_id)
@@ -385,9 +350,7 @@ class WorkItemService:
     # Progress
     # ------------------------------------------------------------------
 
-    async def get_children_progress(
-        self, parent_id: str | None
-    ) -> dict[str, int]:
+    async def get_children_progress(self, parent_id: str | None) -> dict[str, int]:
         if not parent_id:
             return {}
         total, done = await self._repo.get_children_progress(parent_id)
@@ -408,15 +371,12 @@ class WorkItemService:
         valid = {s.value for s in WorkItemStatus}
         if new_status not in valid:
             raise ValidationError(
-                f"Invalid status '{new_status}'. "
-                f"Allowed: {', '.join(sorted(valid))}"
+                f"Invalid status '{new_status}'. " f"Allowed: {', '.join(sorted(valid))}"
             )
 
         next_is_blocked = data.get("is_blocked", existing.is_blocked)
         if new_status == WorkItemStatus.DONE and next_is_blocked:
-            raise BusinessRuleError(
-                "Blocked work item cannot be moved to DONE"
-            )
+            raise BusinessRuleError("Blocked work item cannot be moved to DONE")
 
         if new_status == WorkItemStatus.DONE:
             data["completed_at"] = now
@@ -424,29 +384,16 @@ class WorkItemService:
         elif existing.status == WorkItemStatus.DONE:
             data["completed_at"] = None
 
-        if (
-            new_status == WorkItemStatus.IN_PROGRESS
-            and existing.started_at is None
-        ):
+        if new_status == WorkItemStatus.IN_PROGRESS and existing.started_at is None:
             data["started_at"] = now
 
-    def _validate_blocked_reason(
-        self, data: dict[str, Any], existing: WorkItem
-    ) -> None:
+    def _validate_blocked_reason(self, data: dict[str, Any], existing: WorkItem) -> None:
         next_is_blocked = data.get("is_blocked", existing.is_blocked)
         blocked_reason_in_payload = "blocked_reason" in data
-        blocked_reason = data.get(
-            "blocked_reason", existing.blocked_reason
-        )
+        blocked_reason = data.get("blocked_reason", existing.blocked_reason)
 
-        if (
-            blocked_reason_in_payload
-            and blocked_reason is not None
-            and not next_is_blocked
-        ):
-            raise BusinessRuleError(
-                "blocked_reason can be set only when is_blocked is true"
-            )
+        if blocked_reason_in_payload and blocked_reason is not None and not next_is_blocked:
+            raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
         if not next_is_blocked:
             data["blocked_reason"] = None
 
@@ -455,6 +402,5 @@ class WorkItemService:
         valid = {t.value for t in WorkItemType}
         if type_value not in valid:
             raise ValidationError(
-                f"Invalid type '{type_value}'. "
-                f"Allowed: {', '.join(sorted(valid))}"
+                f"Invalid type '{type_value}'. " f"Allowed: {', '.join(sorted(valid))}"
             )
