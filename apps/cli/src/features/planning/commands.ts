@@ -5,11 +5,12 @@ import { CliUsageError } from "../../core/errors";
 import { unwrapEnvelope } from "../../core/envelope";
 import type { ApiClient } from "../../core/http";
 import { collectOption, parseIntegerOption, parseKeyValueList } from "../../core/kv";
-import { buildPayload } from "../../core/payload";
+import { buildPayload, normalizeWorkItemPayload } from "../../core/payload";
 import { printPayload } from "../../core/output";
 import type { ContextFactory } from "../../core/runtime";
 import {
   PLANNING_RESOURCES,
+  WORK_ITEM_RESOURCES,
   type PathContext,
   type PlanningResourceName,
   type PlanningResourceSpec,
@@ -495,6 +496,10 @@ function registerStandardResourceCommands(
       setFiles: opts.setFile,
     });
 
+    if (WORK_ITEM_RESOURCES.has(spec.name)) {
+      normalizeWorkItemPayload(payloadBody);
+    }
+
     if (spec.defaultQuery?.type && !Object.hasOwn(payloadBody, "type")) {
       payloadBody.type = spec.defaultQuery.type;
     }
@@ -557,6 +562,10 @@ function registerStandardResourceCommands(
       sets: opts.set,
       setFiles: opts.setFile,
     });
+
+    if (WORK_ITEM_RESOURCES.has(spec.name)) {
+      normalizeWorkItemPayload(payloadBody);
+    }
 
     let payload: unknown;
     if (spec.name === "backlog" && Object.hasOwn(payloadBody, "kind")) {

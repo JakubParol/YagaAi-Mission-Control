@@ -31,6 +31,14 @@ const PATHS = {
   "work-item": "/v1/planning/work-items",
 } as const;
 
+/** Resources backed by the /v1/planning/work-items endpoint. */
+export const WORK_ITEM_RESOURCES: ReadonlySet<PlanningResourceName> = new Set([
+  "work-item",
+  "story",
+  "task",
+  "epic",
+]);
+
 export const PLANNING_RESOURCES: Record<PlanningResourceName, PlanningResourceSpec> = {
   project: {
     name: "project",
