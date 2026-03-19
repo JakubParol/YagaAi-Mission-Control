@@ -1,5 +1,11 @@
 """Tests for the /v1/planning/work-items endpoints."""
 
+import asyncio
+
+import httpx
+import pytest
+from httpx import ASGITransport
+
 PREFIX = "/v1/planning/work-items"
 
 
@@ -69,6 +75,52 @@ class TestCreateWorkItem:
             json={"type": "INVALID", "title": "Bad"},
         )
         assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_concurrent_creates_produce_unique_keys(self):
+        """Regression: MC-514 — concurrent creates must not collide on keys.
+
+        Fires 10 requests via asyncio.gather so allocate_key() calls
+        overlap on the same project_counters row within one event loop.
+        Before the atomic UPDATE … RETURNING fix, the read-then-update
+        race could hand the same next_number to two callers.
+        """
+        from app.main import app
+        from app.shared.db.session import _state as _db_state
+
+        # Drop engine reference so a fresh engine is created in the
+        # current (pytest-asyncio) event loop instead of reusing one
+        # bound to a previous TestClient's loop.
+        _db_state.clear()
+
+        n = 10
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+            responses = list(
+                await asyncio.gather(
+                    *[
+                        ac.post(
+                            PREFIX,
+                            json={
+                                "type": "STORY",
+                                "title": f"Concurrent {i}",
+                                "project_id": "p1",
+                                "sub_type": "USER_STORY",
+                            },
+                        )
+                        for i in range(n)
+                    ]
+                )
+            )
+
+        # Clear engine bound to this loop so later sync tests
+        # (which use TestClient with its own loop) get a fresh one.
+        _db_state.clear()
+
+        keys = [r.json()["key"] for r in responses]
+        codes = [r.status_code for r in responses]
+        assert all(c == 201 for c in codes), f"Non-201 responses: {codes}"
+        assert len(set(keys)) == n, f"Duplicate keys: {keys}"
 
 
 class TestListWorkItems:
