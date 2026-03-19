@@ -37,7 +37,6 @@ export function reduceDeleteConfirmPhase(
 export type ActiveZone = "main" | "status";
 
 export type MainAction =
-  | "copy-link"
   | "copy-key"
   | "add-label"
   | "toggle-sprint-membership"
@@ -58,7 +57,7 @@ export interface MenuActionItem {
 }
 
 export const SECTION_GROUPS: ReadonlyArray<ReadonlyArray<MainAction>> = [
-  ["copy-link", "copy-key", "add-label", "toggle-sprint-membership"],
+  ["copy-key", "add-label", "toggle-sprint-membership"],
   ["change-status"],
   ["add-flag", "link-work-item", "link-parent", "archive"],
   ["delete"],
