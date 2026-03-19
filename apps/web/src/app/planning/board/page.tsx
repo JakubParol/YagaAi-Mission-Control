@@ -53,7 +53,8 @@ function BoardPageContent() {
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
   const filtersActive = hasActiveFilters(filters);
-  const filterOptions = buildBoardFilterOptions(viewState, assigneeOptions);
+  const effectiveAssigneeOptions = singleProjectId ? assigneeOptions : [];
+  const filterOptions = buildBoardFilterOptions(viewState, effectiveAssigneeOptions);
   const boardSummary = computeBoardSummary(visibleState);
   const selectedStoryLabels = findSelectedStoryLabels(state, selectedStoryId);
 
@@ -118,7 +119,7 @@ function BoardPageContent() {
   } = useBoardCallbacks({
     state, setState, setPendingStoryIds, pendingStoryIds,
     setErrorToast, selectedStoryId, setSelectedStoryId,
-    assigneeOptions, singleProjectId, refreshCurrentView, loadBoardState,
+    assigneeOptions: effectiveAssigneeOptions, singleProjectId, refreshCurrentView, loadBoardState,
   });
 
   return (
@@ -204,7 +205,7 @@ function BoardPageContent() {
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           onTodoQuickCreate={handleTodoQuickCreate}
-          assigneeOptions={assigneeOptions}
+          assigneeOptions={effectiveAssigneeOptions}
           dragDisabled={filtersActive}
         />
       )}
