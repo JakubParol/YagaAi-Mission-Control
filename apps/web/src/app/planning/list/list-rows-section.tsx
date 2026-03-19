@@ -12,8 +12,7 @@ export interface ListRowsSectionProps {
   rows: PlanningListRow[];
   assignableAgents: BacklogAssigneeOption[];
   pendingIds: Record<string, true>;
-  onStoryClick: (storyId: string) => void;
-  onTaskClick: (row: PlanningListRow) => void;
+  onWorkItemClick: (workItemId: string) => void;
   onStoryDelete: (storyId: string) => void;
   onStoryStatusChange: (storyId: string, status: WorkItemStatus) => void;
   onRowAssigneeChange: (row: PlanningListRow, nextAssigneeAgentId: string | null) => void;
@@ -24,8 +23,7 @@ export function ListRowsSection({
   rows,
   assignableAgents,
   pendingIds,
-  onStoryClick,
-  onTaskClick,
+  onWorkItemClick,
   onStoryDelete,
   onStoryStatusChange,
   onRowAssigneeChange,
@@ -39,13 +37,9 @@ export function ListRowsSection({
   const handleRowClick = useCallback(
     (row: PlanningListRow) => {
       if (pendingIds[row.id]) return;
-      if (row.row_type === "story") {
-        onStoryClick(row.id);
-      } else {
-        onTaskClick(row);
-      }
+      onWorkItemClick(row.id);
     },
-    [pendingIds, onStoryClick, onTaskClick],
+    [pendingIds, onWorkItemClick],
   );
 
   if (rows.length === 0) {

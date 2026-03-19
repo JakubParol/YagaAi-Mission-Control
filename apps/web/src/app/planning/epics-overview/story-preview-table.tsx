@@ -54,6 +54,7 @@ export interface StoryPreviewTableProps {
   stories: EpicOverviewStoryPreview[];
   epicKey: string;
   storyPendingById: Record<string, boolean>;
+  onStoryClick?: (storyId: string) => void;
   onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
   onAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
 }
@@ -64,6 +65,7 @@ export function StoryPreviewTable({
   stories,
   epicKey,
   storyPendingById,
+  onStoryClick,
   onChangeStoryStatus,
   onAddStoryToSprint,
 }: StoryPreviewTableProps) {
@@ -93,9 +95,15 @@ export function StoryPreviewTable({
                     {story.work_item_key ?? "\u2014"}
                   </span>
 
-                  <span className="truncate text-xs text-foreground" title={toStoryPreviewTitle(story)}>
+                  <button
+                    type="button"
+                    onClick={() => onStoryClick?.(story.work_item_id)}
+                    disabled={!onStoryClick}
+                    className="truncate text-left text-xs text-foreground transition-colors hover:text-primary disabled:cursor-default"
+                    title={toStoryPreviewTitle(story)}
+                  >
                     {story.title}
-                  </span>
+                  </button>
 
                   <Badge variant={storyStatusVariant(story.status)} className="h-fit w-fit text-[10px]">
                     {story.status.replaceAll("_", " ")}

@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { Maximize2 } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -77,8 +80,18 @@ export function StoryDetailDialog({
   const content = (
     <>
       {!embedded && (
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="sr-only">{srTitle}</DialogTitle>
+          {storyId && (
+            <Link
+              href={`/planning/work-items/${storyId}`}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              title="Open in full page"
+            >
+              <Maximize2 className="size-3.5" />
+              <span className="hidden sm:inline">Full page</span>
+            </Link>
+          )}
         </DialogHeader>
       )}
       {embedded && <h1 className="sr-only">{srTitle}</h1>}
