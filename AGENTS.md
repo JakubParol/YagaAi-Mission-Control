@@ -64,19 +64,18 @@ Use `mc` CLI for all planning entities (projects, epics, stories, tasks, backlog
 
 Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skills/mc-cli-router/SKILL.md`
 
-## Task Workflow
+## End To End Implementation Flow (E2E)
 
-When asked to deliver a US/task/bug end-to-end, use the delivery flow skill as the execution playbook:
-- `.agents/skills/mission-control-delivery-flow/SKILL.md`
-
-Quality bar is strict: fix issues at source, no hiding warnings unless explicitly approved by user.
+If your ptompt contains the marker '[E2E], you are running full work-item implementation flow.
+The flow is described in .agents/skills/mission-control-delivery-flow/SKILL.md
+Follow that floww strictly.
 
 ## Autonomous Mode
 
 If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one-shot executor inside an automated pipeline. In this mode:
-- **IGNORE "Task Workflow"** - the pipeline manages the workflow
-- **IGNORE "Planning Operations"** - do NOT do planning
-- **IGNORE "Startup Report"** - do NOT report what you read
+- **IGNORE "Task Workflow"** — the pipeline manages the workflow
+- **IGNORE "Planning Operations"** — do NOT call `mc` CLI
+- **IGNORE "Startup Instructions"** — do NOT report what you read
 - Focus ONLY on the specific task described in your prompt
 - Read project docs for context (drill-down is still useful), but do NOT execute any workflow steps beyond what your prompt asks
 
