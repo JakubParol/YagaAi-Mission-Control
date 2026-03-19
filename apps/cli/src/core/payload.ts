@@ -19,6 +19,31 @@ function parseJson(raw: string, source: string): unknown {
   }
 }
 
+function unescapeText(value: string): string {
+  if (!value.includes("\\")) return value;
+  let result = "";
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === "\\" && i + 1 < value.length) {
+      const next = value[i + 1];
+      if (next === "n") {
+        result += "\n";
+        i++;
+      } else if (next === "t") {
+        result += "\t";
+        i++;
+      } else if (next === "\\") {
+        result += "\\";
+        i++;
+      } else {
+        result += value[i];
+      }
+    } else {
+      result += value[i];
+    }
+  }
+  return result;
+}
+
 function coerceValue(raw: string): unknown {
   const value = raw.trim();
   if (value === "true") return true;
@@ -36,7 +61,7 @@ function coerceValue(raw: string): unknown {
   if (isJsonLike) {
     return parseJson(value, "--set value");
   }
-  return value;
+  return unescapeText(value);
 }
 
 export function buildPayload(input: PayloadInput): Record<string, unknown> {
