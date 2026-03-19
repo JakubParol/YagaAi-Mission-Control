@@ -3,7 +3,6 @@ import test from "node:test";
 
 import {
   buildPlanningListRows,
-  COMING_SOON_LABEL,
 } from "./list-view-model.js";
 
 test("buildPlanningListRows composes stories and standalone tasks sorted by updated_at desc", () => {
@@ -89,6 +88,3 @@ test("buildPlanningListRows composes stories and standalone tasks sorted by upda
   assert.equal(rows[0].current_assignee_agent_id, "agent-2");
 });
 
-test("list-view mocked controls contract stays explicit", () => {
-  assert.equal(COMING_SOON_LABEL, "Coming soon");
-});

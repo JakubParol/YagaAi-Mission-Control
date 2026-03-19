@@ -4,8 +4,6 @@ import type { WorkItemStatus } from "@/lib/planning/types";
 
 import type { PlanningAgentApiItem } from "./list-types";
 
-export const COMING_SOON_LABEL = "Coming soon";
-
 export interface PlanningListLabel {
   id: string;
   name: string;

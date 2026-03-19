@@ -74,8 +74,7 @@ export default function PlanningSettingsPage() {
               ))}
             </div>
           </CardContent>
-          <CardFooter className="justify-between border-t">
-            <Badge variant="outline">Coming soon</Badge>
+          <CardFooter className="justify-end border-t">
             <Button disabled size="sm" variant="outline">
               Save project defaults
             </Button>
@@ -140,8 +139,7 @@ export default function PlanningSettingsPage() {
               </p>
             </div>
           </CardContent>
-          <CardFooter className="justify-between border-t">
-            <Badge variant="outline">Coming soon</Badge>
+          <CardFooter className="justify-end border-t">
             <Button disabled size="sm" variant="outline">
               Save backlog policy
             </Button>
@@ -220,8 +218,7 @@ export default function PlanningSettingsPage() {
               ))}
             </div>
           </CardContent>
-          <CardFooter className="justify-between border-t">
-            <Badge variant="outline">Coming soon</Badge>
+          <CardFooter className="justify-end border-t">
             <Button disabled size="sm" variant="outline">
               Save assignment defaults
             </Button>
