@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EpicDeleteConfirmDialog } from "@/components/planning/epic-delete-confirm-dialog";
 import { EpicFormDialog, type EpicFormValues } from "@/components/planning/epic-form-dialog";
+import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import {
   type DeleteConfirmPhase,
 } from "@/components/planning/story-actions-menu-types";
@@ -80,6 +81,7 @@ function EpicOverviewPageContent() {
   const [editDialogState, setEditDialogState] = useState<EditDialogState | null>(null);
   const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState | null>(null);
   const [epicActionError, setEpicActionError] = useState<string | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0] : null;
@@ -405,6 +407,7 @@ function EpicOverviewPageContent() {
                         actionError={sa.storyErrorByKey[item.work_item_key]}
                         onToggleExpand={sa.handleToggleExpand}
                         onPreviewFilterChange={sa.handlePreviewFilterChange}
+                        onStoryClick={setSelectedStoryId}
                         onChangeStoryStatus={sa.handleChangeStoryStatus}
                         onAddStoryToSprint={sa.handleAddStoryToSprint}
                         onEdit={handleEditEpic}
@@ -418,6 +421,13 @@ function EpicOverviewPageContent() {
           )}
         </>
       )}
+
+      <StoryDetailDialog
+        storyId={selectedStoryId}
+        open={selectedStoryId !== null}
+        onOpenChange={(open) => { if (!open) setSelectedStoryId(null); }}
+        onStoryUpdated={() => { void refreshCurrentView().catch(() => undefined); }}
+      />
     </>
   );
 }
