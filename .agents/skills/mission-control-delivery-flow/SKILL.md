@@ -11,36 +11,34 @@ Execute this flow when the user asks to deliver a story/bug end-to-end.
 
 - Work in the Mission Control repo root unless user explicitly says otherwise.
 - Read repo/project AGENTS/docs as required by AGENTS policy.
-- For planning entities use `mc` CLI only.
-- By planning element we are colling UserStory or Task or Bug
+- For work-items use `mc` CLI only.
+- By work-item we are colling UserStory or Task or Bug
 
 ## Planning operation preflight (mandatory)
 
-Before any planning command/mutation:
+Use `mc` CLI for all planning entities (projects, epics, stories, tasks, backlogs, labels, agents). No direct DB or API mutations.
 
-1. `mc --help`
-2. `mc <resource> --help`
-3. `mc <resource> <action> --help`
+Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skills/mc-cli-router/SKILL.md`
 
-Prefer `--output json` for deterministic parsing.
+1. please read 
 
 ## Phase 0 - Preparation
 
 0. Set thinking to High!
-1. Read the planning element details using the MC CLI by element code.
-2. If the planning element is not attached to the current sprint in the MC project, attach it.
+1. Read the work-item details using the MC CLI by element code.
+2. If the work-item is not attached to the current sprint in the MC project, attach it.
 3. If it is not attached to an epic, attach the story to an epic – you can get the list of epics and choose the best one.
 4. Add labels to the user story.
 5. Assign UserStory to Naomi.
 6. Checkout `main`.
 7. Pull the latest changes.
-8. Create a new implementation branch using the planning element code and a short description.
+8. Create a new implementation branch using the work-item code and a short description.
 
 ## Phase 1 — Implementation
 
-1. **Plan atomic tasks** for the target planning element
-2. **Create tasks** in the story via `mc task create`.
-3. Set thinking to Medium!
+1. **Plan atomic tasks** for the target work-item
+2. **Create tasks** in the story via `mc task create`. Tasks must reflect the created plan.
+3. Set thinking to Medium after planning!
 4. **Start story**: set story `IN_PROGRESS` via `mc story update`.
 5. For each task:
    - set task `IN_PROGRESS` via `mc task update`,
@@ -51,21 +49,19 @@ Prefer `--output json` for deterministic parsing.
 
 ## Phase 2 — Pull Request
 
-5. Create PR to `main` using `gh pr create`.
-6. Set story status to `CODE_REVIEW` via `mc story update`.
+1. Create PR to `main` using `gh pr create`.
+2. Set story status to `CODE_REVIEW` via `mc story update`.
 
 ## Phase 3 — Review and fixes
 
-7. Run `/review` (self-review) or perform CodeReview by yourself if /review is not avaiable.
-8. Each finding must be injected into the PR as a comment with gh cli
-9. Fix all findings (including small issues), resolve comments in PR, commit and push.
+1. Perform CodeReview by yourself.
+2. Each finding must be injected into the PR as a comment with gh cli
+3. Fix all findings (including small issues), resolve comments in PR, commit and push.
 
-## Phase 4 — Merge and deploy
+## Phase 4 — Verify phase
 
-10. Merge PR with squash (`gh pr merge --squash --delete-branch`).
-11. Update local main (`git checkout main && git pull`).
-12. Deploy (`./infra/deploy.sh`) unless user explicitly says to skip deploy.
-13. Close story: set `DONE` via `mc story update`.
+1. Move the work-item into Verify state via mc cli
+2. Assign story to agent: Amos
 
 ## Quality bar
 

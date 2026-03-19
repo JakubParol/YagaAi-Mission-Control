@@ -18,6 +18,12 @@ When the user tells you what they're working on, drill into that project:
 - Choose what else to read based on the task
 - Report what you additionally read
 
+## End To End Implementation Flow (E2E)
+
+If your ptompt contains the marker '[E2E], you are running full work-item implementation flow.
+The flow is described in .agents/skills/mission-control-delivery-flow/SKILL.md
+Follow that floww strictly.
+
 ## Autonomous Mode
 
 If your prompt contains the marker `[AUTONOMOUS_STEP]`, you are running as a one-shot executor inside an automated pipeline. In this mode:
