@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import test from "node:test";
 
 import { buildPayload } from "./payload";
+import { CliUsageError } from "./errors";
 
 test("--set unescapes literal \\n to real newline", () => {
   const result = buildPayload({ sets: ["description=Line 1\\nLine 2"] });
@@ -107,4 +108,38 @@ test("--set-file overrides --set for same field", () => {
   } finally {
     rmSync(dir, { recursive: true });
   }
+});
+
+test("--set-file throws CliUsageError for missing file", () => {
+  assert.throws(
+    () => buildPayload({ setFiles: ["desc=/nonexistent/path.txt"] }),
+    (error: unknown) => {
+      assert.ok(error instanceof CliUsageError);
+      assert.match(error.message, /--set-file desc/);
+      assert.match(error.message, /cannot read/);
+      return true;
+    },
+  );
+});
+
+test("--set-file throws CliUsageError for empty path", () => {
+  assert.throws(
+    () => buildPayload({ setFiles: ["desc="] }),
+    (error: unknown) => {
+      assert.ok(error instanceof CliUsageError);
+      assert.match(error.message, /file path cannot be empty/);
+      return true;
+    },
+  );
+});
+
+test("missing payload error message mentions --set-file", () => {
+  assert.throws(
+    () => buildPayload({}),
+    (error: unknown) => {
+      assert.ok(error instanceof CliUsageError);
+      assert.match(error.message, /--set-file/);
+      return true;
+    },
+  );
 });

@@ -72,7 +72,7 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
   const hasSetFiles = Boolean(input.setFiles && input.setFiles.length > 0);
 
   if (!hasJson && !hasFile && !hasSets && !hasSetFiles) {
-    throw new CliUsageError("Missing payload. Provide --json, --file, or at least one --set field=value.");
+    throw new CliUsageError("Missing payload. Provide --json, --file, --set, or --set-file.");
   }
 
   if (hasJson && hasFile) {
@@ -109,7 +109,15 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
   if (hasSetFiles) {
     const pairs = parseKeyValueList(input.setFiles);
     for (const [key, filePath] of Object.entries(pairs)) {
-      base[key] = readFileSync(filePath, "utf8");
+      if (!filePath) {
+        throw new CliUsageError(`--set-file ${key}: file path cannot be empty.`);
+      }
+      try {
+        base[key] = readFileSync(filePath, "utf8");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new CliUsageError(`--set-file ${key}: cannot read '${filePath}': ${msg}`);
+      }
     }
   }
 
