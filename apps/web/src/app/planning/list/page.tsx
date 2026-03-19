@@ -28,7 +28,6 @@ import {
   readFiltersFromSearchParams,
 } from "./list-page-derived";
 import { ListRowsSection } from "./list-rows-section";
-import { TaskDetailDialog } from "./task-detail-dialog";
 
 function PlanningListPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
@@ -37,7 +36,6 @@ function PlanningListPageContent() {
   const router = useRouter();
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
-  const [selectedTaskRow, setSelectedTaskRow] = useState<PlanningListRow | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
@@ -117,10 +115,6 @@ function PlanningListPageContent() {
     if (!open) setSelectedStoryId(null);
   }, []);
 
-  const handleTaskDialogChange = useCallback((open: boolean) => {
-    if (!open) setSelectedTaskRow(null);
-  }, []);
-
   const runWithPending = useCallback(
     (id: string, action: () => Promise<void>, fallbackMsg: string) => {
       if (pendingStoryIds[id]) return;
@@ -183,8 +177,8 @@ function PlanningListPageContent() {
     epicOptions, assigneeOptions, assignableAgents,
   } = deriveFilterOptions(state, UNASSIGNED_FILTER_VALUE);
 
-  const { activeSelectedStoryId, activeSelectedTaskRow, selectedStoryLabels } =
-    deriveSelections(state.kind, visibleRows, selectedStoryId, selectedTaskRow);
+  const { activeSelectedWorkItemId, selectedStoryLabels } =
+    deriveSelections(state.kind, visibleRows, selectedStoryId);
 
   return (
     <>
@@ -258,8 +252,7 @@ function PlanningListPageContent() {
             rows={visibleRows}
             assignableAgents={assignableAgents}
             pendingIds={pendingStoryIds}
-            onStoryClick={setSelectedStoryId}
-            onTaskClick={setSelectedTaskRow}
+            onWorkItemClick={setSelectedStoryId}
             onStoryDelete={handleStoryDelete}
             onStoryStatusChange={handleStoryStatusChange}
             onRowAssigneeChange={handleRowAssigneeChange}
@@ -269,19 +262,13 @@ function PlanningListPageContent() {
       )}
 
       <StoryDetailDialog
-        storyId={activeSelectedStoryId}
-        open={activeSelectedStoryId !== null}
+        storyId={activeSelectedWorkItemId}
+        open={activeSelectedWorkItemId !== null}
         onOpenChange={handleStoryDialogChange}
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => {
           void refreshCurrentView().catch(() => undefined);
         }}
-      />
-
-      <TaskDetailDialog
-        row={activeSelectedTaskRow}
-        open={activeSelectedTaskRow !== null}
-        onOpenChange={handleTaskDialogChange}
       />
     </>
   );

@@ -70,38 +70,28 @@ export function deriveFilterOptions(
 }
 
 export interface DerivedSelections {
-  activeSelectedStoryId: string | null;
-  activeSelectedTaskRow: PlanningListRow | null;
+  activeSelectedWorkItemId: string | null;
   selectedStoryLabels: PlanningListLabel[] | undefined;
 }
 
 export function deriveSelections(
   stateKind: string,
   visibleRows: PlanningListRow[],
-  selectedStoryId: string | null,
-  selectedTaskRow: PlanningListRow | null,
+  selectedWorkItemId: string | null,
 ): DerivedSelections {
-  const activeSelectedStoryId =
+  const activeSelectedWorkItemId =
     stateKind === "ok" &&
-    selectedStoryId &&
-    visibleRows.some((row) => row.row_type === "story" && row.id === selectedStoryId)
-      ? selectedStoryId
-      : null;
-
-  const activeSelectedTaskRow =
-    stateKind === "ok" &&
-    selectedTaskRow &&
-    visibleRows.some((row) => row.row_type === "task" && row.id === selectedTaskRow.id)
-      ? selectedTaskRow
+    selectedWorkItemId &&
+    visibleRows.some((row) => row.id === selectedWorkItemId)
+      ? selectedWorkItemId
       : null;
 
   const selectedStoryLabels =
-    stateKind === "ok" && activeSelectedStoryId
-      ? visibleRows.find((row) => row.row_type === "story" && row.id === activeSelectedStoryId)
-          ?.labels
+    stateKind === "ok" && activeSelectedWorkItemId
+      ? visibleRows.find((row) => row.id === activeSelectedWorkItemId)?.labels
       : undefined;
 
-  return { activeSelectedStoryId, activeSelectedTaskRow, selectedStoryLabels };
+  return { activeSelectedWorkItemId, selectedStoryLabels };
 }
 
 export function readFiltersFromSearchParams(
