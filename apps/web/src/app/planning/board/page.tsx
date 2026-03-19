@@ -80,6 +80,7 @@ function BoardPageContent() {
     if (!singleProjectId) {
       throw new Error("Select a single project before refreshing.");
     }
+    setPendingStoryIds({});
     const nextState = await fetchBoardState(singleProjectId);
     setState(nextState);
   };
@@ -109,9 +110,11 @@ function BoardPageContent() {
     if (!singleProjectId) return;
     return subscribeToSprintLifecycleChanged((payload) => {
       if (payload.projectId !== singleProjectId) return;
-      void refreshCurrentView().catch(() => undefined);
+      void fetchBoardState(singleProjectId)
+        .then((nextState) => { setPendingStoryIds({}); setState(nextState); })
+        .catch(() => undefined);
     });
-  }, [refreshCurrentView, singleProjectId]);
+  }, [singleProjectId]);
 
   const {
     handleStoryStatusChange,

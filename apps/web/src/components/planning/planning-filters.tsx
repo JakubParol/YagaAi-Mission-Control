@@ -32,7 +32,7 @@ interface PlanningFiltersProps {
   assigneeOptions: readonly PlanningFilterOption[];
 }
 
-function sel(allLabel: string, options: readonly PlanningFilterOption[]): ThemedSelectOption[] {
+function buildSelectOptions(allLabel: string, options: readonly PlanningFilterOption[]): ThemedSelectOption[] {
   return [{ value: "", label: allLabel }, ...options];
 }
 
@@ -48,11 +48,11 @@ export function PlanningFilters({
 }: PlanningFiltersProps) {
   return (
     <>
-      <ThemedSelect value={value.status} options={sel("Status: All", statusOptions)} placeholder="Status" disabled={disabled} onValueChange={(v) => onChange("status", v)} triggerClassName="h-8 w-auto min-w-[105px] shrink-0 bg-background/70 text-xs" contentClassName="w-[180px]" />
-      <ThemedSelect value={value.type} options={sel("Type: All", typeOptions)} placeholder="Type" disabled={disabled} onValueChange={(v) => onChange("type", v)} triggerClassName="h-8 w-auto min-w-[95px] shrink-0 bg-background/70 text-xs" contentClassName="w-[180px]" />
-      <ThemedSelect value={value.labelId} options={sel("Label: All", labelOptions)} placeholder="Label" disabled={disabled} onValueChange={(v) => onChange("labelId", v)} triggerClassName="h-8 w-auto min-w-[95px] shrink-0 max-w-[160px] bg-background/70 text-xs" contentClassName="w-[220px]" />
-      <ThemedSelect value={value.epicId} options={sel("Epic: All", epicOptions)} placeholder="Epic" disabled={disabled} onValueChange={(v) => onChange("epicId", v)} triggerClassName="h-8 w-auto min-w-[95px] shrink-0 max-w-[180px] bg-background/70 text-xs" contentClassName="w-[240px]" />
-      <ThemedSelect value={value.assignee} options={sel("Assignee: All", assigneeOptions)} placeholder="Assignee" disabled={disabled} onValueChange={(v) => onChange("assignee", v)} triggerClassName="h-8 w-auto min-w-[115px] shrink-0 max-w-[180px] bg-background/70 text-xs" contentClassName="w-[240px]" />
+      <ThemedSelect value={value.status} options={buildSelectOptions("Status: All", statusOptions)} placeholder="Status" disabled={disabled} onValueChange={(v) => onChange("status", v)} triggerClassName="h-8 w-auto min-w-[105px] shrink-0 bg-background/70 text-xs" contentClassName="w-[180px]" />
+      <ThemedSelect value={value.type} options={buildSelectOptions("Type: All", typeOptions)} placeholder="Type" disabled={disabled} onValueChange={(v) => onChange("type", v)} triggerClassName="h-8 w-auto min-w-[95px] shrink-0 bg-background/70 text-xs" contentClassName="w-[180px]" />
+      <ThemedSelect value={value.labelId} options={buildSelectOptions("Label: All", labelOptions)} placeholder="Label" disabled={disabled} onValueChange={(v) => onChange("labelId", v)} triggerClassName="h-8 w-auto min-w-[95px] shrink-0 max-w-[160px] bg-background/70 text-xs" contentClassName="w-[220px]" />
+      <ThemedSelect value={value.epicId} options={buildSelectOptions("Epic: All", epicOptions)} placeholder="Epic" disabled={disabled} onValueChange={(v) => onChange("epicId", v)} triggerClassName="h-8 w-auto min-w-[95px] shrink-0 max-w-[180px] bg-background/70 text-xs" contentClassName="w-[240px]" />
+      <ThemedSelect value={value.assignee} options={buildSelectOptions("Assignee: All", assigneeOptions)} placeholder="Assignee" disabled={disabled} onValueChange={(v) => onChange("assignee", v)} triggerClassName="h-8 w-auto min-w-[115px] shrink-0 max-w-[180px] bg-background/70 text-xs" contentClassName="w-[240px]" />
     </>
   );
 }

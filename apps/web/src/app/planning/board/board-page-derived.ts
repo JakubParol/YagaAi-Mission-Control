@@ -191,35 +191,6 @@ export function removePendingId(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Quick-create enrichment (pure)                                     */
-/* ------------------------------------------------------------------ */
-
-export function enrichCreatedStory(
-  created: StoryCardStory,
-  assigneeAgentId: string | null,
-  assigneeOptions: QuickCreateAssigneeOption[],
-): StoryCardStory {
-  const match = assigneeOptions.find((opt) => opt.id === assigneeAgentId) ?? null;
-  return {
-    ...created,
-    assignee_agent_id: assigneeAgentId,
-    assignee_name: match?.name ?? null,
-    assignee_last_name: match?.last_name ?? null,
-    assignee_initials: match?.initials ?? null,
-    assignee_avatar: match?.avatar ?? null,
-  };
-}
-
-export function insertCreatedStory(
-  prev: BoardState,
-  projectId: string,
-  story: StoryCardStory,
-): BoardState {
-  if (prev.kind !== "ok" || prev.projectId !== projectId) return prev;
-  return { ...prev, data: { ...prev.data, items: [story, ...prev.data.items] } };
-}
-
-/* ------------------------------------------------------------------ */
 /*  Rank computation (pure)                                            */
 /* ------------------------------------------------------------------ */
 
