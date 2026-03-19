@@ -36,16 +36,24 @@ Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skil
 
 ## Phase 1 — Implementation
 
-1. **Plan atomic tasks** for the target work-item
-2. **Create tasks** in the story via `mc task create`. Tasks must reflect the created plan.
-3. Set thinking to Medium after planning!
-4. **Start story**: set story `IN_PROGRESS` via `mc story update`.
-5. For each task:
-   - set task `IN_PROGRESS` via `mc task update`,
-   - implement code + commit,
-   - run quality gates (see `mission-control-test-gate`),
-   - set task `DONE` via `mc task update`.
-   - Do it for each singke task - Status must be updated before you proceed to another task in the loop.
+### 1.1 — Plan (the plan IS the MC tasks)
+
+1. **Design atomic implementation tasks** for the target work-item.
+2. **Record each task in MC** via `mc task create` with `--set parent_id=<WORK_ITEM_ID>`.
+   - Every task MUST have `parent_id` set to the target work-item's UUID. This is how MC links children to parents. Do NOT use `story_id`.
+3. **Verify linkage:** run `mc task list --parent-key <WORK_ITEM_KEY> --output json` and confirm `total` matches the number of tasks you created. If any task has `parent_id: null`, fix it before proceeding.
+4. Set thinking to Medium after planning!
+
+### 1.2 — Execute (task-by-task loop)
+
+5. **Start story**: set story `IN_PROGRESS` via `mc story update`.
+6. For **each** task (sequentially, one at a time):
+   a. Set task `IN_PROGRESS` via `mc task update`.
+   b. Implement code + commit.
+   c. Run quality gates (see `mission-control-test-gate`).
+   d. Set task `DONE` via `mc task update`.
+   e. If blocked: set task `BLOCKED` with `blocked_reason`, report `BLOCKER`, and stop.
+   - **Do NOT start the next task until the current one is DONE or BLOCKED.**
 
 ## Phase 2 — Pull Request
 
