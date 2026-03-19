@@ -139,6 +139,7 @@ If the review loop has run **3 times** and the sub-agent still returns DIRTY:
 2. Merge the PR using `gh pr merge`, checkout `main`, and pull the latest changes.
 3. Set story status to `DONE` via `mc story update`.
 4. Unassign story from the agent.
+5. Delete both local and origin implementation branches.
 
 ## Phase 6 — Deploy (DEV)
 
