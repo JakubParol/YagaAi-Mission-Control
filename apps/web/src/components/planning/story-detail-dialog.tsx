@@ -50,6 +50,9 @@ export function StoryDetailDialog({
     initialLabels,
     onWorkItemUpdated: onStoryUpdated,
     onRequestClose: () => onOpenChange?.(false),
+    onWorkItemDeleted: embedded
+      ? () => { window.location.assign("/planning/list"); }
+      : () => onOpenChange?.(false),
   });
 
   // ── Shell-level close handling ─────────────────────────────────────────

@@ -17,8 +17,6 @@ import {
   attachLabelApi, detachLabelApi,
 } from "./story-detail-actions";
 
-// ─── Public types ────────────────────────────────────────────────────────────
-
 /** Surface-agnostic workspace view state. */
 export type WorkspaceViewState =
   | { kind: "loading"; forWorkItemId: string }
@@ -30,10 +28,11 @@ export interface UseWorkItemWorkspaceParams {
   isActive: boolean;
   initialLabels?: WorkItemLabel[];
   onWorkItemUpdated?: () => void;
+  /** Called when user closes without deleting (discard, normal close). */
   onRequestClose?: () => void;
+  /** Called after successful deletion. Falls back to onRequestClose if not set. */
+  onWorkItemDeleted?: () => void;
 }
-
-// ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
   const [state, setState] = useState<DialogState>(() => ({ kind: "loading", forStoryId: p.workItemId ?? "" }));
@@ -56,8 +55,6 @@ export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
   const [pendingLabelIds, setPendingLabelIds] = useState<Record<string, true>>({});
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
-
   const viewState: WorkspaceViewState = useMemo(() => {
     if (!p.isActive || !p.workItemId) return { kind: "loading", forWorkItemId: p.workItemId ?? "" };
     if (state.forStoryId === p.workItemId) return mapDialogState(state);
@@ -71,8 +68,6 @@ export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
     () => activeWorkItem !== null && draft !== null && isStoryDirty(draft, activeWorkItem),
     [activeWorkItem, draft],
   );
-
-  // ── Effects ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!p.workItemId || !p.isActive || labelsForId === p.workItemId) return;
@@ -138,8 +133,6 @@ export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
     return () => { window.removeEventListener("beforeunload", h); };
   }, [hasUnsavedChanges, p.isActive]);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
-
   const toggle = (map: Record<string, true>, id: string, on: boolean) => {
     if (on) return { ...map, [id]: true as const };
     const next = { ...map }; delete next[id]; return next;
@@ -150,8 +143,6 @@ export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
     setPendingTaskIds({}); setLabels([]); setLabelsForId(null); setAvailableLabels([]);
     setSelectedLabelId(""); setLabelError(null); setPendingLabelIds({});
   };
-
-  // ── Actions ──────────────────────────────────────────────────────────────
 
   const discardAndClose = () => { resetState(); p.onRequestClose?.(); };
 
@@ -191,8 +182,10 @@ export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
   const deleteWorkItem = async (workItemId: string) => {
     if (isDeleting) return;
     setWorkItemError(null); setIsDeleting(true);
-    try { await deleteStory(workItemId); p.onWorkItemUpdated?.(); p.onRequestClose?.(); }
-    catch (e) { setWorkItemError(e instanceof Error ? e.message : "Failed to delete."); }
+    try {
+      await deleteStory(workItemId); p.onWorkItemUpdated?.(); resetState();
+      (p.onWorkItemDeleted ?? p.onRequestClose)?.();
+    } catch (e) { setWorkItemError(e instanceof Error ? e.message : "Failed to delete."); }
     finally { setIsDeleting(false); }
   };
 
@@ -289,8 +282,7 @@ export function useWorkItemWorkspaceState(p: UseWorkItemWorkspaceParams) {
   };
 }
 
-// ── Internal mapper ────────────────────────────────────────────────────────
-
+// Maps legacy DialogState (forStoryId/story) → WorkspaceViewState (forWorkItemId/workItem)
 function mapDialogState(ds: DialogState): WorkspaceViewState {
   switch (ds.kind) {
     case "loading": return { kind: "loading", forWorkItemId: ds.forStoryId };

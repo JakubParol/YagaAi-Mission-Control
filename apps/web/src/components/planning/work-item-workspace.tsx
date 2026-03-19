@@ -19,8 +19,10 @@ export interface WorkItemWorkspaceProps {
   initialLabels?: WorkItemLabel[];
   /** Called after any mutation so the parent can refresh list data. */
   onWorkItemUpdated?: () => void;
-  /** Called when the workspace wants to close (after delete, etc.). */
+  /** Called when the workspace wants to close (discard, normal close). */
   onRequestClose?: () => void;
+  /** Called after successful deletion. Falls back to onRequestClose if not set. */
+  onWorkItemDeleted?: () => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -40,6 +42,7 @@ export function WorkItemWorkspace({
   initialLabels,
   onWorkItemUpdated,
   onRequestClose,
+  onWorkItemDeleted,
 }: WorkItemWorkspaceProps) {
   const ws = useWorkItemWorkspaceState({
     workItemId,
@@ -47,6 +50,7 @@ export function WorkItemWorkspace({
     initialLabels,
     onWorkItemUpdated,
     onRequestClose,
+    onWorkItemDeleted,
   });
 
   return (
@@ -103,7 +107,7 @@ export function WorkItemWorkspaceContent({ workspace: ws }: WorkItemWorkspaceCon
       <StoryDetailHeader
         story={ws.viewState.workItem}
         storyDraft={ws.workItemDraft}
-        embedded={false}
+        embedded={true}
         isSaving={ws.isSaving}
         isDeleting={ws.isDeleting}
         onStatusChange={ws.changeStatus}
