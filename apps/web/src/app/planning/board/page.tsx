@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 
@@ -53,7 +53,9 @@ function BoardPageContent() {
     return () => window.clearTimeout(timeoutId);
   }, [errorToast]);
 
-  const { singleProjectId, viewState } = deriveViewState(allSelected, selectedProjectIds, state);
+  const derived = deriveViewState(allSelected, selectedProjectIds, state);
+  const singleProjectId = useMemo(() => derived.singleProjectId, [derived.singleProjectId]);
+  const viewState = derived.viewState;
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
   const filtersActive = hasActiveFilters(filters);
@@ -76,14 +78,19 @@ function BoardPageContent() {
     router.replace(buildClearFiltersUrl(pathname, searchParams));
   }, [pathname, router, searchParams]);
 
-  const refreshCurrentView = async () => {
+  const loadBoardState = useCallback(
+    async (projectId: string): Promise<BoardState> => fetchBoardState(projectId),
+    [],
+  );
+
+  const refreshCurrentView = useCallback(async () => {
     if (!singleProjectId) {
       throw new Error("Select a single project before refreshing.");
     }
     setPendingStoryIds({});
-    const nextState = await fetchBoardState(singleProjectId);
+    const nextState = await loadBoardState(singleProjectId);
     setState(nextState);
-  };
+  }, [loadBoardState, singleProjectId]);
 
   useEffect(() => {
     if (!singleProjectId) return;

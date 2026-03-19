@@ -8,7 +8,6 @@ import { BoardColumn, type DropPlacement } from "./sprint-board-column";
 export type { DropPlacement };
 
 // Re-export layout constant so the test import path stays unchanged
-export { TODO_QUICK_CREATE_LAYOUT } from "./sprint-board-quick-create";
 
 // ─── Types (matches API response shape) ─────────────────────────────
 
