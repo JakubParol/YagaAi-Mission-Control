@@ -1,13 +1,14 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningControlBar } from "@/components/planning/planning-control-bar";
 import { PlanningCreateAction } from "@/components/planning/planning-create-action";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
-import { PageShell } from "@/components/page-shell";
+import { PlanningPageShell } from "@/components/planning/planning-page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import { EmptyState } from "@/components/empty-state";
 import { SprintBoard } from "@/components/planning/sprint-board";
@@ -52,7 +53,9 @@ function BoardPageContent() {
     return () => window.clearTimeout(timeoutId);
   }, [errorToast]);
 
-  const { singleProjectId, viewState } = deriveViewState(allSelected, selectedProjectIds, state);
+  const derived = deriveViewState(allSelected, selectedProjectIds, state);
+  const singleProjectId = useMemo(() => derived.singleProjectId, [derived.singleProjectId]);
+  const viewState = derived.viewState;
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
   const filtersActive = hasActiveFilters(filters);
@@ -76,7 +79,7 @@ function BoardPageContent() {
   }, [pathname, router, searchParams]);
 
   const loadBoardState = useCallback(
-    (projectId: string): Promise<BoardState> => fetchBoardState(projectId),
+    async (projectId: string): Promise<BoardState> => fetchBoardState(projectId),
     [],
   );
 
@@ -84,6 +87,7 @@ function BoardPageContent() {
     if (!singleProjectId) {
       throw new Error("Select a single project before refreshing.");
     }
+    setPendingStoryIds({});
     const nextState = await loadBoardState(singleProjectId);
     setState(nextState);
   }, [loadBoardState, singleProjectId]);
@@ -91,13 +95,13 @@ function BoardPageContent() {
   useEffect(() => {
     if (!singleProjectId) return;
     let cancelled = false;
-    void loadBoardState(singleProjectId)
+    void fetchBoardState(singleProjectId)
       .then((nextState) => { if (!cancelled) { setPendingStoryIds({}); setState(nextState); } })
       .catch((error) => {
         if (!cancelled) setState({ kind: "error", projectId: singleProjectId, message: String(error) });
       });
     return () => { cancelled = true; };
-  }, [loadBoardState, singleProjectId]);
+  }, [singleProjectId]);
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -113,20 +117,21 @@ function BoardPageContent() {
     if (!singleProjectId) return;
     return subscribeToSprintLifecycleChanged((payload) => {
       if (payload.projectId !== singleProjectId) return;
-      void refreshCurrentView().catch(() => undefined);
+      void fetchBoardState(singleProjectId)
+        .then((nextState) => { setPendingStoryIds({}); setState(nextState); })
+        .catch(() => undefined);
     });
-  }, [refreshCurrentView, singleProjectId]);
+  }, [singleProjectId]);
 
   const {
     handleStoryStatusChange,
     handleStoryReorder,
-    handleTodoQuickCreate,
     handleStoryDelete,
     handleStoryAssigneeChange,
   } = useBoardCallbacks({
     state, setState, setPendingStoryIds, pendingStoryIds,
     setErrorToast, selectedStoryId, setSelectedStoryId,
-    assigneeOptions: effectiveAssigneeOptions, singleProjectId, refreshCurrentView, loadBoardState,
+    refreshCurrentView,
   });
 
   return (
@@ -141,25 +146,19 @@ function BoardPageContent() {
         </div>
       )}
 
-      <PageShell
+      <PlanningPageShell
         icon={Target}
         title={boardSummary?.sprintName ?? "Board"}
         subtitle="Active sprint board for the selected project."
-        accent="primary"
         controls={
           singleProjectId ? (
-            <PlanningFilters
-              value={filters}
-              onChange={updateFilterParam}
+            <PlanningControlBar
+              search={filters.search}
+              onSearchChange={(v) => updateFilterParam("search", v)}
               onClear={clearAllFilters}
-              searchPlaceholder="Search..."
+              clearDisabled={!hasActiveFilters(filters)}
               disabled={visibleState.kind !== "ok"}
-              statusOptions={filterOptions.statusOptions}
-              typeOptions={filterOptions.typeOptions}
-              labelOptions={filterOptions.labelOptions}
-              epicOptions={filterOptions.epicOptions}
-              assigneeOptions={filterOptions.assigneeFilterOptions}
-              trailingAction={
+              createAction={
                 <PlanningCreateAction
                   projectId={singleProjectId}
                   backlogId={state.kind === "ok" ? state.data.backlog.id : undefined}
@@ -167,7 +166,18 @@ function BoardPageContent() {
                   onSaved={() => void refreshCurrentView().catch(() => undefined)}
                 />
               }
-            />
+            >
+              <PlanningFilters
+                value={filters}
+                onChange={updateFilterParam}
+                disabled={visibleState.kind !== "ok"}
+                statusOptions={filterOptions.statusOptions}
+                typeOptions={filterOptions.typeOptions}
+                labelOptions={filterOptions.labelOptions}
+                epicOptions={filterOptions.epicOptions}
+                assigneeOptions={filterOptions.assigneeFilterOptions}
+              />
+            </PlanningControlBar>
           ) : null
         }
         actions={(
@@ -211,7 +221,6 @@ function BoardPageContent() {
           onStoryAssigneeChange={handleStoryAssigneeChange}
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
-          onTodoQuickCreate={handleTodoQuickCreate}
           assigneeOptions={effectiveAssigneeOptions}
           dragDisabled={filtersActive}
         />

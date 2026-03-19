@@ -6,12 +6,14 @@ import { ListTodo, Loader2 } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningControlBar } from "@/components/planning/planning-control-bar";
 import {
+  hasActivePlanningFilters,
   PlanningFilters,
   UNASSIGNED_FILTER_VALUE,
   type PlanningFiltersValue,
 } from "@/components/planning/planning-filters";
-import { PageShell } from "@/components/page-shell";
+import { PlanningPageShell } from "@/components/planning/planning-page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import type { WorkItemStatus } from "@/lib/planning/types";
@@ -192,23 +194,30 @@ function PlanningListPageContent() {
         </div>
       )}
 
-      <PageShell
+      <PlanningPageShell
         icon={ListTodo}
         title="List"
         subtitle="Unified project work item view."
         controls={
           singleProjectId ? (
-            <PlanningFilters
-              value={filters}
-              onChange={updateFilterParam}
+            <PlanningControlBar
+              search={filters.search}
+              onSearchChange={(v) => updateFilterParam("search", v)}
               onClear={clearAllFilters}
+              clearDisabled={!hasActivePlanningFilters(filters)}
               disabled={state.kind !== "ok"}
-              statusOptions={statusOptions}
-              typeOptions={typeOptions}
-              labelOptions={labelOptions}
-              epicOptions={epicOptions}
-              assigneeOptions={assigneeOptions}
-            />
+            >
+              <PlanningFilters
+                value={filters}
+                onChange={updateFilterParam}
+                disabled={state.kind !== "ok"}
+                statusOptions={statusOptions}
+                typeOptions={typeOptions}
+                labelOptions={labelOptions}
+                epicOptions={epicOptions}
+                assigneeOptions={assigneeOptions}
+              />
+            </PlanningControlBar>
           ) : null
         }
         actions={(

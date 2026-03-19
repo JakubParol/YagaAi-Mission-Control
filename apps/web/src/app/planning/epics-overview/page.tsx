@@ -2,14 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, Loader2, Plus, Radar, Search, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
+import { Loader2, Radar, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { RefreshControl } from "@/components/refresh-control";
-import { PageShell } from "@/components/page-shell";
-import { Button } from "@/components/ui/button";
+import { PlanningPageShell } from "@/components/planning/planning-page-shell";
 import { ThemedSelect } from "@/components/ui/themed-select";
-import { cn } from "@/lib/utils";
+import { PlanningControlBar } from "@/components/planning/planning-control-bar";
+import { PlanningCreateButton } from "@/components/planning/planning-create-button";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EpicDeleteConfirmDialog } from "@/components/planning/epic-delete-confirm-dialog";
 import { EpicFormDialog, type EpicFormValues } from "@/components/planning/epic-form-dialog";
@@ -310,54 +310,29 @@ function EpicOverviewPageContent() {
       {createDialogNode}
       {editDialogNode}
       {deleteDialogNode}
-      <PageShell
+      <PlanningPageShell
         icon={Radar}
         title="Epics Overview"
         subtitle="Health, progress, and risk overview for all epics in selected project."
         controls={singleProjectId ? (
-          <div className="flex w-full flex-col gap-2">
-            <div className="flex w-full flex-wrap items-center gap-2 xl:flex-nowrap">
-              <div className="relative min-w-[280px] flex-1">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => updateParam(FILTER_KEYS.search, e.target.value)}
-                  placeholder="Search by epic key or title"
-                  aria-label="Search epics"
-                  className={cn(
-                    "h-8 w-full rounded-md border border-border/60 bg-background/80 pl-8 pr-3 text-sm text-foreground",
-                    "placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                  )}
-                />
-              </div>
-              <div className="flex w-full flex-wrap items-center gap-2 rounded-md border border-border/60 bg-background/60 px-2 py-1.5 sm:w-auto sm:flex-nowrap">
-                <Filter className="size-3.5 text-muted-foreground" />
-                <ThemedSelect value={filters.status} options={STATUS_OPTIONS} placeholder="Status" onValueChange={(v) => updateParam(FILTER_KEYS.status, v)} triggerClassName="h-8 min-w-[130px] bg-background/70 text-xs" contentClassName="w-[180px]" />
-                <ThemedSelect value={filters.ownerId} options={ownerOptions} placeholder="Owner" onValueChange={(v) => updateParam(FILTER_KEYS.ownerId, v)} triggerClassName="h-8 min-w-[150px] bg-background/70 text-xs" contentClassName="w-[220px]" />
-                <ThemedSelect value={filters.label} options={labelOptions} placeholder="Label" onValueChange={(v) => updateParam(FILTER_KEYS.label, v)} triggerClassName="h-8 min-w-[140px] bg-background/70 text-xs" contentClassName="w-[200px]" />
-                <ThemedSelect value={filters.blocked} options={BLOCKED_OPTIONS} placeholder="Blocked" onValueChange={(v) => updateParam(FILTER_KEYS.blocked, v)} triggerClassName="h-8 min-w-[140px] bg-background/70 text-xs" contentClassName="w-[200px]" />
-                <ThemedSelect value={filters.sort} options={EPIC_OVERVIEW_SORT_OPTIONS} placeholder="Sort" onValueChange={(v) => updateParam(FILTER_KEYS.sort, v)} triggerClassName="h-8 min-w-[165px] bg-background/70 text-xs" contentClassName="w-[210px]" />
-                <Button type="button" variant="ghost" size="sm" onClick={clearAllFilters} disabled={!hasActiveFilters}>Clear</Button>
-              </div>
-            </div>
-          </div>
+          <PlanningControlBar
+            search={filters.search}
+            onSearchChange={(v) => updateParam(FILTER_KEYS.search, v)}
+            onClear={clearAllFilters}
+            clearDisabled={!hasActiveFilters}
+            disabled={pageState.kind !== "ok"}
+            createAction={
+              <PlanningCreateButton tooltip="Create epic" onClick={() => { setEpicActionError(null); setCreateOpen(true); }} />
+            }
+          >
+            <ThemedSelect value={filters.status} options={STATUS_OPTIONS} placeholder="Status" onValueChange={(v) => updateParam(FILTER_KEYS.status, v)} triggerClassName="h-8 min-w-[130px] bg-background/70 text-xs" contentClassName="w-[180px]" />
+            <ThemedSelect value={filters.ownerId} options={ownerOptions} placeholder="Owner" onValueChange={(v) => updateParam(FILTER_KEYS.ownerId, v)} triggerClassName="h-8 min-w-[150px] bg-background/70 text-xs" contentClassName="w-[220px]" />
+            <ThemedSelect value={filters.label} options={labelOptions} placeholder="Label" onValueChange={(v) => updateParam(FILTER_KEYS.label, v)} triggerClassName="h-8 min-w-[140px] bg-background/70 text-xs" contentClassName="w-[200px]" />
+            <ThemedSelect value={filters.blocked} options={BLOCKED_OPTIONS} placeholder="Blocked" onValueChange={(v) => updateParam(FILTER_KEYS.blocked, v)} triggerClassName="h-8 min-w-[140px] bg-background/70 text-xs" contentClassName="w-[200px]" />
+            <ThemedSelect value={filters.sort} options={EPIC_OVERVIEW_SORT_OPTIONS} placeholder="Sort" onValueChange={(v) => updateParam(FILTER_KEYS.sort, v)} triggerClassName="h-8 min-w-[165px] bg-background/70 text-xs" contentClassName="w-[210px]" />
+          </PlanningControlBar>
         ) : null}
-        actions={(
-          <div className="flex items-center gap-2">
-            {singleProjectId && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => { setEpicActionError(null); setCreateOpen(true); }}
-              >
-                <Plus className="mr-1.5 size-3.5" />
-                Create Epic
-              </Button>
-            )}
-            <RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />
-          </div>
-        )}
+        actions={<RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
       />
 
       {pageState.kind === "no-project" && (

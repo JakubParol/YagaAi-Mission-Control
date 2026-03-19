@@ -2,9 +2,9 @@ import { useCallback } from "react";
 
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { deleteStory } from "../story-actions";
-import { createTodoQuickItem, type QuickCreateAssigneeOption, type QuickCreateSubmitInput } from "./quick-create";
 import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
 import {
+  fetchBoardState,
   patchStoryStatus,
   patchStoryAssignee,
   patchStoryRank,
@@ -13,8 +13,6 @@ import {
 import {
   applyOptimisticStoryRank,
   computeReorderRank,
-  enrichCreatedStory,
-  insertCreatedStory,
   removePendingId,
 } from "./board-page-derived";
 import type { DropPlacement } from "@/components/planning/sprint-board";
@@ -27,10 +25,7 @@ interface BoardCallbackDeps {
   setErrorToast: (msg: string) => void;
   selectedStoryId: string | null;
   setSelectedStoryId: (id: string | null) => void;
-  assigneeOptions: QuickCreateAssigneeOption[];
-  singleProjectId: string | null;
   refreshCurrentView: () => Promise<void>;
-  loadBoardState: (projectId: string) => Promise<BoardState>;
 }
 
 export function useBoardCallbacks({
@@ -41,10 +36,7 @@ export function useBoardCallbacks({
   setErrorToast,
   selectedStoryId,
   setSelectedStoryId,
-  assigneeOptions,
-  singleProjectId,
   refreshCurrentView,
-  loadBoardState,
 }: BoardCallbackDeps) {
   const handleStoryStatusChange = useCallback(
     async (storyId: string, nextStatus: WorkItemStatus, placement?: DropPlacement | null) => {
@@ -120,18 +112,6 @@ export function useBoardCallbacks({
     [setErrorToast, setPendingStoryIds, setState, state],
   );
 
-  const handleTodoQuickCreate = useCallback(
-    async (input: Omit<QuickCreateSubmitInput, "projectId">) => {
-      if (!singleProjectId) {
-        throw new Error("Select a single project before creating work.");
-      }
-      const created = await createTodoQuickItem({ ...input, projectId: singleProjectId });
-      const enriched = enrichCreatedStory(created, input.assigneeAgentId, assigneeOptions);
-      setState((prev) => insertCreatedStory(prev, singleProjectId, enriched));
-    },
-    [assigneeOptions, setState, singleProjectId],
-  );
-
   const handleStoryDelete = useCallback(
     async (storyId: string) => {
       if (state.kind !== "ok") return;
@@ -141,7 +121,7 @@ export function useBoardCallbacks({
       try {
         await deleteStory(storyId);
         if (selectedStoryId === storyId) setSelectedStoryId(null);
-        const nextState = await loadBoardState(projectId);
+        const nextState = await fetchBoardState(projectId);
         setPendingStoryIds({});
         setState(nextState);
       } catch (error) {
@@ -150,7 +130,7 @@ export function useBoardCallbacks({
         setPendingStoryIds((prev) => removePendingId(prev, storyId));
       }
     },
-    [loadBoardState, pendingStoryIds, selectedStoryId, setErrorToast, setPendingStoryIds, setSelectedStoryId, setState, state],
+    [pendingStoryIds, selectedStoryId, setErrorToast, setPendingStoryIds, setSelectedStoryId, setState, state],
   );
 
   const handleStoryAssigneeChange = useCallback(
@@ -170,7 +150,6 @@ export function useBoardCallbacks({
   return {
     handleStoryStatusChange,
     handleStoryReorder,
-    handleTodoQuickCreate,
     handleStoryDelete,
     handleStoryAssigneeChange,
   };
