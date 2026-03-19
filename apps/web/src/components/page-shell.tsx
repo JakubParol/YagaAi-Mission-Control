@@ -5,20 +5,34 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+type PageShellAccent = "default" | "primary";
+
 interface PageShellProps {
   icon: LucideIcon;
   title: string;
   subtitle?: string;
+  accent?: PageShellAccent;
   context?: ReactNode;
   controls?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
 
+const ICON_ACCENT: Record<PageShellAccent, string> = {
+  default: "border-border/60 bg-muted/40 text-muted-foreground",
+  primary: "border-primary/40 bg-primary/10 text-primary",
+};
+
+const SUBTITLE_ACCENT: Record<PageShellAccent, string> = {
+  default: "text-muted-foreground",
+  primary: "text-primary/80",
+};
+
 export function PageShell({
   icon: Icon,
   title,
   subtitle,
+  accent = "default",
   context,
   controls,
   actions,
@@ -36,13 +50,13 @@ export function PageShell({
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="inline-flex size-8 items-center justify-center rounded-xl border border-border/60 bg-muted/40 text-muted-foreground">
+            <span className={cn("inline-flex size-8 items-center justify-center rounded-xl border", ICON_ACCENT[accent])}>
               <Icon className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
               {subtitle ? (
-                <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+                <p className={cn("mt-0.5 text-xs", SUBTITLE_ACCENT[accent])}>{subtitle}</p>
               ) : null}
             </div>
           </div>

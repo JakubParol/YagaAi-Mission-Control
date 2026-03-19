@@ -1,20 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { useCallback, useState } from "react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-const SUCCESS_STATE_TTL_MS = 2000;
-
-export type RefreshPhase = "idle" | "loading" | "success" | "error";
+export type RefreshPhase = "idle" | "loading" | "error";
 
 export interface RefreshState {
   phase: RefreshPhase;
   errorMessage: string | null;
-  refreshedAt: number | null;
 }
 
 export function toRefreshErrorMessage(error: unknown): string {
@@ -25,17 +22,15 @@ export function toRefreshErrorMessage(error: unknown): string {
 export async function runRefresh(
   refresh: () => Promise<void>,
   setState: (next: RefreshState) => void,
-  now: () => number = () => Date.now(),
 ): Promise<void> {
-  setState({ phase: "loading", errorMessage: null, refreshedAt: null });
+  setState({ phase: "loading", errorMessage: null });
   try {
     await refresh();
-    setState({ phase: "success", errorMessage: null, refreshedAt: now() });
+    setState({ phase: "idle", errorMessage: null });
   } catch (error) {
     setState({
       phase: "error",
       errorMessage: toRefreshErrorMessage(error),
-      refreshedAt: null,
     });
     throw error;
   }
@@ -59,19 +54,7 @@ export function RefreshControl({
   const [state, setState] = useState<RefreshState>({
     phase: "idle",
     errorMessage: null,
-    refreshedAt: null,
   });
-
-  useEffect(() => {
-    if (state.phase !== "success") return;
-    const timeoutId = window.setTimeout(() => {
-      setState((prev) =>
-        prev.phase === "success" ? { phase: "idle", errorMessage: null, refreshedAt: null } : prev,
-      );
-    }, SUCCESS_STATE_TTL_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [state.phase]);
 
   const triggerRefresh = useCallback(async () => {
     if (disabled || state.phase === "loading") return;
@@ -107,22 +90,13 @@ export function RefreshControl({
               )}
             >
               {state.phase === "loading" && <Loader2 className="size-3.5 animate-spin" />}
-              {state.phase === "success" && <CheckCircle2 className="size-3.5 text-emerald-300" />}
-              {(state.phase === "idle" || state.phase === "error") && (
-                <RefreshCw className="size-3.5" />
-              )}
+              {state.phase !== "loading" && <RefreshCw className="size-3.5" />}
               {buttonLabel}
             </Button>
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom">{tooltipText}</TooltipContent>
       </Tooltip>
-
-      {state.phase === "success" && (
-        <p className="text-[11px] text-emerald-300" role="status" aria-live="polite">
-          Updated just now.
-        </p>
-      )}
 
       {state.phase === "error" && (
         <div

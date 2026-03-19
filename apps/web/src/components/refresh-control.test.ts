@@ -11,7 +11,7 @@ import {
   type RefreshState,
 } from "./refresh-control.js";
 
-test("runRefresh enters loading before refresh promise resolves", async () => {
+test("runRefresh enters loading then returns to idle on success", async () => {
   const states: RefreshState[] = [];
   let resolveRefresh: (() => void) | undefined;
 
@@ -23,7 +23,6 @@ test("runRefresh enters loading before refresh promise resolves", async () => {
     (next) => {
       states.push(next);
     },
-    () => 123,
   );
 
   assert.equal(states.length, 1);
@@ -33,8 +32,7 @@ test("runRefresh enters loading before refresh promise resolves", async () => {
   resolveRefresh();
   await refreshPromise;
 
-  assert.equal(states.at(-1)?.phase, "success");
-  assert.equal(states.at(-1)?.refreshedAt, 123);
+  assert.equal(states.at(-1)?.phase, "idle");
 });
 
 test("runRefresh captures error path and rethrows", async () => {

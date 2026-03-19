@@ -4,42 +4,33 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Target } from "lucide-react";
 
-import type { WorkItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningCreateAction } from "@/components/planning/planning-create-action";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
 import { PageShell } from "@/components/page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import { EmptyState } from "@/components/empty-state";
-import { SprintBoard, type DropPlacement } from "@/components/planning/sprint-board";
+import { SprintBoard } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
-import { deleteStory } from "../story-actions";
-import { createTodoQuickItem, type QuickCreateAssigneeOption, type QuickCreateSubmitInput } from "./quick-create";
-import { applyOptimisticStoryStatus, rollbackStoryStatus } from "./status-updates";
+import { type QuickCreateAssigneeOption } from "./quick-create";
 import { subscribeToSprintLifecycleChanged } from "../sprint-lifecycle-events";
 import {
   fetchBoardState,
   fetchAssigneeOptions,
-  patchStoryStatus,
-  patchStoryAssignee,
-  patchStoryRank,
   type BoardState,
 } from "./board-page-actions";
 import {
   applyBoardFilters,
-  applyOptimisticStoryRank,
   buildBoardFilterOptions,
   buildClearFiltersUrl,
   buildFilterUrl,
   computeBoardSummary,
-  computeReorderRank,
   deriveViewState,
-  enrichCreatedStory,
   findSelectedStoryLabels,
   hasActiveFilters,
-  insertCreatedStory,
   readFiltersFromSearchParams,
-  removePendingId,
 } from "./board-page-derived";
+import { useBoardCallbacks } from "./board-page-callbacks";
 
 function BoardPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
@@ -50,7 +41,10 @@ function BoardPageContent() {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [assigneeOptions, setAssigneeOptions] = useState<QuickCreateAssigneeOption[]>([]);
+  const [assigneeOptionsState, setAssigneeOptionsState] = useState<{
+    projectId: string | null;
+    options: QuickCreateAssigneeOption[];
+  }>({ projectId: null, options: [] });
 
   useEffect(() => {
     if (!errorToast) return;
@@ -62,7 +56,11 @@ function BoardPageContent() {
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
   const filtersActive = hasActiveFilters(filters);
-  const filterOptions = buildBoardFilterOptions(viewState, assigneeOptions);
+  const effectiveAssigneeOptions =
+    singleProjectId && assigneeOptionsState.projectId === singleProjectId
+      ? assigneeOptionsState.options
+      : [];
+  const filterOptions = buildBoardFilterOptions(viewState, effectiveAssigneeOptions);
   const boardSummary = computeBoardSummary(visibleState);
   const selectedStoryLabels = findSelectedStoryLabels(state, selectedStoryId);
 
@@ -77,10 +75,10 @@ function BoardPageContent() {
     router.replace(buildClearFiltersUrl(pathname, searchParams));
   }, [pathname, router, searchParams]);
 
-  const loadBoardState = useCallback(async (projectId: string): Promise<BoardState> => {
-    setPendingStoryIds({});
-    return fetchBoardState(projectId);
-  }, []);
+  const loadBoardState = useCallback(
+    (projectId: string): Promise<BoardState> => fetchBoardState(projectId),
+    [],
+  );
 
   const refreshCurrentView = useCallback(async () => {
     if (!singleProjectId) {
@@ -94,7 +92,7 @@ function BoardPageContent() {
     if (!singleProjectId) return;
     let cancelled = false;
     void loadBoardState(singleProjectId)
-      .then((nextState) => { if (!cancelled) setState(nextState); })
+      .then((nextState) => { if (!cancelled) { setPendingStoryIds({}); setState(nextState); } })
       .catch((error) => {
         if (!cancelled) setState({ kind: "error", projectId: singleProjectId, message: String(error) });
       });
@@ -102,11 +100,12 @@ function BoardPageContent() {
   }, [loadBoardState, singleProjectId]);
 
   useEffect(() => {
-    if (!singleProjectId) { setAssigneeOptions([]); return; }
+    if (!singleProjectId) return;
+    const reqProjectId = singleProjectId;
     let cancelled = false;
     fetchAssigneeOptions()
-      .then((parsed) => { if (!cancelled) setAssigneeOptions(parsed); })
-      .catch(() => { if (!cancelled) setAssigneeOptions([]); });
+      .then((parsed) => { if (!cancelled) setAssigneeOptionsState({ projectId: reqProjectId, options: parsed }); })
+      .catch(() => { if (!cancelled) setAssigneeOptionsState({ projectId: reqProjectId, options: [] }); });
     return () => { cancelled = true; };
   }, [singleProjectId]);
 
@@ -118,135 +117,17 @@ function BoardPageContent() {
     });
   }, [refreshCurrentView, singleProjectId]);
 
-  const handleStoryStatusChange = useCallback(
-    async (storyId: string, nextStatus: WorkItemStatus, placement?: DropPlacement | null) => {
-      if (state.kind !== "ok") return;
-      const existingStory = state.data.items.find((item) => item.id === storyId);
-      if (!existingStory || existingStory.status === nextStatus) return;
-      const previousStatus: WorkItemStatus = existingStory.status;
-      const previousRank = existingStory.rank;
-      const backlogId = state.data.backlog.id;
-
-      // Compute a new rank when the drop landed at a specific position in the target column.
-      const newRank = placement
-        ? computeReorderRank(state.data.items, storyId, placement.beforeId, placement.afterId)
-        : null;
-
-      setState((prev) => {
-        if (prev.kind !== "ok") return prev;
-        const statusResult = applyOptimisticStoryStatus(prev.data, storyId, nextStatus);
-        if (!statusResult.previousStatus) return prev;
-        const afterStatus: BoardState = { ...prev, data: statusResult.data };
-        return newRank ? applyOptimisticStoryRank(afterStatus, storyId, newRank) : afterStatus;
-      });
-      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
-
-      try {
-        await patchStoryStatus(storyId, nextStatus);
-        // Status is now persisted on the server. Any failure from here on cannot
-        // be cleanly rolled back locally — we must refresh from server instead.
-        if (newRank) {
-          try {
-            await patchStoryRank(backlogId, storyId, newRank);
-          } catch {
-            // Rank update failed but status update already succeeded on the server.
-            // Refresh from server so the UI reflects the actual persisted state.
-            try {
-              await refreshCurrentView();
-            } catch {
-              // If the refresh also fails, leave the optimistic state visible.
-            }
-            setErrorToast("Story moved but position could not be saved. Board refreshed.");
-          }
-        }
-      } catch {
-        // patchStoryStatus failed — nothing was persisted yet, safe to roll back locally.
-        setState((prev) => {
-          if (prev.kind !== "ok") return prev;
-          const withRestoredRank = newRank ? applyOptimisticStoryRank(prev, storyId, previousRank) : prev;
-          if (withRestoredRank.kind !== "ok") return withRestoredRank;
-          return { ...withRestoredRank, data: rollbackStoryStatus(withRestoredRank.data, storyId, previousStatus) };
-        });
-        setErrorToast("Failed to update story status. Changes were rolled back.");
-      } finally {
-        setPendingStoryIds((prev) => removePendingId(prev, storyId));
-      }
-    },
-    [refreshCurrentView, setErrorToast, state],
-  );
-
-  const handleStoryReorder = useCallback(
-    async (storyId: string, beforeId: string | null, afterId: string | null) => {
-      if (state.kind !== "ok") return;
-      const existingStory = state.data.items.find((item) => item.id === storyId);
-      if (!existingStory) return;
-
-      const newRank = computeReorderRank(state.data.items, storyId, beforeId, afterId);
-      if (newRank === null) return; // no-op: dropped onto itself
-
-      const previousRank = existingStory.rank;
-      const backlogId = state.data.backlog.id;
-
-      setState((prev) => applyOptimisticStoryRank(prev, storyId, newRank));
-      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
-
-      try {
-        await patchStoryRank(backlogId, storyId, newRank);
-      } catch {
-        setState((prev) => applyOptimisticStoryRank(prev, storyId, previousRank));
-        setErrorToast("Failed to reorder story. Changes were rolled back.");
-      } finally {
-        setPendingStoryIds((prev) => removePendingId(prev, storyId));
-      }
-    },
-    [state],
-  );
-
-  const handleTodoQuickCreate = useCallback(
-    async (input: Omit<QuickCreateSubmitInput, "projectId">) => {
-      if (!singleProjectId) {
-        throw new Error("Select a single project before creating work.");
-      }
-      const created = await createTodoQuickItem({ ...input, projectId: singleProjectId });
-      const enriched = enrichCreatedStory(created, input.assigneeAgentId, assigneeOptions);
-      setState((prev) => insertCreatedStory(prev, singleProjectId, enriched));
-    },
-    [assigneeOptions, singleProjectId],
-  );
-
-  const handleStoryDelete = useCallback(
-    async (storyId: string) => {
-      if (state.kind !== "ok") return;
-      if (pendingStoryIds[storyId]) return;
-      const projectId = state.projectId;
-      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
-      try {
-        await deleteStory(storyId);
-        if (selectedStoryId === storyId) setSelectedStoryId(null);
-        const nextState = await loadBoardState(projectId);
-        setState(nextState);
-      } catch (error) {
-        setErrorToast(error instanceof Error ? error.message : "Failed to delete story.");
-      } finally {
-        setPendingStoryIds((prev) => removePendingId(prev, storyId));
-      }
-    },
-    [loadBoardState, pendingStoryIds, selectedStoryId, setErrorToast, state],
-  );
-
-  const handleStoryAssigneeChange = useCallback(
-    async (storyId: string, assigneeAgentId: string | null) => {
-      if (state.kind !== "ok") return;
-      if (pendingStoryIds[storyId]) return;
-      setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
-      try {
-        await patchStoryAssignee(storyId, assigneeAgentId);
-      } finally {
-        setPendingStoryIds((prev) => removePendingId(prev, storyId));
-      }
-    },
-    [pendingStoryIds, state.kind],
-  );
+  const {
+    handleStoryStatusChange,
+    handleStoryReorder,
+    handleTodoQuickCreate,
+    handleStoryDelete,
+    handleStoryAssigneeChange,
+  } = useBoardCallbacks({
+    state, setState, setPendingStoryIds, pendingStoryIds,
+    setErrorToast, selectedStoryId, setSelectedStoryId,
+    assigneeOptions: effectiveAssigneeOptions, singleProjectId, refreshCurrentView, loadBoardState,
+  });
 
   return (
     <>
@@ -264,18 +145,28 @@ function BoardPageContent() {
         icon={Target}
         title={boardSummary?.sprintName ?? "Board"}
         subtitle="Active sprint board for the selected project."
+        accent="primary"
         controls={
           singleProjectId ? (
             <PlanningFilters
               value={filters}
               onChange={updateFilterParam}
               onClear={clearAllFilters}
+              searchPlaceholder="Search..."
               disabled={visibleState.kind !== "ok"}
               statusOptions={filterOptions.statusOptions}
               typeOptions={filterOptions.typeOptions}
               labelOptions={filterOptions.labelOptions}
               epicOptions={filterOptions.epicOptions}
               assigneeOptions={filterOptions.assigneeFilterOptions}
+              trailingAction={
+                <PlanningCreateAction
+                  projectId={singleProjectId}
+                  backlogId={state.kind === "ok" ? state.data.backlog.id : undefined}
+                  disabled={visibleState.kind !== "ok"}
+                  onSaved={() => void refreshCurrentView().catch(() => undefined)}
+                />
+              }
             />
           ) : null
         }
@@ -321,7 +212,7 @@ function BoardPageContent() {
           onStoryDelete={handleStoryDelete}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           onTodoQuickCreate={handleTodoQuickCreate}
-          assigneeOptions={assigneeOptions}
+          assigneeOptions={effectiveAssigneeOptions}
           dragDisabled={filtersActive}
         />
       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Filter, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ interface PlanningFiltersProps {
   labelOptions: readonly PlanningFilterOption[];
   epicOptions: readonly PlanningFilterOption[];
   assigneeOptions: readonly PlanningFilterOption[];
+  trailingAction?: ReactNode;
   className?: string;
 }
 
@@ -57,6 +59,7 @@ export function PlanningFilters({
   labelOptions,
   epicOptions,
   assigneeOptions,
+  trailingAction,
   className,
 }: PlanningFiltersProps) {
   return (
@@ -115,7 +118,7 @@ export function PlanningFilters({
           onValueChange={(next) => {
             onChange("labelId", next);
           }}
-          triggerClassName="h-8 min-w-[128px] bg-background/70 text-xs"
+          triggerClassName="h-8 min-w-[128px] max-w-[180px] bg-background/70 text-xs"
           contentClassName="w-[220px]"
         />
 
@@ -127,7 +130,7 @@ export function PlanningFilters({
           onValueChange={(next) => {
             onChange("epicId", next);
           }}
-          triggerClassName="h-8 min-w-[136px] bg-background/70 text-xs"
+          triggerClassName="h-8 min-w-[136px] max-w-[200px] bg-background/70 text-xs"
           contentClassName="w-[240px]"
         />
 
@@ -139,7 +142,7 @@ export function PlanningFilters({
           onValueChange={(next) => {
             onChange("assignee", next);
           }}
-          triggerClassName="h-8 min-w-[136px] bg-background/70 text-xs"
+          triggerClassName="h-8 min-w-[136px] max-w-[200px] bg-background/70 text-xs"
           contentClassName="w-[240px]"
         />
 
@@ -152,6 +155,8 @@ export function PlanningFilters({
         >
           Clear
         </Button>
+
+        {trailingAction}
       </div>
     </div>
   );
