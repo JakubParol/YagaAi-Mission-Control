@@ -54,14 +54,83 @@ Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skil
 
 ## Phase 3 — Review and fixes
 
-1. Perform CodeReview by yourself.
-2. Each finding must be injected into the PR as a comment with gh cli
-3. Fix all findings (including small issues), resolve comments in PR, commit and push.
+Code review is delegated to a sub-agent. Maximum **3 review loops** before escalation.
+
+### 3.1 — Spawn review sub-agent
+
+Use the `Agent` tool to spawn a sub-agent with the following context in its prompt:
+
+```
+You are a senior code reviewer for the Mission Control monorepo.
+
+## Context
+- Repo root: /home/kuba/repos/mission-control
+- Work item: <WORK_ITEM_KEY> — <WORK_ITEM_TITLE>
+- PR number: <PR_NUMBER>
+- Base branch: main
+
+## Required reading before review
+1. /home/kuba/repos/mission-control/AGENTS.md — repo rules and review guidelines
+2. /home/kuba/repos/mission-control/docs/standards/coding-standards.md — quality gate, git, file size, code quality
+3. /home/kuba/repos/mission-control/docs/standards/coding-standards-backend.md — if PR touches services/api/
+4. /home/kuba/repos/mission-control/docs/standards/coding-standards-frontend.md — if PR touches apps/web/
+5. /home/kuba/repos/mission-control/docs/standards/testing-standards-backend.md — if PR touches backend tests
+6. /home/kuba/.openclaw/skills/mc-cli-router/SKILL.md — only if PR touches planning CLI operations
+
+Read the standards relevant to the changed files BEFORE reviewing.
+
+## Review scope
+1. Run: gh pr diff <PR_NUMBER>
+2. Review the ENTIRE diff systematically — do not stop after 1-2 findings.
+3. Check: correctness, edge cases, error handling, performance regressions, null handling,
+   backward compatibility, API contract changes, race conditions, unused imports/dead code,
+   adherence to coding standards read above.
+4. Treat correctness and security as P1.
+
+## Output protocol
+- If NO findings: return exactly "REVIEW_RESULT: CLEAR"
+- If findings exist:
+  1. Post EACH finding as a separate PR comment using:
+     gh pr comment <PR_NUMBER> --body "**CR finding (<severity>):** <description>"
+     where severity is one of: P1-blocker, P2-should-fix, P3-nit
+  2. Return exactly "REVIEW_RESULT: DIRTY — <N> findings posted"
+
+Do NOT fix code. Do NOT create commits. Review only.
+```
+
+Fill in `<WORK_ITEM_KEY>`, `<WORK_ITEM_TITLE>`, and `<PR_NUMBER>` from the current session context.
+
+### 3.2 — Handle review result
+
+**If CLEAR:** proceed to Phase 4.
+
+**If DIRTY:**
+1. Set story status back to `IN_PROGRESS` via `mc story update`.
+2. For each finding posted on the PR:
+   - Fix the issue in code.
+   - Resolve the comment on the PR: `gh pr comment <PR_NUMBER> --body "Fixed in <commit-sha>."`
+3. Run quality gates (lint + tests).
+4. Commit and push fixes.
+5. Set story status to `CODE_REVIEW` via `mc story update`.
+6. **Loop back to 3.1** — spawn a fresh review sub-agent.
+
+### 3.3 — Escalation
+
+If the review loop has run **3 times** and the sub-agent still returns DIRTY:
+- Stop and report `BLOCKER`.
+- Post a summary of unresolved findings to the PR.
+- Escalate to the user for manual decision.
 
 ## Phase 4 — Verify phase
 
 1. Move the work-item into Verify state via mc cli
 2. Assign story to agent: Amos
+
+## Phase 5 — Closure
+1. Assume that the verification is complete.
+2. Merge the PR using `gh pr merge`, checkout `main`, and pull the latest changes.
+3. Set story status to `DONE` via `mc story update`.
+4. Unassign story from the agent.
 
 ## Quality bar
 
