@@ -8,6 +8,7 @@ interface PayloadInput {
   json?: string;
   file?: string;
   sets?: string[];
+  setFiles?: string[];
 }
 
 function parseJson(raw: string, source: string): unknown {
@@ -68,8 +69,9 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
   const hasJson = Boolean(input.json && input.json.trim());
   const hasFile = Boolean(input.file && input.file.trim());
   const hasSets = Boolean(input.sets && input.sets.length > 0);
+  const hasSetFiles = Boolean(input.setFiles && input.setFiles.length > 0);
 
-  if (!hasJson && !hasFile && !hasSets) {
+  if (!hasJson && !hasFile && !hasSets && !hasSetFiles) {
     throw new CliUsageError("Missing payload. Provide --json, --file, or at least one --set field=value.");
   }
 
@@ -101,6 +103,13 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
     const pairs = parseKeyValueList(input.sets);
     for (const [key, raw] of Object.entries(pairs)) {
       base[key] = coerceValue(raw);
+    }
+  }
+
+  if (hasSetFiles) {
+    const pairs = parseKeyValueList(input.setFiles);
+    for (const [key, filePath] of Object.entries(pairs)) {
+      base[key] = readFileSync(filePath, "utf8");
     }
   }
 
