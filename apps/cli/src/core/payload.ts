@@ -123,3 +123,34 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
 
   return base;
 }
+
+const LEGACY_PARENT_ALIASES: Record<string, string> = {
+  epic_id: "parent_id",
+  story_id: "parent_id",
+};
+
+/**
+ * Detect legacy parent-link aliases (epic_id, story_id) in a work-item
+ * mutation payload and normalize them to parent_id.
+ *
+ * Throws if both a legacy alias and parent_id are present (ambiguous intent).
+ */
+export function normalizeWorkItemPayload(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  for (const [legacy, canonical] of Object.entries(LEGACY_PARENT_ALIASES)) {
+    if (!Object.hasOwn(payload, legacy)) continue;
+
+    if (Object.hasOwn(payload, canonical)) {
+      throw new CliUsageError(
+        `Payload contains both '${legacy}' and '${canonical}'. ` +
+          `Use '${canonical}' only — '${legacy}' is a legacy alias that the API ignores.`,
+      );
+    }
+
+    payload[canonical] = payload[legacy];
+    delete payload[legacy];
+  }
+
+  return payload;
+}
