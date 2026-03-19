@@ -120,6 +120,43 @@ mc run tail --run-id incident-2026-03-08 --event-type control-plane.watchdog.act
 
 Agent fallback precedence for consumers is: `avatar` -> `initials` -> derived initials from `name` + `last_name` -> first letter of `name`.
 
+## Multiline Text in `--set`
+
+The `--set` flag automatically unescapes `\n` (newline), `\t` (tab), and `\\` (literal backslash) in string values. This means you can pass multiline content inline:
+
+```bash
+# Inline newlines via \n (recommended for short text)
+mc story update --by key=MC-100 --set description='Line 1\nLine 2\nLine 3'
+
+# ANSI-C quoting also works (bash/zsh)
+mc story update --by key=MC-100 --set description=$'Line 1\nLine 2'
+```
+
+For longer multiline content, use `--set-file` to read the value from a file:
+
+```bash
+# Read description from a file (preserves all whitespace and newlines)
+mc story create --project-id <uuid> \
+  --set title='My Story' \
+  --set-file description=./description.md
+
+# Combine --set and --set-file freely
+mc task update --by key=MC-200 \
+  --set status=IN_PROGRESS \
+  --set-file notes=./notes.txt
+```
+
+**Escape rules for `--set` string values:**
+
+| Input | Output | Notes |
+|---|---|---|
+| `\n` | newline | Most common use case |
+| `\t` | tab | |
+| `\\` | `\` | Use when you need a literal backslash |
+| `\x` | `\x` | Unknown sequences are preserved as-is |
+
+Non-string values (booleans, numbers, `null`, JSON objects/arrays) are not affected by escape processing.
+
 ## Output Modes
 
 - `table` (default): optimized for interactive terminal usage

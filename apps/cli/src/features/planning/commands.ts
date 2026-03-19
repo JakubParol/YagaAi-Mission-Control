@@ -48,6 +48,7 @@ interface MutationOptions extends SelectorOptions {
   json?: string;
   file?: string;
   set?: string[];
+  setFile?: string[];
 }
 
 interface DeleteOptions extends SelectorOptions {
@@ -58,6 +59,7 @@ interface CreateOptions {
   json?: string;
   file?: string;
   set?: string[];
+  setFile?: string[];
   projectId?: string;
 }
 
@@ -129,6 +131,12 @@ function addPayloadOptions(command: Command): Command {
     .option(
       "--set <field=value>",
       "payload field override (repeatable)",
+      collectOption,
+      [],
+    )
+    .option(
+      "--set-file <field=path>",
+      "read field value from file (repeatable, preserves newlines)",
       collectOption,
       [],
     );
@@ -484,6 +492,7 @@ function registerStandardResourceCommands(
       json: opts.json,
       file: opts.file,
       sets: opts.set,
+      setFiles: opts.setFile,
     });
 
     if (spec.defaultQuery?.type && !Object.hasOwn(payloadBody, "type")) {
@@ -546,6 +555,7 @@ function registerStandardResourceCommands(
       json: opts.json,
       file: opts.file,
       sets: opts.set,
+      setFiles: opts.setFile,
     });
 
     let payload: unknown;

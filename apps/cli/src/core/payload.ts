@@ -8,6 +8,7 @@ interface PayloadInput {
   json?: string;
   file?: string;
   sets?: string[];
+  setFiles?: string[];
 }
 
 function parseJson(raw: string, source: string): unknown {
@@ -17,6 +18,31 @@ function parseJson(raw: string, source: string): unknown {
     const msg = error instanceof Error ? error.message : String(error);
     throw new CliUsageError(`Invalid JSON in ${source}: ${msg}`);
   }
+}
+
+function unescapeText(value: string): string {
+  if (!value.includes("\\")) return value;
+  let result = "";
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === "\\" && i + 1 < value.length) {
+      const next = value[i + 1];
+      if (next === "n") {
+        result += "\n";
+        i++;
+      } else if (next === "t") {
+        result += "\t";
+        i++;
+      } else if (next === "\\") {
+        result += "\\";
+        i++;
+      } else {
+        result += value[i];
+      }
+    } else {
+      result += value[i];
+    }
+  }
+  return result;
 }
 
 function coerceValue(raw: string): unknown {
@@ -36,16 +62,17 @@ function coerceValue(raw: string): unknown {
   if (isJsonLike) {
     return parseJson(value, "--set value");
   }
-  return value;
+  return unescapeText(value);
 }
 
 export function buildPayload(input: PayloadInput): Record<string, unknown> {
   const hasJson = Boolean(input.json && input.json.trim());
   const hasFile = Boolean(input.file && input.file.trim());
   const hasSets = Boolean(input.sets && input.sets.length > 0);
+  const hasSetFiles = Boolean(input.setFiles && input.setFiles.length > 0);
 
-  if (!hasJson && !hasFile && !hasSets) {
-    throw new CliUsageError("Missing payload. Provide --json, --file, or at least one --set field=value.");
+  if (!hasJson && !hasFile && !hasSets && !hasSetFiles) {
+    throw new CliUsageError("Missing payload. Provide --json, --file, --set, or --set-file.");
   }
 
   if (hasJson && hasFile) {
@@ -76,6 +103,21 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
     const pairs = parseKeyValueList(input.sets);
     for (const [key, raw] of Object.entries(pairs)) {
       base[key] = coerceValue(raw);
+    }
+  }
+
+  if (hasSetFiles) {
+    const pairs = parseKeyValueList(input.setFiles);
+    for (const [key, filePath] of Object.entries(pairs)) {
+      if (!filePath) {
+        throw new CliUsageError(`--set-file ${key}: file path cannot be empty.`);
+      }
+      try {
+        base[key] = readFileSync(filePath, "utf8");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        throw new CliUsageError(`--set-file ${key}: cannot read '${filePath}': ${msg}`);
+      }
     }
   }
 
