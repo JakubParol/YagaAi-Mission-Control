@@ -41,7 +41,10 @@ function BoardPageContent() {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [assigneeOptions, setAssigneeOptions] = useState<QuickCreateAssigneeOption[]>([]);
+  const [assigneeOptionsState, setAssigneeOptionsState] = useState<{
+    projectId: string | null;
+    options: QuickCreateAssigneeOption[];
+  }>({ projectId: null, options: [] });
 
   useEffect(() => {
     if (!errorToast) return;
@@ -53,7 +56,10 @@ function BoardPageContent() {
   const filters = readFiltersFromSearchParams(searchParams);
   const visibleState = applyBoardFilters(viewState, filters);
   const filtersActive = hasActiveFilters(filters);
-  const effectiveAssigneeOptions = singleProjectId ? assigneeOptions : [];
+  const effectiveAssigneeOptions =
+    singleProjectId && assigneeOptionsState.projectId === singleProjectId
+      ? assigneeOptionsState.options
+      : [];
   const filterOptions = buildBoardFilterOptions(viewState, effectiveAssigneeOptions);
   const boardSummary = computeBoardSummary(visibleState);
   const selectedStoryLabels = findSelectedStoryLabels(state, selectedStoryId);
@@ -95,10 +101,11 @@ function BoardPageContent() {
 
   useEffect(() => {
     if (!singleProjectId) return;
+    const reqProjectId = singleProjectId;
     let cancelled = false;
     fetchAssigneeOptions()
-      .then((parsed) => { if (!cancelled) setAssigneeOptions(parsed); })
-      .catch(() => { if (!cancelled) setAssigneeOptions([]); });
+      .then((parsed) => { if (!cancelled) setAssigneeOptionsState({ projectId: reqProjectId, options: parsed }); })
+      .catch(() => { if (!cancelled) setAssigneeOptionsState({ projectId: reqProjectId, options: [] }); });
     return () => { cancelled = true; };
   }, [singleProjectId]);
 
