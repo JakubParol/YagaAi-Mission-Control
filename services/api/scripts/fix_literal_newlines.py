@@ -204,18 +204,6 @@ def main() -> int:
     dsn = to_sync_dsn(raw_dsn)
     targets = active_targets(include_activity_log=args.include_activity_log)
 
-    print("Read on startup:")
-    print("- /AGENTS.md")
-    print("- docs/standards/coding-standards.md")
-    print("- docs/standards/documentation.md")
-    print("- docs/INDEX.md")
-    print("- docs/REPO_MAP.md")
-    print("- services/api/AGENTS.md")
-    print("- services/api/docs/INDEX.md")
-    print("- docs/standards/coding-standards-backend.md")
-    print("- docs/standards/testing-standards-backend.md")
-    print()
-
     with psycopg.connect(dsn) as conn:
         results = scan(conn, targets)
         print_scan(results)
