@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { ThemedSelect } from "@/components/ui/themed-select";
@@ -113,14 +112,6 @@ export function StoryPreviewTable({
                   </span>
 
                   <div className="flex items-center gap-1.5">
-                    <Link
-                      href={`/planning/stories/${story.work_item_id}`}
-                      className="inline-flex h-7 items-center gap-1 rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border"
-                    >
-                      Details
-                      <ExternalLink className="size-3" />
-                    </Link>
-
                     <ThemedSelect
                       value={story.status}
                       options={STATUS_OPTIONS}

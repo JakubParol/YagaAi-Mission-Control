@@ -201,7 +201,7 @@ function PlanningListPageContent() {
       <PageShell
         icon={ListTodo}
         title="List"
-        subtitle="Unified project view of stories and standalone tasks."
+        subtitle="Unified project work item view."
         controls={
           singleProjectId ? (
             <PlanningFilters
@@ -248,7 +248,7 @@ function PlanningListPageContent() {
         <EmptyState
           icon="default"
           title="No work items"
-          description="This project has no stories or standalone tasks to display."
+          description="This project has no work items to display."
         />
       )}
 

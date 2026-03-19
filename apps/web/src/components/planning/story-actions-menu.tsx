@@ -56,11 +56,6 @@ export {
   calculateSubmenuCoordinates,
 } from "./story-actions-menu-positioning";
 
-function getStoryLinkUrl(storyId: string): string {
-  if (typeof window === "undefined") return `/planning/stories/${storyId}`;
-  return new URL(`/planning/stories/${storyId}`, window.location.origin).toString();
-}
-
 async function writeClipboard(text: string): Promise<void> {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -105,7 +100,6 @@ export function StoryActionsMenu({
   const storyLabel = storyKey ? `${storyKey} ${storyTitle}` : storyTitle;
 
   const mainActions = useMemo<MenuActionItem[]>(() => [
-    { id: "copy-link", label: "Copy link", icon: Copy, disabled: isDisabled },
     { id: "copy-key", label: "Copy key", icon: Copy, disabled: isDisabled || !storyKey },
     { id: "add-label", label: "Add label", icon: Tag, disabled: isDisabled },
     ...(sprintMembershipAction ? [{
@@ -205,7 +199,6 @@ export function StoryActionsMenu({
     if (actionId === "change-status") { openStatusSub(); return; }
     if (actionId === "delete") { if (!isDisabled) { closeMenu(); setConfirmPhase((p) => reduceDeleteConfirmPhase(p, "OPEN")); } return; }
     if (actionId === "toggle-sprint-membership") { if (sprintMembershipAction && !isDisabled) { await sprintMembershipAction.onSelect(storyId); closeMenu(); } return; }
-    if (actionId === "copy-link") { await writeClipboard(getStoryLinkUrl(storyId)); closeMenu(); return; }
     if (actionId === "copy-key") { if (storyKey) await writeClipboard(storyKey); closeMenu(); return; }
     if (actionId === "add-label") { onAddLabel?.(storyId); closeMenu(); }
   };

@@ -1,11 +1,10 @@
 "use client";
 
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import type { WorkItemStatus, WorkItemDetail } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { STATUS_STYLE } from "./story-card";
 import {
   isStoryActionsSupportedType,
@@ -95,22 +94,6 @@ export function StoryDetailHeader({
               disabled={isSaving}
               isDeleting={isDeleting}
             />
-          )}
-          {/* "Open in new tab" — only shown in dialog (overlay) mode */}
-          {!embedded && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <a
-                  href={`/planning/stories/${story.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <ExternalLink className="size-3.5" />
-                </a>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Open in new tab</TooltipContent>
-            </Tooltip>
           )}
         </div>
       </div>

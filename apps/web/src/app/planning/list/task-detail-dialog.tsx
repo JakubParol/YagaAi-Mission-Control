@@ -8,7 +8,6 @@ import {
 import { STATUS_LABEL } from "@/components/planning/story-card";
 
 import {
-  COMING_SOON_LABEL,
   formatUpdatedAt,
   getPriorityLabel,
   type PlanningListRow,
@@ -42,10 +41,6 @@ export function TaskDetailDialog({ row, open, onOpenChange }: TaskDetailDialogPr
             <p className="text-xs text-muted-foreground">
               Priority: {getPriorityLabel(row.priority)} | Updated:{" "}
               {formatUpdatedAt(row.updated_at)}
-            </p>
-            <p className="text-xs text-amber-300">
-              Read-only preview. Full standalone task detail is {COMING_SOON_LABEL.toLowerCase()}
-              .
             </p>
           </div>
         )}

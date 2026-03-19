@@ -181,7 +181,7 @@ export function useStoryDetailState(p: UseStoryDetailParams) {
     setStoryError(null); setIsDeletingStory(true);
     try {
       await deleteStory(tid); p.onStoryUpdated?.();
-      if (p.embedded) { window.location.assign("/planning/stories"); return; }
+      if (p.embedded) { window.location.assign("/planning/list"); return; }
       if (viewState.kind === "ok") { setStoryDraft(toStoryDraft(viewState.story)); setStoryDraftForId(viewState.story.id); }
       executeDialogClose();
     } catch (e) { setStoryError(e instanceof Error ? e.message : "Failed to delete story."); }
