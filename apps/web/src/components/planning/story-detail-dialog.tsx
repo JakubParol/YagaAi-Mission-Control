@@ -1,7 +1,5 @@
 "use client";
 
-import { AlertTriangle, Loader2 } from "lucide-react";
-
 import {
   Dialog,
   DialogContent,
@@ -12,16 +10,23 @@ import type { WorkItemLabel } from "@/lib/planning/types";
 import {
   STORY_DETAIL_HEADER_LAYOUT,
   shouldShowStoryDetailActions,
-  StoryDetailHeader,
 } from "./story-detail-header";
-import { StoryDetailFields } from "./story-detail-fields";
 import { ConfirmDiscardDialog } from "./story-detail-confirm-dialog";
-import { useStoryDetailState } from "./story-detail-state";
+import {
+  WorkItemWorkspaceContent,
+  useWorkItemWorkspaceState,
+} from "./work-item-workspace";
 
 export { STORY_DETAIL_HEADER_LAYOUT, shouldShowStoryDetailActions };
 
 // ── StoryDetailDialog ───────────────────────────────────────────────────────
 
+/**
+ * Modal/embedded shell that wraps the canonical WorkItemWorkspace.
+ *
+ * This is a thin shell — all content, state, and data fetching are delegated
+ * to WorkItemWorkspace. The shell only adds Dialog chrome and close/discard logic.
+ */
 export function StoryDetailDialog({
   storyId,
   open = false,
@@ -39,121 +44,60 @@ export function StoryDetailDialog({
 }) {
   const isActive = embedded ? storyId !== null : open;
 
-  const s = useStoryDetailState({
-    storyId,
+  const ws = useWorkItemWorkspaceState({
+    workItemId: storyId,
     isActive,
-    embedded,
     initialLabels,
-    onOpenChange,
-    onStoryUpdated,
+    onWorkItemUpdated: onStoryUpdated,
+    onRequestClose: () => onOpenChange?.(false),
+    onWorkItemDeleted: embedded
+      ? () => { window.location.assign("/planning/list"); }
+      : () => onOpenChange?.(false),
   });
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Shell-level close handling ─────────────────────────────────────────
 
-  const dialogBody = (
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      if (ws.hasUnsavedChanges) { ws.setShowDiscardConfirm(true); return; }
+      ws.discardAndClose();
+    } else {
+      onOpenChange?.(true);
+    }
+  };
+
+  // ── Accessibility title for Dialog ─────────────────────────────────────
+
+  const srTitle = ws.viewState.kind === "ok"
+    ? ws.viewState.workItem.title
+    : ws.viewState.kind === "error" ? "Error" : "Loading\u2026";
+
+  // ── Render ─────────────────────────────────────────────────────────────
+
+  const content = (
     <>
-      {s.viewState.kind === "loading" && (
-        <>
-          {embedded ? (
-            <h1 className="sr-only">Loading story&#8230;</h1>
-          ) : (
-            <DialogHeader>
-              <DialogTitle className="sr-only">Loading story&#8230;</DialogTitle>
-            </DialogHeader>
-          )}
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        </>
+      {!embedded && (
+        <DialogHeader>
+          <DialogTitle className="sr-only">{srTitle}</DialogTitle>
+        </DialogHeader>
       )}
-
-      {s.viewState.kind === "error" && (
-        <>
-          {embedded ? (
-            <h1 className="sr-only">Error</h1>
-          ) : (
-            <DialogHeader>
-              <DialogTitle className="sr-only">Error</DialogTitle>
-            </DialogHeader>
-          )}
-          <div className="py-12 text-center">
-            <AlertTriangle className="mx-auto mb-3 size-6 text-destructive" />
-            <p className="text-sm text-muted-foreground">{s.viewState.message}</p>
-          </div>
-        </>
-      )}
-
-      {s.viewState.kind === "ok" && s.storyDraft && (
-        <div className="flex flex-col gap-5">
-          <StoryDetailHeader
-            story={s.viewState.story}
-            storyDraft={s.storyDraft}
-            embedded={embedded}
-            isSaving={s.isSavingStory}
-            isDeleting={s.isDeletingStory}
-            onStatusChange={s.handleStoryStatusChange}
-            onDelete={s.handleStoryDelete}
-            onTitleChange={(value) => s.updateStoryDraft("title", value)}
-          />
-          <StoryDetailFields
-            story={s.viewState.story}
-            storyDraft={s.storyDraft}
-            storyError={s.storyError}
-            epics={s.epics}
-            isLoadingEpics={s.isLoadingEpics}
-            isSaving={s.isSavingStory}
-            hasUnsavedChanges={s.hasUnsavedStoryChanges}
-            onDraftChange={s.updateStoryDraft}
-            onSave={s.saveStory}
-            onCancel={s.handleCancelChanges}
-            taskManagerProps={{
-              tasks: s.viewState.tasks,
-              isCreating: s.isCreatingTask,
-              pendingTaskIds: s.pendingSet,
-              error: s.taskError,
-              onCreate: s.createTask,
-              onPatch: s.patchTask,
-              onMarkDone: s.markTaskDone,
-              onDelete: s.deleteTaskHandler,
-            }}
-            labelManagerProps={{
-              labels: s.storyLabels,
-              availableLabels: s.availableLabels,
-              selectedLabelId: s.selectedLabelId,
-              isLoading: s.isLoadingLabels,
-              pendingLabelIds: s.pendingLabelSet,
-              error: s.labelError,
-              onSelectLabel: s.setSelectedLabelId,
-              onAttachLabel: s.attachLabel,
-              onDetachLabel: s.detachLabel,
-            }}
-          />
-        </div>
-      )}
-
-      {s.viewState.kind === "ok" && !s.storyDraft && (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      )}
+      {embedded && <h1 className="sr-only">{srTitle}</h1>}
+      <WorkItemWorkspaceContent workspace={ws} />
     </>
   );
 
   const discardConfirm = (
     <ConfirmDiscardDialog
-      open={s.showDiscardConfirm}
-      onKeepEditing={() => s.setShowDiscardConfirm(false)}
-      onDiscard={() => {
-        s.setShowDiscardConfirm(false);
-        s.executeDialogClose();
-      }}
+      open={ws.showDiscardConfirm}
+      onKeepEditing={() => ws.setShowDiscardConfirm(false)}
+      onDiscard={() => { ws.setShowDiscardConfirm(false); ws.discardAndClose(); }}
     />
   );
 
   if (embedded) {
     return (
       <div className="w-full">
-        {dialogBody}
+        {content}
         {discardConfirm}
       </div>
     );
@@ -161,12 +105,12 @@ export function StoryDetailDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={s.handleDialogOpenChange}>
+      <Dialog open={open} onOpenChange={handleDialogOpenChange}>
         <DialogContent
           className="sm:max-w-6xl max-h-[90vh] overflow-y-auto"
           aria-describedby={undefined}
         >
-          {dialogBody}
+          {content}
         </DialogContent>
       </Dialog>
       {discardConfirm}
