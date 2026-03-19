@@ -193,3 +193,14 @@ test("normalizeWorkItemPayload throws when story_id conflicts with parent_id", (
     },
   );
 });
+
+test("normalizeWorkItemPayload throws when both epic_id and story_id present", () => {
+  assert.throws(
+    () => normalizeWorkItemPayload({ epic_id: "e-1", story_id: "s-1" }),
+    (error: unknown) => {
+      assert.ok(error instanceof CliUsageError);
+      assert.match(error.message, /multiple legacy parent aliases/);
+      return true;
+    },
+  );
+});

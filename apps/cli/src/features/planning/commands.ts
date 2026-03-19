@@ -502,7 +502,7 @@ function registerStandardResourceCommands(
     createCommand.addHelpText(
       "after",
       "\nParent linkage: use --set parent_id=<STORY_UUID> to attach a task to a story.\n" +
-        "Legacy aliases (epic_id, story_id) are auto-normalized to parent_id.\n" +
+        "Legacy alias story_id is auto-normalized to parent_id.\n" +
         "\nExamples:\n" +
         "  mc task create --project-id <uuid> --set project_id=<uuid> --set title='My Task' --set parent_id=<story-uuid>\n" +
         "  mc task create --project-id <uuid> --set project_id=<uuid> --set title='My Task' --set status=TODO",
@@ -581,7 +581,7 @@ function registerStandardResourceCommands(
     updateCommand.addHelpText(
       "after",
       "\nParent linkage: use --set parent_id=<STORY_UUID> to re-parent a task.\n" +
-        "Legacy aliases (epic_id, story_id) are auto-normalized to parent_id.\n" +
+        "Legacy alias story_id is auto-normalized to parent_id.\n" +
         "\nExamples:\n" +
         "  mc task update --by key=MC-200 --set status=DONE\n" +
         "  mc task update --id <uuid> --set parent_id=<story-uuid>",
