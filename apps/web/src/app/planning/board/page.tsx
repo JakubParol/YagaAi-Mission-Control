@@ -264,6 +264,7 @@ function BoardPageContent() {
         icon={Target}
         title={boardSummary?.sprintName ?? "Board"}
         subtitle="Active sprint board for the selected project."
+        accent="primary"
         controls={
           singleProjectId ? (
             <PlanningFilters
