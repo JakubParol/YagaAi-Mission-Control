@@ -123,3 +123,46 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
 
   return base;
 }
+
+const LEGACY_PARENT_ALIASES: ReadonlySet<string> = new Set(["epic_id", "story_id"]);
+
+/**
+ * Detect legacy parent-link aliases (epic_id, story_id) in a work-item
+ * mutation payload and normalize them to parent_id.
+ *
+ * Throws if multiple legacy aliases or a legacy alias + parent_id are present.
+ */
+export function normalizeWorkItemPayload(
+  payload: Record<string, unknown>,
+): Record<string, unknown> {
+  const found: string[] = [];
+  for (const legacy of LEGACY_PARENT_ALIASES) {
+    if (Object.hasOwn(payload, legacy)) {
+      found.push(legacy);
+    }
+  }
+
+  if (found.length === 0) return payload;
+
+  if (found.length > 1) {
+    throw new CliUsageError(
+      `Payload contains multiple legacy parent aliases: ${found.join(", ")}. ` +
+        "Use 'parent_id' only — these aliases are not supported by the API.",
+    );
+  }
+
+  // found.length is exactly 1 here (0 and >1 cases handled above)
+  const legacy = found[0]!;
+
+  if (Object.hasOwn(payload, "parent_id")) {
+    throw new CliUsageError(
+      `Payload contains both '${legacy}' and 'parent_id'. ` +
+        `Use 'parent_id' only — '${legacy}' is a legacy alias that the API ignores.`,
+    );
+  }
+
+  payload.parent_id = payload[legacy];
+  delete payload[legacy];
+
+  return payload;
+}

@@ -5,11 +5,12 @@ import { CliUsageError } from "../../core/errors";
 import { unwrapEnvelope } from "../../core/envelope";
 import type { ApiClient } from "../../core/http";
 import { collectOption, parseIntegerOption, parseKeyValueList } from "../../core/kv";
-import { buildPayload } from "../../core/payload";
+import { buildPayload, normalizeWorkItemPayload } from "../../core/payload";
 import { printPayload } from "../../core/output";
 import type { ContextFactory } from "../../core/runtime";
 import {
   PLANNING_RESOURCES,
+  WORK_ITEM_RESOURCES,
   type PathContext,
   type PlanningResourceName,
   type PlanningResourceSpec,
@@ -486,6 +487,28 @@ function registerStandardResourceCommands(
     );
   }
 
+  if (spec.name === "story") {
+    createCommand.addHelpText(
+      "after",
+      "\nParent linkage: use --set parent_id=<EPIC_UUID> to attach a story to an epic.\n" +
+        "Legacy alias epic_id is auto-normalized to parent_id.\n" +
+        "\nExamples:\n" +
+        "  mc story create --project-id <uuid> --set project_id=<uuid> --set title='My Story' --set parent_id=<epic-uuid>\n" +
+        "  mc story create --project-id <uuid> --set project_id=<uuid> --set title='My Story' --set status=TODO",
+    );
+  }
+
+  if (spec.name === "task") {
+    createCommand.addHelpText(
+      "after",
+      "\nParent linkage: use --set parent_id=<STORY_UUID> to attach a task to a story.\n" +
+        "Legacy alias story_id is auto-normalized to parent_id.\n" +
+        "\nExamples:\n" +
+        "  mc task create --project-id <uuid> --set project_id=<uuid> --set title='My Task' --set parent_id=<story-uuid>\n" +
+        "  mc task create --project-id <uuid> --set project_id=<uuid> --set title='My Task' --set status=TODO",
+    );
+  }
+
   createCommand.action(async (opts: CreateOptions, command: Command) => {
     const ctx = getContext(command);
     const payloadBody = buildPayload({
@@ -494,6 +517,10 @@ function registerStandardResourceCommands(
       sets: opts.set,
       setFiles: opts.setFile,
     });
+
+    if (WORK_ITEM_RESOURCES.has(spec.name)) {
+      normalizeWorkItemPayload(payloadBody);
+    }
 
     if (spec.defaultQuery?.type && !Object.hasOwn(payloadBody, "type")) {
       payloadBody.type = spec.defaultQuery.type;
@@ -539,6 +566,28 @@ function registerStandardResourceCommands(
     );
   }
 
+  if (spec.name === "story") {
+    updateCommand.addHelpText(
+      "after",
+      "\nParent linkage: use --set parent_id=<EPIC_UUID> to re-parent a story.\n" +
+        "Legacy alias epic_id is auto-normalized to parent_id.\n" +
+        "\nExamples:\n" +
+        "  mc story update --by key=MC-100 --set status=IN_PROGRESS\n" +
+        "  mc story update --id <uuid> --set parent_id=<epic-uuid>",
+    );
+  }
+
+  if (spec.name === "task") {
+    updateCommand.addHelpText(
+      "after",
+      "\nParent linkage: use --set parent_id=<STORY_UUID> to re-parent a task.\n" +
+        "Legacy alias story_id is auto-normalized to parent_id.\n" +
+        "\nExamples:\n" +
+        "  mc task update --by key=MC-200 --set status=DONE\n" +
+        "  mc task update --id <uuid> --set parent_id=<story-uuid>",
+    );
+  }
+
   if (spec.name === "backlog") {
     updateCommand.addHelpText(
       "after",
@@ -557,6 +606,10 @@ function registerStandardResourceCommands(
       sets: opts.set,
       setFiles: opts.setFile,
     });
+
+    if (WORK_ITEM_RESOURCES.has(spec.name)) {
+      normalizeWorkItemPayload(payloadBody);
+    }
 
     let payload: unknown;
     if (spec.name === "backlog" && Object.hasOwn(payloadBody, "kind")) {
