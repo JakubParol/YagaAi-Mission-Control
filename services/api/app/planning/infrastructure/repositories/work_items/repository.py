@@ -303,26 +303,28 @@ class DbWorkItemRepository(WorkItemRepository):
             msg = f"Project {project_id} not found"
             raise ValueError(msg)
 
-        counter_row = (
-            (
-                await self._db.execute(
-                    select(project_counters).where(project_counters.c.project_id == project_id)
+        # Atomic increment: UPDATE … SET next_number = next_number + 1
+        # RETURNING gives us the post-increment value; subtract 1 to get
+        # the allocated number.  PostgreSQL's row-level lock on the UPDATE
+        # serialises concurrent callers, preventing duplicate keys.
+        row = (
+            await self._db.execute(
+                update(project_counters)
+                .where(project_counters.c.project_id == project_id)
+                .values(
+                    next_number=project_counters.c.next_number + 1,
+                    updated_at=utc_now(),
                 )
+                .returning(project_counters.c.next_number)
             )
-            .mappings()
-            .first()
-        )
-        if not counter_row:
+        ).scalar_one_or_none()
+
+        if row is None:
             msg = f"Counter for project {project_id} not found"
             raise ValueError(msg)
 
-        next_num = counter_row["next_number"]
-        await self._db.execute(
-            update(project_counters)
-            .where(project_counters.c.project_id == project_id)
-            .values(next_number=next_num + 1, updated_at=utc_now())
-        )
-        return f"{proj_row['key']}-{next_num}"
+        allocated = row - 1
+        return f"{proj_row['key']}-{allocated}"
 
     # ------------------------------------------------------------------
     # Existence checks
