@@ -491,7 +491,7 @@ function registerStandardResourceCommands(
     createCommand.addHelpText(
       "after",
       "\nParent linkage: use --set parent_id=<EPIC_UUID> to attach a story to an epic.\n" +
-        "Legacy aliases (epic_id, story_id) are auto-normalized to parent_id.\n" +
+        "Legacy alias epic_id is auto-normalized to parent_id.\n" +
         "\nExamples:\n" +
         "  mc story create --project-id <uuid> --set project_id=<uuid> --set title='My Story' --set parent_id=<epic-uuid>\n" +
         "  mc story create --project-id <uuid> --set project_id=<uuid> --set title='My Story' --set status=TODO",
@@ -570,7 +570,7 @@ function registerStandardResourceCommands(
     updateCommand.addHelpText(
       "after",
       "\nParent linkage: use --set parent_id=<EPIC_UUID> to re-parent a story.\n" +
-        "Legacy aliases (epic_id, story_id) are auto-normalized to parent_id.\n" +
+        "Legacy alias epic_id is auto-normalized to parent_id.\n" +
         "\nExamples:\n" +
         "  mc story update --by key=MC-100 --set status=IN_PROGRESS\n" +
         "  mc story update --id <uuid> --set parent_id=<epic-uuid>",

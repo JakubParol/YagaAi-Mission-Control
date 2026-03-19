@@ -124,10 +124,7 @@ export function buildPayload(input: PayloadInput): Record<string, unknown> {
   return base;
 }
 
-const LEGACY_PARENT_ALIASES: Record<string, string> = {
-  epic_id: "parent_id",
-  story_id: "parent_id",
-};
+const LEGACY_PARENT_ALIASES: ReadonlySet<string> = new Set(["epic_id", "story_id"]);
 
 /**
  * Detect legacy parent-link aliases (epic_id, story_id) in a work-item
@@ -139,7 +136,7 @@ export function normalizeWorkItemPayload(
   payload: Record<string, unknown>,
 ): Record<string, unknown> {
   const found: string[] = [];
-  for (const legacy of Object.keys(LEGACY_PARENT_ALIASES)) {
+  for (const legacy of LEGACY_PARENT_ALIASES) {
     if (Object.hasOwn(payload, legacy)) {
       found.push(legacy);
     }
