@@ -70,6 +70,24 @@ class TestCreateWorkItem:
         )
         assert resp.status_code == 422
 
+    def test_rapid_creates_produce_unique_keys(self, client):
+        """Regression: MC-514 — rapid sequential creates must never collide."""
+        keys: list[str] = []
+        for i in range(10):
+            resp = client.post(
+                PREFIX,
+                json={
+                    "type": "STORY",
+                    "title": f"Rapid {i}",
+                    "project_id": "p1",
+                    "sub_type": "USER_STORY",
+                },
+            )
+            assert resp.status_code == 201, resp.text
+            keys.append(resp.json()["key"])
+
+        assert len(keys) == len(set(keys)), f"Duplicate keys detected: {keys}"
+
 
 class TestListWorkItems:
     def test_list_all(self, client):
