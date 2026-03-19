@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-import { buildPayload } from "./payload";
+import { buildPayload, normalizeWorkItemPayload } from "./payload";
 import { CliUsageError } from "./errors";
 
 test("--set unescapes literal \\n to real newline", () => {
@@ -139,6 +139,56 @@ test("missing payload error message mentions --set-file", () => {
     (error: unknown) => {
       assert.ok(error instanceof CliUsageError);
       assert.match(error.message, /--set-file/);
+      return true;
+    },
+  );
+});
+
+// --- normalizeWorkItemPayload ---
+
+test("normalizeWorkItemPayload maps epic_id to parent_id", () => {
+  const payload: Record<string, unknown> = { title: "Story", epic_id: "e-1" };
+  normalizeWorkItemPayload(payload);
+  assert.equal(payload.parent_id, "e-1");
+  assert.equal(Object.hasOwn(payload, "epic_id"), false);
+});
+
+test("normalizeWorkItemPayload maps story_id to parent_id", () => {
+  const payload: Record<string, unknown> = { title: "Task", story_id: "s-1" };
+  normalizeWorkItemPayload(payload);
+  assert.equal(payload.parent_id, "s-1");
+  assert.equal(Object.hasOwn(payload, "story_id"), false);
+});
+
+test("normalizeWorkItemPayload is a no-op when parent_id already set", () => {
+  const payload = { title: "Task", parent_id: "p-1" };
+  normalizeWorkItemPayload(payload);
+  assert.equal(payload.parent_id, "p-1");
+});
+
+test("normalizeWorkItemPayload is a no-op when no legacy fields present", () => {
+  const payload = { title: "Task", status: "TODO" };
+  normalizeWorkItemPayload(payload);
+  assert.deepEqual(payload, { title: "Task", status: "TODO" });
+});
+
+test("normalizeWorkItemPayload throws when epic_id conflicts with parent_id", () => {
+  assert.throws(
+    () => normalizeWorkItemPayload({ epic_id: "e-1", parent_id: "p-1" }),
+    (error: unknown) => {
+      assert.ok(error instanceof CliUsageError);
+      assert.match(error.message, /epic_id.*parent_id/);
+      return true;
+    },
+  );
+});
+
+test("normalizeWorkItemPayload throws when story_id conflicts with parent_id", () => {
+  assert.throws(
+    () => normalizeWorkItemPayload({ story_id: "s-1", parent_id: "p-1" }),
+    (error: unknown) => {
+      assert.ok(error instanceof CliUsageError);
+      assert.match(error.message, /story_id.*parent_id/);
       return true;
     },
   );
