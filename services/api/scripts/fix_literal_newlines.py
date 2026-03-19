@@ -120,7 +120,7 @@ def fetch_count(cur: psycopg.Cursor[tuple], target: TargetColumn) -> int:
 
 
 def fetch_samples(cur: psycopg.Cursor[tuple], target: TargetColumn) -> tuple[str, ...]:
-    select_parts: list[sql.SQL] = [
+    select_parts: list[sql.Composable] = [
         sql.SQL("SELECT {}::text").format(sql.Identifier(target.id_column))
     ]
     if target.key_column:
