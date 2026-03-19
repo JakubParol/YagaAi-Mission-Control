@@ -6,10 +6,7 @@ import type { WorkItemLabel } from "@/lib/planning/types";
 import { StoryDetailHeader } from "./story-detail-header";
 import { StoryDetailFields } from "./story-detail-fields";
 import { ConfirmDiscardDialog } from "./story-detail-confirm-dialog";
-import {
-  useWorkItemWorkspaceState,
-  type UseWorkItemWorkspaceParams,
-} from "./work-item-workspace-state";
+import { useWorkItemWorkspaceState } from "./work-item-workspace-state";
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
