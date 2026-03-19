@@ -7,8 +7,6 @@ import { BoardColumn, type DropPlacement } from "./sprint-board-column";
 
 export type { DropPlacement };
 
-// Re-export layout constant so the test import path stays unchanged
-
 // ─── Types (matches API response shape) ─────────────────────────────
 
 export interface SprintBacklog {

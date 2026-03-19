@@ -320,6 +320,7 @@ function EpicOverviewPageContent() {
             onSearchChange={(v) => updateParam(FILTER_KEYS.search, v)}
             onClear={clearAllFilters}
             clearDisabled={!hasActiveFilters}
+            disabled={pageState.kind !== "ok"}
             createAction={
               <PlanningCreateButton tooltip="Create epic" onClick={() => { setEpicActionError(null); setCreateOpen(true); }} />
             }
