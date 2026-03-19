@@ -7,8 +7,7 @@ import {
   StoryAssigneeControl,
   type StoryAssigneeSelection,
 } from "@/components/planning/story-assignee-control";
-import type { QuickCreateAssigneeOption, QuickCreateSubmitInput } from "@/app/planning/board/quick-create";
-import { TodoQuickCreate } from "./sprint-board-quick-create";
+import type { QuickCreateAssigneeOption } from "@/app/planning/board/quick-create";
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -40,7 +39,6 @@ export interface BoardColumnProps {
   pendingStoryIds: Set<string>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
-  onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions: readonly QuickCreateAssigneeOption[];
   assigneeOverrides: Readonly<Record<string, StoryAssigneeSelection>>;
   onStoryAssigneeChange: (storyId: string, assignee: StoryAssigneeSelection) => void;
@@ -63,7 +61,6 @@ export function BoardColumn({
   pendingStoryIds,
   onStoryDelete,
   onStoryStatusChange,
-  onTodoQuickCreate,
   assigneeOptions,
   assigneeOverrides,
   onStoryAssigneeChange,
@@ -122,10 +119,6 @@ export function BoardColumn({
           {stories.length}
         </span>
       </div>
-
-      {status === "TODO" && onTodoQuickCreate && (
-        <TodoQuickCreate assigneeOptions={assigneeOptions} onTodoQuickCreate={onTodoQuickCreate} />
-      )}
 
       {/* Cards */}
       <div className="flex flex-col gap-2 p-2 min-h-[120px]">

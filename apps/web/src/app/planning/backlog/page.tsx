@@ -2,16 +2,17 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Layers, Loader2, Plus } from "lucide-react";
+import { Layers, Loader2 } from "lucide-react";
 
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EmptyState } from "@/components/empty-state";
-import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
-import { PageShell } from "@/components/page-shell";
+import { PlanningControlBar } from "@/components/planning/planning-control-bar";
+import { PlanningCreateButton } from "@/components/planning/planning-create-button";
+import { hasActivePlanningFilters, PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
+import { PlanningPageShell } from "@/components/planning/planning-page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
-import { Button } from "@/components/ui/button";
 import { deleteStory } from "../story-actions";
 
 import type {
@@ -192,18 +193,21 @@ function BacklogPageContent() {
         </div>
       )}
 
-      <PageShell
+      <PlanningPageShell
         icon={Layers}
         title="Backlog"
         subtitle="All backlogs and their stories for the selected project."
         controls={singleProjectId ? (
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <PlanningFilters value={filters} onChange={updateFilterParam} onClear={clearAllFilters} disabled={state.kind !== "ok"} statusOptions={filterOptions.statusOptions} typeOptions={filterOptions.typeOptions} labelOptions={filterOptions.labelOptions} epicOptions={filterOptions.epicOptions} assigneeOptions={filterOptions.assigneeOptions} className="flex-1" />
-            <Button type="button" variant="outline" size="sm" onClick={() => setCreateBoardOpen(true)} className="gap-1.5">
-              <Plus className="size-3.5" />
-              Create board
-            </Button>
-          </div>
+          <PlanningControlBar
+            search={filters.search}
+            onSearchChange={(v) => updateFilterParam("search", v)}
+            onClear={clearAllFilters}
+            clearDisabled={!hasActivePlanningFilters(filters)}
+            disabled={state.kind !== "ok"}
+            createAction={<PlanningCreateButton tooltip="Create board" onClick={() => setCreateBoardOpen(true)} />}
+          >
+            <PlanningFilters value={filters} onChange={updateFilterParam} disabled={state.kind !== "ok"} statusOptions={filterOptions.statusOptions} typeOptions={filterOptions.typeOptions} labelOptions={filterOptions.labelOptions} epicOptions={filterOptions.epicOptions} assigneeOptions={filterOptions.assigneeOptions} />
+          </PlanningControlBar>
         ) : null}
         actions={<RefreshControl onRefresh={refreshCurrentView} disabled={!singleProjectId} className="items-stretch sm:items-end" />}
       />

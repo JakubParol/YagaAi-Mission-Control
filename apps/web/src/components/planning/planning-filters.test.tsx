@@ -142,12 +142,11 @@ test("story option builders emit unique sorted values", () => {
   ]);
 });
 
-test("PlanningFilters renders all controls and clear action", () => {
+test("PlanningFilters renders all five filter dropdowns", () => {
   const html = renderToStaticMarkup(
     React.createElement(PlanningFilters, {
       value: emptyFilters(),
       onChange: () => undefined,
-      onClear: () => undefined,
       statusOptions: [{ value: "TODO", label: "TODO" }],
       typeOptions: [{ value: "USER_STORY", label: "USER STORY" }],
       labelOptions: [{ value: "l-web", label: "WEB" }],
@@ -156,6 +155,9 @@ test("PlanningFilters renders all controls and clear action", () => {
     }),
   );
 
-  assert.match(html, /Search by key or title/);
-  assert.match(html, /Clear/);
+  assert.match(html, /Status/);
+  assert.match(html, /Type/);
+  assert.match(html, /Label/);
+  assert.match(html, /Epic/);
+  assert.match(html, /Assignee/);
 });

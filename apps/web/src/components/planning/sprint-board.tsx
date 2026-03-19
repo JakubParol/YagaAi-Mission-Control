@@ -2,7 +2,7 @@ import { useMemo, useState, type DragEvent } from "react";
 import type { WorkItemStatus } from "@/lib/planning/types";
 import type { StoryCardStory } from "./story-card";
 import type { StoryAssigneeSelection } from "@/components/planning/story-assignee-control";
-import type { QuickCreateAssigneeOption, QuickCreateSubmitInput } from "@/app/planning/board/quick-create";
+import type { QuickCreateAssigneeOption } from "@/app/planning/board/quick-create";
 import { BoardColumn, type DropPlacement } from "./sprint-board-column";
 
 export type { DropPlacement };
@@ -53,7 +53,6 @@ export interface SprintBoardProps {
   onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   pendingStoryIds?: ReadonlySet<string>;
-  onTodoQuickCreate?: (input: Omit<QuickCreateSubmitInput, "projectId">) => Promise<void>;
   assigneeOptions?: readonly QuickCreateAssigneeOption[];
   /** When true, disables all drag-and-drop reordering (e.g. when filters may hide cards). */
   dragDisabled?: boolean;
@@ -69,7 +68,6 @@ export function SprintBoard({
   onStoryAssigneeChange,
   onStoryDelete,
   pendingStoryIds,
-  onTodoQuickCreate,
   assigneeOptions = [],
   dragDisabled = false,
 }: SprintBoardProps) {
@@ -175,7 +173,6 @@ export function SprintBoard({
             pendingStoryIds={pendingSet}
             onStoryDelete={onStoryDelete}
             onStoryStatusChange={onStoryStatusChange}
-            onTodoQuickCreate={col.status === "TODO" ? onTodoQuickCreate : undefined}
             assigneeOptions={assigneeOptions}
             assigneeOverrides={assigneeOverrides}
             onStoryAssigneeChange={handleStoryAssigneeChange}
