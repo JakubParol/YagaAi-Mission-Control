@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -107,22 +107,13 @@ export function RefreshControl({
               )}
             >
               {state.phase === "loading" && <Loader2 className="size-3.5 animate-spin" />}
-              {state.phase === "success" && <CheckCircle2 className="size-3.5 text-emerald-300" />}
-              {(state.phase === "idle" || state.phase === "error") && (
-                <RefreshCw className="size-3.5" />
-              )}
+              {state.phase !== "loading" && <RefreshCw className="size-3.5" />}
               {buttonLabel}
             </Button>
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom">{tooltipText}</TooltipContent>
       </Tooltip>
-
-      {state.phase === "success" && (
-        <p className="text-[11px] text-emerald-300" role="status" aria-live="polite">
-          Updated just now.
-        </p>
-      )}
 
       {state.phase === "error" && (
         <div
