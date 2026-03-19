@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Filter, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ interface PlanningFiltersProps {
   labelOptions: readonly PlanningFilterOption[];
   epicOptions: readonly PlanningFilterOption[];
   assigneeOptions: readonly PlanningFilterOption[];
+  trailingAction?: ReactNode;
   className?: string;
 }
 
@@ -57,6 +59,7 @@ export function PlanningFilters({
   labelOptions,
   epicOptions,
   assigneeOptions,
+  trailingAction,
   className,
 }: PlanningFiltersProps) {
   return (
@@ -152,6 +155,8 @@ export function PlanningFilters({
         >
           Clear
         </Button>
+
+        {trailingAction}
       </div>
     </div>
   );

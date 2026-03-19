@@ -6,6 +6,7 @@ import { Loader2, Target } from "lucide-react";
 
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
+import { PlanningCreateAction } from "@/components/planning/planning-create-action";
 import { PlanningFilters, type PlanningFiltersValue } from "@/components/planning/planning-filters";
 import { PageShell } from "@/components/page-shell";
 import { RefreshControl } from "@/components/refresh-control";
@@ -271,12 +272,21 @@ function BoardPageContent() {
               value={filters}
               onChange={updateFilterParam}
               onClear={clearAllFilters}
+              searchPlaceholder="Search..."
               disabled={visibleState.kind !== "ok"}
               statusOptions={filterOptions.statusOptions}
               typeOptions={filterOptions.typeOptions}
               labelOptions={filterOptions.labelOptions}
               epicOptions={filterOptions.epicOptions}
               assigneeOptions={filterOptions.assigneeFilterOptions}
+              trailingAction={
+                <PlanningCreateAction
+                  projectId={singleProjectId}
+                  backlogId={state.kind === "ok" ? state.data.backlog.id : undefined}
+                  disabled={visibleState.kind !== "ok"}
+                  onSaved={() => void refreshCurrentView().catch(() => undefined)}
+                />
+              }
             />
           ) : null
         }
