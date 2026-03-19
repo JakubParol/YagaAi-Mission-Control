@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { BACKLOG_ROW_LAYOUT } from "./backlog-row.js";
 import { STORY_CARD_LAYOUT } from "./story-card.js";
-import { STORY_DETAIL_HEADER_LAYOUT } from "./story-detail-dialog.js";
+import { STORY_DETAIL_HEADER_LAYOUT } from "./story-detail-header.js";
 
 test("story card keeps a single metadata row layout", () => {
   assert.equal(STORY_CARD_LAYOUT.metadataRow, "flex items-center justify-between gap-2");
