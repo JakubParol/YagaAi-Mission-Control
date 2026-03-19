@@ -132,6 +132,27 @@ If the review loop has run **3 times** and the sub-agent still returns DIRTY:
 3. Set story status to `DONE` via `mc story update`.
 4. Unassign story from the agent.
 
+## Phase 6 — Deploy (DEV)
+
+Deploy the merged changes to the DEV container runtime.
+
+1. Ensure you are on `main` with latest changes pulled (should be done in Phase 5).
+2. Run the deploy script in non-interactive mode:
+   ```bash
+   ./infra/deploy.sh dev
+   ```
+   This builds Docker images (api + web), runs migrations, starts/updates the DEV stack,
+   and runs smoke checks against `http://127.0.0.1:5000/healthz` and `http://127.0.0.1:3000/dashboard`.
+3. **Verify the output:**
+   - All build steps complete without error.
+   - Smoke checks pass (API healthz + WEB dashboard respond).
+   - `[OK] DEV deploy complete` appears at the end.
+4. **If deploy fails:** report `BLOCKER` with the error output and escalate to the user.
+   Do NOT retry automatically — deploy failures may require infrastructure investigation.
+
+> **Note:** PROD deploy (`./infra/deploy.sh prod`) is never run autonomously.
+> Only DEV deploy is in scope for the E2E flow. PROD requires explicit user authorization.
+
 ## Quality bar
 
 - Follow zero-warnings policy: fix at source.
