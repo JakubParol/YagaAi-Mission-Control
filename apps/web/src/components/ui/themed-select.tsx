@@ -215,14 +215,12 @@ export function ThemedSelect({
         >
           <span
             className={cn(
-              "min-w-0 grow text-left",
-              !selectedOption && "truncate text-muted-foreground",
+              "min-w-0 grow truncate text-left",
+              !selectedOption && "text-muted-foreground",
             )}
           >
             {selectedOption
-              ? (renderValue ? renderValue(selectedOption) : (
-                <span className="truncate">{selectedOption.label}</span>
-              ))
+              ? (renderValue ? renderValue(selectedOption) : selectedOption.label)
               : placeholder}
           </span>
           {hideChevron ? null : (
