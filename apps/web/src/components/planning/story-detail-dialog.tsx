@@ -10,17 +10,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { WorkItemLabel } from "@/lib/planning/types";
-import {
-  STORY_DETAIL_HEADER_LAYOUT,
-  shouldShowStoryDetailActions,
-} from "./story-detail-header";
 import { ConfirmDiscardDialog } from "./story-detail-confirm-dialog";
+import {
+  getStoryDetailShellState,
+} from "./story-detail-shell";
 import {
   WorkItemWorkspaceContent,
   useWorkItemWorkspaceState,
 } from "./work-item-workspace";
-
-export { STORY_DETAIL_HEADER_LAYOUT, shouldShowStoryDetailActions };
 
 // ── StoryDetailDialog ───────────────────────────────────────────────────────
 
@@ -45,16 +42,16 @@ export function StoryDetailDialog({
   initialLabels?: WorkItemLabel[];
   onStoryUpdated?: () => void;
 }) {
-  const isActive = embedded ? storyId !== null : open;
+  const shell = getStoryDetailShellState({ embedded, open, storyId });
 
   const ws = useWorkItemWorkspaceState({
     workItemId: storyId,
-    isActive,
+    isActive: shell.isActive,
     initialLabels,
     onWorkItemUpdated: onStoryUpdated,
     onRequestClose: () => onOpenChange?.(false),
     onWorkItemDeleted: embedded
-      ? () => { window.location.assign("/planning/list"); }
+      ? () => { window.location.assign(shell.deleteRedirectHref); }
       : () => onOpenChange?.(false),
   });
 
@@ -82,9 +79,9 @@ export function StoryDetailDialog({
       {!embedded && (
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="sr-only">{srTitle}</DialogTitle>
-          {storyId && (
+          {shell.fullPageHref && (
             <Link
-              href={`/planning/work-items/${storyId}`}
+              href={shell.fullPageHref}
               className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               title="Open in full page"
             >
