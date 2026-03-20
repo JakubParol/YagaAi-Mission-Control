@@ -32,6 +32,7 @@ export const navModules: NavModule[] = [
     label: "Control Plane",
     icon: Radar,
     subPages: [
+      { href: "/control-plane/dashboard", label: "Dashboard" },
       { href: "/control-plane/timeline", label: "Timeline" },
     ],
   },
