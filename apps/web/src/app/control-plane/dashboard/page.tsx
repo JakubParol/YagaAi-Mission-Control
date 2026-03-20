@@ -1,5 +1,3 @@
-"use client";
-
 import { LayoutDashboard } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
