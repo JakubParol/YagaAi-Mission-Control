@@ -17,12 +17,13 @@ test("planning sub-pages include all views in correct order", () => {
   ]);
 });
 
-test("control-plane sub-pages include timeline", () => {
+test("control-plane sub-pages include dashboard and timeline", () => {
   const controlPlane = navModules.find((module) => module.href === "/control-plane");
   assert.ok(controlPlane);
 
   const subPageHrefs = controlPlane.subPages?.map((page) => page.href);
   assert.deepEqual(subPageHrefs, [
+    "/control-plane/dashboard",
     "/control-plane/timeline",
   ]);
 });
