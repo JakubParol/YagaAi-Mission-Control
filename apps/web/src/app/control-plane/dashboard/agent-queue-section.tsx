@@ -44,7 +44,7 @@ function QueuePanel({ queue }: { queue: AgentQueue }) {
                 "h-full rounded-full transition-all",
                 count > 2 ? "bg-amber-500/70" : "bg-primary/70",
               )}
-              style={{ width: `${Math.min((count / 5) * 100, 100)}%` }}
+              style={{ width: `${Math.min((count / queue.capacity) * 20, 100)}%` }}
             />
           </div>
 

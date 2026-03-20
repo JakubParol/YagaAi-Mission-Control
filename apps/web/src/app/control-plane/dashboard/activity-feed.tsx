@@ -25,15 +25,32 @@ interface EventStyle {
   color: string;
 }
 
+const EVENT_STYLE_MAP: Record<CanonicalEventType, EventStyle> = {
+  "agent.assignment.requested": { icon: Circle, color: "text-muted-foreground" },
+  "agent.assignment.queued": { icon: Circle, color: "text-muted-foreground" },
+  "agent.assignment.dispatched": { icon: Play, color: "text-blue-400" },
+  "agent.assignment.accepted": { icon: CheckCircle2, color: "text-emerald-400" },
+  "agent.assignment.rejected": { icon: XCircle, color: "text-red-400" },
+  "agent.assignment.ack_timed_out": { icon: ShieldAlert, color: "text-amber-400" },
+  "agent.assignment.retry_scheduled": { icon: ShieldAlert, color: "text-amber-400" },
+  "agent.planning.started": { icon: Play, color: "text-blue-400" },
+  "agent.planning.completed": { icon: CheckCircle2, color: "text-emerald-400" },
+  "agent.planning.blocked": { icon: XCircle, color: "text-red-400" },
+  "agent.execution.started": { icon: Play, color: "text-blue-400" },
+  "agent.execution.completed": { icon: CheckCircle2, color: "text-emerald-400" },
+  "agent.execution.failed": { icon: XCircle, color: "text-red-400" },
+  "agent.task.started": { icon: Play, color: "text-blue-400" },
+  "agent.task.completed": { icon: CheckCircle2, color: "text-emerald-400" },
+  "agent.task.blocked": { icon: XCircle, color: "text-red-400" },
+  "agent.pr.opened": { icon: GitPullRequest, color: "text-purple-400" },
+  "agent.review.requested": { icon: GitPullRequest, color: "text-purple-400" },
+  "agent.dispatch.failed": { icon: XCircle, color: "text-red-400" },
+  "agent.session.stale": { icon: ShieldAlert, color: "text-amber-400" },
+  "agent.watchdog.intervened": { icon: XCircle, color: "text-red-400" },
+};
+
 function eventStyle(t: CanonicalEventType): EventStyle {
-  if (t.includes("completed")) return { icon: CheckCircle2, color: "text-emerald-400" };
-  if (t.includes("started")) return { icon: Play, color: "text-blue-400" };
-  if (t === "agent.pr.opened" || t === "agent.review.requested")
-    return { icon: GitPullRequest, color: "text-purple-400" };
-  if (t.includes("failed") || t.includes("watchdog") || t.includes("blocked"))
-    return { icon: XCircle, color: "text-red-400" };
-  if (t.includes("stale")) return { icon: ShieldAlert, color: "text-amber-400" };
-  return { icon: Circle, color: "text-muted-foreground" };
+  return EVENT_STYLE_MAP[t];
 }
 
 /* ----- Component ----- */
