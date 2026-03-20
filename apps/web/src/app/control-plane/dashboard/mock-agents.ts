@@ -3,14 +3,7 @@
 /* ------------------------------------------------------------------ */
 
 import type { AgentQueue, DashboardAgent } from "./dashboard-types";
-
-function hoursAgo(h: number): string {
-  return new Date(Date.now() - h * 3_600_000).toISOString();
-}
-
-function minutesAgo(m: number): string {
-  return new Date(Date.now() - m * 60_000).toISOString();
-}
+import { hoursAgo, minutesAgo } from "./mock-time-helpers";
 
 export const MOCK_AGENTS: DashboardAgent[] = [
   {

@@ -6,13 +6,16 @@ import type { ActivityEvent, DashboardAlert } from "./dashboard-types";
 
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
 
 export function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 0) return "just now";
   if (diff < MINUTE) return "just now";
   if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
-  const hours = Math.floor(diff / HOUR);
-  return `${hours}h ago`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
+  const days = Math.floor(diff / DAY);
+  return `${days}d ago`;
 }
 
 export function filterActivityByAgent(
