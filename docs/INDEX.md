@@ -25,7 +25,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 
 | Project | Docs |
 |---|---|
-| Web | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md) |
+| Web | [`apps/web/AGENTS.md`](../apps/web/AGENTS.md), [`apps/web/docs/INDEX.md`](../apps/web/docs/INDEX.md) |
 | CLI | [`apps/cli/AGENTS.md`](../apps/cli/AGENTS.md) (placeholder) |
 | API | [`services/api/AGENTS.md`](../services/api/AGENTS.md), [`services/api/docs/INDEX.md`](../services/api/docs/INDEX.md) |
 

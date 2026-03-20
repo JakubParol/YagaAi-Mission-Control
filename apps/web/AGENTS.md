@@ -37,3 +37,4 @@ Before making changes, read:
 
 - [Root AGENTS.md](../../AGENTS.md)
 - [Root docs/INDEX.md](../../docs/INDEX.md)
+- [docs/INDEX.md](./docs/INDEX.md)
