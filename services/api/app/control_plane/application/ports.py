@@ -5,6 +5,8 @@ from app.control_plane.domain.models import (
     ControlPlaneHealthSnapshot,
     ControlPlaneRun,
     ControlPlaneStep,
+    NaomiQueueEntry,
+    NaomiQueueStatus,
     OutboxEventEnvelope,
     RunAttemptReadModel,
     RunReadModel,
@@ -214,3 +216,32 @@ class ReadModelRepository(ABC):
 
     @abstractmethod
     async def get_health_snapshot(self) -> ControlPlaneHealthSnapshot: ...
+
+
+class NaomiQueueRepository(ABC):
+    @abstractmethod
+    async def enqueue(self, *, entry: NaomiQueueEntry) -> None: ...
+
+    @abstractmethod
+    async def get_active_by_work_item(self, *, work_item_id: str) -> NaomiQueueEntry | None: ...
+
+    @abstractmethod
+    async def cancel_by_work_item(
+        self,
+        *,
+        work_item_id: str,
+        cancelled_at: str,
+    ) -> bool: ...
+
+    @abstractmethod
+    async def next_queue_position(self, *, agent_id: str) -> int: ...
+
+    @abstractmethod
+    async def list_queued_by_agent(
+        self,
+        *,
+        agent_id: str,
+        status: NaomiQueueStatus | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[NaomiQueueEntry], int]: ...

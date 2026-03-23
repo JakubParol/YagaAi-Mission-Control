@@ -108,3 +108,40 @@ class ControlPlaneHealthMetricsResponse(BaseModel):
     run_latency_avg_ms: float | None
     run_latency_p95_ms: float | None
     generated_at: str
+
+
+# --- Naomi queue ingress ---
+
+
+class QueueIngressRequest(BaseModel):
+    work_item_id: str = Field(..., min_length=1)
+    work_item_key: str = Field(..., min_length=1)
+    work_item_type: str = Field(..., min_length=1)
+    work_item_status: str = Field(..., min_length=1)
+    agent_id: str | None = Field(None)
+    previous_agent_id: str | None = Field(None)
+    agent_openclaw_key: str | None = Field(None)
+    previous_agent_openclaw_key: str | None = Field(None)
+    correlation_id: str | None = Field(None)
+    causation_id: str | None = Field(None)
+
+
+class QueueIngressResponse(BaseModel):
+    action: str
+    queue_entry_id: str | None = None
+    reason: str | None = None
+
+
+class NaomiQueueEntryResponse(BaseModel):
+    id: str
+    work_item_id: str
+    work_item_key: str
+    work_item_type: str
+    agent_id: str
+    status: str
+    queue_position: int
+    correlation_id: str
+    causation_id: str | None
+    enqueued_at: str
+    updated_at: str
+    cancelled_at: str | None
