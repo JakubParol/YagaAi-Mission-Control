@@ -50,7 +50,7 @@ class WatchdogAction(StrEnum):
     QUARANTINE = "QUARANTINE"
 
 
-class NaomiQueueStatus(StrEnum):
+class AgentQueueStatus(StrEnum):
     QUEUED = "QUEUED"
     DISPATCHING = "DISPATCHING"
     ACK_PENDING = "ACK_PENDING"
@@ -63,20 +63,18 @@ class NaomiQueueStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-NAOMI_AGENT_KEY = "naomi"
-
 QUEUE_ELIGIBLE_WORK_ITEM_TYPES = frozenset({"STORY", "BUG"})
 QUEUE_ELIGIBLE_PLANNING_STATUSES = frozenset({"TODO"})
 
 
 @dataclass
-class NaomiQueueEntry:
+class AgentQueueEntry:
     id: str
     work_item_id: str
     work_item_key: str
     work_item_type: str
     agent_id: str
-    status: NaomiQueueStatus
+    status: AgentQueueStatus
     queue_position: int
     correlation_id: str
     causation_id: str | None

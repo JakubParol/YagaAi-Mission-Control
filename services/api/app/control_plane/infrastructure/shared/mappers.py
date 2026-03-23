@@ -3,10 +3,10 @@ from typing import Any
 from sqlalchemy import Row
 
 from app.control_plane.domain.models import (
+    AgentQueueEntry,
+    AgentQueueStatus,
     ControlPlaneRun,
     ControlPlaneStep,
-    NaomiQueueEntry,
-    NaomiQueueStatus,
     OutboxEventEnvelope,
     OutboxStatus,
     RunAttemptReadModel,
@@ -133,14 +133,14 @@ def run_attempt_from_row(row: Row[Any]) -> RunAttemptReadModel:
     )
 
 
-def queue_entry_from_row(row: Row[Any]) -> NaomiQueueEntry:
-    return NaomiQueueEntry(
+def queue_entry_from_row(row: Row[Any]) -> AgentQueueEntry:
+    return AgentQueueEntry(
         id=str(row.id),
         work_item_id=str(row.work_item_id),
         work_item_key=str(row.work_item_key),
         work_item_type=str(row.work_item_type),
         agent_id=str(row.agent_id),
-        status=NaomiQueueStatus(str(row.status)),
+        status=AgentQueueStatus(str(row.status)),
         queue_position=int(row.queue_position),
         correlation_id=str(row.correlation_id),
         causation_id=(str(row.causation_id) if row.causation_id else None),

@@ -1,13 +1,12 @@
 import logging
 from dataclasses import dataclass
 
-from app.control_plane.application.ports import NaomiQueueRepository
+from app.control_plane.application.ports import AgentQueueRepository
 from app.control_plane.domain.models import (
-    NAOMI_AGENT_KEY,
     QUEUE_ELIGIBLE_PLANNING_STATUSES,
     QUEUE_ELIGIBLE_WORK_ITEM_TYPES,
-    NaomiQueueEntry,
-    NaomiQueueStatus,
+    AgentQueueEntry,
+    AgentQueueStatus,
 )
 from app.shared.logging import log_event
 from app.shared.utils import new_uuid, utc_now
@@ -22,8 +21,8 @@ class IngressResult:
     reason: str | None = None
 
 
-class NaomiQueueIngressService:
-    def __init__(self, repo: NaomiQueueRepository) -> None:
+class QueueIngressService:
+    def __init__(self, repo: AgentQueueRepository) -> None:
         self._repo = repo
 
     async def handle_assignment_changed(
@@ -35,32 +34,22 @@ class NaomiQueueIngressService:
         work_item_status: str,
         agent_id: str | None,
         previous_agent_id: str | None,
-        agent_openclaw_key: str | None,
-        previous_agent_openclaw_key: str | None,
         correlation_id: str | None = None,
         causation_id: str | None = None,
     ) -> IngressResult:
         correlation_id = correlation_id or new_uuid()
 
-        was_naomi = previous_agent_openclaw_key == NAOMI_AGENT_KEY
-        is_naomi = agent_openclaw_key == NAOMI_AGENT_KEY
-
-        if was_naomi and not is_naomi:
-            return await self._cancel_queued(
+        # Reassigned away or unassigned — cancel any active queue entry
+        if previous_agent_id and previous_agent_id != agent_id:
+            await self._cancel_queued(
                 work_item_id=work_item_id,
                 work_item_key=work_item_key,
-            )
-
-        if not is_naomi:
-            return IngressResult(
-                action="skipped",
-                reason="not_naomi",
             )
 
         if not agent_id:
             return IngressResult(
                 action="skipped",
-                reason="missing_agent_id",
+                reason="unassigned",
             )
 
         if not self._is_eligible(work_item_type, work_item_status):
@@ -90,10 +79,10 @@ class NaomiQueueIngressService:
         self,
         *,
         agent_id: str,
-        status: NaomiQueueStatus | None = None,
+        status: AgentQueueStatus | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[NaomiQueueEntry], int]:
+    ) -> tuple[list[AgentQueueEntry], int]:
         return await self._repo.list_queued_by_agent(
             agent_id=agent_id,
             status=status,
@@ -121,13 +110,13 @@ class NaomiQueueIngressService:
         now = utc_now()
         entry_id = new_uuid()
 
-        entry = NaomiQueueEntry(
+        entry = AgentQueueEntry(
             id=entry_id,
             work_item_id=work_item_id,
             work_item_key=work_item_key,
             work_item_type=work_item_type,
             agent_id=agent_id,
-            status=NaomiQueueStatus.QUEUED,
+            status=AgentQueueStatus.QUEUED,
             queue_position=0,  # actual position set atomically by repository
             correlation_id=correlation_id,
             causation_id=causation_id,
@@ -139,10 +128,11 @@ class NaomiQueueIngressService:
         log_event(
             logger,
             level=logging.INFO,
-            event="control_plane.naomi.queue.enqueued",
+            event="control_plane.agent.queue.enqueued",
             work_item_id=work_item_id,
             work_item_key=work_item_key,
             queue_entry_id=entry_id,
+            agent_id=agent_id,
             correlation_id=correlation_id,
         )
 
@@ -171,7 +161,7 @@ class NaomiQueueIngressService:
         log_event(
             logger,
             level=logging.INFO,
-            event="control_plane.naomi.queue.cancelled",
+            event="control_plane.agent.queue.cancelled",
             work_item_id=work_item_id,
             work_item_key=work_item_key,
         )

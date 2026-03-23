@@ -1,12 +1,12 @@
 from abc import ABC, abstractmethod
 
 from app.control_plane.domain.models import (
+    AgentQueueEntry,
+    AgentQueueStatus,
     CommandEnvelope,
     ControlPlaneHealthSnapshot,
     ControlPlaneRun,
     ControlPlaneStep,
-    NaomiQueueEntry,
-    NaomiQueueStatus,
     OutboxEventEnvelope,
     RunAttemptReadModel,
     RunReadModel,
@@ -218,12 +218,12 @@ class ReadModelRepository(ABC):
     async def get_health_snapshot(self) -> ControlPlaneHealthSnapshot: ...
 
 
-class NaomiQueueRepository(ABC):
+class AgentQueueRepository(ABC):
     @abstractmethod
-    async def enqueue(self, *, entry: NaomiQueueEntry) -> None: ...
+    async def enqueue(self, *, entry: AgentQueueEntry) -> None: ...
 
     @abstractmethod
-    async def get_active_by_work_item(self, *, work_item_id: str) -> NaomiQueueEntry | None: ...
+    async def get_active_by_work_item(self, *, work_item_id: str) -> AgentQueueEntry | None: ...
 
     @abstractmethod
     async def cancel_by_work_item(
@@ -241,7 +241,7 @@ class NaomiQueueRepository(ABC):
         self,
         *,
         agent_id: str,
-        status: NaomiQueueStatus | None = None,
+        status: AgentQueueStatus | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[NaomiQueueEntry], int]: ...
+    ) -> tuple[list[AgentQueueEntry], int]: ...

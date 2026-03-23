@@ -123,8 +123,8 @@ control_plane_run_timeline = Table(
     Column("created_at", Text, nullable=False),
 )
 
-control_plane_naomi_queue = Table(
-    "control_plane_naomi_queue",
+control_plane_agent_queue = Table(
+    "control_plane_agent_queue",
     metadata,
     Column("id", Text, primary_key=True),
     Column("work_item_id", Text, nullable=False),
@@ -169,14 +169,14 @@ Index(
     control_plane_run_steps.c.updated_at,
 )
 Index(
-    "idx_cp_naomi_queue_agent_status",
-    control_plane_naomi_queue.c.agent_id,
-    control_plane_naomi_queue.c.status,
-    control_plane_naomi_queue.c.queue_position,
+    "idx_cp_agent_queue_agent_status",
+    control_plane_agent_queue.c.agent_id,
+    control_plane_agent_queue.c.status,
+    control_plane_agent_queue.c.queue_position,
 )
 Index(
-    "idx_cp_naomi_queue_work_item_status",
-    control_plane_naomi_queue.c.work_item_id,
-    control_plane_naomi_queue.c.status,
+    "idx_cp_agent_queue_work_item_status",
+    control_plane_agent_queue.c.work_item_id,
+    control_plane_agent_queue.c.status,
     unique=True,
 )
