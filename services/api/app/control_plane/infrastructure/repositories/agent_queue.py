@@ -64,6 +64,7 @@ class DbAgentQueueRepository(AgentQueueRepository):
                 ),
             )
         )
+        await self._db.commit()
 
     async def get_active_by_work_item(self, *, work_item_id: str) -> AgentQueueEntry | None:
         result = await self._db.execute(
@@ -93,6 +94,7 @@ class DbAgentQueueRepository(AgentQueueRepository):
                 updated_at=cancelled_at,
             )
         )
+        await self._db.commit()
         return _affected_rows(result) > 0
 
     async def next_queue_position(self, *, agent_id: str) -> int:
