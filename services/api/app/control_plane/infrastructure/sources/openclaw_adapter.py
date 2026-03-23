@@ -1,6 +1,5 @@
+import asyncio
 import logging
-
-import httpx
 
 from app.control_plane.application.ports import OpenClawDispatchPort
 from app.control_plane.domain.models import DispatchEnvelope, OpenClawSessionMetadata
@@ -8,104 +7,87 @@ from app.shared.logging import log_event
 
 logger = logging.getLogger(__name__)
 
-_DISPATCH_TIMEOUT_SECONDS = 30
+_QUICK_FAIL_SECONDS = 2
 
 
-class HttpOpenClawDispatchAdapter(OpenClawDispatchPort):
-    """Sends one-shot dispatch requests to the OpenClaw Gateway via HTTP.
+class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
+    """Dispatches work to an agent's main session via `openclaw agent` CLI.
 
-    v1 behaviour: Naomi-only. Posts a structured prompt to the gateway's
-    ACP dispatch endpoint to start a one-shot session for the agent.
+    Semantics: this is a session-dispatch, not a harness launch.
+    MC sends a structured message to the agent's main session.
+    The agent decides how to execute (ACP, Claude Code, Codex, etc.).
 
-    All transport/parsing errors are surfaced as RuntimeError so the
-    application layer does not need to depend on httpx types.
+    The subprocess is launched detached so it survives API process restarts.
+    A quick-fail check catches immediate startup errors (bad binary, bad args).
     """
 
-    def __init__(
-        self,
-        *,
-        gateway_base_url: str,
-        gateway_token: str,
-    ) -> None:
-        self._base_url = gateway_base_url.rstrip("/")
-        self._token = gateway_token
+    def __init__(self, *, openclaw_binary: str = "openclaw") -> None:
+        self._binary = openclaw_binary
 
     async def send_dispatch(
-        self,
-        *,
-        envelope: DispatchEnvelope,
+        self, *, envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata:
         prompt = self._build_prompt(envelope)
-        payload = {
-            "agentId": envelope.agent_id,
-            "prompt": prompt,
-            "mode": "one-shot",
-            "metadata": {
-                "run_id": envelope.run_id,
-                "correlation_id": envelope.correlation_id,
-                "causation_id": envelope.causation_id,
-                "work_item_key": envelope.work_item_key,
-                "contract_version": envelope.contract_version,
-            },
-            "cwd": envelope.work_dir,
-        }
+        cmd = [
+            self._binary,
+            "agent",
+            "--agent", envelope.openclaw_key,
+            "--session-id", envelope.main_session_key,
+            "--message", prompt,
+            "--json",
+            "--timeout", "3600",
+        ]
 
         log_event(
             logger,
             level=logging.INFO,
-            event="control_plane.openclaw.adapter.sending",
+            event="control_plane.dispatch.adapter.launching",
             agent_id=envelope.agent_id,
+            openclaw_key=envelope.openclaw_key,
+            main_session_key=envelope.main_session_key,
             run_id=envelope.run_id,
             work_item_key=envelope.work_item_key,
         )
 
         try:
-            async with httpx.AsyncClient(timeout=_DISPATCH_TIMEOUT_SECONDS) as client:
-                response = await client.post(
-                    f"{self._base_url}/api/acp/dispatch",
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {self._token}",
-                        "Content-Type": "application/json",
-                        "X-Correlation-Id": envelope.correlation_id,
-                    },
-                )
-        except httpx.HTTPError as exc:
-            msg = f"OpenClaw dispatch transport error: {exc}"
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,
+            )
+        except (OSError, FileNotFoundError) as exc:
+            msg = f"Failed to launch openclaw subprocess: {exc}"
             raise RuntimeError(msg) from exc
 
-        if response.status_code >= 400:
-            body_text = response.text[:500]
-            msg = f"OpenClaw dispatch failed: HTTP {response.status_code} — {body_text}"
+        # Quick-fail: if the process dies within the grace period, it failed
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=_QUICK_FAIL_SECONDS)
+            # Process exited within grace period — likely an error
+            stderr_bytes = await proc.stderr.read() if proc.stderr else b""
+            stderr_text = stderr_bytes.decode("utf-8", errors="replace")[:500]
+            msg = (
+                f"openclaw agent exited immediately with code {proc.returncode}: "
+                f"{stderr_text}"
+            )
             raise RuntimeError(msg)
+        except asyncio.TimeoutError:
+            # Process is still running after grace period — dispatch is underway
+            pass
 
-        return self._parse_response(response, envelope)
-
-    @staticmethod
-    def _parse_response(
-        response: httpx.Response,
-        envelope: DispatchEnvelope,
-    ) -> OpenClawSessionMetadata:
-        content_type = response.headers.get("content-type", "")
-        if "json" not in content_type:
-            return OpenClawSessionMetadata(session_id=envelope.run_id)
-
-        try:
-            data = response.json()
-        except ValueError:
-            return OpenClawSessionMetadata(session_id=envelope.run_id)
-
-        session_id = data.get("sessionId") or data.get("session_id") or envelope.run_id
-        raw_pid = data.get("processId", data.get("process_id"))
-        try:
-            process_id = int(raw_pid) if raw_pid is not None else None
-        except (ValueError, TypeError):
-            process_id = None
+        log_event(
+            logger,
+            level=logging.INFO,
+            event="control_plane.dispatch.adapter.sent",
+            agent_id=envelope.agent_id,
+            run_id=envelope.run_id,
+            pid=proc.pid,
+            main_session_key=envelope.main_session_key,
+        )
 
         return OpenClawSessionMetadata(
-            session_id=str(session_id),
-            process_id=process_id,
-            work_dir=data.get("cwd") or envelope.work_dir,
+            session_id=envelope.main_session_key,
+            process_id=proc.pid,
         )
 
     @staticmethod

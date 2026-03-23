@@ -44,8 +44,7 @@ class Settings(BaseSettings):
     control_plane_commands_enabled: bool = True
     control_plane_dapr_ingest_enabled: bool = True
     control_plane_watchdog_enabled: bool = True
-    control_plane_openclaw_gateway_url: str = "http://localhost:18789"
-    control_plane_openclaw_gateway_token: str = ""
+    control_plane_openclaw_binary: str = "openclaw"
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 
