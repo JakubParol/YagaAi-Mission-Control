@@ -283,7 +283,9 @@ class AgentQueueRepository(ABC):
 class OpenClawDispatchPort(ABC):
     @abstractmethod
     async def send_dispatch(
-        self, *, envelope: DispatchEnvelope,
+        self,
+        *,
+        envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata: ...
 
 
@@ -293,7 +295,9 @@ class DispatchRecordRepository(ABC):
 
     @abstractmethod
     async def get_by_queue_entry_id(
-        self, *, queue_entry_id: str,
+        self,
+        *,
+        queue_entry_id: str,
     ) -> DispatchRecord | None: ...
 
     @abstractmethod

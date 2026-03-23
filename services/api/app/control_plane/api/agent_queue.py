@@ -154,12 +154,13 @@ async def _try_push_dispatch(
         selection = await selection_svc.try_dispatch_next(agent_id=agent_id)
         if selection.action == "dispatched" and selection.entry is not None:
             await dispatch_svc.dispatch_to_openclaw(entry=selection.entry)
-    except Exception:
+    except (RuntimeError, OSError, ValueError, TypeError) as exc:
         log_event(
             logger,
             level=logging.WARNING,
             event="control_plane.push_dispatch.failed",
             agent_id=agent_id,
+            error=str(exc),
         )
 
 

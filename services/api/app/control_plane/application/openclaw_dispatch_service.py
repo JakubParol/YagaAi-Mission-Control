@@ -1,4 +1,3 @@
-import json
 import logging
 from dataclasses import asdict, dataclass
 
@@ -75,12 +74,15 @@ class OpenClawDispatchService:
         now = utc_now()
         envelope = self._build_envelope(entry=entry, run_id=run_id)
         record = self._build_record(
-            entry=entry, run_id=run_id, envelope=envelope, now=now,
+            entry=entry,
+            run_id=run_id,
+            envelope=envelope,
+            now=now,
         )
 
         try:
             session_meta = await self._adapter.send_dispatch(envelope=envelope)
-        except Exception as exc:
+        except (RuntimeError, OSError, ValueError, TypeError) as exc:
             return await self._handle_failure(
                 entry=entry,
                 record=record,

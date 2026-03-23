@@ -1,6 +1,4 @@
-import json
 import logging
-from dataclasses import asdict
 
 import httpx
 
@@ -71,9 +69,7 @@ class HttpOpenClawDispatchAdapter(OpenClawDispatchPort):
 
         if response.status_code >= 400:
             body_text = response.text[:500]
-            msg = (
-                f"OpenClaw dispatch failed: HTTP {response.status_code} — {body_text}"
-            )
+            msg = f"OpenClaw dispatch failed: HTTP {response.status_code} — {body_text}"
             raise RuntimeError(msg)
 
         data = response.json()

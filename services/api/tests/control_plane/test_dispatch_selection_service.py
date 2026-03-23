@@ -24,6 +24,7 @@ def _make_entry(
         work_item_id=work_item_id,
         work_item_key=work_item_key,
         work_item_type="STORY",
+        work_item_title="Test story title",
         agent_id=agent_id,
         status=status,
         queue_position=queue_position,
