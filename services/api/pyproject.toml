@@ -157,6 +157,7 @@ ignore_imports = [
     "app.observability.dependencies -> app.observability.infrastructure.repositories.*",
     "app.observability.dependencies -> app.observability.infrastructure.sources.*",
     "app.control_plane.dependencies -> app.control_plane.infrastructure.repositories.*",
+    "app.control_plane.dependencies -> app.control_plane.infrastructure.sources.*",
     "app.planning.dependencies -> app.planning.infrastructure.repositories.*",
     "app.planning.dependencies -> app.planning.infrastructure.repositories.backlogs.*",
     "app.planning.dependencies -> app.planning.infrastructure.sources.*",

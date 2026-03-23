@@ -117,6 +117,7 @@ class QueueIngressRequest(BaseModel):
     work_item_id: str = Field(..., min_length=1)
     work_item_key: str = Field(..., min_length=1)
     work_item_type: str = Field(..., min_length=1)
+    work_item_title: str = Field("", min_length=0)
     work_item_status: str = Field(..., min_length=1)
     agent_id: str | None = Field(None)
     previous_agent_id: str | None = Field(None)
@@ -135,6 +136,7 @@ class AgentQueueEntryResponse(BaseModel):
     work_item_id: str
     work_item_key: str
     work_item_type: str
+    work_item_title: str
     agent_id: str
     status: str
     queue_position: int
@@ -152,9 +154,22 @@ class DispatchRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
 
 
+class DispatchRecordResponse(BaseModel):
+    id: str
+    run_id: str
+    agent_id: str
+    work_item_key: str
+    status: str
+    session_id: str | None = None
+    process_id: int | None = None
+    error_message: str | None = None
+    dispatched_at: str | None = None
+
+
 class DispatchResponse(BaseModel):
     action: str
     entry: AgentQueueEntryResponse | None = None
+    dispatch_record: DispatchRecordResponse | None = None
     reason: str | None = None
 
 

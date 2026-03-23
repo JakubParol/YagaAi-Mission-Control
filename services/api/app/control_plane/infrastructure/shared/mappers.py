@@ -7,6 +7,8 @@ from app.control_plane.domain.models import (
     AgentQueueStatus,
     ControlPlaneRun,
     ControlPlaneStep,
+    DispatchRecord,
+    DispatchRecordStatus,
     OutboxEventEnvelope,
     OutboxStatus,
     RunAttemptReadModel,
@@ -139,6 +141,7 @@ def queue_entry_from_row(row: Row[Any]) -> AgentQueueEntry:
         work_item_id=str(row.work_item_id),
         work_item_key=str(row.work_item_key),
         work_item_type=str(row.work_item_type),
+        work_item_title=str(row.work_item_title) if row.work_item_title else "",
         agent_id=str(row.agent_id),
         status=AgentQueueStatus(str(row.status)),
         queue_position=int(row.queue_position),
@@ -147,4 +150,22 @@ def queue_entry_from_row(row: Row[Any]) -> AgentQueueEntry:
         enqueued_at=str(row.enqueued_at),
         updated_at=str(row.updated_at),
         cancelled_at=(str(row.cancelled_at) if row.cancelled_at else None),
+    )
+
+
+def dispatch_record_from_row(row: Row[Any], envelope: dict[str, Any]) -> DispatchRecord:
+    return DispatchRecord(
+        id=str(row.id),
+        queue_entry_id=str(row.queue_entry_id),
+        run_id=str(row.run_id),
+        agent_id=str(row.agent_id),
+        work_item_id=str(row.work_item_id),
+        work_item_key=str(row.work_item_key),
+        status=DispatchRecordStatus(str(row.status)),
+        envelope_json=envelope,
+        session_id=(str(row.session_id) if row.session_id else None),
+        process_id=(int(row.process_id) if row.process_id else None),
+        error_message=(str(row.error_message) if row.error_message else None),
+        dispatched_at=(str(row.dispatched_at) if row.dispatched_at else None),
+        created_at=str(row.created_at),
     )
