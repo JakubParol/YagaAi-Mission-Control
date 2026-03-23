@@ -6,6 +6,16 @@ from app.planning.domain.models import WorkItem, WorkItemAssignment, WorkItemOve
 
 class WorkItemRepository(ABC):
     # ------------------------------------------------------------------
+    # Transaction control
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    async def flush(self) -> None: ...
+
+    @abstractmethod
+    async def commit(self) -> None: ...
+
+    # ------------------------------------------------------------------
     # CRUD
     # ------------------------------------------------------------------
 
