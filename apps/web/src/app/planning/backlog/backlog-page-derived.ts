@@ -16,10 +16,10 @@ import {
   type PlanningFiltersValue,
 } from "@/components/planning/planning-filters";
 import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
-import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
 import type { StoryCardStory } from "@/components/planning/story-card";
+import type { BacklogMembershipTarget } from "@/components/planning/story-actions-menu-types";
 
-import type { BacklogItem, BacklogWithItems, PageState, SprintCompleteDialogState } from "./backlog-types";
+import type { BacklogItem, BacklogWithItems, PageState } from "./backlog-types";
 import { isCompleteSprintTarget } from "./backlog-view-model";
 
 // ── URL filter helpers ───────────────────────────────────────────────
@@ -187,111 +187,52 @@ export function removePendingId(
   return next;
 }
 
-// ── Board move helpers ───────────────────────────────────────────────
+// ── Backlog membership helpers ───────────────────────────────────────
 
-export interface BoardSwapTarget {
-  currentId: string;
-  currentRank: string;
-  swapWithId: string;
-  swapWithRank: string;
+/**
+ * Build a map: storyId → Set of backlogIds the story belongs to.
+ * Scans all sections once — O(total items).
+ */
+export function buildStoryBacklogMembership(
+  sections: readonly BacklogWithItems[],
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const section of sections) {
+    for (const item of section.items) {
+      let set = map.get(item.id);
+      if (!set) { set = new Set(); map.set(item.id, set); }
+      set.add(section.backlog.id);
+    }
+  }
+  return map;
 }
 
-export type MoveDirection = "top" | "up" | "down" | "bottom";
-
-export function computeBoardSwapTarget(
-  state: PageState,
-  backlogId: string,
-  direction: MoveDirection,
-): BoardSwapTarget | null {
-  if (state.kind !== "ok") return null;
-  const moveable = state.sections
-    .map((s) => s.backlog)
-    .filter((b) => !(b.kind === "SPRINT" && b.status === "ACTIVE") && !b.is_default);
-  const currentIndex = moveable.findIndex((b) => b.id === backlogId);
-  if (currentIndex === -1) return null;
-
-  let swapIndex: number;
-  if (direction === "top") swapIndex = 0;
-  else if (direction === "up") swapIndex = currentIndex - 1;
-  else if (direction === "down") swapIndex = currentIndex + 1;
-  else swapIndex = moveable.length - 1;
-
-  if (swapIndex === currentIndex || swapIndex < 0 || swapIndex >= moveable.length) return null;
-
-  const current = moveable[currentIndex];
-  const swapWith = moveable[swapIndex];
-  return {
-    currentId: current.id,
-    currentRank: current.rank,
-    swapWithId: swapWith.id,
-    swapWithRank: swapWith.rank,
-  };
+/**
+ * Build the list of backlog targets for the "Manage backlogs" submenu.
+ * Returns all non-closed backlogs with isMember flag per story.
+ */
+export function buildBacklogTargetsForStory(
+  sections: readonly BacklogWithItems[],
+  storyId: string,
+  membershipMap: Map<string, Set<string>>,
+): BacklogMembershipTarget[] {
+  const memberOf = membershipMap.get(storyId) ?? new Set<string>();
+  return sections
+    .filter((s) => s.backlog.status !== "CLOSED")
+    .map((s) => ({
+      id: s.backlog.id,
+      name: s.backlog.name,
+      kind: s.backlog.kind,
+      isMember: memberOf.has(s.backlog.id),
+    }));
 }
 
-// ── Sprint completion preparation ────────────────────────────────────
-
-export type SprintCompletionResult =
-  | { outcome: "error"; message: string }
-  | { outcome: "no-open-stories"; backlogId: string; backlogName: string }
-  | {
-      outcome: "has-open-stories";
-      dialog: SprintCompleteDialogState;
-      defaultTargetId: string;
-    };
-
-export function prepareSprintCompletion(
-  state: PageState,
-  backlogId: string,
-  backlogName: string,
-): SprintCompletionResult {
-  if (state.kind !== "ok") {
-    return { outcome: "error", message: "Sprint data is not available. Refresh and try again." };
-  }
-  const section = state.sections.find((s) => s.backlog.id === backlogId);
-  if (!section) {
-    return { outcome: "error", message: "Sprint was not found in current view. Refresh and try again." };
-  }
-  const openStories: StoryCardStory[] = section.items.filter((s) => s.status !== "DONE");
-  if (openStories.length === 0) {
-    return { outcome: "no-open-stories", backlogId, backlogName };
-  }
-  const targets = state.sections
-    .map((s) => s.backlog)
-    .filter((b) => isCompleteSprintTarget(b, backlogId));
-  if (targets.length === 0) {
-    return { outcome: "error", message: "No target sprint/backlog is available for open work items. Create one first." };
-  }
-  const defaultTargetId = targets.find((b) => b.is_default)?.id ?? targets[0].id;
-  return {
-    outcome: "has-open-stories",
-    dialog: {
-      backlogId,
-      backlogName,
-      completedCount: section.items.filter((s) => s.status === "DONE").length,
-      openStories,
-    },
-    defaultTargetId,
-  };
-}
-
-// ── Board edit item builder ──────────────────────────────────────────
-
-export function buildEditBoardItem(
-  state: PageState,
-  backlogId: string,
-): BacklogEditItem | null {
-  if (state.kind !== "ok") return null;
-  const section = state.sections.find((s) => s.backlog.id === backlogId);
-  if (!section) return null;
-  const { backlog } = section;
-  return {
-    id: backlog.id,
-    name: backlog.name,
-    kind: backlog.kind,
-    status: backlog.status,
-    goal: backlog.goal,
-    start_date: backlog.start_date,
-    end_date: backlog.end_date,
-    is_default: backlog.is_default,
-  };
-}
+// Re-export board helpers that were extracted for file-size compliance.
+export {
+  computeBoardSwapTarget,
+  prepareSprintCompletion,
+  buildEditBoardItem,
+  type BoardSwapTarget,
+  type MoveDirection,
+  type SprintCompletionResult,
+} from "./backlog-page-board-helpers";

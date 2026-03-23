@@ -9,8 +9,7 @@ import { useCallback } from "react";
 
 import { completeSprint, startSprint, type SprintLifecycleOperation } from "../sprint-lifecycle-actions";
 import { emitSprintLifecycleChanged } from "../sprint-lifecycle-events";
-import { addStoryToActiveSprint, removeStoryFromActiveSprint } from "../sprint-membership-actions";
-import { deleteBoard } from "./board-actions";
+import { addStoryToBacklog, deleteBoard, removeStoryFromBacklog } from "./board-actions";
 import { swapBoardOrder } from "./backlog-page-actions";
 import { computeBoardSwapTarget, prepareSprintCompletion, removePendingId } from "./backlog-page-derived";
 import type { PageState, SprintCompleteDialogState } from "./backlog-types";
@@ -35,18 +34,17 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
     setPendingStoryIds, setPendingSprintIds, setPendingBoardIds,
   } = deps;
 
-  const updateSprintMembership = useCallback(
-    async (storyId: string, op: "add" | "remove") => {
-      if (!singleProjectId) return;
+  const updateBacklogMembership = useCallback(
+    async (storyId: string, backlogId: string, op: "add" | "remove") => {
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
       try {
-        if (op === "add") await addStoryToActiveSprint(singleProjectId, storyId);
-        else await removeStoryFromActiveSprint(singleProjectId, storyId);
+        if (op === "add") await addStoryToBacklog(backlogId, storyId);
+        else await removeStoryFromBacklog(backlogId, storyId);
         await refreshCurrentView();
-      } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to update sprint membership."); }
+      } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to update backlog membership."); }
       finally { setPendingStoryIds((prev) => removePendingId(prev, storyId)); }
     },
-    [refreshCurrentView, showErrorToast, singleProjectId, setPendingStoryIds],
+    [refreshCurrentView, showErrorToast, setPendingStoryIds],
   );
 
   const updateSprintLifecycle = useCallback(
@@ -115,7 +113,7 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
   );
 
   return {
-    updateSprintMembership,
+    updateBacklogMembership,
     updateSprintLifecycle,
     handleCompleteSprint,
     handleCompleteDialogConfirm,

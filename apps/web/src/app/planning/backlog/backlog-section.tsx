@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import type { BacklogWithItems } from "./backlog-types";
+import { buildBacklogTargetsForStory } from "./backlog-page-derived";
 
 export interface BacklogSectionProps {
   section: BacklogWithItems;
@@ -23,10 +24,12 @@ export interface BacklogSectionProps {
   hasAnyActiveSprint: boolean;
   siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
   assigneeOptions: readonly BacklogAssigneeOption[];
+  allSections: readonly BacklogWithItems[];
+  storyMembershipMap: Map<string, Set<string>>;
   onStoryClick: (storyId: string) => void;
   onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
-  onAddToActiveSprint: (storyId: string) => void;
-  onRemoveFromActiveSprint: (storyId: string) => void;
+  onAddToBacklog: (storyId: string, backlogId: string) => void | Promise<void>;
+  onRemoveFromBacklog: (storyId: string, backlogId: string) => void | Promise<void>;
   onStartSprint: (backlogId: string, backlogName: string) => void;
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
@@ -43,14 +46,16 @@ export interface BacklogSectionProps {
 
 export function BacklogSection({
   section,
-  isActiveSprint,
+  isActiveSprint: _isActiveSprint,
   hasAnyActiveSprint,
   siblingBacklogs,
+  allSections,
+  storyMembershipMap,
   assigneeOptions,
   onStoryClick,
   onStoryAssigneeChange,
-  onAddToActiveSprint,
-  onRemoveFromActiveSprint,
+  onAddToBacklog,
+  onRemoveFromBacklog,
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
@@ -66,9 +71,6 @@ export function BacklogSection({
 }: BacklogSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { backlog, items } = section;
-
-  const canAddToActiveSprint = backlog.kind === "BACKLOG";
-  const canRemoveFromActiveSprint = isActiveSprint;
   const isSprintPending = pendingSprintIds.has(backlog.id);
   const isBoardDeletePending = pendingBoardIds.has(backlog.id);
 
@@ -125,19 +127,11 @@ export function BacklogSection({
                         onDelete={onStoryDelete}
                         onStatusChange={onStoryStatusChange}
                         onAddLabel={onStoryClick}
-                        sprintMembershipAction={
-                          canAddToActiveSprint
-                            ? {
-                                mode: "add",
-                                onSelect: onAddToActiveSprint,
-                              }
-                            : canRemoveFromActiveSprint
-                              ? {
-                                  mode: "remove",
-                                  onSelect: onRemoveFromActiveSprint,
-                                }
-                              : undefined
-                        }
+                        backlogMembershipActions={{
+                          targets: buildBacklogTargetsForStory(allSections, story.id, storyMembershipMap),
+                          onAdd: onAddToBacklog,
+                          onRemove: onRemoveFromBacklog,
+                        }}
                         disabled={pendingStoryIds.has(story.id)}
                         isDeleting={pendingDeleteStoryIds.has(story.id)}
                       />

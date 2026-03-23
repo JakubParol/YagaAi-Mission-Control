@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { STATUS_LABEL } from "./story-card";
 import { type FloatingCoordinates } from "./story-actions-menu-positioning";
-import { SECTION_GROUPS, type MenuActionItem } from "./story-actions-menu-types";
+import { SECTION_GROUPS, type BacklogMembershipTarget, type MenuActionItem } from "./story-actions-menu-types";
 
 export interface MainMenuPanelProps {
   menuRef: RefObject<HTMLDivElement | null>;
@@ -157,6 +157,85 @@ export function StatusSubmenuPanel({
           {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ── Backlog submenu ──────────────────────────────────────────────────
+
+const KIND_BADGE: Record<string, string> = {
+  SPRINT: "text-blue-400",
+  BACKLOG: "text-slate-400",
+  IDEAS: "text-amber-400",
+};
+
+const KIND_SHORT: Record<string, string> = {
+  SPRINT: "Sprint",
+  BACKLOG: "Backlog",
+  IDEAS: "Ideas",
+};
+
+export interface BacklogSubmenuPanelProps {
+  submenuRef: RefObject<HTMLDivElement | null>;
+  targets: readonly BacklogMembershipTarget[];
+  backlogActionRefs: RefObject<Array<HTMLButtonElement | null>>;
+  submenuCoordinates: FloatingCoordinates | null;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onToggle: (target: BacklogMembershipTarget) => void;
+  onHover: (index: number) => void;
+}
+
+export function BacklogSubmenuPanel({
+  submenuRef,
+  targets,
+  backlogActionRefs,
+  submenuCoordinates,
+  onKeyDown,
+  onToggle,
+  onHover,
+}: BacklogSubmenuPanelProps) {
+  const style: CSSProperties = {
+    position: "fixed",
+    top: submenuCoordinates?.top ?? 0,
+    left: submenuCoordinates?.left ?? 0,
+    visibility: submenuCoordinates ? "visible" : "hidden",
+  };
+
+  return (
+    <div
+      ref={submenuRef}
+      role="menu"
+      aria-label="Manage backlog membership"
+      onKeyDown={onKeyDown}
+      style={style}
+      className="z-[70] min-w-52 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+    >
+      {targets.length === 0 ? (
+        <p className="px-2 py-1.5 text-xs text-muted-foreground">No backlogs available</p>
+      ) : (
+        targets.map((target, index) => (
+          <button
+            key={target.id}
+            ref={(el) => { backlogActionRefs.current[index] = el; }}
+            type="button"
+            role="menuitem"
+            className={cn(
+              "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+              "text-foreground hover:bg-muted/60",
+            )}
+            onMouseEnter={() => onHover(index)}
+            onClick={() => onToggle(target)}
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className={cn("shrink-0 text-[10px] font-medium", KIND_BADGE[target.kind] ?? "text-muted-foreground")}>
+                {KIND_SHORT[target.kind] ?? target.kind}
+              </span>
+              <span className="truncate">{target.name}</span>
+            </span>
+            {target.isMember && <span className="text-[10px] text-primary">✓</span>}
+          </button>
+        ))
+      )}
     </div>
   );
 }

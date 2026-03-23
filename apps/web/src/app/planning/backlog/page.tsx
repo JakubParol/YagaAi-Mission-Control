@@ -27,7 +27,7 @@ import {
   computeFilteredSections, buildBacklogFilterOptions, getAssignableAgents,
   computeWorkItemStats, hasAnyActiveSprint, findDefaultBacklogId,
   computeCompleteDialogTargets, resolveActiveSelectedStoryId, resolveSelectedStoryLabels,
-  removePendingId, buildEditBoardItem,
+  removePendingId, buildEditBoardItem, buildStoryBacklogMembership,
 } from "./backlog-page-derived";
 import { useBacklogPageCallbacks } from "./backlog-page-hooks";
 
@@ -79,12 +79,10 @@ function BacklogPageContent() {
   const stats = computeWorkItemStats(state, filteredSections);
   const anyActiveSprint = hasAnyActiveSprint(state);
   const defaultBacklogId = findDefaultBacklogId(state);
-  const completeDialogTargetOptions = useMemo(
-    () => computeCompleteDialogTargets(state, completeDialog?.backlogId ?? null),
-    [completeDialog, state],
-  );
+  const completeDialogTargetOptions = useMemo(() => computeCompleteDialogTargets(state, completeDialog?.backlogId ?? null), [completeDialog, state]);
   const activeSelectedStoryId = resolveActiveSelectedStoryId(state, selectedStoryId);
   const selectedStoryLabels = resolveSelectedStoryLabels(state, activeSelectedStoryId);
+  const storyMembershipMap = useMemo(() => (state.kind === "ok" ? buildStoryBacklogMembership(state.sections) : new Map<string, Set<string>>()), [state]);
 
   const updateFilterParam = useCallback(
     (key: keyof PlanningFiltersValue, value: string) => router.replace(buildFilterUrl(pathname, searchParams, key, value)),
@@ -227,10 +225,12 @@ function BacklogPageContent() {
               hasAnyActiveSprint={anyActiveSprint}
               siblingBacklogs={state.sections.map((s) => s.backlog)}
               assigneeOptions={assignableAgents}
+              allSections={state.sections}
+              storyMembershipMap={storyMembershipMap}
               onStoryClick={setSelectedStoryId}
               onStoryAssigneeChange={handleStoryAssigneeChange}
-              onAddToActiveSprint={(id) => void ops.updateSprintMembership(id, "add")}
-              onRemoveFromActiveSprint={(id) => void ops.updateSprintMembership(id, "remove")}
+              onAddToBacklog={(storyId, backlogId) => void ops.updateBacklogMembership(storyId, backlogId, "add")}
+              onRemoveFromBacklog={(storyId, backlogId) => void ops.updateBacklogMembership(storyId, backlogId, "remove")}
               onStartSprint={(id, name) => setStartDialog({ backlogId: id, backlogName: name })}
               onCompleteSprint={onCompleteSprint}
               onCreateStory={setCreateBacklogId}

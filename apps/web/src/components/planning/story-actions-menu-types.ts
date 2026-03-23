@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-import type { WorkItemStatus } from "@/lib/planning/types";
+import type { BacklogKind, WorkItemStatus } from "@/lib/planning/types";
 
 export const STORY_ACTIONS_SUPPORTED_TYPES = ["USER_STORY", "TASK", "BUG"] as const;
 
@@ -34,7 +34,21 @@ export function reduceDeleteConfirmPhase(
   return phase;
 }
 
-export type ActiveZone = "main" | "status";
+export type ActiveZone = "main" | "status" | "backlog";
+
+export interface BacklogMembershipTarget {
+  id: string;
+  name: string;
+  kind: BacklogKind;
+  isMember: boolean;
+}
+
+export interface BacklogMembershipActions {
+  targets: readonly BacklogMembershipTarget[];
+  onAdd: (storyId: string, backlogId: string) => void | Promise<void>;
+  onRemove: (storyId: string, backlogId: string) => void | Promise<void>;
+  disabled?: boolean;
+}
 
 export type MainAction =
   | "copy-key"
@@ -72,11 +86,7 @@ export interface StoryActionsMenuProps {
   onDelete: (storyId: string) => void | Promise<void>;
   onStatusChange?: (storyId: string, status: WorkItemStatus) => void | Promise<void>;
   onAddLabel?: (storyId: string) => void;
-  sprintMembershipAction?: {
-    mode: "add" | "remove";
-    onSelect: (storyId: string) => void | Promise<void>;
-    disabled?: boolean;
-  };
+  backlogMembershipActions?: BacklogMembershipActions;
   disabled?: boolean;
   isDeleting?: boolean;
   defaultOpen?: boolean;
