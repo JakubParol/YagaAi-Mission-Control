@@ -130,6 +130,7 @@ control_plane_agent_queue = Table(
     Column("work_item_id", Text, nullable=False),
     Column("work_item_key", Text, nullable=False),
     Column("work_item_type", Text, nullable=False),
+    Column("work_item_title", Text, nullable=False, server_default=""),
     Column("agent_id", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("queue_position", Integer, nullable=False),

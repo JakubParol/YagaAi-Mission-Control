@@ -139,6 +139,7 @@ def queue_entry_from_row(row: Row[Any]) -> AgentQueueEntry:
         work_item_id=str(row.work_item_id),
         work_item_key=str(row.work_item_key),
         work_item_type=str(row.work_item_type),
+        work_item_title=str(row.work_item_title) if row.work_item_title else "",
         agent_id=str(row.agent_id),
         status=AgentQueueStatus(str(row.status)),
         queue_position=int(row.queue_position),

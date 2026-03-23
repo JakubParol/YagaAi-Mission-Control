@@ -73,6 +73,7 @@ class AgentQueueEntry:
     work_item_id: str
     work_item_key: str
     work_item_type: str
+    work_item_title: str
     agent_id: str
     status: AgentQueueStatus
     queue_position: int
