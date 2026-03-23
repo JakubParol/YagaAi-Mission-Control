@@ -25,17 +25,23 @@ class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
         self._binary = openclaw_binary
 
     async def send_dispatch(
-        self, *, envelope: DispatchEnvelope,
+        self,
+        *,
+        envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata:
         prompt = self._build_prompt(envelope)
         cmd = [
             self._binary,
             "agent",
-            "--agent", envelope.openclaw_key,
-            "--session-id", envelope.main_session_key,
-            "--message", prompt,
+            "--agent",
+            envelope.openclaw_key,
+            "--session-id",
+            envelope.main_session_key,
+            "--message",
+            prompt,
             "--json",
-            "--timeout", "3600",
+            "--timeout",
+            "3600",
         ]
 
         log_event(
@@ -67,8 +73,7 @@ class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
             stderr_bytes = await proc.stderr.read() if proc.stderr else b""
             stderr_text = stderr_bytes.decode("utf-8", errors="replace")[:500]
             msg = (
-                f"openclaw agent exited immediately with code {proc.returncode}: "
-                f"{stderr_text}"
+                f"openclaw agent exited immediately with code {proc.returncode}: " f"{stderr_text}"
             )
             raise RuntimeError(msg)
         except asyncio.TimeoutError:

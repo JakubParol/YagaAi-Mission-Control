@@ -8,7 +8,9 @@ from app.control_plane.application.queue_dispatch_service import QueueDispatchSe
 from app.control_plane.application.queue_ingress_service import QueueIngressService
 from app.control_plane.infrastructure.repositories.agent_queue import DbAgentQueueRepository
 from app.control_plane.infrastructure.repositories.dispatch_record import DbDispatchRecordRepository
-from app.control_plane.infrastructure.sources.openclaw_adapter import SubprocessSessionDispatchAdapter
+from app.control_plane.infrastructure.sources.openclaw_adapter import (
+    SubprocessSessionDispatchAdapter,
+)
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
 from app.planning.application.label_service import LabelService

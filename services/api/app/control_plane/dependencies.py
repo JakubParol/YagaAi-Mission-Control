@@ -16,7 +16,9 @@ from app.control_plane.infrastructure.repositories.consumer import DbConsumerRep
 from app.control_plane.infrastructure.repositories.dispatch_record import DbDispatchRecordRepository
 from app.control_plane.infrastructure.repositories.read_model import DbReadModelRepository
 from app.control_plane.infrastructure.repositories.run import DbRunRepository
-from app.control_plane.infrastructure.sources.openclaw_adapter import SubprocessSessionDispatchAdapter
+from app.control_plane.infrastructure.sources.openclaw_adapter import (
+    SubprocessSessionDispatchAdapter,
+)
 from app.planning.infrastructure.shared.agent_lookup_adapter import DbAgentLookupAdapter
 from app.shared.api.deps import get_db
 

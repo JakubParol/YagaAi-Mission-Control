@@ -70,15 +70,21 @@ class OpenClawDispatchService:
             main_session_key=main_session_key,
         )
         record = self._build_record(
-            entry=entry, run_id=run_id, envelope=envelope,
-            dispatch_session_key=main_session_key, now=now,
+            entry=entry,
+            run_id=run_id,
+            envelope=envelope,
+            dispatch_session_key=main_session_key,
+            now=now,
         )
 
         try:
             session_meta = await self._adapter.send_dispatch(envelope=envelope)
         except (RuntimeError, OSError, ValueError) as exc:
             return await self._handle_failure(
-                entry=entry, record=record, error=str(exc), now=now,
+                entry=entry,
+                record=record,
+                error=str(exc),
+                now=now,
             )
 
         record.status = DispatchRecordStatus.SENT
@@ -234,5 +240,7 @@ class OpenClawDispatchService:
         )
 
         return ExternalDispatchResult(
-            action="failed", dispatch_record=record, error=error,
+            action="failed",
+            dispatch_record=record,
+            error=error,
         )
