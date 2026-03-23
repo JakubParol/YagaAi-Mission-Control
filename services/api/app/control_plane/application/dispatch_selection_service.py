@@ -107,24 +107,8 @@ class DispatchSelectionService:
         agent_id: str,
     ) -> AgentQueueSummary:
         """Return a summary of active-vs-queued state for an agent."""
-        has_active = await self._repo.has_active_item(agent_id=agent_id)
-
-        # Find the current active entry (if any)
-        active_entry: AgentQueueEntry | None = None
-        if has_active:
-            active_entries, _ = await self._repo.list_queued_by_agent(
-                agent_id=agent_id,
-                limit=50,
-            )
-            for entry in active_entries:
-                if entry.status not in (
-                    AgentQueueStatus.QUEUED,
-                    AgentQueueStatus.DONE,
-                    AgentQueueStatus.FAILED,
-                    AgentQueueStatus.CANCELLED,
-                ):
-                    active_entry = entry
-                    break
+        active_entry = await self._repo.get_active_entry_for_agent(agent_id=agent_id)
+        has_active = active_entry is not None
 
         queued_entries, queued_count = await self._repo.list_queued_by_agent(
             agent_id=agent_id,

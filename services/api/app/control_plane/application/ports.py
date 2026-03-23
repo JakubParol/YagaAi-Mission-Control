@@ -257,6 +257,13 @@ class AgentQueueRepository(ABC):
     async def has_active_item(self, *, agent_id: str) -> bool: ...
 
     @abstractmethod
+    async def get_active_entry_for_agent(
+        self,
+        *,
+        agent_id: str,
+    ) -> AgentQueueEntry | None: ...
+
+    @abstractmethod
     async def transition_status(
         self,
         *,

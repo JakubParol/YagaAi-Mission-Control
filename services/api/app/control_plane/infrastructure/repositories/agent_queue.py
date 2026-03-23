@@ -168,6 +168,22 @@ class DbAgentQueueRepository(AgentQueueRepository):
         )
         return (result.scalar_one() or 0) > 0
 
+    async def get_active_entry_for_agent(
+        self,
+        *,
+        agent_id: str,
+    ) -> AgentQueueEntry | None:
+        result = await self._db.execute(
+            select(_t)
+            .where(
+                _t.c.agent_id == agent_id,
+                _t.c.status.in_(_ACTIVE_RUNTIME_STATUSES),
+            )
+            .limit(1)
+        )
+        row = result.first()
+        return queue_entry_from_row(row) if row else None
+
     async def transition_status(
         self,
         *,

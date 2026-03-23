@@ -100,6 +100,16 @@ class FakeAgentQueueRepo(AgentQueueRepository):
     async def has_active_item(self, *, agent_id: str) -> bool:
         return any(e.agent_id == agent_id and e.status in _ACTIVE_RUNTIME for e in self.entries)
 
+    async def get_active_entry_for_agent(
+        self,
+        *,
+        agent_id: str,
+    ) -> AgentQueueEntry | None:
+        for e in self.entries:
+            if e.agent_id == agent_id and e.status in _ACTIVE_RUNTIME:
+                return e
+        return None
+
     async def transition_status(
         self,
         *,
