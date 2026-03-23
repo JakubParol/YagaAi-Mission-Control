@@ -223,9 +223,7 @@ class NaomiQueueRepository(ABC):
     async def enqueue(self, *, entry: NaomiQueueEntry) -> None: ...
 
     @abstractmethod
-    async def get_active_by_work_item(
-        self, *, work_item_id: str
-    ) -> NaomiQueueEntry | None: ...
+    async def get_active_by_work_item(self, *, work_item_id: str) -> NaomiQueueEntry | None: ...
 
     @abstractmethod
     async def cancel_by_work_item(

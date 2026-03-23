@@ -1,4 +1,6 @@
-from sqlalchemy import func, select, text, update
+from typing import Any
+
+from sqlalchemy import Result, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.control_plane.application.ports import NaomiQueueRepository
@@ -7,6 +9,10 @@ from app.control_plane.infrastructure.shared.mappers import queue_entry_from_row
 from app.control_plane.infrastructure.tables import control_plane_naomi_queue
 
 _t = control_plane_naomi_queue
+
+
+def _affected_rows(result: Result[Any]) -> int:
+    return getattr(result, "rowcount", 0)
 
 
 class DbNaomiQueueRepository(NaomiQueueRepository):
@@ -30,9 +36,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
             )
         )
 
-    async def get_active_by_work_item(
-        self, *, work_item_id: str
-    ) -> NaomiQueueEntry | None:
+    async def get_active_by_work_item(self, *, work_item_id: str) -> NaomiQueueEntry | None:
         result = await self._db.execute(
             select(_t).where(
                 _t.c.work_item_id == work_item_id,
@@ -60,7 +64,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
                 updated_at=cancelled_at,
             )
         )
-        return result.rowcount > 0
+        return _affected_rows(result) > 0
 
     async def next_queue_position(self, *, agent_id: str) -> int:
         result = await self._db.execute(
@@ -81,9 +85,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
         offset: int = 0,
     ) -> tuple[list[NaomiQueueEntry], int]:
         base = select(_t).where(_t.c.agent_id == agent_id)
-        count_base = select(func.count()).select_from(_t).where(
-            _t.c.agent_id == agent_id
-        )
+        count_base = select(func.count()).select_from(_t).where(_t.c.agent_id == agent_id)
         if status is not None:
             base = base.where(_t.c.status == status.value)
             count_base = count_base.where(_t.c.status == status.value)

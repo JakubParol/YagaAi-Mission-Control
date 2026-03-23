@@ -63,9 +63,7 @@ class NaomiQueueIngressService:
                 reason="not_eligible",
             )
 
-        existing = await self._repo.get_active_by_work_item(
-            work_item_id=work_item_id
-        )
+        existing = await self._repo.get_active_by_work_item(work_item_id=work_item_id)
         if existing is not None:
             return IngressResult(
                 action="skipped",

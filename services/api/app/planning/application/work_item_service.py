@@ -15,12 +15,18 @@ from app.shared.api.errors import (
     NotFoundError,
     ValidationError,
 )
+from app.shared.ports import OnAssignmentChanged
 from app.shared.utils import new_uuid, utc_now
 
 
 class WorkItemService:
-    def __init__(self, work_item_repo: WorkItemRepository) -> None:
+    def __init__(
+        self,
+        work_item_repo: WorkItemRepository,
+        on_assignment_changed: OnAssignmentChanged | None = None,
+    ) -> None:
         self._repo = work_item_repo
+        self._on_assignment_changed = on_assignment_changed
 
     # ------------------------------------------------------------------
     # List / Get
@@ -268,6 +274,13 @@ class WorkItemService:
         if not updated:
             raise NotFoundError(f"Work item {work_item_id} not found")
 
+        if assignee_changed:
+            await self._notify_assignment_changed(
+                updated,
+                agent_id=data.get("current_assignee_agent_id"),
+                previous_agent_id=existing.current_assignee_agent_id,
+            )
+
         # Recompute parent derived status when child status changes.
         if "status" in data and existing.parent_id:
             await self._repo.recompute_derived_status(existing.parent_id)
@@ -327,7 +340,7 @@ class WorkItemService:
         if active and active.agent_id == agent_id:
             raise ConflictError(f"Agent {agent_id} already assigned to {work_item_id}")
         now = utc_now()
-        return await self._repo.assign_agent_with_event(
+        assignment = await self._repo.assign_agent_with_event(
             work_item_id=work_item_id,
             agent_id=agent_id,
             previous_assignee_agent_id=active.agent_id if active else None,
@@ -336,6 +349,12 @@ class WorkItemService:
             correlation_id=new_uuid(),
             causation_id=work_item_id,
         )
+        await self._notify_assignment_changed(
+            item,
+            agent_id=agent_id,
+            previous_agent_id=active.agent_id if active else None,
+        )
+        return assignment
 
     async def unassign_current_agent(self, work_item_id: str) -> None:
         item = await self._repo.get_by_id(work_item_id)
@@ -352,6 +371,11 @@ class WorkItemService:
             occurred_at=utc_now(),
             correlation_id=new_uuid(),
             causation_id=work_item_id,
+        )
+        await self._notify_assignment_changed(
+            item,
+            agent_id=None,
+            previous_agent_id=active.agent_id,
         )
 
     async def list_assignments(self, work_item_id: str) -> list[WorkItemAssignment]:
@@ -409,6 +433,24 @@ class WorkItemService:
             raise BusinessRuleError("blocked_reason can be set only when is_blocked is true")
         if not next_is_blocked:
             data["blocked_reason"] = None
+
+    async def _notify_assignment_changed(
+        self,
+        item: WorkItem,
+        *,
+        agent_id: str | None,
+        previous_agent_id: str | None,
+    ) -> None:
+        if self._on_assignment_changed is None:
+            return
+        await self._on_assignment_changed(
+            work_item_id=item.id,
+            work_item_key=item.key,
+            work_item_type=item.type.value,
+            work_item_status=item.status.value,
+            agent_id=agent_id,
+            previous_agent_id=previous_agent_id,
+        )
 
     @staticmethod
     def _validate_type(type_value: str) -> None:
