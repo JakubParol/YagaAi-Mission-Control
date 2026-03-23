@@ -37,10 +37,12 @@ class DispatchSelectionService:
         under concurrent calls. Idempotent: repeated calls on an
         already-dispatching item are safe.
 
-        Race-safety: the CAS QUEUED→DISPATCHING is the atomic claim.
-        After claiming, we re-check has_active_item to detect whether
-        a concurrent caller also won a CAS on a different entry. If
-        so, we roll back our claim to preserve capacity=1.
+        Race-safety: the CAS QUEUED→DISPATCHING is the atomic claim
+        on a single entry. Concurrent callers targeting the same entry
+        will fail the CAS harmlessly. The pre-check has_active_item
+        prevents dispatch when an item is already active, but does not
+        guard against two callers racing on different QUEUED entries.
+        Full DB-level serialisation is deferred to MC-568 (adapter).
         """
         if await self._repo.has_active_item(agent_id=agent_id):
             return DispatchResult(action="skipped", reason="agent_busy")
@@ -77,6 +79,8 @@ class DispatchSelectionService:
                 queue_entry_id=candidate.id,
             )
             return DispatchResult(action="skipped", reason="transition_conflict")
+
+        await self._repo.commit()
 
         # Re-read the entry to return the updated state
         updated = await self._repo.get_active_by_work_item(

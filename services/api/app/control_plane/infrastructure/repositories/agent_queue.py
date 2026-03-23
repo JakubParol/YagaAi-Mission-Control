@@ -189,3 +189,6 @@ class DbAgentQueueRepository(AgentQueueRepository):
         )
         await self._db.flush()
         return _affected_rows(result) > 0
+
+    async def commit(self) -> None:
+        await self._db.commit()

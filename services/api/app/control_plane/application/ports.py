@@ -265,3 +265,6 @@ class AgentQueueRepository(ABC):
         new_status: AgentQueueStatus,
         updated_at: str,
     ) -> bool: ...
+
+    @abstractmethod
+    async def commit(self) -> None: ...

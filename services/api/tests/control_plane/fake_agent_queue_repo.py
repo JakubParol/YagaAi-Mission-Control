@@ -114,3 +114,6 @@ class FakeAgentQueueRepo(AgentQueueRepository):
                 e.updated_at = updated_at
                 return True
         return False
+
+    async def commit(self) -> None:
+        pass  # no-op for in-memory fake
