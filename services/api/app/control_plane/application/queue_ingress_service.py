@@ -119,7 +119,6 @@ class NaomiQueueIngressService:
         causation_id: str | None,
     ) -> IngressResult:
         now = utc_now()
-        position = await self._repo.next_queue_position(agent_id=agent_id)
         entry_id = new_uuid()
 
         entry = NaomiQueueEntry(
@@ -129,7 +128,7 @@ class NaomiQueueIngressService:
             work_item_type=work_item_type,
             agent_id=agent_id,
             status=NaomiQueueStatus.QUEUED,
-            queue_position=position,
+            queue_position=0,  # actual position set atomically by repository
             correlation_id=correlation_id,
             causation_id=causation_id,
             enqueued_at=now,
@@ -144,7 +143,6 @@ class NaomiQueueIngressService:
             work_item_id=work_item_id,
             work_item_key=work_item_key,
             queue_entry_id=entry_id,
-            queue_position=position,
             correlation_id=correlation_id,
         )
 

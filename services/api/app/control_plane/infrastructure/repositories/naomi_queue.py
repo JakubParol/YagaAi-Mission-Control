@@ -10,7 +10,7 @@ from app.control_plane.infrastructure.tables import control_plane_naomi_queue
 
 _t = control_plane_naomi_queue
 
-_NON_TERMINAL_STATUSES = (
+_CANCELLABLE_STATUSES = (
     NaomiQueueStatus.QUEUED.value,
     NaomiQueueStatus.DISPATCHING.value,
     NaomiQueueStatus.ACK_PENDING.value,
@@ -69,7 +69,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
         result = await self._db.execute(
             select(_t).where(
                 _t.c.work_item_id == work_item_id,
-                _t.c.status.in_(_NON_TERMINAL_STATUSES),
+                _t.c.status.in_(_CANCELLABLE_STATUSES),
             )
         )
         row = result.first()
@@ -85,7 +85,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
             update(_t)
             .where(
                 _t.c.work_item_id == work_item_id,
-                _t.c.status.in_(_NON_TERMINAL_STATUSES),
+                _t.c.status.in_(_CANCELLABLE_STATUSES),
             )
             .values(
                 status=NaomiQueueStatus.CANCELLED.value,

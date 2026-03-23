@@ -261,12 +261,12 @@ async def test_missing_agent_id_is_skipped() -> None:
 
 
 @pytest.mark.asyncio
-async def test_queue_position_increments() -> None:
+async def test_multiple_items_enqueue_independently() -> None:
     repo = FakeNaomiQueueRepo()
     svc = NaomiQueueIngressService(repo=repo)
 
     for i, wi_id in enumerate(["wi-1", "wi-2", "wi-3"]):
-        await svc.handle_assignment_changed(
+        result = await svc.handle_assignment_changed(
             work_item_id=wi_id,
             work_item_key=f"MC-{100 + i}",
             work_item_type="STORY",
@@ -276,6 +276,8 @@ async def test_queue_position_increments() -> None:
             agent_openclaw_key=NAOMI_AGENT_KEY,
             previous_agent_openclaw_key=None,
         )
+        assert result.action == "enqueued"
 
-    positions = [e.queue_position for e in repo.entries]
-    assert positions == [1, 2, 3]
+    assert len(repo.entries) == 3
+    work_item_ids = [e.work_item_id for e in repo.entries]
+    assert work_item_ids == ["wi-1", "wi-2", "wi-3"]
