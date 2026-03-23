@@ -154,9 +154,22 @@ class DispatchRequest(BaseModel):
     agent_id: str = Field(..., min_length=1)
 
 
+class DispatchRecordResponse(BaseModel):
+    id: str
+    run_id: str
+    agent_id: str
+    work_item_key: str
+    status: str
+    session_id: str | None = None
+    process_id: int | None = None
+    error_message: str | None = None
+    dispatched_at: str | None = None
+
+
 class DispatchResponse(BaseModel):
     action: str
     entry: AgentQueueEntryResponse | None = None
+    dispatch_record: DispatchRecordResponse | None = None
     reason: str | None = None
 
 

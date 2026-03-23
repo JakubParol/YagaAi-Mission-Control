@@ -1,8 +1,10 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.control_plane.application.command_service import CommandService
 from app.control_plane.application.dispatch_selection_service import DispatchSelectionService
+from app.control_plane.application.openclaw_dispatch_service import OpenClawDispatchService
 from app.control_plane.application.queue_ingress_service import QueueIngressService
 from app.control_plane.application.read_model_service import RunReadModelService
 from app.control_plane.application.watchdog_service import WatchdogService
@@ -10,8 +12,10 @@ from app.control_plane.application.worker_state_machine_service import WorkerSta
 from app.control_plane.infrastructure.repositories.agent_queue import DbAgentQueueRepository
 from app.control_plane.infrastructure.repositories.command import DbCommandRepository
 from app.control_plane.infrastructure.repositories.consumer import DbConsumerRepository
+from app.control_plane.infrastructure.repositories.dispatch_record import DbDispatchRecordRepository
 from app.control_plane.infrastructure.repositories.read_model import DbReadModelRepository
 from app.control_plane.infrastructure.repositories.run import DbRunRepository
+from app.control_plane.infrastructure.sources.openclaw_adapter import HttpOpenClawDispatchAdapter
 from app.shared.api.deps import get_db
 
 
@@ -52,3 +56,18 @@ async def get_dispatch_selection_service(
     db: AsyncSession = Depends(get_db),
 ) -> DispatchSelectionService:
     return DispatchSelectionService(repo=DbAgentQueueRepository(db))
+
+
+async def get_openclaw_dispatch_service(
+    db: AsyncSession = Depends(get_db),
+) -> OpenClawDispatchService:
+    return OpenClawDispatchService(
+        queue_repo=DbAgentQueueRepository(db),
+        dispatch_repo=DbDispatchRecordRepository(db),
+        openclaw_adapter=HttpOpenClawDispatchAdapter(
+            gateway_base_url=settings.control_plane_openclaw_gateway_url,
+            gateway_token=settings.control_plane_openclaw_gateway_token,
+        ),
+        repo_root=settings.control_plane_dispatch_repo_root,
+        contract_doc_path=settings.control_plane_dispatch_contract_doc,
+    )
