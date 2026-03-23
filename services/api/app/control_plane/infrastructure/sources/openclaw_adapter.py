@@ -97,10 +97,14 @@ class HttpOpenClawDispatchAdapter(OpenClawDispatchPort):
 
         session_id = data.get("sessionId") or data.get("session_id") or envelope.run_id
         raw_pid = data.get("processId", data.get("process_id"))
+        try:
+            process_id = int(raw_pid) if raw_pid is not None else None
+        except (ValueError, TypeError):
+            process_id = None
 
         return OpenClawSessionMetadata(
             session_id=str(session_id),
-            process_id=int(raw_pid) if raw_pid is not None else None,
+            process_id=process_id,
             work_dir=data.get("cwd") or envelope.work_dir,
         )
 
