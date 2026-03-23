@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,10 +19,7 @@ from app.planning.infrastructure.repositories.work_items import DbWorkItemReposi
 from app.planning.infrastructure.sources.openclaw import FileOpenClawAgentSource
 from app.shared.api.deps import get_db
 from app.shared.api.errors import NotFoundError
-from app.shared.logging import log_event
 from app.shared.ports import OnAssignmentChanged
-
-logger = logging.getLogger(__name__)
 
 
 async def get_project_service(
@@ -63,22 +58,14 @@ def _make_assignment_hook(
         agent_id: str | None,
         previous_agent_id: str | None,
     ) -> None:
-        try:
-            await ingress.handle_assignment_changed(
-                work_item_id=work_item_id,
-                work_item_key=work_item_key or "",
-                work_item_type=work_item_type,
-                work_item_status=work_item_status,
-                agent_id=agent_id,
-                previous_agent_id=previous_agent_id,
-            )
-        except Exception:
-            log_event(
-                logger,
-                level=logging.WARNING,
-                event="assignment_queue_bridge.failed",
-                work_item_id=work_item_id,
-            )
+        await ingress.handle_assignment_changed(
+            work_item_id=work_item_id,
+            work_item_key=work_item_key or "",
+            work_item_type=work_item_type,
+            work_item_status=work_item_status,
+            agent_id=agent_id,
+            previous_agent_id=previous_agent_id,
+        )
 
     return on_assignment_changed
 
