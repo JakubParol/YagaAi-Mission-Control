@@ -5,6 +5,8 @@ from sqlalchemy import Row
 from app.control_plane.domain.models import (
     ControlPlaneRun,
     ControlPlaneStep,
+    NaomiQueueEntry,
+    NaomiQueueStatus,
     OutboxEventEnvelope,
     OutboxStatus,
     RunAttemptReadModel,
@@ -128,4 +130,21 @@ def run_attempt_from_row(row: Row[Any]) -> RunAttemptReadModel:
         last_error=(str(row.last_error) if row.last_error else None),
         correlation_id=str(row.correlation_id),
         causation_id=(str(row.causation_id) if row.causation_id else None),
+    )
+
+
+def queue_entry_from_row(row: Row[Any]) -> NaomiQueueEntry:
+    return NaomiQueueEntry(
+        id=str(row.id),
+        work_item_id=str(row.work_item_id),
+        work_item_key=str(row.work_item_key),
+        work_item_type=str(row.work_item_type),
+        agent_id=str(row.agent_id),
+        status=NaomiQueueStatus(str(row.status)),
+        queue_position=int(row.queue_position),
+        correlation_id=str(row.correlation_id),
+        causation_id=(str(row.causation_id) if row.causation_id else None),
+        enqueued_at=str(row.enqueued_at),
+        updated_at=str(row.updated_at),
+        cancelled_at=(str(row.cancelled_at) if row.cancelled_at else None),
     )
