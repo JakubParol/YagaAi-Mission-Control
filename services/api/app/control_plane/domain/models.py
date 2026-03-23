@@ -77,6 +77,7 @@ class AgentQueueEntry:
     work_item_key: str
     work_item_type: str
     work_item_title: str
+    project_repo_root: str
     agent_id: str
     status: AgentQueueStatus
     queue_position: int
@@ -264,7 +265,6 @@ class DispatchEnvelope:
     work_dir: str
     prompt_marker: str
     contract_version: str
-    contract_doc_path: str
 
 
 @dataclass

@@ -450,7 +450,9 @@ class WorkItemService:
             work_item_id=item.id,
             work_item_key=item.key,
             work_item_type=item.type.value,
+            work_item_title=item.title,
             work_item_status=item.status.value,
+            project_id=item.project_id,
             agent_id=agent_id,
             previous_agent_id=previous_agent_id,
         )

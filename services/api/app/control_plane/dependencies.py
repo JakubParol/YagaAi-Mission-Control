@@ -68,6 +68,4 @@ async def get_openclaw_dispatch_service(
             gateway_base_url=settings.control_plane_openclaw_gateway_url,
             gateway_token=settings.control_plane_openclaw_gateway_token,
         ),
-        repo_root=settings.control_plane_dispatch_repo_root,
-        contract_doc_path=settings.control_plane_dispatch_contract_doc,
     )

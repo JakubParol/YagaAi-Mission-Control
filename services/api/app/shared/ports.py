@@ -8,7 +8,9 @@ class OnAssignmentChanged(Protocol):
         work_item_id: str,
         work_item_key: str | None,
         work_item_type: str,
+        work_item_title: str,
         work_item_status: str,
+        project_id: str | None,
         agent_id: str | None,
         previous_agent_id: str | None,
     ) -> None: ...
