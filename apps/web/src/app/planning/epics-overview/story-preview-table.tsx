@@ -1,8 +1,9 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ThemedSelect } from "@/components/ui/themed-select";
 import type { WorkItemStatus } from "@/lib/planning/types";
 
@@ -56,7 +57,7 @@ export interface StoryPreviewTableProps {
   storyPendingById: Record<string, boolean>;
   onStoryClick?: (storyId: string) => void;
   onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
-  onAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
+  onMoveToEpic: (story: EpicOverviewStoryPreview) => void;
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -67,7 +68,7 @@ export function StoryPreviewTable({
   storyPendingById,
   onStoryClick,
   onChangeStoryStatus,
-  onAddStoryToSprint,
+  onMoveToEpic,
 }: StoryPreviewTableProps) {
   return (
     <div className="overflow-hidden rounded border border-border/40">
@@ -134,16 +135,16 @@ export function StoryPreviewTable({
                       contentClassName="w-[170px]"
                     />
 
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="xs"
                       disabled={pending}
-                      onClick={() => {
-                        onAddStoryToSprint(epicKey, story);
-                      }}
-                      className="inline-flex h-7 items-center rounded border border-border/60 px-2 text-[10px] text-foreground transition-colors hover:border-border disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => onMoveToEpic(story)}
                     >
-                      Add to sprint
-                    </button>
+                      <ArrowRight className="size-3" />
+                      Move to epic
+                    </Button>
                   </div>
                 </div>
               );

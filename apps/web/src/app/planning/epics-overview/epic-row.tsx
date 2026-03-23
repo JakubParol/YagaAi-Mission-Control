@@ -86,7 +86,7 @@ export interface EpicRowProps {
   onPreviewFilterChange: (epicKey: string, patch: Partial<EpicOverviewStoryPreviewFilters>) => void;
   onStoryClick?: (storyId: string) => void;
   onChangeStoryStatus: (epicKey: string, story: EpicOverviewStoryPreview, nextStatus: WorkItemStatus) => void;
-  onAddStoryToSprint: (epicKey: string, story: EpicOverviewStoryPreview) => void;
+  onMoveToEpic: (story: EpicOverviewStoryPreview) => void;
   onEdit?: (epicId: string) => void;
   onDelete?: (epicId: string) => void;
 }
@@ -104,7 +104,7 @@ export function EpicRow({
   onPreviewFilterChange,
   onStoryClick,
   onChangeStoryStatus,
-  onAddStoryToSprint,
+  onMoveToEpic,
   onEdit,
   onDelete,
 }: EpicRowProps) {
@@ -238,7 +238,7 @@ export function EpicRow({
                 storyPendingById={storyPendingById}
                 onStoryClick={onStoryClick}
                 onChangeStoryStatus={onChangeStoryStatus}
-                onAddStoryToSprint={onAddStoryToSprint}
+                onMoveToEpic={onMoveToEpic}
               />
             )
           ) : null}

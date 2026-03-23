@@ -18,10 +18,11 @@ import { RefreshControl } from "@/components/refresh-control";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { deleteStory } from "../story-actions";
+import { addStoryToBacklog, removeStoryFromBacklog } from "../backlog/board-actions";
 import type { PlanningListRow } from "./list-view-model";
 import { applyPlanningListFilters } from "./list-filters";
 import type { PageState, ScopedFetchResult } from "./list-types";
-import { fetchListResult, patchRowAssignee, patchStoryStatus } from "./list-page-actions";
+import { fetchBacklogsForProject, fetchListResult, patchRowAssignee, patchStoryStatus, type ListBacklogData } from "./list-page-actions";
 import {
   buildClearFiltersUrl,
   buildFilterUrl,
@@ -39,6 +40,7 @@ function PlanningListPageContent() {
   const [fetchResultState, setFetchResultState] = useState<ScopedFetchResult | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
+  const [backlogData, setBacklogData] = useState<ListBacklogData>({ backlogs: [], membershipMap: new Map() });
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const singleProjectId =
@@ -71,11 +73,10 @@ function PlanningListPageContent() {
   }, [pathname, router, searchParams]);
 
   const refreshCurrentView = useCallback(async () => {
-    if (!singleProjectId) {
-      throw new Error("Select a single project before refreshing.");
-    }
-    const result = await fetchListResult(singleProjectId);
+    if (!singleProjectId) throw new Error("Select a single project before refreshing.");
+    const [result, bd] = await Promise.all([fetchListResult(singleProjectId), fetchBacklogsForProject(singleProjectId)]);
     setFetchResultState({ projectId: singleProjectId, result });
+    setBacklogData(bd);
   }, [singleProjectId]);
 
   useEffect(() => {
@@ -91,20 +92,17 @@ function PlanningListPageContent() {
 
     let cancelled = false;
 
-    void fetchListResult(singleProjectId)
-      .then((result) => {
+    void Promise.all([fetchListResult(singleProjectId), fetchBacklogsForProject(singleProjectId)])
+      .then(([result, bd]) => {
         if (cancelled) return;
         setFetchResultState({ projectId: singleProjectId, result });
+        setBacklogData(bd);
       })
       .catch((error) => {
         if (cancelled) return;
         setFetchResultState({
           projectId: singleProjectId,
-          result: {
-            kind: "error",
-            message:
-              error instanceof Error ? error.message : "Failed to load planning list items.",
-          },
+          result: { kind: "error", message: error instanceof Error ? error.message : "Failed to load planning list items." },
         });
       });
 
@@ -152,19 +150,21 @@ function PlanningListPageContent() {
   );
 
   const handleStoryStatusChange = useCallback(
-    (storyId: string, status: WorkItemStatus) => {
-      runWithPending(storyId, () => patchStoryStatus(storyId, status), "Failed to update story status.");
-    },
+    (storyId: string, status: WorkItemStatus) => runWithPending(storyId, () => patchStoryStatus(storyId, status), "Failed to update story status."),
     [runWithPending],
   );
 
   const handleRowAssigneeChange = useCallback(
-    (row: PlanningListRow, nextAssigneeAgentId: string | null) => {
-      runWithPending(
-        row.id,
-        () => patchRowAssignee(row.row_type, row.id, nextAssigneeAgentId),
-        "Failed to update assignee.",
-      );
+    (row: PlanningListRow, nextAssigneeAgentId: string | null) => runWithPending(row.id, () => patchRowAssignee(row.row_type, row.id, nextAssigneeAgentId), "Failed to update assignee."),
+    [runWithPending],
+  );
+
+  const handleMoveToBacklog = useCallback(
+    (storyId: string, sourceBacklogId: string, targetBacklogId: string) => {
+      runWithPending(storyId, async () => {
+        if (sourceBacklogId) await removeStoryFromBacklog(sourceBacklogId, storyId);
+        await addStoryToBacklog(targetBacklogId, storyId);
+      }, "Failed to move work item.");
     },
     [runWithPending],
   );
@@ -260,12 +260,15 @@ function PlanningListPageContent() {
           <ListRowsSection
             rows={visibleRows}
             assignableAgents={assignableAgents}
+            backlogs={backlogData.backlogs}
+            membershipMap={backlogData.membershipMap}
             pendingIds={pendingStoryIds}
             onWorkItemClick={setSelectedStoryId}
             onStoryDelete={handleStoryDelete}
             onStoryStatusChange={handleStoryStatusChange}
             onRowAssigneeChange={handleRowAssigneeChange}
             onAddLabel={setSelectedStoryId}
+            onMoveToBacklog={handleMoveToBacklog}
           />
         </section>
       )}

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Radar, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
 
+import { apiUrl } from "@/lib/api-client";
 import { EmptyState } from "@/components/empty-state";
 import { RefreshControl } from "@/components/refresh-control";
 import { PlanningPageShell } from "@/components/planning/planning-page-shell";
@@ -19,6 +20,7 @@ import {
 } from "@/components/planning/story-actions-menu-types";
 
 import { EpicRow, type PreviewState } from "./epic-row";
+import { MoveToEpicDialog, type MoveToEpicTarget } from "./move-to-epic-dialog";
 import { deleteEpic, fetchEpicDetail, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,
@@ -82,6 +84,9 @@ function EpicOverviewPageContent() {
   const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState | null>(null);
   const [epicActionError, setEpicActionError] = useState<string | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [moveToEpicState, setMoveToEpicState] = useState<{
+    storyId: string; storyKey: string | null; storyTitle: string; currentEpicId: string;
+  } | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0] : null;
@@ -190,6 +195,22 @@ function EpicOverviewPageContent() {
       setEpicActionError(err instanceof Error ? err.message : "Failed to load epic details for editing.");
     }
   }, []);
+
+  const epicTargets = useMemo<MoveToEpicTarget[]>(
+    () => (state.kind === "ok" ? state.rows.map((r) => ({ id: r.work_item_id, key: r.work_item_key, title: r.title })) : []),
+    [state],
+  );
+
+  const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
+    if (!moveToEpicState) return;
+    const res = await fetch(apiUrl(`/v1/planning/work-items/${moveToEpicState.storyId}`), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parent_id: targetEpicId }),
+    });
+    if (!res.ok) throw new Error(`Failed to move work item. HTTP ${res.status}.`);
+    await refreshCurrentView();
+  }, [moveToEpicState, refreshCurrentView]);
 
   const handleDeleteEpic = useCallback((epicId: string) => {
     if (state.kind !== "ok") return;
@@ -384,7 +405,12 @@ function EpicOverviewPageContent() {
                         onPreviewFilterChange={sa.handlePreviewFilterChange}
                         onStoryClick={setSelectedStoryId}
                         onChangeStoryStatus={sa.handleChangeStoryStatus}
-                        onAddStoryToSprint={sa.handleAddStoryToSprint}
+                        onMoveToEpic={(story) => setMoveToEpicState({
+                          storyId: story.work_item_id,
+                          storyKey: story.work_item_key ?? null,
+                          storyTitle: story.title,
+                          currentEpicId: item.work_item_id,
+                        })}
                         onEdit={handleEditEpic}
                         onDelete={handleDeleteEpic}
                       />
@@ -402,6 +428,16 @@ function EpicOverviewPageContent() {
         open={selectedStoryId !== null}
         onOpenChange={(open) => { if (!open) setSelectedStoryId(null); }}
         onStoryUpdated={() => { void refreshCurrentView().catch(() => undefined); }}
+      />
+
+      <MoveToEpicDialog
+        open={moveToEpicState !== null}
+        storyKey={moveToEpicState?.storyKey ?? null}
+        storyTitle={moveToEpicState?.storyTitle ?? ""}
+        currentEpicId={moveToEpicState?.currentEpicId ?? ""}
+        epicTargets={epicTargets}
+        onMove={handleMoveToEpicConfirm}
+        onOpenChange={(open) => { if (!open) setMoveToEpicState(null); }}
       />
     </>
   );
