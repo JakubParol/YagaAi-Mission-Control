@@ -39,6 +39,7 @@ export interface BoardColumnProps {
   pendingStoryIds: Set<string>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
   onStoryStatusChange?: (storyId: string, status: WorkItemStatus) => void;
+  onLinkParent?: (storyId: string) => void;
   assigneeOptions: readonly QuickCreateAssigneeOption[];
   assigneeOverrides: Readonly<Record<string, StoryAssigneeSelection>>;
   onStoryAssigneeChange: (storyId: string, assignee: StoryAssigneeSelection) => void;
@@ -61,6 +62,7 @@ export function BoardColumn({
   pendingStoryIds,
   onStoryDelete,
   onStoryStatusChange,
+  onLinkParent,
   assigneeOptions,
   assigneeOverrides,
   onStoryAssigneeChange,
@@ -176,6 +178,7 @@ export function BoardColumn({
                             onDelete={onStoryDelete}
                             onStatusChange={onStoryStatusChange}
                             onAddLabel={onStoryClick}
+                            onLinkParent={onLinkParent}
                             disabled={isPending}
                             isDeleting={isPending}
                           />

@@ -13,7 +13,9 @@ import { hasActivePlanningFilters, PlanningFilters, type PlanningFiltersValue } 
 import { PlanningPageShell } from "@/components/planning/planning-page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
-import { deleteStory } from "../story-actions";
+import { MoveToEpicDialog } from "@/components/planning/move-to-epic-dialog";
+import { fetchEpics, type FetchEpicsResult } from "@/components/planning/story-detail-actions";
+import { deleteStory, moveWorkItemToEpic } from "../story-actions";
 
 import type {
   DeleteBoardDialogState, PageState, ScopedFetchResult,
@@ -27,7 +29,7 @@ import {
   computeFilteredSections, buildBacklogFilterOptions, getAssignableAgents,
   computeWorkItemStats, hasAnyActiveSprint, findDefaultBacklogId,
   computeCompleteDialogTargets, resolveActiveSelectedStoryId, resolveSelectedStoryLabels,
-  removePendingId, buildEditBoardItem,
+  removePendingId, buildEditBoardItem, buildStoryBacklogMembership,
 } from "./backlog-page-derived";
 import { useBacklogPageCallbacks } from "./backlog-page-hooks";
 
@@ -54,7 +56,8 @@ function BacklogPageContent() {
   const [completeDialogError, setCompleteDialogError] = useState<string | null>(null);
   const [deleteBoardDialog, setDeleteBoardDialog] = useState<DeleteBoardDialogState | null>(null);
   const [editBoardBacklog, setEditBoardBacklog] = useState<BacklogEditItem | null>(null);
-
+  const [epicTargets, setEpicTargets] = useState<FetchEpicsResult[]>([]);
+  const [moveToEpicStoryId, setMoveToEpicStoryId] = useState<string | null>(null);
   const showErrorToast = useCallback((msg: string) => setErrorToast(msg), []);
 
   useEffect(() => {
@@ -79,13 +82,10 @@ function BacklogPageContent() {
   const stats = computeWorkItemStats(state, filteredSections);
   const anyActiveSprint = hasAnyActiveSprint(state);
   const defaultBacklogId = findDefaultBacklogId(state);
-  const completeDialogTargetOptions = useMemo(
-    () => computeCompleteDialogTargets(state, completeDialog?.backlogId ?? null),
-    [completeDialog, state],
-  );
+  const completeDialogTargetOptions = useMemo(() => computeCompleteDialogTargets(state, completeDialog?.backlogId ?? null), [completeDialog, state]);
   const activeSelectedStoryId = resolveActiveSelectedStoryId(state, selectedStoryId);
   const selectedStoryLabels = resolveSelectedStoryLabels(state, activeSelectedStoryId);
-
+  const storyMembershipMap = useMemo(() => (state.kind === "ok" ? buildStoryBacklogMembership(state.sections) : new Map<string, Set<string>>()), [state]);
   const updateFilterParam = useCallback(
     (key: keyof PlanningFiltersValue, value: string) => router.replace(buildFilterUrl(pathname, searchParams, key, value)),
     [pathname, router, searchParams],
@@ -106,8 +106,8 @@ function BacklogPageContent() {
   useEffect(() => {
     if (!singleProjectId) return;
     let cancelled = false;
-    void fetchBacklogData(singleProjectId)
-      .then((r) => { if (!cancelled) setFetchResultState({ projectId: singleProjectId, result: r }); })
+    void Promise.all([fetchBacklogData(singleProjectId), fetchEpics(singleProjectId).catch(() => [])])
+      .then(([r, epics]) => { if (!cancelled) { setFetchResultState({ projectId: singleProjectId, result: r }); setEpicTargets(epics); } })
       .catch((e) => { if (!cancelled) setFetchResultState({ projectId: singleProjectId, result: { kind: "error", message: String(e) } }); });
     return () => { cancelled = true; };
   }, [singleProjectId]);
@@ -152,6 +152,8 @@ function BacklogPageContent() {
     [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, withPendingStory],
   );
 
+  const handleMoveToEpicConfirm = useCallback(async (tid: string) => { if (moveToEpicStoryId) { await moveWorkItemToEpic(moveToEpicStoryId, tid); await refreshCurrentView(); } }, [moveToEpicStoryId, refreshCurrentView]);
+
   const ops = useBacklogPageCallbacks({
     singleProjectId, state, defaultBacklogId, showErrorToast, refreshCurrentView,
     setPendingStoryIds, setPendingSprintIds, setPendingBoardIds,
@@ -169,19 +171,13 @@ function BacklogPageContent() {
     [ops, showErrorToast],
   );
 
-  const onCompleteDialogConfirm = useCallback(
-    () => {
-      if (!completeDialog) return;
-      void ops.handleCompleteDialogConfirm(completeDialog, completeTargetBacklogId, completeDialogTargetOptions, setCompleteDialogError)
-        .then((ok) => { if (ok) { setCompleteDialog(null); setCompleteTargetBacklogId(""); } });
-    },
-    [completeDialog, completeDialogTargetOptions, completeTargetBacklogId, ops],
-  );
+  const onCompleteDialogConfirm = useCallback(() => {
+    if (!completeDialog) return;
+    void ops.handleCompleteDialogConfirm(completeDialog, completeTargetBacklogId, completeDialogTargetOptions, setCompleteDialogError)
+      .then((ok) => { if (ok) { setCompleteDialog(null); setCompleteTargetBacklogId(""); } });
+  }, [completeDialog, completeDialogTargetOptions, completeTargetBacklogId, ops]);
 
-  const onDeleteBoardConfirm = useCallback(
-    () => { if (deleteBoardDialog) void ops.handleDeleteBoardConfirm(deleteBoardDialog.backlogId, () => setDeleteBoardDialog(null)); },
-    [deleteBoardDialog, ops],
-  );
+  const onDeleteBoardConfirm = useCallback(() => { if (deleteBoardDialog) void ops.handleDeleteBoardConfirm(deleteBoardDialog.backlogId, () => setDeleteBoardDialog(null)); }, [deleteBoardDialog, ops]);
 
   // ── Render ────────────────────────────────────────────────────────
 
@@ -223,14 +219,15 @@ function BacklogPageContent() {
             <BacklogSection
               key={section.backlog.id}
               section={section}
-              isActiveSprint={section.backlog.kind === "SPRINT" && section.backlog.status === "ACTIVE"}
               hasAnyActiveSprint={anyActiveSprint}
               siblingBacklogs={state.sections.map((s) => s.backlog)}
               assigneeOptions={assignableAgents}
+              allSections={state.sections}
+              storyMembershipMap={storyMembershipMap}
               onStoryClick={setSelectedStoryId}
               onStoryAssigneeChange={handleStoryAssigneeChange}
-              onAddToActiveSprint={(id) => void ops.updateSprintMembership(id, "add")}
-              onRemoveFromActiveSprint={(id) => void ops.updateSprintMembership(id, "remove")}
+              onMoveToBacklog={(storyId, sourceId, targetId) => void ops.moveToBacklog(storyId, sourceId, targetId)}
+              onLinkParent={epicTargets.length > 0 ? setMoveToEpicStoryId : undefined}
               onStartSprint={(id, name) => setStartDialog({ backlogId: id, backlogName: name })}
               onCompleteSprint={onCompleteSprint}
               onCreateStory={setCreateBacklogId}
@@ -250,6 +247,8 @@ function BacklogPageContent() {
           </div>
         </div>
       )}
+
+      <MoveToEpicDialog open={moveToEpicStoryId !== null} storyKey={null} storyTitle="" currentEpicId="" epicTargets={epicTargets.map((e) => ({ id: e.id, key: e.key ?? "", title: e.title }))} onMove={handleMoveToEpicConfirm} onOpenChange={(open) => { if (!open) setMoveToEpicStoryId(null); }} />
 
       <BacklogPageDialogs
         singleProjectId={singleProjectId}

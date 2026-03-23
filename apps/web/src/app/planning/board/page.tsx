@@ -13,6 +13,9 @@ import { RefreshControl } from "@/components/refresh-control";
 import { EmptyState } from "@/components/empty-state";
 import { SprintBoard } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
+import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
+import { fetchEpics } from "@/components/planning/story-detail-actions";
+import { moveWorkItemToEpic } from "../story-actions";
 import { type QuickCreateAssigneeOption } from "./quick-create";
 import { subscribeToSprintLifecycleChanged } from "../sprint-lifecycle-events";
 import {
@@ -66,6 +69,8 @@ function BoardPageContent() {
   const filterOptions = buildBoardFilterOptions(viewState, effectiveAssigneeOptions);
   const boardSummary = computeBoardSummary(visibleState);
   const selectedStoryLabels = findSelectedStoryLabels(state, selectedStoryId);
+  const [epicTargets, setEpicTargets] = useState<MoveToEpicTarget[]>([]);
+  const [moveToEpicStoryId, setMoveToEpicStoryId] = useState<string | null>(null);
 
   const updateFilterParam = useCallback(
     (key: keyof PlanningFiltersValue, value: string) => {
@@ -91,6 +96,21 @@ function BoardPageContent() {
     const nextState = await loadBoardState(singleProjectId);
     setState(nextState);
   }, [loadBoardState, singleProjectId]);
+
+  useEffect(() => {
+    if (!singleProjectId) return;
+    let cancelled = false;
+    void fetchEpics(singleProjectId)
+      .then((epics) => { if (!cancelled) setEpicTargets(epics.map((e) => ({ id: e.id, key: e.key ?? "", title: e.title }))); })
+      .catch(() => { if (!cancelled) setEpicTargets([]); });
+    return () => { cancelled = true; };
+  }, [singleProjectId]);
+
+  const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
+    if (!moveToEpicStoryId) return;
+    await moveWorkItemToEpic(moveToEpicStoryId, targetEpicId);
+    await refreshCurrentView();
+  }, [moveToEpicStoryId, refreshCurrentView]);
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -220,6 +240,7 @@ function BoardPageContent() {
           onStoryReorder={filtersActive ? undefined : handleStoryReorder}
           onStoryAssigneeChange={handleStoryAssigneeChange}
           onStoryDelete={handleStoryDelete}
+          onLinkParent={epicTargets.length > 0 ? setMoveToEpicStoryId : undefined}
           pendingStoryIds={new Set(Object.keys(pendingStoryIds))}
           assigneeOptions={effectiveAssigneeOptions}
           dragDisabled={filtersActive}
@@ -232,6 +253,15 @@ function BoardPageContent() {
         onOpenChange={(open) => { if (!open) setSelectedStoryId(null); }}
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => { void refreshCurrentView().catch(() => undefined); }}
+      />
+      <MoveToEpicDialog
+        open={moveToEpicStoryId !== null}
+        storyKey={null}
+        storyTitle=""
+        currentEpicId=""
+        epicTargets={epicTargets}
+        onMove={handleMoveToEpicConfirm}
+        onOpenChange={(open) => { if (!open) setMoveToEpicStoryId(null); }}
       />
     </>
   );

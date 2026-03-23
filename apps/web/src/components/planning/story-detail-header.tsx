@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import type { WorkItemStatus, WorkItemDetail } from "@/lib/planning/types";
 import { cn } from "@/lib/utils";
 import { DialogTitle } from "@/components/ui/dialog";
+import { ThemedSelect } from "@/components/ui/themed-select";
 import { STATUS_STYLE } from "./story-card";
 import {
   isStoryActionsSupportedType,
@@ -54,22 +55,21 @@ export function StoryDetailHeader({
         </span>
 
         {/* Inline status selector */}
-        <select
+        <ThemedSelect
           value={story.status}
+          options={STATUS_OPTIONS}
+          placeholder="Status"
           disabled={isSaving}
-          onChange={(e) => onStatusChange(story.id, e.target.value as WorkItemStatus)}
-          className={cn(
-            "h-5 cursor-pointer appearance-none rounded-full border-0 px-2 text-[10px] font-medium focus:outline-none focus:ring-1 focus:ring-ring",
+          ariaLabel="Story status"
+          hideChevron
+          triggerClassName={cn(
+            "h-5 min-h-0 w-auto rounded-full border-0 px-2 text-[10px] font-medium",
             STATUS_STYLE[story.status].bg,
             STATUS_STYLE[story.status].text,
           )}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          contentClassName="w-[160px]"
+          onValueChange={(v) => onStatusChange(story.id, v as WorkItemStatus)}
+        />
 
         {isSaving && (
           <Loader2 className="size-3.5 animate-spin text-muted-foreground" />

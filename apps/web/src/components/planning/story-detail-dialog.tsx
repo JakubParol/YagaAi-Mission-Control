@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, XIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -77,18 +78,30 @@ export function StoryDetailDialog({
   const content = (
     <>
       {!embedded && (
-        <DialogHeader className="flex flex-row items-center justify-between">
+        <DialogHeader className="flex flex-row items-center justify-end gap-1">
           <DialogTitle className="sr-only">{srTitle}</DialogTitle>
           {shell.fullPageHref && (
-            <Link
+            <a
               href={shell.fullPageHref}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               title="Open in full page"
             >
               <Maximize2 className="size-3.5" />
               <span className="hidden sm:inline">Full page</span>
-            </Link>
+            </a>
           )}
+          <DialogClose asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Close"
+            >
+              <XIcon className="size-4" />
+            </Button>
+          </DialogClose>
         </DialogHeader>
       )}
       {embedded && <h1 className="sr-only">{srTitle}</h1>}
@@ -119,6 +132,7 @@ export function StoryDetailDialog({
         <DialogContent
           className="sm:max-w-6xl max-h-[90vh] overflow-y-auto"
           aria-describedby={undefined}
+          showCloseButton={false}
         >
           {content}
         </DialogContent>

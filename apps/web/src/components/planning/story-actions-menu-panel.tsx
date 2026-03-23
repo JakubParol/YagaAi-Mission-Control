@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { STATUS_LABEL } from "./story-card";
 import { type FloatingCoordinates } from "./story-actions-menu-positioning";
-import { SECTION_GROUPS, type MenuActionItem } from "./story-actions-menu-types";
+import { SECTION_GROUPS, type BacklogMembershipTarget, type MenuActionItem } from "./story-actions-menu-types";
 
 export interface MainMenuPanelProps {
   menuRef: RefObject<HTMLDivElement | null>;
@@ -44,7 +44,7 @@ export function MainMenuPanel({
       aria-label={`Story actions for ${storyLabel}`}
       onKeyDown={onKeyDown}
       style={menuStyle}
-      className="z-30 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+      className="z-[60] min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl"
     >
       {SECTION_GROUPS.map((group, groupIndex) => (
         <div key={`group-${groupIndex}`} className={cn(groupIndex > 0 && "mt-1 border-t border-border/40 pt-1")}>
@@ -64,10 +64,11 @@ export function MainMenuPanel({
                 role="menuitem"
                 disabled={action.disabled}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs transition-colors",
                   action.tone === "danger"
-                    ? "text-red-300 hover:bg-red-500/10"
-                    : "text-foreground hover:bg-muted/60",
+                    ? "text-red-300 hover:bg-red-500/15"
+                    : "text-foreground hover:bg-accent/70 hover:text-accent-foreground",
+                  "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
                   action.submenu && "justify-between",
                   "disabled:cursor-not-allowed disabled:opacity-50",
                 )}
@@ -131,7 +132,7 @@ export function StatusSubmenuPanel({
       aria-label="Story status options"
       onKeyDown={onKeyDown}
       style={submenuStyle}
-      className="z-40 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+      className="z-[70] min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
     >
       {statusOptions.map((option, index) => (
         <button
@@ -143,8 +144,9 @@ export function StatusSubmenuPanel({
           role="menuitem"
           disabled={option.disabled}
           className={cn(
-            "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-            "text-foreground hover:bg-muted/60",
+            "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs transition-colors",
+            "text-foreground hover:bg-accent/70 hover:text-accent-foreground",
+            "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
             "disabled:cursor-not-allowed disabled:opacity-50",
           )}
           onMouseEnter={() => onStatusHover(index)}
@@ -157,6 +159,93 @@ export function StatusSubmenuPanel({
           {storyStatus === option.status && <span className="text-[10px] text-muted-foreground">Current</span>}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ── Backlog submenu ──────────────────────────────────────────────────
+
+const KIND_BADGE: Record<string, string> = {
+  SPRINT: "text-blue-400",
+  BACKLOG: "text-slate-400",
+  IDEAS: "text-amber-400",
+};
+
+const KIND_SHORT: Record<string, string> = {
+  SPRINT: "Sprint",
+  BACKLOG: "Backlog",
+  IDEAS: "Ideas",
+};
+
+export interface BacklogSubmenuPanelProps {
+  submenuRef: RefObject<HTMLDivElement | null>;
+  targets: readonly BacklogMembershipTarget[];
+  backlogActionRefs: RefObject<Array<HTMLButtonElement | null>>;
+  submenuCoordinates: FloatingCoordinates | null;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onToggle: (target: BacklogMembershipTarget) => void;
+  onHover: (index: number) => void;
+}
+
+export function BacklogSubmenuPanel({
+  submenuRef,
+  targets,
+  backlogActionRefs,
+  submenuCoordinates,
+  onKeyDown,
+  onToggle,
+  onHover,
+}: BacklogSubmenuPanelProps) {
+  const style: CSSProperties = {
+    position: "fixed",
+    top: submenuCoordinates?.top ?? 0,
+    left: submenuCoordinates?.left ?? 0,
+    visibility: submenuCoordinates ? "visible" : "hidden",
+  };
+
+  return (
+    <div
+      ref={submenuRef}
+      role="menu"
+      aria-label="Manage backlog membership"
+      onKeyDown={onKeyDown}
+      style={style}
+      className="z-[70] min-w-52 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+    >
+      {targets.length === 0 ? (
+        <p className="px-2 py-1.5 text-xs text-muted-foreground">No backlogs available</p>
+      ) : (
+        targets.map((target, index) => {
+          const tag = target.isActive ? "Active" : target.isDefault ? "Default" : null;
+          return (
+            <button
+              key={target.id}
+              ref={(el) => { backlogActionRefs.current[index] = el; }}
+              type="button"
+              role="menuitem"
+              disabled={target.isCurrentBacklog}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                "text-foreground transition-colors",
+                "hover:bg-accent/70 hover:text-accent-foreground",
+                "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
+                "disabled:cursor-not-allowed disabled:opacity-40",
+              )}
+              onMouseEnter={() => onHover(index)}
+              onClick={() => { if (!target.isCurrentBacklog) onToggle(target); }}
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className={cn("shrink-0 text-[10px] font-medium", KIND_BADGE[target.kind] ?? "text-muted-foreground")}>
+                  {KIND_SHORT[target.kind] ?? target.kind}
+                </span>
+                <span className="truncate">{target.name}</span>
+                {tag && <span className="shrink-0 text-[9px] text-muted-foreground/60">{tag}</span>}
+              </span>
+              {target.isCurrentBacklog && <span className="text-[10px] text-muted-foreground">Current</span>}
+            </button>
+          );
+        })
+      )}
     </div>
   );
 }

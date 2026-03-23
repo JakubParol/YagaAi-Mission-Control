@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { Calendar, CheckCircle2, Clock, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ThemedSelect, type ThemedSelectOption } from "@/components/ui/themed-select";
 import type { WorkItemDetail, WorkItemLabel } from "@/lib/planning/types";
 import { StoryLabelManager } from "./story-detail-label-section";
 import { TaskManager, type TaskManagerProps } from "./story-detail-task-section";
@@ -70,6 +72,17 @@ export function StoryDetailFields({
   taskManagerProps,
   labelManagerProps,
 }: StoryDetailFieldsProps) {
+  const epicOptions = useMemo<ThemedSelectOption[]>(
+    () => [
+      { value: "", label: "No epic" },
+      ...epics.map((epic) => ({
+        value: epic.id,
+        label: epic.key ? `${epic.key} ${epic.title}` : epic.title,
+      })),
+    ],
+    [epics],
+  );
+
   return (
     <>
       {/* Error banner */}
@@ -115,18 +128,14 @@ export function StoryDetailFields({
         {/* Right: properties sidebar */}
         <div className="w-64 flex-none space-y-4 rounded-xl border border-border/30 bg-card/40 p-5 shadow-sm">
           <SidebarField label="Type">
-            <select
-              id="story-detail-type"
+            <ThemedSelect
               value={storyDraft.sub_type}
-              onChange={(event) => onDraftChange("sub_type", event.target.value)}
-              className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
-            >
-              {STORY_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={STORY_TYPE_OPTIONS}
+              placeholder="Select type"
+              ariaLabel="Story type"
+              triggerClassName="h-8 rounded-lg border-border/50 bg-background/60 px-2.5 text-sm"
+              onValueChange={(v) => onDraftChange("sub_type", v)}
+            />
           </SidebarField>
 
           <SidebarField label="Priority">
@@ -142,20 +151,15 @@ export function StoryDetailFields({
           </SidebarField>
 
           <SidebarField label="Epic">
-            <select
-              id="story-detail-epic"
+            <ThemedSelect
               value={storyDraft.parent_id}
+              options={epicOptions}
+              placeholder="No epic"
               disabled={isLoadingEpics}
-              onChange={(event) => onDraftChange("parent_id", event.target.value)}
-              className="h-8 w-full rounded-lg border border-border/50 bg-background/60 px-2.5 text-sm text-foreground focus-ring"
-            >
-              <option value="">No epic</option>
-              {epics.map((epic) => (
-                <option key={epic.id} value={epic.id}>
-                  {epic.key ? `${epic.key} ${epic.title}` : epic.title}
-                </option>
-              ))}
-            </select>
+              ariaLabel="Epic"
+              triggerClassName="h-8 rounded-lg border-border/50 bg-background/60 px-2.5 text-sm"
+              onValueChange={(v) => onDraftChange("parent_id", v)}
+            />
           </SidebarField>
 
           <div id="story-detail-labels" className="border-t border-border/20 pt-4">

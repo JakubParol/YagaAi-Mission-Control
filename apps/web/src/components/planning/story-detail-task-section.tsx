@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ThemedSelect } from "@/components/ui/themed-select";
 import type { TaskPatch } from "./task-optimistic";
 import {
   STATUS_OPTIONS,
@@ -208,18 +209,14 @@ export function TaskManager({
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">Status</label>
-                  <select
+                  <ThemedSelect
                     value={editDraft.status}
+                    options={STATUS_OPTIONS}
+                    placeholder="Select status"
                     disabled={pendingTaskIds.has(editingTask.id)}
-                    onChange={(event) =>
-                      updateEditDraft("status", event.target.value as WorkItemStatus)
-                    }
-                    className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
-                  >
-                    {STATUS_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                    ariaLabel="Task status"
+                    onValueChange={(v) => updateEditDraft("status", v as WorkItemStatus)}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="inline-flex h-9 items-center gap-2 text-xs text-muted-foreground">

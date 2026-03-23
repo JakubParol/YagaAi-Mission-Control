@@ -74,6 +74,7 @@ Extends [coding-standards.md](./coding-standards.md). Everything in the parent a
 - **`cn()` helper** (`lib/utils.ts`) for conditional class merging — always use it, never manual string concatenation.
 - **CVA (class-variance-authority)** for variant-driven components (buttons, badges, cards).
 - **shadcn/ui** for base primitives (dialog, popover, command, select). Customize via Tailwind, don't fork.
+- **`ThemedSelect` for all dropdowns.** Never use native `<select>` — it renders with browser-default styling that breaks the dark theme. Use `ThemedSelect` from `components/ui/themed-select.tsx` for every dropdown. Pass options as `{ value, label }[]` and customize appearance via `triggerClassName`/`contentClassName`.
 - **Dark mode is the default.** All color choices must work on dark backgrounds.
 
 ---

@@ -1,6 +1,6 @@
 import type { BacklogAssigneeOption } from "@/components/planning/backlog-row";
 import { apiUrl } from "@/lib/api-client";
-import type { WorkItemStatus } from "@/lib/planning/types";
+import type { BacklogKind, BacklogStatus, WorkItemStatus } from "@/lib/planning/types";
 
 import {
   buildLabelOptions,
@@ -118,4 +118,34 @@ export async function patchRowAssignee(
   if (!response.ok) {
     throw new Error(`Failed to update assignee. HTTP ${response.status}.`);
   }
+}
+
+// ── Backlog membership data (for "Manage backlogs" submenu) ──────────
+
+export interface ListBacklogItem {
+  id: string;
+  name: string;
+  kind: BacklogKind;
+  status: BacklogStatus;
+  is_default: boolean;
+  items?: Array<{ work_item_id: string }>;
+}
+
+export interface ListBacklogData {
+  backlogs: ListBacklogItem[];
+  membershipMap: Map<string, string>;
+}
+
+export async function fetchBacklogsForProject(projectId: string): Promise<ListBacklogData> {
+  const res = await fetch(apiUrl(`/v1/planning/backlogs?project_id=${projectId}&limit=100&include=items`));
+  if (!res.ok) return { backlogs: [], membershipMap: new Map() };
+  const json = (await res.json()) as { data?: ListBacklogItem[] };
+  const backlogs = (json.data ?? []).filter((b) => b.status !== "CLOSED");
+  const membershipMap = new Map<string, string>();
+  for (const b of backlogs) {
+    for (const item of b.items ?? []) {
+      membershipMap.set(item.work_item_id, b.id);
+    }
+  }
+  return { backlogs, membershipMap };
 }

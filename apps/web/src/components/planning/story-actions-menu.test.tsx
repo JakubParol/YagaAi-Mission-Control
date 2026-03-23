@@ -44,7 +44,7 @@ test("StoryActionsMenu renders Delete option when opened", () => {
   assert.match(markup, />Change status</);
   assert.match(markup, />Add flag</);
   assert.match(markup, />Link work item</);
-  assert.match(markup, />Link parent</);
+  assert.match(markup, />Move to epic</);
   assert.match(markup, />Archive</);
   assert.match(markup, />Delete</);
 });

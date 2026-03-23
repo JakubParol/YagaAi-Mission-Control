@@ -12,14 +12,13 @@ import { PlanningControlBar } from "@/components/planning/planning-control-bar";
 import { PlanningCreateButton } from "@/components/planning/planning-create-button";
 import { usePlanningFilter } from "@/components/planning/planning-filter-context";
 import { EpicDeleteConfirmDialog } from "@/components/planning/epic-delete-confirm-dialog";
-import { EpicFormDialog, type EpicFormValues } from "@/components/planning/epic-form-dialog";
+import { EpicFormDialog } from "@/components/planning/epic-form-dialog";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
-import {
-  type DeleteConfirmPhase,
-} from "@/components/planning/story-actions-menu-types";
+import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
 
 import { EpicRow, type PreviewState } from "./epic-row";
-import { deleteEpic, fetchEpicDetail, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
+import { fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
+import { useEpicPageCallbacks, type DeleteDialogState, type EditDialogState, type MoveToEpicState } from "./epics-page-hooks";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,
   EPIC_OVERVIEW_DEFAULT_STORY_PREVIEW_FILTERS,
@@ -55,18 +54,6 @@ type PageState =
   | { kind: "error"; message: string }
   | { kind: "ok"; rows: EpicOverviewItem[]; agents: EpicOverviewAgent[]; labels: EpicOverviewLabel[] };
 
-interface DeleteDialogState {
-  epicId: string;
-  epicTitle: string;
-  phase: DeleteConfirmPhase;
-}
-
-interface EditDialogState {
-  open: boolean;
-  epicId: string;
-  initialValues?: Partial<EpicFormValues>;
-}
-
 function EpicOverviewPageContent() {
   const { selectedProjectIds, allSelected } = usePlanningFilter();
   const searchParams = useSearchParams();
@@ -82,6 +69,7 @@ function EpicOverviewPageContent() {
   const [deleteDialogState, setDeleteDialogState] = useState<DeleteDialogState | null>(null);
   const [epicActionError, setEpicActionError] = useState<string | null>(null);
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [moveToEpicState, setMoveToEpicState] = useState<MoveToEpicState | null>(null);
 
   const singleProjectId = !allSelected && selectedProjectIds.length === 1
     ? selectedProjectIds[0] : null;
@@ -172,66 +160,15 @@ function EpicOverviewPageContent() {
     setState({ kind: "ok", ...result });
   }, [doFetchOverview, singleProjectId]);
 
-  const handleEditEpic = useCallback(async (epicId: string) => {
-    setEpicActionError(null);
-    try {
-      const detail = await fetchEpicDetail(epicId);
-      setEditDialogState({
-        open: true,
-        epicId,
-        initialValues: {
-          title: detail.title,
-          status: detail.status,
-          description: detail.description ?? "",
-          priority: detail.priority !== null ? String(detail.priority) : "",
-        },
-      });
-    } catch (err) {
-      setEpicActionError(err instanceof Error ? err.message : "Failed to load epic details for editing.");
-    }
-  }, []);
+  const epicOps = useEpicPageCallbacks({
+    state, moveToEpicState, deleteDialogState, refreshCurrentView,
+    setEpicActionError, setEditDialogState, setDeleteDialogState,
+  });
 
-  const handleDeleteEpic = useCallback((epicId: string) => {
-    if (state.kind !== "ok") return;
-    const item = state.rows.find((r) => r.work_item_id === epicId);
-    if (!item) return;
-    if (item.children_total > 0) {
-      setEpicActionError(
-        `Cannot delete "${item.title}" — it still has ${item.children_total} child ${item.children_total === 1 ? "story" : "stories"}. Move or delete them first.`,
-      );
-      return;
-    }
-    setDeleteDialogState({ epicId, epicTitle: item.title, phase: "open" });
-  }, [state]);
-
-  const handleCreateSaved = useCallback(async (_epicId: string) => {
-    setEpicActionError(null);
-    try { await refreshCurrentView(); } catch (err) {
-      setEpicActionError(err instanceof Error ? err.message : "Failed to refresh after creating epic.");
-    }
-  }, [refreshCurrentView]);
-
-  const handleEditSaved = useCallback(async () => {
-    setEpicActionError(null);
-    try { await refreshCurrentView(); } catch (err) {
-      setEpicActionError(err instanceof Error ? err.message : "Failed to refresh after updating epic.");
-    }
-  }, [refreshCurrentView]);
-
-  const handleConfirmDelete = useCallback(async () => {
-    if (!deleteDialogState) return;
-    const { epicId } = deleteDialogState;
-    setDeleteDialogState((s) => s ? { ...s, phase: "submitting" } : null);
-    setEpicActionError(null);
-    try {
-      await deleteEpic(epicId);
-      setDeleteDialogState(null);
-      await refreshCurrentView();
-    } catch (err) {
-      setDeleteDialogState((s) => s ? { ...s, phase: "open" } : null);
-      setEpicActionError(err instanceof Error ? err.message : "Failed to delete epic.");
-    }
-  }, [deleteDialogState, refreshCurrentView]);
+  const epicTargets = useMemo<MoveToEpicTarget[]>(
+    () => (state.kind === "ok" ? state.rows.map((r) => ({ id: r.work_item_id, key: r.work_item_key, title: r.title })) : []),
+    [state],
+  );
 
   useEffect(() => {
     if (!singleProjectId) return;
@@ -281,7 +218,7 @@ function EpicOverviewPageContent() {
       projectId={singleProjectId}
       open={createOpen}
       onOpenChange={setCreateOpen}
-      onSaved={handleCreateSaved}
+      onSaved={epicOps.handleCreateSaved}
     />
   ) : null;
 
@@ -292,7 +229,7 @@ function EpicOverviewPageContent() {
       initialValues={editDialogState.initialValues}
       open={editDialogState.open}
       onOpenChange={(open) => setEditDialogState((s) => s ? { ...s, open } : null)}
-      onSaved={handleEditSaved}
+      onSaved={epicOps.handleEditSaved}
     />
   ) : null;
 
@@ -301,7 +238,7 @@ function EpicOverviewPageContent() {
       epicTitle={deleteDialogState.epicTitle}
       confirmPhase={deleteDialogState.phase}
       onPhaseChange={(next) => setDeleteDialogState((s) => s ? { ...s, phase: next } : null)}
-      onConfirmDelete={handleConfirmDelete}
+      onConfirmDelete={epicOps.handleConfirmDelete}
     />
   ) : null;
 
@@ -384,9 +321,14 @@ function EpicOverviewPageContent() {
                         onPreviewFilterChange={sa.handlePreviewFilterChange}
                         onStoryClick={setSelectedStoryId}
                         onChangeStoryStatus={sa.handleChangeStoryStatus}
-                        onAddStoryToSprint={sa.handleAddStoryToSprint}
-                        onEdit={handleEditEpic}
-                        onDelete={handleDeleteEpic}
+                        onMoveToEpic={(story) => setMoveToEpicState({
+                          storyId: story.work_item_id,
+                          storyKey: story.work_item_key ?? null,
+                          storyTitle: story.title,
+                          currentEpicId: item.work_item_id,
+                        })}
+                        onEdit={epicOps.handleEditEpic}
+                        onDelete={epicOps.handleDeleteEpic}
                       />
                     ))}
                   </div>
@@ -402,6 +344,16 @@ function EpicOverviewPageContent() {
         open={selectedStoryId !== null}
         onOpenChange={(open) => { if (!open) setSelectedStoryId(null); }}
         onStoryUpdated={() => { void refreshCurrentView().catch(() => undefined); }}
+      />
+
+      <MoveToEpicDialog
+        open={moveToEpicState !== null}
+        storyKey={moveToEpicState?.storyKey ?? null}
+        storyTitle={moveToEpicState?.storyTitle ?? ""}
+        currentEpicId={moveToEpicState?.currentEpicId ?? ""}
+        epicTargets={epicTargets}
+        onMove={epicOps.handleMoveToEpicConfirm}
+        onOpenChange={(open) => { if (!open) setMoveToEpicState(null); }}
       />
     </>
   );

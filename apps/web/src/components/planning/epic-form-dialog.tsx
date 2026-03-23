@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ThemedSelect } from "@/components/ui/themed-select";
 import type { WorkItemStatus } from "@/lib/planning/types";
 import {
   createEpic,
@@ -219,20 +220,15 @@ export function EpicFormDialog(props: EpicFormDialogProps) {
 
           {/* Status — edit mode only */}
           {mode === "edit" && (
-            <FormField label="Status" htmlFor="epic-form-status">
-              <select
-                id="epic-form-status"
+            <FormField label="Status">
+              <ThemedSelect
                 value={values.status}
+                options={EPIC_STATUS_OPTIONS}
+                placeholder="Select status"
                 disabled={isSaving}
-                onChange={(e) => updateField("status", e.target.value)}
-                className="h-9 w-full rounded-lg border border-border/50 bg-background/60 px-3 text-sm text-foreground focus-ring"
-              >
-                {EPIC_STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Epic status"
+                onValueChange={(v) => updateField("status", v)}
+              />
             </FormField>
           )}
 

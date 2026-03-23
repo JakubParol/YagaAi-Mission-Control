@@ -4,6 +4,7 @@ import { CheckCircle2, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { ThemedSelect } from "@/components/ui/themed-select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { STATUS_LABEL, STATUS_STYLE } from "./story-card";
 import type { TaskItemView } from "@/lib/planning/types";
@@ -131,18 +132,14 @@ export function TaskForm({ draft, disabled, onUpdate }: TaskFormProps) {
 
       <div className="space-y-1">
         <label className="text-xs text-muted-foreground">Type</label>
-        <select
+        <ThemedSelect
           value={draft.sub_type}
-          onChange={(event) => onUpdate("sub_type", event.target.value)}
+          options={TASK_TYPE_OPTIONS}
+          placeholder="Select type"
           disabled={disabled}
-          className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm focus-ring"
-        >
-          {TASK_TYPE_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          ariaLabel="Task type"
+          onValueChange={(v) => onUpdate("sub_type", v)}
+        />
       </div>
 
       <div className="space-y-1">
