@@ -59,23 +59,20 @@ class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
                 start_new_session=True,
             )
         except (OSError, FileNotFoundError) as exc:
             msg = f"Failed to launch openclaw subprocess: {exc}"
             raise RuntimeError(msg) from exc
 
-        # Quick-fail: if the process dies within the grace period, it failed
+        # Quick-fail: if the process exits with non-zero within the grace
+        # period, treat as a startup error. Exit code 0 is a fast success.
         try:
             await asyncio.wait_for(proc.wait(), timeout=_QUICK_FAIL_SECONDS)
-            # Process exited within grace period — likely an error
-            stderr_bytes = await proc.stderr.read() if proc.stderr else b""
-            stderr_text = stderr_bytes.decode("utf-8", errors="replace")[:500]
-            msg = (
-                f"openclaw agent exited immediately with code {proc.returncode}: " f"{stderr_text}"
-            )
-            raise RuntimeError(msg)
+            if proc.returncode != 0:
+                msg = f"openclaw agent exited immediately with code {proc.returncode}"
+                raise RuntimeError(msg)
         except asyncio.TimeoutError:
             # Process is still running after grace period — dispatch is underway
             pass

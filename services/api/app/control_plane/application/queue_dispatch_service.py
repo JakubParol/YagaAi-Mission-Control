@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 
 from app.control_plane.application.dispatch_selection_service import (
     DispatchSelectionService,
@@ -10,10 +11,19 @@ from app.control_plane.application.queue_ingress_service import (
     IngressResult,
     QueueIngressService,
 )
+from app.control_plane.domain.models import AgentQueueEntry, DispatchRecord
 from app.shared.logging import log_event
 from app.shared.ports import AgentLookupPort
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ManualDispatchResult:
+    action: str
+    entry: AgentQueueEntry | None = None
+    dispatch_record: DispatchRecord | None = None
+    reason: str | None = None
 
 
 class QueueDispatchService:
@@ -76,15 +86,21 @@ class QueueDispatchService:
 
         return result
 
-    async def manual_dispatch(self, *, agent_id: str) -> dict:
+    async def manual_dispatch(self, *, agent_id: str) -> ManualDispatchResult:
         """Manual re-drive / testing path for POST /dispatch."""
         selection = await self._selection.try_dispatch_next(agent_id=agent_id)
         if selection.action != "dispatched" or selection.entry is None:
-            return {"action": selection.action, "reason": selection.reason}
+            return ManualDispatchResult(action=selection.action, reason=selection.reason)
 
         agent_info = await self._agent_lookup.get_agent_by_id(selection.entry.agent_id)
         if agent_info is None:
-            return {"action": "failed", "reason": "agent_not_found"}
+            # Revert to QUEUED so the entry doesn't leak in ACK_PENDING
+            await self._dispatch.dispatch_to_openclaw(
+                entry=selection.entry,
+                openclaw_key="",
+                main_session_key=None,
+            )
+            return ManualDispatchResult(action="failed", reason="agent_not_found")
 
         send_result = await self._dispatch.dispatch_to_openclaw(
             entry=selection.entry,
@@ -93,12 +109,12 @@ class QueueDispatchService:
         )
 
         action = "dispatched" if send_result.action == "sent" else send_result.action
-        return {
-            "action": action,
-            "entry": selection.entry,
-            "dispatch_record": send_result.dispatch_record,
-            "reason": send_result.error,
-        }
+        return ManualDispatchResult(
+            action=action,
+            entry=selection.entry,
+            dispatch_record=send_result.dispatch_record,
+            reason=send_result.error,
+        )
 
     async def _try_push_dispatch(self, *, agent_id: str) -> None:
         """Best-effort push dispatch — does not propagate errors."""
@@ -116,6 +132,12 @@ class QueueDispatchService:
                     level=logging.WARNING,
                     event="control_plane.push_dispatch.agent_not_found",
                     agent_id=agent_id,
+                )
+                # Revert to QUEUED via dispatch (handles missing key path)
+                await self._dispatch.dispatch_to_openclaw(
+                    entry=selection.entry,
+                    openclaw_key="",
+                    main_session_key=None,
                 )
                 return
 

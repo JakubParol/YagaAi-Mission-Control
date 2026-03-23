@@ -62,18 +62,6 @@ async def get_dispatch_selection_service(
     return DispatchSelectionService(repo=DbAgentQueueRepository(db))
 
 
-async def get_openclaw_dispatch_service(
-    db: AsyncSession = Depends(get_db),
-) -> OpenClawDispatchService:
-    return OpenClawDispatchService(
-        queue_repo=DbAgentQueueRepository(db),
-        dispatch_repo=DbDispatchRecordRepository(db),
-        openclaw_adapter=SubprocessSessionDispatchAdapter(
-            openclaw_binary=settings.control_plane_openclaw_binary,
-        ),
-    )
-
-
 async def get_queue_dispatch_service(
     db: AsyncSession = Depends(get_db),
 ) -> QueueDispatchService:

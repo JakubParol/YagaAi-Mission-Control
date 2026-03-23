@@ -84,15 +84,16 @@ async def dispatch_next(
 ) -> Envelope[DispatchResponse]:
     result = await svc.manual_dispatch(agent_id=body.agent_id)
 
-    entry = result.get("entry")
-    record = result.get("dispatch_record")
-
     return Envelope(
         data=DispatchResponse(
-            action=result["action"],
-            entry=_to_response(entry) if entry else None,
-            dispatch_record=_to_dispatch_record_response(record) if record else None,
-            reason=result.get("reason"),
+            action=result.action,
+            entry=_to_response(result.entry) if result.entry else None,
+            dispatch_record=(
+                _to_dispatch_record_response(result.dispatch_record)
+                if result.dispatch_record
+                else None
+            ),
+            reason=result.reason,
         )
     )
 
