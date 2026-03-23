@@ -16,6 +16,16 @@ _CANCELLABLE_STATUSES = (
     AgentQueueStatus.ACK_PENDING.value,
 )
 
+# Statuses that mean the agent is actively working (capacity occupied)
+_ACTIVE_RUNTIME_STATUSES = (
+    AgentQueueStatus.DISPATCHING.value,
+    AgentQueueStatus.ACK_PENDING.value,
+    AgentQueueStatus.PLANNING.value,
+    AgentQueueStatus.EXECUTING.value,
+    AgentQueueStatus.BLOCKED.value,
+    AgentQueueStatus.REVIEW_READY.value,
+)
+
 
 def _affected_rows(result: Result[Any]) -> int:
     return getattr(result, "rowcount", 0)
@@ -129,3 +139,53 @@ class DbAgentQueueRepository(AgentQueueRepository):
         )
         entries = [queue_entry_from_row(row) for row in rows_result]
         return entries, total
+
+    async def get_oldest_queued_for_agent(
+        self,
+        *,
+        agent_id: str,
+    ) -> AgentQueueEntry | None:
+        result = await self._db.execute(
+            select(_t)
+            .where(
+                _t.c.agent_id == agent_id,
+                _t.c.status == AgentQueueStatus.QUEUED.value,
+            )
+            .order_by(_t.c.queue_position.asc())
+            .limit(1)
+        )
+        row = result.first()
+        return queue_entry_from_row(row) if row else None
+
+    async def has_active_item(self, *, agent_id: str) -> bool:
+        result = await self._db.execute(
+            select(func.count())
+            .select_from(_t)
+            .where(
+                _t.c.agent_id == agent_id,
+                _t.c.status.in_(_ACTIVE_RUNTIME_STATUSES),
+            )
+        )
+        return (result.scalar_one() or 0) > 0
+
+    async def transition_status(
+        self,
+        *,
+        entry_id: str,
+        expected_status: AgentQueueStatus,
+        new_status: AgentQueueStatus,
+        updated_at: str,
+    ) -> bool:
+        result = await self._db.execute(
+            update(_t)
+            .where(
+                _t.c.id == entry_id,
+                _t.c.status == expected_status.value,
+            )
+            .values(
+                status=new_status.value,
+                updated_at=updated_at,
+            )
+        )
+        await self._db.flush()
+        return _affected_rows(result) > 0
