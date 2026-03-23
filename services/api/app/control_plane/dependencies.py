@@ -2,6 +2,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.control_plane.application.command_service import CommandService
+from app.control_plane.application.dispatch_selection_service import DispatchSelectionService
 from app.control_plane.application.queue_ingress_service import QueueIngressService
 from app.control_plane.application.read_model_service import RunReadModelService
 from app.control_plane.application.watchdog_service import WatchdogService
@@ -45,3 +46,9 @@ async def get_queue_ingress_service(
     db: AsyncSession = Depends(get_db),
 ) -> QueueIngressService:
     return QueueIngressService(repo=DbAgentQueueRepository(db))
+
+
+async def get_dispatch_selection_service(
+    db: AsyncSession = Depends(get_db),
+) -> DispatchSelectionService:
+    return DispatchSelectionService(repo=DbAgentQueueRepository(db))
