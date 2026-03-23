@@ -229,8 +229,7 @@ function BacklogPageContent() {
               storyMembershipMap={storyMembershipMap}
               onStoryClick={setSelectedStoryId}
               onStoryAssigneeChange={handleStoryAssigneeChange}
-              onAddToBacklog={(storyId, backlogId) => void ops.updateBacklogMembership(storyId, backlogId, "add")}
-              onRemoveFromBacklog={(storyId, backlogId) => void ops.updateBacklogMembership(storyId, backlogId, "remove")}
+              onMoveToBacklog={(storyId, sourceId, targetId) => void ops.moveToBacklog(storyId, sourceId, targetId)}
               onStartSprint={(id, name) => setStartDialog({ backlogId: id, backlogName: name })}
               onCompleteSprint={onCompleteSprint}
               onCreateStory={setCreateBacklogId}

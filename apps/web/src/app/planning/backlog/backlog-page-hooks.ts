@@ -34,14 +34,14 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
     setPendingStoryIds, setPendingSprintIds, setPendingBoardIds,
   } = deps;
 
-  const updateBacklogMembership = useCallback(
-    async (storyId: string, backlogId: string, op: "add" | "remove") => {
+  const moveToBacklog = useCallback(
+    async (storyId: string, sourceBacklogId: string, targetBacklogId: string) => {
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
       try {
-        if (op === "add") await addStoryToBacklog(backlogId, storyId);
-        else await removeStoryFromBacklog(backlogId, storyId);
+        await removeStoryFromBacklog(sourceBacklogId, storyId);
+        await addStoryToBacklog(targetBacklogId, storyId);
         await refreshCurrentView();
-      } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to update backlog membership."); }
+      } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to move work item."); }
       finally { setPendingStoryIds((prev) => removePendingId(prev, storyId)); }
     },
     [refreshCurrentView, showErrorToast, setPendingStoryIds],
@@ -113,7 +113,7 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
   );
 
   return {
-    updateBacklogMembership,
+    moveToBacklog,
     updateSprintLifecycle,
     handleCompleteSprint,
     handleCompleteDialogConfirm,

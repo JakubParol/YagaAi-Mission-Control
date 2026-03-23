@@ -211,10 +211,8 @@ export function StoryActionsMenu({
     await onStatusChange(storyId, status); closeMenu();
   };
   const handleBacklogToggle = async (target: BacklogMembershipTarget) => {
-    if (!backlogMembershipActions || isDisabled) return;
-    if (target.isCurrentBacklog && target.isMember) return;
-    if (target.isMember) await backlogMembershipActions.onRemove(storyId, target.id);
-    else await backlogMembershipActions.onAdd(storyId, target.id);
+    if (!backlogMembershipActions || isDisabled || target.isCurrentBacklog) return;
+    await backlogMembershipActions.onMove(storyId, target.id);
     closeMenu();
   };
   const handleConfirmDelete = async () => {

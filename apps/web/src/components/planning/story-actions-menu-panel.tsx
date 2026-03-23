@@ -64,10 +64,11 @@ export function MainMenuPanel({
                 role="menuitem"
                 disabled={action.disabled}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs transition-colors",
                   action.tone === "danger"
-                    ? "text-red-300 hover:bg-red-500/10"
-                    : "text-foreground hover:bg-muted/60",
+                    ? "text-red-300 hover:bg-red-500/15"
+                    : "text-foreground hover:bg-accent/70 hover:text-accent-foreground",
+                  "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
                   action.submenu && "justify-between",
                   "disabled:cursor-not-allowed disabled:opacity-50",
                 )}
@@ -143,8 +144,9 @@ export function StatusSubmenuPanel({
           role="menuitem"
           disabled={option.disabled}
           className={cn(
-            "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-            "text-foreground hover:bg-muted/60",
+            "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs transition-colors",
+            "text-foreground hover:bg-accent/70 hover:text-accent-foreground",
+            "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
             "disabled:cursor-not-allowed disabled:opacity-50",
           )}
           onMouseEnter={() => onStatusHover(index)}
@@ -221,16 +223,16 @@ export function BacklogSubmenuPanel({
               ref={(el) => { backlogActionRefs.current[index] = el; }}
               type="button"
               role="menuitem"
-              disabled={target.isCurrentBacklog && target.isMember}
+              disabled={target.isCurrentBacklog}
               className={cn(
                 "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
                 "text-foreground transition-colors",
                 "hover:bg-accent/70 hover:text-accent-foreground",
                 "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
-                "disabled:cursor-not-allowed disabled:opacity-50",
+                "disabled:cursor-not-allowed disabled:opacity-40",
               )}
               onMouseEnter={() => onHover(index)}
-              onClick={() => { if (!(target.isCurrentBacklog && target.isMember)) onToggle(target); }}
+              onClick={() => { if (!target.isCurrentBacklog) onToggle(target); }}
             >
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className={cn("shrink-0 text-[10px] font-medium", KIND_BADGE[target.kind] ?? "text-muted-foreground")}>
@@ -239,7 +241,7 @@ export function BacklogSubmenuPanel({
                 <span className="truncate">{target.name}</span>
                 {tag && <span className="shrink-0 text-[9px] text-muted-foreground/60">{tag}</span>}
               </span>
-              {target.isMember && <span className="text-[10px] text-primary">✓</span>}
+              {target.isCurrentBacklog && <span className="text-[10px] text-muted-foreground">Current</span>}
             </button>
           );
         })

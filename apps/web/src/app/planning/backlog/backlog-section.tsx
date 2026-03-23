@@ -28,8 +28,7 @@ export interface BacklogSectionProps {
   storyMembershipMap: Map<string, Set<string>>;
   onStoryClick: (storyId: string) => void;
   onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
-  onAddToBacklog: (storyId: string, backlogId: string) => void | Promise<void>;
-  onRemoveFromBacklog: (storyId: string, backlogId: string) => void | Promise<void>;
+  onMoveToBacklog: (storyId: string, sourceBacklogId: string, targetBacklogId: string) => void | Promise<void>;
   onStartSprint: (backlogId: string, backlogName: string) => void;
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
@@ -54,8 +53,7 @@ export function BacklogSection({
   assigneeOptions,
   onStoryClick,
   onStoryAssigneeChange,
-  onAddToBacklog,
-  onRemoveFromBacklog,
+  onMoveToBacklog,
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
@@ -129,8 +127,7 @@ export function BacklogSection({
                         onAddLabel={onStoryClick}
                         backlogMembershipActions={{
                           targets: buildBacklogTargetsForStory(allSections, story.id, storyMembershipMap, backlog.id),
-                          onAdd: onAddToBacklog,
-                          onRemove: onRemoveFromBacklog,
+                          onMove: (sid, targetId) => onMoveToBacklog(sid, backlog.id, targetId),
                         }}
                         disabled={pendingStoryIds.has(story.id)}
                         isDeleting={pendingDeleteStoryIds.has(story.id)}

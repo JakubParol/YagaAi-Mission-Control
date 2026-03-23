@@ -49,8 +49,8 @@ export interface BacklogMembershipTarget {
 
 export interface BacklogMembershipActions {
   targets: readonly BacklogMembershipTarget[];
-  onAdd: (storyId: string, backlogId: string) => void | Promise<void>;
-  onRemove: (storyId: string, backlogId: string) => void | Promise<void>;
+  /** Move the item from its current backlog to the target backlog. */
+  onMove: (storyId: string, targetBacklogId: string) => void | Promise<void>;
   disabled?: boolean;
 }
 
