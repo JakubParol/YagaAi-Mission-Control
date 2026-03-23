@@ -143,3 +143,24 @@ class AgentQueueEntryResponse(BaseModel):
     enqueued_at: str
     updated_at: str
     cancelled_at: str | None
+
+
+# --- Agent queue dispatch ---
+
+
+class DispatchRequest(BaseModel):
+    agent_id: str = Field(..., min_length=1)
+
+
+class DispatchResponse(BaseModel):
+    action: str
+    entry: AgentQueueEntryResponse | None = None
+    reason: str | None = None
+
+
+class AgentQueueSummaryResponse(BaseModel):
+    agent_id: str
+    has_active_item: bool
+    active_entry: AgentQueueEntryResponse | None = None
+    queued_count: int
+    queued_entries: list[AgentQueueEntryResponse]

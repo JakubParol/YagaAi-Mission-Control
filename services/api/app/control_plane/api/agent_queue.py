@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, Query
 
 from app.control_plane.api.schemas import (
     AgentQueueEntryResponse,
+    AgentQueueSummaryResponse,
+    DispatchRequest,
+    DispatchResponse,
     QueueIngressRequest,
     QueueIngressResponse,
 )
+from app.control_plane.application.dispatch_selection_service import DispatchSelectionService
 from app.control_plane.application.queue_ingress_service import QueueIngressService
-from app.control_plane.dependencies import get_queue_ingress_service
+from app.control_plane.dependencies import get_dispatch_selection_service, get_queue_ingress_service
 from app.control_plane.domain.models import AgentQueueEntry, AgentQueueStatus
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 from app.shared.api.errors import ValidationError
@@ -50,9 +54,9 @@ async def list_agent_queue(
     if status:
         try:
             queue_status = AgentQueueStatus(status)
-        except ValueError:
+        except ValueError as exc:
             valid = ", ".join(s.value for s in AgentQueueStatus)
-            raise ValidationError(f"Invalid status '{status}'. Allowed: {valid}")
+            raise ValidationError(f"Invalid status '{status}'. Allowed: {valid}") from exc
     entries, total = await service.list_queue(
         agent_id=agent_id,
         status=queue_status,
@@ -62,6 +66,38 @@ async def list_agent_queue(
     return ListEnvelope(
         data=[_to_response(e) for e in entries],
         meta=ListMeta(total=total, limit=limit, offset=offset),
+    )
+
+
+@router.post("/dispatch", status_code=200)
+async def dispatch_next(
+    body: DispatchRequest,
+    service: DispatchSelectionService = Depends(get_dispatch_selection_service),
+) -> Envelope[DispatchResponse]:
+    result = await service.try_dispatch_next(agent_id=body.agent_id)
+    return Envelope(
+        data=DispatchResponse(
+            action=result.action,
+            entry=_to_response(result.entry) if result.entry else None,
+            reason=result.reason,
+        )
+    )
+
+
+@router.get("/status")
+async def agent_queue_status(
+    agent_id: str = Query(..., min_length=1),
+    service: DispatchSelectionService = Depends(get_dispatch_selection_service),
+) -> Envelope[AgentQueueSummaryResponse]:
+    summary = await service.get_agent_queue_summary(agent_id=agent_id)
+    return Envelope(
+        data=AgentQueueSummaryResponse(
+            agent_id=summary.agent_id,
+            has_active_item=summary.has_active_item,
+            active_entry=(_to_response(summary.active_entry) if summary.active_entry else None),
+            queued_count=summary.queued_count,
+            queued_entries=[_to_response(e) for e in summary.queued_entries],
+        )
     )
 
 

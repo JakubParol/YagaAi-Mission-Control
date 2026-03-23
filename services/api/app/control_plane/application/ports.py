@@ -245,3 +245,33 @@ class AgentQueueRepository(ABC):
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[AgentQueueEntry], int]: ...
+
+    @abstractmethod
+    async def get_oldest_queued_for_agent(
+        self,
+        *,
+        agent_id: str,
+    ) -> AgentQueueEntry | None: ...
+
+    @abstractmethod
+    async def has_active_item(self, *, agent_id: str) -> bool: ...
+
+    @abstractmethod
+    async def get_active_entry_for_agent(
+        self,
+        *,
+        agent_id: str,
+    ) -> AgentQueueEntry | None: ...
+
+    @abstractmethod
+    async def transition_status(
+        self,
+        *,
+        entry_id: str,
+        expected_status: AgentQueueStatus,
+        new_status: AgentQueueStatus,
+        updated_at: str,
+    ) -> bool: ...
+
+    @abstractmethod
+    async def commit(self) -> None: ...
