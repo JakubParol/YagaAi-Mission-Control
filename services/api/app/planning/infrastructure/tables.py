@@ -50,6 +50,7 @@ agents = Table(
     Column("avatar", Text),
     Column("is_active", Integer, nullable=False, server_default=text("1")),
     Column("source", Text, nullable=False, server_default=text("'manual'")),
+    Column("main_session_key", Text),
     Column("metadata_json", Text),
     Column("last_synced_at", Text),
     Column("created_at", Text, nullable=False),
@@ -310,4 +311,12 @@ Index(
     "idx_work_item_status_history_item",
     work_item_status_history.c.work_item_id,
     work_item_status_history.c.changed_at,
+)
+
+# Agents
+Index(
+    "idx_agents_main_session_key_unique",
+    agents.c.main_session_key,
+    unique=True,
+    postgresql_where=text("main_session_key IS NOT NULL"),
 )

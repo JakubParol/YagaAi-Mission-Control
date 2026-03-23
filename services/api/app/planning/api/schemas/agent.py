@@ -17,6 +17,7 @@ class AgentCreate(BaseModel):
     avatar: str | None = None
     is_active: bool = True
     source: str = Field("manual", pattern=r"^(openclaw_json|manual)$")
+    main_session_key: str | None = None
     metadata_json: str | None = None
 
     @field_validator("avatar")
@@ -44,6 +45,7 @@ class AgentUpdate(BaseModel):
     avatar: str | None = None
     is_active: bool | None = None
     source: str | None = Field(None, pattern=r"^(openclaw_json|manual)$")
+    main_session_key: str | None = None
     metadata_json: str | None = None
 
     @field_validator("avatar")
@@ -73,6 +75,7 @@ class AgentResponse(BaseModel):
     avatar: str | None
     is_active: bool
     source: str
+    main_session_key: str | None
     metadata_json: str | None
     last_synced_at: str | None
     created_at: str
