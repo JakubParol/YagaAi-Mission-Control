@@ -22,6 +22,7 @@ export interface ListRowsSectionProps {
   onRowAssigneeChange: (row: PlanningListRow, nextAssigneeAgentId: string | null) => void;
   onAddLabel: (storyId: string) => void;
   onMoveToBacklog: (storyId: string, sourceBacklogId: string, targetBacklogId: string) => void;
+  onLinkParent?: (storyId: string) => void;
 }
 
 export function ListRowsSection({
@@ -36,6 +37,7 @@ export function ListRowsSection({
   onRowAssigneeChange,
   onAddLabel,
   onMoveToBacklog,
+  onLinkParent,
 }: ListRowsSectionProps) {
   const assigneeById = useMemo(
     () => new Map(assignableAgents.map((agent) => [agent.id, agent])),
@@ -110,6 +112,7 @@ export function ListRowsSection({
                       onDelete={onStoryDelete}
                       onStatusChange={onStoryStatusChange}
                       onAddLabel={onAddLabel}
+                      onLinkParent={onLinkParent}
                       backlogMembershipActions={backlogs.length > 0 ? {
                         targets: buildTargets(row.id),
                         onMove: (sid, targetId) => {

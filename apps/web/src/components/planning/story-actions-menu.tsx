@@ -68,7 +68,7 @@ async function writeClipboard(text: string): Promise<void> {
 
 export function StoryActionsMenu({
   storyId, storyType, storyKey, storyTitle, storyStatus,
-  onDelete, onStatusChange, onAddLabel, backlogMembershipActions,
+  onDelete, onStatusChange, onAddLabel, backlogMembershipActions, onLinkParent,
   disabled = false, isDeleting = false, defaultOpen = false,
   defaultConfirmOpen = false, defaultStatusSubmenuOpen = false,
 }: StoryActionsMenuProps) {
@@ -109,10 +109,10 @@ export function StoryActionsMenu({
     { id: "change-status", label: "Change status", icon: ChevronRight, disabled: isDisabled || !onStatusChange, submenu: true },
     { id: "add-flag", label: "Add flag", icon: Flag, disabled: true },
     { id: "link-work-item", label: "Link work item", icon: Link2, disabled: true },
-    { id: "link-parent", label: "Link parent", icon: Link2, disabled: true },
+    { id: "link-parent", label: "Move to epic", icon: Link2, disabled: isDisabled || !onLinkParent },
     { id: "archive", label: "Archive", icon: Archive, disabled: true },
     { id: "delete", label: "Delete", icon: Trash2, disabled: isDisabled, tone: "danger" },
-  ], [backlogMembershipActions?.disabled, hasBacklogTargets, isDisabled, onStatusChange, storyKey]);
+  ], [backlogMembershipActions?.disabled, hasBacklogTargets, isDisabled, onLinkParent, onStatusChange, storyKey]);
 
   const enabledMainIdxs = useMemo(() => mainActions.flatMap((a, i) => (a.disabled ? [] : [i])), [mainActions]);
   const statusOptions = useMemo(
@@ -204,7 +204,8 @@ export function StoryActionsMenu({
     if (actionId === "toggle-sprint-membership") { openBacklogSub(); return; }
     if (actionId === "delete") { if (!isDisabled) { closeMenu(); setConfirmPhase((p) => reduceDeleteConfirmPhase(p, "OPEN")); } return; }
     if (actionId === "copy-key") { if (storyKey) await writeClipboard(storyKey); closeMenu(); return; }
-    if (actionId === "add-label") { onAddLabel?.(storyId); closeMenu(); }
+    if (actionId === "add-label") { onAddLabel?.(storyId); closeMenu(); return; }
+    if (actionId === "link-parent") { onLinkParent?.(storyId); closeMenu(); }
   };
   const handleStatusAction = async (status: WorkItemStatus) => {
     if (!onStatusChange || status === storyStatus || isDisabled) return;

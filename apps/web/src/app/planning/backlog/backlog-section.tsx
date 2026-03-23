@@ -29,6 +29,7 @@ export interface BacklogSectionProps {
   onStoryClick: (storyId: string) => void;
   onStoryAssigneeChange: (storyId: string, nextAssigneeAgentId: string | null) => void;
   onMoveToBacklog: (storyId: string, sourceBacklogId: string, targetBacklogId: string) => void | Promise<void>;
+  onLinkParent?: (storyId: string) => void;
   onStartSprint: (backlogId: string, backlogName: string) => void;
   onCompleteSprint: (backlogId: string, backlogName: string) => void;
   onCreateStory: (backlogId: string) => void;
@@ -54,6 +55,7 @@ export function BacklogSection({
   onStoryClick,
   onStoryAssigneeChange,
   onMoveToBacklog,
+  onLinkParent,
   onStartSprint,
   onCompleteSprint,
   onCreateStory,
@@ -125,6 +127,7 @@ export function BacklogSection({
                         onDelete={onStoryDelete}
                         onStatusChange={onStoryStatusChange}
                         onAddLabel={onStoryClick}
+                        onLinkParent={onLinkParent}
                         backlogMembershipActions={{
                           targets: buildBacklogTargetsForStory(allSections, story.id, storyMembershipMap, backlog.id),
                           onMove: (sid, targetId) => onMoveToBacklog(sid, backlog.id, targetId),

@@ -20,7 +20,7 @@ import {
 } from "@/components/planning/story-actions-menu-types";
 
 import { EpicRow, type PreviewState } from "./epic-row";
-import { MoveToEpicDialog, type MoveToEpicTarget } from "./move-to-epic-dialog";
+import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
 import { deleteEpic, fetchEpicDetail, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,

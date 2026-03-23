@@ -19,6 +19,9 @@ import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import type { WorkItemStatus } from "@/lib/planning/types";
 import { deleteStory } from "../story-actions";
 import { addStoryToBacklog, removeStoryFromBacklog } from "../backlog/board-actions";
+import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
+import { fetchEpics } from "@/components/planning/story-detail-actions";
+import { apiUrl } from "@/lib/api-client";
 import type { PlanningListRow } from "./list-view-model";
 import { applyPlanningListFilters } from "./list-filters";
 import type { PageState, ScopedFetchResult } from "./list-types";
@@ -41,6 +44,8 @@ function PlanningListPageContent() {
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [pendingStoryIds, setPendingStoryIds] = useState<Record<string, true>>({});
   const [backlogData, setBacklogData] = useState<ListBacklogData>({ backlogs: [], membershipMap: new Map() });
+  const [epicTargets, setEpicTargets] = useState<MoveToEpicTarget[]>([]);
+  const [moveToEpicStoryId, setMoveToEpicStoryId] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const singleProjectId =
@@ -92,11 +97,12 @@ function PlanningListPageContent() {
 
     let cancelled = false;
 
-    void Promise.all([fetchListResult(singleProjectId), fetchBacklogsForProject(singleProjectId)])
-      .then(([result, bd]) => {
+    void Promise.all([fetchListResult(singleProjectId), fetchBacklogsForProject(singleProjectId), fetchEpics(singleProjectId).catch(() => [])])
+      .then(([result, bd, epics]) => {
         if (cancelled) return;
         setFetchResultState({ projectId: singleProjectId, result });
         setBacklogData(bd);
+        setEpicTargets(epics.map((e) => ({ id: e.id, key: e.key ?? "", title: e.title })));
       })
       .catch((error) => {
         if (cancelled) return;
@@ -158,6 +164,13 @@ function PlanningListPageContent() {
     (row: PlanningListRow, nextAssigneeAgentId: string | null) => runWithPending(row.id, () => patchRowAssignee(row.row_type, row.id, nextAssigneeAgentId), "Failed to update assignee."),
     [runWithPending],
   );
+
+  const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
+    if (!moveToEpicStoryId) return;
+    const res = await fetch(apiUrl(`/v1/planning/work-items/${moveToEpicStoryId}`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent_id: targetEpicId }) });
+    if (!res.ok) throw new Error(`Failed to move work item. HTTP ${res.status}.`);
+    await refreshCurrentView();
+  }, [moveToEpicStoryId, refreshCurrentView]);
 
   const handleMoveToBacklog = useCallback(
     (storyId: string, sourceBacklogId: string, targetBacklogId: string) => {
@@ -269,6 +282,7 @@ function PlanningListPageContent() {
             onRowAssigneeChange={handleRowAssigneeChange}
             onAddLabel={setSelectedStoryId}
             onMoveToBacklog={handleMoveToBacklog}
+            onLinkParent={epicTargets.length > 0 ? setMoveToEpicStoryId : undefined}
           />
         </section>
       )}
@@ -278,9 +292,16 @@ function PlanningListPageContent() {
         open={activeSelectedWorkItemId !== null}
         onOpenChange={handleStoryDialogChange}
         initialLabels={selectedStoryLabels}
-        onStoryUpdated={() => {
-          void refreshCurrentView().catch(() => undefined);
-        }}
+        onStoryUpdated={() => { void refreshCurrentView().catch(() => undefined); }}
+      />
+      <MoveToEpicDialog
+        open={moveToEpicStoryId !== null}
+        storyKey={null}
+        storyTitle=""
+        currentEpicId=""
+        epicTargets={epicTargets}
+        onMove={handleMoveToEpicConfirm}
+        onOpenChange={(open) => { if (!open) setMoveToEpicStoryId(null); }}
       />
     </>
   );

@@ -49,6 +49,7 @@ export interface SprintBoardProps {
   onStoryReorder?: (storyId: string, beforeId: string | null, afterId: string | null) => void;
   onStoryAssigneeChange?: (storyId: string, assigneeAgentId: string | null) => Promise<void>;
   onStoryDelete?: (storyId: string) => Promise<void> | void;
+  onLinkParent?: (storyId: string) => void;
   pendingStoryIds?: ReadonlySet<string>;
   assigneeOptions?: readonly QuickCreateAssigneeOption[];
   /** When true, disables all drag-and-drop reordering (e.g. when filters may hide cards). */
@@ -64,6 +65,7 @@ export function SprintBoard({
   onStoryReorder,
   onStoryAssigneeChange,
   onStoryDelete,
+  onLinkParent,
   pendingStoryIds,
   assigneeOptions = [],
   dragDisabled = false,
@@ -169,6 +171,7 @@ export function SprintBoard({
             onCardDragEnd={handleCardDragEnd}
             pendingStoryIds={pendingSet}
             onStoryDelete={onStoryDelete}
+            onLinkParent={onLinkParent}
             onStoryStatusChange={onStoryStatusChange}
             assigneeOptions={assigneeOptions}
             assigneeOverrides={assigneeOverrides}

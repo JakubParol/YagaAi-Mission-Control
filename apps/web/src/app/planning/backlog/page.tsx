@@ -13,6 +13,9 @@ import { hasActivePlanningFilters, PlanningFilters, type PlanningFiltersValue } 
 import { PlanningPageShell } from "@/components/planning/planning-page-shell";
 import { RefreshControl } from "@/components/refresh-control";
 import type { BacklogEditItem } from "@/components/planning/backlog-edit-dialog";
+import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
+import { fetchEpics } from "@/components/planning/story-detail-actions";
+import { apiUrl } from "@/lib/api-client";
 import { deleteStory } from "../story-actions";
 
 import type {
@@ -54,6 +57,8 @@ function BacklogPageContent() {
   const [completeDialogError, setCompleteDialogError] = useState<string | null>(null);
   const [deleteBoardDialog, setDeleteBoardDialog] = useState<DeleteBoardDialogState | null>(null);
   const [editBoardBacklog, setEditBoardBacklog] = useState<BacklogEditItem | null>(null);
+  const [epicTargets, setEpicTargets] = useState<MoveToEpicTarget[]>([]);
+  const [moveToEpicStoryId, setMoveToEpicStoryId] = useState<string | null>(null);
 
   const showErrorToast = useCallback((msg: string) => setErrorToast(msg), []);
 
@@ -104,8 +109,8 @@ function BacklogPageContent() {
   useEffect(() => {
     if (!singleProjectId) return;
     let cancelled = false;
-    void fetchBacklogData(singleProjectId)
-      .then((r) => { if (!cancelled) setFetchResultState({ projectId: singleProjectId, result: r }); })
+    void Promise.all([fetchBacklogData(singleProjectId), fetchEpics(singleProjectId).catch(() => [])])
+      .then(([r, epics]) => { if (!cancelled) { setFetchResultState({ projectId: singleProjectId, result: r }); setEpicTargets(epics.map((e) => ({ id: e.id, key: e.key ?? "", title: e.title }))); } })
       .catch((e) => { if (!cancelled) setFetchResultState({ projectId: singleProjectId, result: { kind: "error", message: String(e) } }); });
     return () => { cancelled = true; };
   }, [singleProjectId]);
@@ -149,6 +154,13 @@ function BacklogPageContent() {
     }),
     [pendingDeleteStoryIds, pendingStoryIds, refreshCurrentView, withPendingStory],
   );
+
+  const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
+    if (!moveToEpicStoryId) return;
+    const res = await fetch(apiUrl(`/v1/planning/work-items/${moveToEpicStoryId}`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent_id: targetEpicId }) });
+    if (!res.ok) throw new Error(`Failed to move work item. HTTP ${res.status}.`);
+    await refreshCurrentView();
+  }, [moveToEpicStoryId, refreshCurrentView]);
 
   const ops = useBacklogPageCallbacks({
     singleProjectId, state, defaultBacklogId, showErrorToast, refreshCurrentView,
@@ -230,6 +242,7 @@ function BacklogPageContent() {
               onStoryClick={setSelectedStoryId}
               onStoryAssigneeChange={handleStoryAssigneeChange}
               onMoveToBacklog={(storyId, sourceId, targetId) => void ops.moveToBacklog(storyId, sourceId, targetId)}
+              onLinkParent={epicTargets.length > 0 ? setMoveToEpicStoryId : undefined}
               onStartSprint={(id, name) => setStartDialog({ backlogId: id, backlogName: name })}
               onCompleteSprint={onCompleteSprint}
               onCreateStory={setCreateBacklogId}
@@ -249,6 +262,16 @@ function BacklogPageContent() {
           </div>
         </div>
       )}
+
+      <MoveToEpicDialog
+        open={moveToEpicStoryId !== null}
+        storyKey={null}
+        storyTitle=""
+        currentEpicId=""
+        epicTargets={epicTargets}
+        onMove={handleMoveToEpicConfirm}
+        onOpenChange={(open) => { if (!open) setMoveToEpicStoryId(null); }}
+      />
 
       <BacklogPageDialogs
         singleProjectId={singleProjectId}

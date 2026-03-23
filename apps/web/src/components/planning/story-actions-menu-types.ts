@@ -91,6 +91,7 @@ export interface StoryActionsMenuProps {
   onStatusChange?: (storyId: string, status: WorkItemStatus) => void | Promise<void>;
   onAddLabel?: (storyId: string) => void;
   backlogMembershipActions?: BacklogMembershipActions;
+  onLinkParent?: (storyId: string) => void;
   disabled?: boolean;
   isDeleting?: boolean;
   defaultOpen?: boolean;
