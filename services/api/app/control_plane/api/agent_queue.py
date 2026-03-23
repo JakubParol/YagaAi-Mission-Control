@@ -112,9 +112,12 @@ async def dispatch_next(
     # Entry is now ACK_PENDING — send to OpenClaw
     send_result = await dispatch_svc.dispatch_to_openclaw(entry=selection.entry)
 
+    # Preserve backward compat: "sent" → "dispatched", keep failure actions as-is
+    action = "dispatched" if send_result.action == "sent" else send_result.action
+
     return Envelope(
         data=DispatchResponse(
-            action=send_result.action,
+            action=action,
             entry=_to_response(selection.entry),
             dispatch_record=(
                 _to_dispatch_record_response(send_result.dispatch_record)
@@ -154,7 +157,8 @@ async def _try_push_dispatch(
         selection = await selection_svc.try_dispatch_next(agent_id=agent_id)
         if selection.action == "dispatched" and selection.entry is not None:
             await dispatch_svc.dispatch_to_openclaw(entry=selection.entry)
-    except (RuntimeError, OSError, ValueError, TypeError) as exc:
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        # Best-effort: any failure (DB, network, logic) must not break ingress
         log_event(
             logger,
             level=logging.WARNING,
