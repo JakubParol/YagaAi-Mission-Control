@@ -8,9 +8,6 @@ from app.shared.utils import utc_now
 
 logger = logging.getLogger(__name__)
 
-# v1 specialist capacity: one active work item per agent
-AGENT_CAPACITY = 1
-
 
 @dataclass
 class DispatchResult:
@@ -36,9 +33,14 @@ class DispatchSelectionService:
         """Select and begin dispatching the oldest queued item for an agent.
 
         Enforces capacity=1: if the agent already has an active item,
-        no new dispatch occurs. Transitions QUEUED → DISPATCHING → ACK_PENDING
-        atomically. Idempotent: repeated calls on an already-dispatching item
-        are safe (the CAS transition will simply not match).
+        no new dispatch occurs. Uses CAS transitions for correctness
+        under concurrent calls. Idempotent: repeated calls on an
+        already-dispatching item are safe.
+
+        Race-safety: the CAS QUEUED→DISPATCHING is the atomic claim.
+        After claiming, we re-check has_active_item to detect whether
+        a concurrent caller also won a CAS on a different entry. If
+        so, we roll back our claim to preserve capacity=1.
         """
         if await self._repo.has_active_item(agent_id=agent_id):
             return DispatchResult(action="skipped", reason="agent_busy")
@@ -49,23 +51,32 @@ class DispatchSelectionService:
 
         now = utc_now()
 
-        # CAS: QUEUED → DISPATCHING (idempotent — fails silently if already transitioned)
-        transitioned = await self._repo.transition_status(
+        # CAS: QUEUED → DISPATCHING (atomic claim — fails if already transitioned)
+        claimed = await self._repo.transition_status(
             entry_id=candidate.id,
             expected_status=AgentQueueStatus.QUEUED,
             new_status=AgentQueueStatus.DISPATCHING,
             updated_at=now,
         )
-        if not transitioned:
+        if not claimed:
             return DispatchResult(action="skipped", reason="already_transitioning")
 
         # DISPATCHING → ACK_PENDING
-        await self._repo.transition_status(
+        ack_set = await self._repo.transition_status(
             entry_id=candidate.id,
             expected_status=AgentQueueStatus.DISPATCHING,
             new_status=AgentQueueStatus.ACK_PENDING,
             updated_at=now,
         )
+        if not ack_set:
+            log_event(
+                logger,
+                level=logging.WARNING,
+                event="control_plane.agent.queue.dispatch_ack_failed",
+                agent_id=agent_id,
+                queue_entry_id=candidate.id,
+            )
+            return DispatchResult(action="skipped", reason="transition_conflict")
 
         # Re-read the entry to return the updated state
         updated = await self._repo.get_active_by_work_item(
@@ -98,7 +109,8 @@ class DispatchSelectionService:
         active_entry: AgentQueueEntry | None = None
         if has_active:
             active_entries, _ = await self._repo.list_queued_by_agent(
-                agent_id=agent_id, limit=50,
+                agent_id=agent_id,
+                limit=50,
             )
             for entry in active_entries:
                 if entry.status not in (
