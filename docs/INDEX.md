@@ -20,6 +20,7 @@ These must be read on every session (referenced from [AGENTS.md](../AGENTS.md)):
 | Document | Description |
 |---|---|
 | [CONTROL_PLANE_V1.md](./CONTROL_PLANE_V1.md) | Root-level source of truth for the Control Plane: assignment-driven specialist orchestration through Mission Control + OpenClaw |
+| [CONTROL_PLANE_NAOMI_DELIVERY_V1.md](./CONTROL_PLANE_NAOMI_DELIVERY_V1.md) | Naomi-first delivery contract for the first real specialist-execution vertical slice: dispatch envelope, runtime callback events, watchdog expectations, and short Claude CLI launch prompts |
 
 ## Project Docs
 

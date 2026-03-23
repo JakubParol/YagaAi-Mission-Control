@@ -543,6 +543,7 @@ This document should drive follow-on implementation docs, including:
 - dispatch worker behavior
 - watchdog / reconciler behavior
 - runtime read-model schema
+- [CONTROL_PLANE_NAOMI_DELIVERY_V1.md](./CONTROL_PLANE_NAOMI_DELIVERY_V1.md) — Naomi-first dispatch + callback contract for the first one-shot delivery slice
 
 ### Web
 - operator monitoring views
