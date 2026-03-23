@@ -67,7 +67,7 @@ async def close_assignment(db: AsyncSession, work_item_id: str, unassigned_at: s
         )
         .values(unassigned_at=unassigned_at)
     )
-    await db.commit()
+    await db.flush()
     return affected_rows(result) > 0
 
 
@@ -137,7 +137,7 @@ async def assign_agent_with_event(
         correlation_id=correlation_id,
         causation_id=causation_id,
     )
-    await db.commit()
+    await db.flush()
     return assignment
 
 
@@ -179,5 +179,5 @@ async def unassign_agent_with_event(
         correlation_id=correlation_id,
         causation_id=causation_id,
     )
-    await db.commit()
+    await db.flush()
     return True

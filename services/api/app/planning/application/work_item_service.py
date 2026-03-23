@@ -280,6 +280,7 @@ class WorkItemService:
                 agent_id=data.get("current_assignee_agent_id"),
                 previous_agent_id=existing.current_assignee_agent_id,
             )
+            await self._repo.commit()
 
         # Recompute parent derived status when child status changes.
         if "status" in data and existing.parent_id:
@@ -354,6 +355,7 @@ class WorkItemService:
             agent_id=agent_id,
             previous_agent_id=active.agent_id if active else None,
         )
+        await self._repo.commit()
         return assignment
 
     async def unassign_current_agent(self, work_item_id: str) -> None:
@@ -377,6 +379,7 @@ class WorkItemService:
             agent_id=None,
             previous_agent_id=active.agent_id,
         )
+        await self._repo.commit()
 
     async def list_assignments(self, work_item_id: str) -> list[WorkItemAssignment]:
         if not await self._repo.get_by_id(work_item_id):

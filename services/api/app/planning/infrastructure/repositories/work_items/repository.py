@@ -44,6 +44,12 @@ class DbWorkItemRepository(WorkItemRepository):
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
+    async def flush(self) -> None:
+        await self._db.flush()
+
+    async def commit(self) -> None:
+        await self._db.commit()
+
     # ------------------------------------------------------------------
     # CRUD
     # ------------------------------------------------------------------
@@ -491,7 +497,7 @@ class DbWorkItemRepository(WorkItemRepository):
             correlation_id=correlation_id,
             causation_id=causation_id,
         )
-        await self._db.commit()
+        await self._db.flush()
         return updated
 
     # ------------------------------------------------------------------
