@@ -54,9 +54,9 @@ async def list_agent_queue(
     if status:
         try:
             queue_status = AgentQueueStatus(status)
-        except ValueError:
+        except ValueError as exc:
             valid = ", ".join(s.value for s in AgentQueueStatus)
-            raise ValidationError(f"Invalid status '{status}'. Allowed: {valid}")
+            raise ValidationError(f"Invalid status '{status}'. Allowed: {valid}") from exc
     entries, total = await service.list_queue(
         agent_id=agent_id,
         status=queue_status,
@@ -94,9 +94,7 @@ async def agent_queue_status(
         data=AgentQueueSummaryResponse(
             agent_id=summary.agent_id,
             has_active_item=summary.has_active_item,
-            active_entry=(
-                _to_response(summary.active_entry) if summary.active_entry else None
-            ),
+            active_entry=(_to_response(summary.active_entry) if summary.active_entry else None),
             queued_count=summary.queued_count,
             queued_entries=[_to_response(e) for e in summary.queued_entries],
         )

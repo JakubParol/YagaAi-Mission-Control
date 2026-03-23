@@ -62,6 +62,47 @@ class FakeAgentQueueRepo(AgentQueueRepository):
         total = len(filtered)
         return filtered[offset : offset + limit], total
 
+    async def get_oldest_queued_for_agent(self, *, agent_id: str) -> AgentQueueEntry | None:
+        queued = [
+            e
+            for e in self.entries
+            if e.agent_id == agent_id and e.status == AgentQueueStatus.QUEUED
+        ]
+        if not queued:
+            return None
+        queued.sort(key=lambda e: e.queue_position)
+        return queued[0]
+
+    async def has_active_item(self, *, agent_id: str) -> bool:
+        return any(
+            e.agent_id == agent_id
+            and e.status
+            in (
+                AgentQueueStatus.DISPATCHING,
+                AgentQueueStatus.ACK_PENDING,
+                AgentQueueStatus.PLANNING,
+                AgentQueueStatus.EXECUTING,
+                AgentQueueStatus.BLOCKED,
+                AgentQueueStatus.REVIEW_READY,
+            )
+            for e in self.entries
+        )
+
+    async def transition_status(
+        self,
+        *,
+        entry_id: str,
+        expected_status: AgentQueueStatus,
+        new_status: AgentQueueStatus,
+        updated_at: str,
+    ) -> bool:
+        for e in self.entries:
+            if e.id == entry_id and e.status == expected_status:
+                e.status = new_status
+                e.updated_at = updated_at
+                return True
+        return False
+
 
 async def _assign(
     svc: QueueIngressService,
