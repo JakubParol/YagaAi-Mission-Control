@@ -16,6 +16,9 @@ class HttpOpenClawDispatchAdapter(OpenClawDispatchPort):
 
     v1 behaviour: Naomi-only. Posts a structured prompt to the gateway's
     ACP dispatch endpoint to start a one-shot session for the agent.
+
+    All transport/parsing errors are surfaced as RuntimeError so the
+    application layer does not need to depend on httpx types.
     """
 
     def __init__(
@@ -56,28 +59,48 @@ class HttpOpenClawDispatchAdapter(OpenClawDispatchPort):
             work_item_key=envelope.work_item_key,
         )
 
-        async with httpx.AsyncClient(timeout=_DISPATCH_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                f"{self._base_url}/api/acp/dispatch",
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {self._token}",
-                    "Content-Type": "application/json",
-                    "X-Correlation-Id": envelope.correlation_id,
-                },
-            )
+        try:
+            async with httpx.AsyncClient(timeout=_DISPATCH_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    f"{self._base_url}/api/acp/dispatch",
+                    json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self._token}",
+                        "Content-Type": "application/json",
+                        "X-Correlation-Id": envelope.correlation_id,
+                    },
+                )
+        except httpx.HTTPError as exc:
+            msg = f"OpenClaw dispatch transport error: {exc}"
+            raise RuntimeError(msg) from exc
 
         if response.status_code >= 400:
             body_text = response.text[:500]
             msg = f"OpenClaw dispatch failed: HTTP {response.status_code} — {body_text}"
             raise RuntimeError(msg)
 
-        data = response.json()
+        return self._parse_response(response, envelope)
+
+    @staticmethod
+    def _parse_response(
+        response: httpx.Response,
+        envelope: DispatchEnvelope,
+    ) -> OpenClawSessionMetadata:
+        content_type = response.headers.get("content-type", "")
+        if "json" not in content_type:
+            return OpenClawSessionMetadata(session_id=envelope.run_id)
+
+        try:
+            data = response.json()
+        except ValueError:
+            return OpenClawSessionMetadata(session_id=envelope.run_id)
+
         session_id = data.get("sessionId") or data.get("session_id") or envelope.run_id
+        raw_pid = data.get("processId", data.get("process_id"))
 
         return OpenClawSessionMetadata(
             session_id=str(session_id),
-            process_id=data.get("processId") or data.get("process_id"),
+            process_id=int(raw_pid) if raw_pid is not None else None,
             work_dir=data.get("cwd") or envelope.work_dir,
         )
 

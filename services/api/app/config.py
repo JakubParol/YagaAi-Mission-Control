@@ -46,10 +46,8 @@ class Settings(BaseSettings):
     control_plane_watchdog_enabled: bool = True
     control_plane_openclaw_gateway_url: str = "http://localhost:18789"
     control_plane_openclaw_gateway_token: str = ""
-    control_plane_dispatch_repo_root: str = "/home/kuba/repos/mission-control"
-    control_plane_dispatch_contract_doc: str = (
-        "/home/kuba/repos/mission-control/docs/CONTROL_PLANE_NAOMI_DELIVERY_V1.md"
-    )
+    control_plane_dispatch_repo_root: str = ""
+    control_plane_dispatch_contract_doc: str = ""
 
     model_config = SettingsConfigDict(env_prefix="MC_API_")
 

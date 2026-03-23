@@ -65,6 +65,14 @@ class OpenClawDispatchService:
         outcome and reverts to QUEUED on failure.
         """
         if entry.agent_id not in DISPATCH_SUPPORTED_AGENTS:
+            now = utc_now()
+            await self._queue_repo.transition_status(
+                entry_id=entry.id,
+                expected_status=AgentQueueStatus.ACK_PENDING,
+                new_status=AgentQueueStatus.QUEUED,
+                updated_at=now,
+            )
+            await self._queue_repo.commit()
             return ExternalDispatchResult(
                 action="unsupported_agent",
                 error=f"Agent '{entry.agent_id}' not supported for v1 dispatch",
@@ -82,7 +90,7 @@ class OpenClawDispatchService:
 
         try:
             session_meta = await self._adapter.send_dispatch(envelope=envelope)
-        except (RuntimeError, OSError, ValueError, TypeError) as exc:
+        except (RuntimeError, OSError, ValueError) as exc:
             return await self._handle_failure(
                 entry=entry,
                 record=record,
@@ -152,7 +160,7 @@ class OpenClawDispatchService:
             agent_id=entry.agent_id,
             work_item_id=entry.work_item_id,
             work_item_key=entry.work_item_key,
-            status=DispatchRecordStatus.SENT,
+            status=DispatchRecordStatus.FAILED,  # starts as FAILED; set to SENT on success
             envelope_json=asdict(envelope),
             created_at=now,
         )

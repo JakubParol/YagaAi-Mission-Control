@@ -282,11 +282,7 @@ class AgentQueueRepository(ABC):
 
 class OpenClawDispatchPort(ABC):
     @abstractmethod
-    async def send_dispatch(
-        self,
-        *,
-        envelope: DispatchEnvelope,
-    ) -> OpenClawSessionMetadata: ...
+    async def send_dispatch(self, *, envelope: DispatchEnvelope) -> OpenClawSessionMetadata: ...
 
 
 class DispatchRecordRepository(ABC):
@@ -294,11 +290,7 @@ class DispatchRecordRepository(ABC):
     async def create(self, *, record: DispatchRecord) -> None: ...
 
     @abstractmethod
-    async def get_by_queue_entry_id(
-        self,
-        *,
-        queue_entry_id: str,
-    ) -> DispatchRecord | None: ...
+    async def get_by_queue_entry_id(self, *, queue_entry_id: str) -> DispatchRecord | None: ...
 
     @abstractmethod
     async def commit(self) -> None: ...
