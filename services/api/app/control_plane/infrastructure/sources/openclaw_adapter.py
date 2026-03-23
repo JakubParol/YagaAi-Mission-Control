@@ -114,12 +114,6 @@ class HttpOpenClawDispatchAdapter(OpenClawDispatchPort):
             f"{envelope.prompt_marker} Implement only this story.\n"
             f"\n"
             f"Work item: {envelope.work_item_key} — {envelope.work_item_title}\n"
-            f"Project: {envelope.project_key}\n"
-            f"Repo root: {envelope.repo_root}\n"
-            f"Contract: {envelope.contract_version}\n"
-            f"Contract doc: {envelope.contract_doc_path}\n"
             f"Run ID: {envelope.run_id}\n"
-            f"Correlation ID: {envelope.correlation_id}\n"
-            f"\n"
-            f"Read the contract doc before starting. Follow the E2E flow strictly."
+            f"Correlation ID: {envelope.correlation_id}"
         )

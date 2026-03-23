@@ -48,21 +48,32 @@ async def get_label_service(
 
 def _make_assignment_hook(
     ingress: QueueIngressService,
+    project_repo: DbProjectRepository,
 ) -> "OnAssignmentChanged":
     async def on_assignment_changed(
         *,
         work_item_id: str,
         work_item_key: str | None,
         work_item_type: str,
+        work_item_title: str,
         work_item_status: str,
+        project_id: str | None,
         agent_id: str | None,
         previous_agent_id: str | None,
     ) -> None:
+        repo_root = ""
+        if project_id:
+            project = await project_repo.get_by_id(project_id)
+            if project and project.repo_root:
+                repo_root = project.repo_root
+
         await ingress.handle_assignment_changed(
             work_item_id=work_item_id,
             work_item_key=work_item_key or "",
             work_item_type=work_item_type,
+            work_item_title=work_item_title,
             work_item_status=work_item_status,
+            project_repo_root=repo_root,
             agent_id=agent_id,
             previous_agent_id=previous_agent_id,
         )
@@ -74,7 +85,7 @@ async def get_work_item_service(
     db: AsyncSession = Depends(get_db),
 ) -> WorkItemService:
     ingress = QueueIngressService(repo=DbAgentQueueRepository(db))
-    hook = _make_assignment_hook(ingress)
+    hook = _make_assignment_hook(ingress, project_repo=DbProjectRepository(db))
     return WorkItemService(DbWorkItemRepository(db), on_assignment_changed=hook)
 
 
@@ -88,7 +99,7 @@ async def get_work_item_action_service(
     db: AsyncSession = Depends(get_db),
 ) -> WorkItemActionService:
     ingress = QueueIngressService(repo=DbAgentQueueRepository(db))
-    hook = _make_assignment_hook(ingress)
+    hook = _make_assignment_hook(ingress, project_repo=DbProjectRepository(db))
     return WorkItemActionService(
         work_item_service=WorkItemService(DbWorkItemRepository(db), on_assignment_changed=hook),
         backlog_service=BacklogService(DbBacklogRepository(db)),

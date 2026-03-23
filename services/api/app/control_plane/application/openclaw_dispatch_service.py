@@ -43,14 +43,10 @@ class OpenClawDispatchService:
         queue_repo: AgentQueueRepository,
         dispatch_repo: DispatchRecordRepository,
         openclaw_adapter: OpenClawDispatchPort,
-        repo_root: str,
-        contract_doc_path: str,
     ) -> None:
         self._queue_repo = queue_repo
         self._dispatch_repo = dispatch_repo
         self._adapter = openclaw_adapter
-        self._repo_root = repo_root
-        self._contract_doc_path = contract_doc_path
 
     async def dispatch_to_openclaw(
         self,
@@ -120,14 +116,15 @@ class OpenClawDispatchService:
 
         return ExternalDispatchResult(action="sent", dispatch_record=record)
 
+    @staticmethod
     def _build_envelope(
-        self,
         *,
         entry: AgentQueueEntry,
         run_id: str,
     ) -> DispatchEnvelope:
         project_key = entry.work_item_key.split("-")[0] if "-" in entry.work_item_key else "MC"
         prompt_marker = f"[{entry.work_item_key}] [E2E]"
+        repo_root = entry.project_repo_root
 
         return DispatchEnvelope(
             run_id=run_id,
@@ -138,11 +135,10 @@ class OpenClawDispatchService:
             work_item_key=entry.work_item_key,
             work_item_title=entry.work_item_title,
             project_key=project_key,
-            repo_root=self._repo_root,
-            work_dir=self._repo_root,
+            repo_root=repo_root,
+            work_dir=repo_root,
             prompt_marker=prompt_marker,
             contract_version=DISPATCH_CONTRACT_VERSION,
-            contract_doc_path=self._contract_doc_path,
         )
 
     @staticmethod

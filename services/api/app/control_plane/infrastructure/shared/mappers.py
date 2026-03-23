@@ -142,6 +142,7 @@ def queue_entry_from_row(row: Row[Any]) -> AgentQueueEntry:
         work_item_key=str(row.work_item_key),
         work_item_type=str(row.work_item_type),
         work_item_title=str(row.work_item_title) if row.work_item_title else "",
+        project_repo_root=str(row.project_repo_root) if row.project_repo_root else "",
         agent_id=str(row.agent_id),
         status=AgentQueueStatus(str(row.status)),
         queue_position=int(row.queue_position),
