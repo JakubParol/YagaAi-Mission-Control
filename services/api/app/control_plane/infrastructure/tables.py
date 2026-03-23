@@ -141,6 +141,24 @@ control_plane_agent_queue = Table(
     Column("cancelled_at", Text),
 )
 
+control_plane_dispatch_records = Table(
+    "control_plane_dispatch_records",
+    metadata,
+    Column("id", Text, primary_key=True),
+    Column("queue_entry_id", Text, nullable=False),
+    Column("run_id", Text, nullable=False),
+    Column("agent_id", Text, nullable=False),
+    Column("work_item_id", Text, nullable=False),
+    Column("work_item_key", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("envelope_json", Text, nullable=False),
+    Column("session_id", Text),
+    Column("process_id", Integer),
+    Column("error_message", Text),
+    Column("dispatched_at", Text),
+    Column("created_at", Text, nullable=False),
+)
+
 Index(
     "idx_control_plane_commands_created_at",
     control_plane_commands.c.created_at,
@@ -182,4 +200,12 @@ Index(
     postgresql_where=control_plane_agent_queue.c.status.in_(
         ("QUEUED", "DISPATCHING", "ACK_PENDING")
     ),
+)
+Index(
+    "idx_cp_dispatch_records_queue_entry",
+    control_plane_dispatch_records.c.queue_entry_id,
+)
+Index(
+    "idx_cp_dispatch_records_run_id",
+    control_plane_dispatch_records.c.run_id,
 )
