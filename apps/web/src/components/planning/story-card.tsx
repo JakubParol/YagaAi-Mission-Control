@@ -73,7 +73,7 @@ export const STORY_CARD_LAYOUT = {
   metadataRow: "flex items-center justify-between gap-2",
   metadataLeft: "flex min-w-0 items-center gap-1.5",
   metadataRight: "flex items-center gap-2.5",
-  actions: "absolute right-2 top-2 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+  actions: "absolute right-2 top-2 opacity-60 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
 } as const;
 
 function PriorityIndicator({ priority }: { priority: number | null }) {

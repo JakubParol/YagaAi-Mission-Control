@@ -44,7 +44,7 @@ export function MainMenuPanel({
       aria-label={`Story actions for ${storyLabel}`}
       onKeyDown={onKeyDown}
       style={menuStyle}
-      className="z-30 min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+      className="z-[60] min-w-48 rounded-md border border-border/70 bg-card p-1 shadow-xl"
     >
       {SECTION_GROUPS.map((group, groupIndex) => (
         <div key={`group-${groupIndex}`} className={cn(groupIndex > 0 && "mt-1 border-t border-border/40 pt-1")}>
@@ -131,7 +131,7 @@ export function StatusSubmenuPanel({
       aria-label="Story status options"
       onKeyDown={onKeyDown}
       style={submenuStyle}
-      className="z-40 min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
+      className="z-[70] min-w-44 rounded-md border border-border/70 bg-card p-1 shadow-xl"
     >
       {statusOptions.map((option, index) => (
         <button
