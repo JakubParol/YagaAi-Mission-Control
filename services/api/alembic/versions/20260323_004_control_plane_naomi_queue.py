@@ -5,9 +5,7 @@ On existing databases: creates the table and indexes.
 """
 
 from alembic import op
-from sqlalchemy import Column, Index, Integer, Table, Text, inspect
-
-from app.shared.db.metadata import metadata
+from sqlalchemy import inspect, text
 
 revision = "20260323_004"
 down_revision = "20260318_003"
@@ -25,37 +23,36 @@ def upgrade() -> None:
     if TABLE_NAME in existing_tables:
         return
 
-    table = Table(
-        TABLE_NAME,
-        metadata,
-        Column("id", Text, primary_key=True),
-        Column("work_item_id", Text, nullable=False),
-        Column("work_item_key", Text, nullable=False),
-        Column("work_item_type", Text, nullable=False),
-        Column("agent_id", Text, nullable=False),
-        Column("status", Text, nullable=False),
-        Column("queue_position", Integer, nullable=False),
-        Column("correlation_id", Text, nullable=False),
-        Column("causation_id", Text),
-        Column("enqueued_at", Text, nullable=False),
-        Column("updated_at", Text, nullable=False),
-        Column("cancelled_at", Text),
-        keep_existing=True,
+    conn.execute(
+        text("""
+        CREATE TABLE control_plane_naomi_queue (
+            id TEXT PRIMARY KEY,
+            work_item_id TEXT NOT NULL,
+            work_item_key TEXT NOT NULL,
+            work_item_type TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            queue_position INTEGER NOT NULL,
+            correlation_id TEXT NOT NULL,
+            causation_id TEXT,
+            enqueued_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            cancelled_at TEXT
+        )
+        """)
     )
-    table.create(conn)
-
-    Index(
-        "idx_cp_naomi_queue_agent_status",
-        table.c.agent_id,
-        table.c.status,
-        table.c.queue_position,
-    ).create(conn)
-    Index(
-        "idx_cp_naomi_queue_work_item_status",
-        table.c.work_item_id,
-        table.c.status,
-        unique=True,
-    ).create(conn)
+    conn.execute(
+        text("""
+        CREATE INDEX idx_cp_naomi_queue_agent_status
+            ON control_plane_naomi_queue (agent_id, status, queue_position)
+        """)
+    )
+    conn.execute(
+        text("""
+        CREATE UNIQUE INDEX idx_cp_naomi_queue_work_item_status
+            ON control_plane_naomi_queue (work_item_id, status)
+        """)
+    )
 
 
 def downgrade() -> None:
