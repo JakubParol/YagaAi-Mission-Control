@@ -215,6 +215,7 @@ export function buildBacklogTargetsForStory(
   sections: readonly BacklogWithItems[],
   storyId: string,
   membershipMap: Map<string, Set<string>>,
+  currentBacklogId: string,
 ): BacklogMembershipTarget[] {
   const memberOf = membershipMap.get(storyId) ?? new Set<string>();
   return sections
@@ -224,6 +225,9 @@ export function buildBacklogTargetsForStory(
       name: s.backlog.name,
       kind: s.backlog.kind,
       isMember: memberOf.has(s.backlog.id),
+      isCurrentBacklog: s.backlog.id === currentBacklogId,
+      isActive: s.backlog.kind === "SPRINT" && s.backlog.status === "ACTIVE",
+      isDefault: s.backlog.is_default,
     }));
 }
 

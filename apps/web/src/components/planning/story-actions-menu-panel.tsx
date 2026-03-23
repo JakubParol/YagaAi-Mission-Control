@@ -213,28 +213,36 @@ export function BacklogSubmenuPanel({
       {targets.length === 0 ? (
         <p className="px-2 py-1.5 text-xs text-muted-foreground">No backlogs available</p>
       ) : (
-        targets.map((target, index) => (
-          <button
-            key={target.id}
-            ref={(el) => { backlogActionRefs.current[index] = el; }}
-            type="button"
-            role="menuitem"
-            className={cn(
-              "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
-              "text-foreground hover:bg-muted/60",
-            )}
-            onMouseEnter={() => onHover(index)}
-            onClick={() => onToggle(target)}
-          >
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn("shrink-0 text-[10px] font-medium", KIND_BADGE[target.kind] ?? "text-muted-foreground")}>
-                {KIND_SHORT[target.kind] ?? target.kind}
+        targets.map((target, index) => {
+          const tag = target.isActive ? "Active" : target.isDefault ? "Default" : null;
+          return (
+            <button
+              key={target.id}
+              ref={(el) => { backlogActionRefs.current[index] = el; }}
+              type="button"
+              role="menuitem"
+              disabled={target.isCurrentBacklog && target.isMember}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-xs",
+                "text-foreground transition-colors",
+                "hover:bg-accent/70 hover:text-accent-foreground",
+                "focus-visible:bg-accent/70 focus-visible:text-accent-foreground focus-visible:outline-none",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+              )}
+              onMouseEnter={() => onHover(index)}
+              onClick={() => { if (!(target.isCurrentBacklog && target.isMember)) onToggle(target); }}
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className={cn("shrink-0 text-[10px] font-medium", KIND_BADGE[target.kind] ?? "text-muted-foreground")}>
+                  {KIND_SHORT[target.kind] ?? target.kind}
+                </span>
+                <span className="truncate">{target.name}</span>
+                {tag && <span className="shrink-0 text-[9px] text-muted-foreground/60">{tag}</span>}
               </span>
-              <span className="truncate">{target.name}</span>
-            </span>
-            {target.isMember && <span className="text-[10px] text-primary">✓</span>}
-          </button>
-        ))
+              {target.isMember && <span className="text-[10px] text-primary">✓</span>}
+            </button>
+          );
+        })
       )}
     </div>
   );

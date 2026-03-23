@@ -212,6 +212,7 @@ export function StoryActionsMenu({
   };
   const handleBacklogToggle = async (target: BacklogMembershipTarget) => {
     if (!backlogMembershipActions || isDisabled) return;
+    if (target.isCurrentBacklog && target.isMember) return;
     if (target.isMember) await backlogMembershipActions.onRemove(storyId, target.id);
     else await backlogMembershipActions.onAdd(storyId, target.id);
     closeMenu();

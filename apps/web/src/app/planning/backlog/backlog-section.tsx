@@ -128,7 +128,7 @@ export function BacklogSection({
                         onStatusChange={onStoryStatusChange}
                         onAddLabel={onStoryClick}
                         backlogMembershipActions={{
-                          targets: buildBacklogTargetsForStory(allSections, story.id, storyMembershipMap),
+                          targets: buildBacklogTargetsForStory(allSections, story.id, storyMembershipMap, backlog.id),
                           onAdd: onAddToBacklog,
                           onRemove: onRemoveFromBacklog,
                         }}

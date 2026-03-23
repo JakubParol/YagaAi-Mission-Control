@@ -41,6 +41,10 @@ export interface BacklogMembershipTarget {
   name: string;
   kind: BacklogKind;
   isMember: boolean;
+  /** This is the backlog the item is currently displayed in — cannot remove from it. */
+  isCurrentBacklog: boolean;
+  isActive: boolean;
+  isDefault: boolean;
 }
 
 export interface BacklogMembershipActions {
