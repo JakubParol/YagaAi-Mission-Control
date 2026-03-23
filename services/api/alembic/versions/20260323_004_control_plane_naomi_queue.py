@@ -74,8 +74,9 @@ def upgrade() -> None:
     )
     conn.execute(
         text("""
-        CREATE UNIQUE INDEX idx_cp_agent_queue_work_item_status
-            ON control_plane_agent_queue (work_item_id, status)
+        CREATE UNIQUE INDEX idx_cp_agent_queue_work_item_active
+            ON control_plane_agent_queue (work_item_id)
+            WHERE status IN ('QUEUED', 'DISPATCHING', 'ACK_PENDING')
         """)
     )
 

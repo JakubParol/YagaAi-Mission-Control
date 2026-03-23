@@ -175,8 +175,10 @@ Index(
     control_plane_agent_queue.c.queue_position,
 )
 Index(
-    "idx_cp_agent_queue_work_item_status",
+    "idx_cp_agent_queue_work_item_active",
     control_plane_agent_queue.c.work_item_id,
-    control_plane_agent_queue.c.status,
     unique=True,
+    postgresql_where=control_plane_agent_queue.c.status.in_(
+        ("QUEUED", "DISPATCHING", "ACK_PENDING")
+    ),
 )
