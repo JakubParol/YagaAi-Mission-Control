@@ -160,7 +160,6 @@ ignore_imports = [
     "app.planning.dependencies -> app.planning.infrastructure.repositories.*",
     "app.planning.dependencies -> app.planning.infrastructure.repositories.backlogs.*",
     "app.planning.dependencies -> app.planning.infrastructure.sources.*",
-    "app.planning.dependencies -> app.planning.infrastructure.tables",
     "app.planning.dependencies -> app.control_plane.infrastructure.repositories.*",
     "app.planning.dependencies -> app.control_plane.application.*",
 ]

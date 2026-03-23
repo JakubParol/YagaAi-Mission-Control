@@ -110,7 +110,7 @@ class ControlPlaneHealthMetricsResponse(BaseModel):
     generated_at: str
 
 
-# --- Naomi queue ingress ---
+# --- Agent queue ingress ---
 
 
 class QueueIngressRequest(BaseModel):
@@ -120,8 +120,6 @@ class QueueIngressRequest(BaseModel):
     work_item_status: str = Field(..., min_length=1)
     agent_id: str | None = Field(None)
     previous_agent_id: str | None = Field(None)
-    agent_openclaw_key: str | None = Field(None)
-    previous_agent_openclaw_key: str | None = Field(None)
     correlation_id: str | None = Field(None)
     causation_id: str | None = Field(None)
 
@@ -132,7 +130,7 @@ class QueueIngressResponse(BaseModel):
     reason: str | None = None
 
 
-class NaomiQueueEntryResponse(BaseModel):
+class AgentQueueEntryResponse(BaseModel):
     id: str
     work_item_id: str
     work_item_key: str

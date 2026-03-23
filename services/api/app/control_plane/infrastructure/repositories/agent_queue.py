@@ -3,17 +3,17 @@ from typing import Any
 from sqlalchemy import Result, func, literal, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.control_plane.application.ports import NaomiQueueRepository
-from app.control_plane.domain.models import NaomiQueueEntry, NaomiQueueStatus
+from app.control_plane.application.ports import AgentQueueRepository
+from app.control_plane.domain.models import AgentQueueEntry, AgentQueueStatus
 from app.control_plane.infrastructure.shared.mappers import queue_entry_from_row
-from app.control_plane.infrastructure.tables import control_plane_naomi_queue
+from app.control_plane.infrastructure.tables import control_plane_agent_queue
 
-_t = control_plane_naomi_queue
+_t = control_plane_agent_queue
 
 _CANCELLABLE_STATUSES = (
-    NaomiQueueStatus.QUEUED.value,
-    NaomiQueueStatus.DISPATCHING.value,
-    NaomiQueueStatus.ACK_PENDING.value,
+    AgentQueueStatus.QUEUED.value,
+    AgentQueueStatus.DISPATCHING.value,
+    AgentQueueStatus.ACK_PENDING.value,
 )
 
 
@@ -21,16 +21,16 @@ def _affected_rows(result: Result[Any]) -> int:
     return getattr(result, "rowcount", 0)
 
 
-class DbNaomiQueueRepository(NaomiQueueRepository):
+class DbAgentQueueRepository(AgentQueueRepository):
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def enqueue(self, *, entry: NaomiQueueEntry) -> None:
+    async def enqueue(self, *, entry: AgentQueueEntry) -> None:
         next_pos = (
             select(func.coalesce(func.max(_t.c.queue_position), 0) + 1)
             .where(
                 _t.c.agent_id == entry.agent_id,
-                _t.c.status == NaomiQueueStatus.QUEUED.value,
+                _t.c.status == AgentQueueStatus.QUEUED.value,
             )
             .scalar_subquery()
         )
@@ -65,7 +65,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
             )
         )
 
-    async def get_active_by_work_item(self, *, work_item_id: str) -> NaomiQueueEntry | None:
+    async def get_active_by_work_item(self, *, work_item_id: str) -> AgentQueueEntry | None:
         result = await self._db.execute(
             select(_t).where(
                 _t.c.work_item_id == work_item_id,
@@ -88,7 +88,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
                 _t.c.status.in_(_CANCELLABLE_STATUSES),
             )
             .values(
-                status=NaomiQueueStatus.CANCELLED.value,
+                status=AgentQueueStatus.CANCELLED.value,
                 cancelled_at=cancelled_at,
                 updated_at=cancelled_at,
             )
@@ -99,7 +99,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
         result = await self._db.execute(
             select(func.coalesce(func.max(_t.c.queue_position), 0)).where(
                 _t.c.agent_id == agent_id,
-                _t.c.status == NaomiQueueStatus.QUEUED.value,
+                _t.c.status == AgentQueueStatus.QUEUED.value,
             )
         )
         current_max = result.scalar_one()
@@ -109,10 +109,10 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
         self,
         *,
         agent_id: str,
-        status: NaomiQueueStatus | None = None,
+        status: AgentQueueStatus | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> tuple[list[NaomiQueueEntry], int]:
+    ) -> tuple[list[AgentQueueEntry], int]:
         base = select(_t).where(_t.c.agent_id == agent_id)
         count_base = select(func.count()).select_from(_t).where(_t.c.agent_id == agent_id)
         if status is not None:

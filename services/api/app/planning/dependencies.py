@@ -1,12 +1,11 @@
 import logging
 
 from fastapi import Depends, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.control_plane.application.queue_ingress_service import NaomiQueueIngressService
-from app.control_plane.infrastructure.repositories.naomi_queue import DbNaomiQueueRepository
+from app.control_plane.application.queue_ingress_service import QueueIngressService
+from app.control_plane.infrastructure.repositories.agent_queue import DbAgentQueueRepository
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
 from app.planning.application.label_service import LabelService
@@ -20,7 +19,6 @@ from app.planning.infrastructure.repositories.labels import DbLabelRepository
 from app.planning.infrastructure.repositories.projects import DbProjectRepository
 from app.planning.infrastructure.repositories.work_items import DbWorkItemRepository
 from app.planning.infrastructure.sources.openclaw import FileOpenClawAgentSource
-from app.planning.infrastructure.tables import agents as agents_table
 from app.shared.api.deps import get_db
 from app.shared.api.errors import NotFoundError
 from app.shared.logging import log_event
@@ -53,19 +51,8 @@ async def get_label_service(
     return LabelService(DbLabelRepository(db))
 
 
-async def _resolve_openclaw_key(db: AsyncSession, agent_id: str | None) -> str | None:
-    if not agent_id:
-        return None
-    result = await db.execute(
-        select(agents_table.c.openclaw_key).where(agents_table.c.id == agent_id)
-    )
-    row = result.first()
-    return str(row.openclaw_key) if row else None
-
-
 def _make_assignment_hook(
-    db: AsyncSession,
-    ingress: NaomiQueueIngressService,
+    ingress: QueueIngressService,
 ) -> "OnAssignmentChanged":
     async def on_assignment_changed(
         *,
@@ -77,8 +64,6 @@ def _make_assignment_hook(
         previous_agent_id: str | None,
     ) -> None:
         try:
-            agent_key = await _resolve_openclaw_key(db, agent_id)
-            prev_key = await _resolve_openclaw_key(db, previous_agent_id)
             await ingress.handle_assignment_changed(
                 work_item_id=work_item_id,
                 work_item_key=work_item_key or "",
@@ -86,8 +71,6 @@ def _make_assignment_hook(
                 work_item_status=work_item_status,
                 agent_id=agent_id,
                 previous_agent_id=previous_agent_id,
-                agent_openclaw_key=agent_key,
-                previous_agent_openclaw_key=prev_key,
             )
         except Exception:
             log_event(
@@ -103,8 +86,8 @@ def _make_assignment_hook(
 async def get_work_item_service(
     db: AsyncSession = Depends(get_db),
 ) -> WorkItemService:
-    ingress = NaomiQueueIngressService(repo=DbNaomiQueueRepository(db))
-    hook = _make_assignment_hook(db, ingress)
+    ingress = QueueIngressService(repo=DbAgentQueueRepository(db))
+    hook = _make_assignment_hook(ingress)
     return WorkItemService(DbWorkItemRepository(db), on_assignment_changed=hook)
 
 
@@ -117,8 +100,8 @@ async def get_backlog_service(
 async def get_work_item_action_service(
     db: AsyncSession = Depends(get_db),
 ) -> WorkItemActionService:
-    ingress = NaomiQueueIngressService(repo=DbNaomiQueueRepository(db))
-    hook = _make_assignment_hook(db, ingress)
+    ingress = QueueIngressService(repo=DbAgentQueueRepository(db))
+    hook = _make_assignment_hook(ingress)
     return WorkItemActionService(
         work_item_service=WorkItemService(DbWorkItemRepository(db), on_assignment_changed=hook),
         backlog_service=BacklogService(DbBacklogRepository(db)),
