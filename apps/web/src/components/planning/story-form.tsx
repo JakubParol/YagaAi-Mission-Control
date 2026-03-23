@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ThemedSelectOption } from "@/components/ui/themed-select";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ThemedSelect } from "@/components/ui/themed-select";
 import { fetchEpics, type FetchEpicsResult } from "./story-detail-actions";
 import {
   createStory,
@@ -67,6 +69,17 @@ export function StoryForm({
       cancelled = true;
     };
   }, [projectId]);
+
+  const epicOptions = useMemo<ThemedSelectOption[]>(
+    () => [
+      { value: "", label: "No epic" },
+      ...epics.map((epic) => ({
+        value: epic.id,
+        label: epic.key ? `${epic.key} ${epic.title}` : epic.title,
+      })),
+    ],
+    [epics],
+  );
 
   const buttonLabel = useMemo(() => {
     if (submitLabel) return submitLabel;
@@ -149,19 +162,14 @@ export function StoryForm({
           >
             Type
           </label>
-          <select
-            id="story-type"
+          <ThemedSelect
             value={values.story_type}
+            options={STORY_TYPE_OPTIONS}
+            placeholder="Select type"
             disabled={isSubmitting}
-            onChange={(event) => updateValue("story_type", event.target.value)}
-            className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-          >
-            {STORY_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            ariaLabel="Story type"
+            onValueChange={(v) => updateValue("story_type", v)}
+          />
           {fieldErrors.story_type && (
             <p className="text-xs text-red-300">{fieldErrors.story_type}</p>
           )}
@@ -193,20 +201,14 @@ export function StoryForm({
         <label htmlFor="story-epic" className="text-xs text-muted-foreground">
           Epic
         </label>
-        <select
-          id="story-epic"
+        <ThemedSelect
           value={values.epic_id}
+          options={epicOptions}
+          placeholder="No epic"
           disabled={isSubmitting || isLoadingEpics}
-          onChange={(event) => updateValue("epic_id", event.target.value)}
-          className="h-9 w-full rounded-md border border-border/60 bg-background px-3 text-sm text-foreground focus-ring"
-        >
-          <option value="">No epic</option>
-          {epics.map((epic) => (
-            <option key={epic.id} value={epic.id}>
-              {epic.key ? `${epic.key} ${epic.title}` : epic.title}
-            </option>
-          ))}
-        </select>
+          ariaLabel="Epic"
+          onValueChange={(v) => updateValue("epic_id", v)}
+        />
         {fieldErrors.epic_id && (
           <p className="text-xs text-red-300">{fieldErrors.epic_id}</p>
         )}

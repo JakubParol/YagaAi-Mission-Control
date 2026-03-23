@@ -59,7 +59,13 @@ interface NormalizedStory {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const TASK_TYPE_OPTIONS = ["CODING", "TESTING", "RESEARCH", "DOCS", "OPS"] as const;
+export const TASK_TYPE_OPTIONS = [
+  { value: "CODING", label: "Coding" },
+  { value: "TESTING", label: "Testing" },
+  { value: "RESEARCH", label: "Research" },
+  { value: "DOCS", label: "Docs" },
+  { value: "OPS", label: "Ops" },
+] as const;
 
 export const STORY_TYPE_OPTIONS = [
   { value: "USER_STORY", label: "Story" },
