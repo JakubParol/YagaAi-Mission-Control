@@ -5,6 +5,7 @@ from app.config import settings
 from app.control_plane.application.command_service import CommandService
 from app.control_plane.application.dispatch_selection_service import DispatchSelectionService
 from app.control_plane.application.openclaw_dispatch_service import OpenClawDispatchService
+from app.control_plane.application.queue_dispatch_service import QueueDispatchService
 from app.control_plane.application.queue_ingress_service import QueueIngressService
 from app.control_plane.application.read_model_service import RunReadModelService
 from app.control_plane.application.watchdog_service import WatchdogService
@@ -15,7 +16,8 @@ from app.control_plane.infrastructure.repositories.consumer import DbConsumerRep
 from app.control_plane.infrastructure.repositories.dispatch_record import DbDispatchRecordRepository
 from app.control_plane.infrastructure.repositories.read_model import DbReadModelRepository
 from app.control_plane.infrastructure.repositories.run import DbRunRepository
-from app.control_plane.infrastructure.sources.openclaw_adapter import HttpOpenClawDispatchAdapter
+from app.control_plane.infrastructure.sources.openclaw_adapter import SubprocessSessionDispatchAdapter
+from app.planning.infrastructure.shared.agent_lookup_adapter import DbAgentLookupAdapter
 from app.shared.api.deps import get_db
 
 
@@ -64,8 +66,26 @@ async def get_openclaw_dispatch_service(
     return OpenClawDispatchService(
         queue_repo=DbAgentQueueRepository(db),
         dispatch_repo=DbDispatchRecordRepository(db),
-        openclaw_adapter=HttpOpenClawDispatchAdapter(
-            gateway_base_url=settings.control_plane_openclaw_gateway_url,
-            gateway_token=settings.control_plane_openclaw_gateway_token,
+        openclaw_adapter=SubprocessSessionDispatchAdapter(
+            openclaw_binary=settings.control_plane_openclaw_binary,
         ),
+    )
+
+
+async def get_queue_dispatch_service(
+    db: AsyncSession = Depends(get_db),
+) -> QueueDispatchService:
+    queue_repo = DbAgentQueueRepository(db)
+    dispatch_repo = DbDispatchRecordRepository(db)
+    return QueueDispatchService(
+        ingress=QueueIngressService(repo=queue_repo),
+        selection=DispatchSelectionService(repo=queue_repo),
+        dispatch=OpenClawDispatchService(
+            queue_repo=queue_repo,
+            dispatch_repo=dispatch_repo,
+            openclaw_adapter=SubprocessSessionDispatchAdapter(
+                openclaw_binary=settings.control_plane_openclaw_binary,
+            ),
+        ),
+        agent_lookup=DbAgentLookupAdapter(db),
     )

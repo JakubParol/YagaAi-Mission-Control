@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import APIRouter, Depends, Query
 
 from app.control_plane.api.schemas import (
@@ -12,19 +10,16 @@ from app.control_plane.api.schemas import (
     QueueIngressResponse,
 )
 from app.control_plane.application.dispatch_selection_service import DispatchSelectionService
-from app.control_plane.application.openclaw_dispatch_service import OpenClawDispatchService
+from app.control_plane.application.queue_dispatch_service import QueueDispatchService
 from app.control_plane.application.queue_ingress_service import QueueIngressService
 from app.control_plane.dependencies import (
     get_dispatch_selection_service,
-    get_openclaw_dispatch_service,
+    get_queue_dispatch_service,
     get_queue_ingress_service,
 )
 from app.control_plane.domain.models import AgentQueueEntry, AgentQueueStatus, DispatchRecord
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
 from app.shared.api.errors import ValidationError
-from app.shared.logging import log_event
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agent-queue", tags=["control-plane-agent-queue"])
 
@@ -32,11 +27,9 @@ router = APIRouter(prefix="/agent-queue", tags=["control-plane-agent-queue"])
 @router.post("/ingest", status_code=200)
 async def queue_ingest(
     body: QueueIngressRequest,
-    ingress_svc: QueueIngressService = Depends(get_queue_ingress_service),
-    selection_svc: DispatchSelectionService = Depends(get_dispatch_selection_service),
-    dispatch_svc: OpenClawDispatchService = Depends(get_openclaw_dispatch_service),
+    svc: QueueDispatchService = Depends(get_queue_dispatch_service),
 ) -> Envelope[QueueIngressResponse]:
-    result = await ingress_svc.handle_assignment_changed(
+    result = await svc.enqueue_and_dispatch(
         work_item_id=body.work_item_id,
         work_item_key=body.work_item_key,
         work_item_type=body.work_item_type,
@@ -48,15 +41,6 @@ async def queue_ingest(
         correlation_id=body.correlation_id,
         causation_id=body.causation_id,
     )
-
-    # Push-driven v1: after successful enqueue, try dispatch if idle
-    if result.action == "enqueued" and body.agent_id:
-        await _try_push_dispatch(
-            agent_id=body.agent_id,
-            selection_svc=selection_svc,
-            dispatch_svc=dispatch_svc,
-        )
-
     return Envelope(
         data=QueueIngressResponse(
             action=result.action,
@@ -96,36 +80,19 @@ async def list_agent_queue(
 @router.post("/dispatch", status_code=200)
 async def dispatch_next(
     body: DispatchRequest,
-    selection_svc: DispatchSelectionService = Depends(get_dispatch_selection_service),
-    dispatch_svc: OpenClawDispatchService = Depends(get_openclaw_dispatch_service),
+    svc: QueueDispatchService = Depends(get_queue_dispatch_service),
 ) -> Envelope[DispatchResponse]:
-    selection = await selection_svc.try_dispatch_next(agent_id=body.agent_id)
+    result = await svc.manual_dispatch(agent_id=body.agent_id)
 
-    if selection.action != "dispatched" or selection.entry is None:
-        return Envelope(
-            data=DispatchResponse(
-                action=selection.action,
-                entry=_to_response(selection.entry) if selection.entry else None,
-                reason=selection.reason,
-            )
-        )
-
-    # Entry is now ACK_PENDING — send to OpenClaw
-    send_result = await dispatch_svc.dispatch_to_openclaw(entry=selection.entry)
-
-    # Preserve backward compat: "sent" → "dispatched", keep failure actions as-is
-    action = "dispatched" if send_result.action == "sent" else send_result.action
+    entry = result.get("entry")
+    record = result.get("dispatch_record")
 
     return Envelope(
         data=DispatchResponse(
-            action=action,
-            entry=_to_response(selection.entry),
-            dispatch_record=(
-                _to_dispatch_record_response(send_result.dispatch_record)
-                if send_result.dispatch_record
-                else None
-            ),
-            reason=send_result.error,
+            action=result["action"],
+            entry=_to_response(entry) if entry else None,
+            dispatch_record=_to_dispatch_record_response(record) if record else None,
+            reason=result.get("reason"),
         )
     )
 
@@ -145,28 +112,6 @@ async def agent_queue_status(
             queued_entries=[_to_response(e) for e in summary.queued_entries],
         )
     )
-
-
-async def _try_push_dispatch(
-    *,
-    agent_id: str,
-    selection_svc: DispatchSelectionService,
-    dispatch_svc: OpenClawDispatchService,
-) -> None:
-    """Best-effort push dispatch after enqueue — does not fail the ingest."""
-    try:
-        selection = await selection_svc.try_dispatch_next(agent_id=agent_id)
-        if selection.action == "dispatched" and selection.entry is not None:
-            await dispatch_svc.dispatch_to_openclaw(entry=selection.entry)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        # Best-effort: any failure (DB, network, logic) must not break ingress
-        log_event(
-            logger,
-            level=logging.WARNING,
-            event="control_plane.push_dispatch.failed",
-            agent_id=agent_id,
-            error=str(exc),
-        )
 
 
 def _to_response(entry: AgentQueueEntry) -> AgentQueueEntryResponse:
@@ -195,6 +140,7 @@ def _to_dispatch_record_response(record: DispatchRecord) -> DispatchRecordRespon
         agent_id=record.agent_id,
         work_item_key=record.work_item_key,
         status=record.status.value,
+        dispatch_session_key=record.dispatch_session_key,
         session_id=record.session_id,
         process_id=record.process_id,
         error_message=record.error_message,
