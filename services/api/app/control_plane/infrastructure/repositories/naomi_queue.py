@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import Result, func, select, update
+from sqlalchemy import Result, func, literal, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.control_plane.application.ports import NaomiQueueRepository
@@ -9,6 +9,12 @@ from app.control_plane.infrastructure.shared.mappers import queue_entry_from_row
 from app.control_plane.infrastructure.tables import control_plane_naomi_queue
 
 _t = control_plane_naomi_queue
+
+_NON_TERMINAL_STATUSES = (
+    NaomiQueueStatus.QUEUED.value,
+    NaomiQueueStatus.DISPATCHING.value,
+    NaomiQueueStatus.ACK_PENDING.value,
+)
 
 
 def _affected_rows(result: Result[Any]) -> int:
@@ -20,19 +26,42 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
         self._db = db
 
     async def enqueue(self, *, entry: NaomiQueueEntry) -> None:
+        next_pos = (
+            select(func.coalesce(func.max(_t.c.queue_position), 0) + 1)
+            .where(
+                _t.c.agent_id == entry.agent_id,
+                _t.c.status == NaomiQueueStatus.QUEUED.value,
+            )
+            .scalar_subquery()
+        )
         await self._db.execute(
-            _t.insert().values(
-                id=entry.id,
-                work_item_id=entry.work_item_id,
-                work_item_key=entry.work_item_key,
-                work_item_type=entry.work_item_type,
-                agent_id=entry.agent_id,
-                status=entry.status.value,
-                queue_position=entry.queue_position,
-                correlation_id=entry.correlation_id,
-                causation_id=entry.causation_id,
-                enqueued_at=entry.enqueued_at,
-                updated_at=entry.updated_at,
+            _t.insert().from_select(
+                [
+                    "id",
+                    "work_item_id",
+                    "work_item_key",
+                    "work_item_type",
+                    "agent_id",
+                    "status",
+                    "queue_position",
+                    "correlation_id",
+                    "causation_id",
+                    "enqueued_at",
+                    "updated_at",
+                ],
+                select(
+                    literal(entry.id),
+                    literal(entry.work_item_id),
+                    literal(entry.work_item_key),
+                    literal(entry.work_item_type),
+                    literal(entry.agent_id),
+                    literal(entry.status.value),
+                    next_pos,
+                    literal(entry.correlation_id),
+                    literal(entry.causation_id),
+                    literal(entry.enqueued_at),
+                    literal(entry.updated_at),
+                ),
             )
         )
 
@@ -40,7 +69,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
         result = await self._db.execute(
             select(_t).where(
                 _t.c.work_item_id == work_item_id,
-                _t.c.status == NaomiQueueStatus.QUEUED.value,
+                _t.c.status.in_(_NON_TERMINAL_STATUSES),
             )
         )
         row = result.first()
@@ -56,7 +85,7 @@ class DbNaomiQueueRepository(NaomiQueueRepository):
             update(_t)
             .where(
                 _t.c.work_item_id == work_item_id,
-                _t.c.status == NaomiQueueStatus.QUEUED.value,
+                _t.c.status.in_(_NON_TERMINAL_STATUSES),
             )
             .values(
                 status=NaomiQueueStatus.CANCELLED.value,

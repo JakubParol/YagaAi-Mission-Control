@@ -24,6 +24,7 @@ from app.planning.infrastructure.tables import agents as agents_table
 from app.shared.api.deps import get_db
 from app.shared.api.errors import NotFoundError
 from app.shared.logging import log_event
+from app.shared.ports import OnAssignmentChanged
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ async def _resolve_openclaw_key(db: AsyncSession, agent_id: str | None) -> str |
 def _make_assignment_hook(
     db: AsyncSession,
     ingress: NaomiQueueIngressService,
-):
+) -> "OnAssignmentChanged":
     async def on_assignment_changed(
         *,
         work_item_id: str,

@@ -57,6 +57,12 @@ class NaomiQueueIngressService:
                 reason="not_naomi",
             )
 
+        if not agent_id:
+            return IngressResult(
+                action="skipped",
+                reason="missing_agent_id",
+            )
+
         if not self._is_eligible(work_item_type, work_item_status):
             return IngressResult(
                 action="skipped",
@@ -75,7 +81,7 @@ class NaomiQueueIngressService:
             work_item_id=work_item_id,
             work_item_key=work_item_key,
             work_item_type=work_item_type,
-            agent_id=agent_id or "",
+            agent_id=agent_id,
             correlation_id=correlation_id,
             causation_id=causation_id,
         )

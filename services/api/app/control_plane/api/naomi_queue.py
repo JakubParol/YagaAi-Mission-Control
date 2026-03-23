@@ -9,6 +9,7 @@ from app.control_plane.application.queue_ingress_service import NaomiQueueIngres
 from app.control_plane.dependencies import get_queue_ingress_service
 from app.control_plane.domain.models import NaomiQueueEntry, NaomiQueueStatus
 from app.shared.api.envelope import Envelope, ListEnvelope, ListMeta
+from app.shared.api.errors import ValidationError
 
 router = APIRouter(prefix="/naomi/queue", tags=["control-plane-naomi-queue"])
 
@@ -47,7 +48,13 @@ async def list_naomi_queue(
     offset: int = Query(0, ge=0),
     service: NaomiQueueIngressService = Depends(get_queue_ingress_service),
 ) -> ListEnvelope[NaomiQueueEntryResponse]:
-    queue_status = NaomiQueueStatus(status) if status else None
+    queue_status: NaomiQueueStatus | None = None
+    if status:
+        try:
+            queue_status = NaomiQueueStatus(status)
+        except ValueError:
+            valid = ", ".join(s.value for s in NaomiQueueStatus)
+            raise ValidationError(f"Invalid status '{status}'. Allowed: {valid}")
     entries, total = await service.list_queue(
         agent_id=agent_id,
         status=queue_status,
