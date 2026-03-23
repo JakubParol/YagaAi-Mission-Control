@@ -10,6 +10,7 @@ from starlette.responses import Response
 
 from app.config import settings
 from app.control_plane.api.dapr_router import router as control_plane_dapr_router
+from app.control_plane.api.naomi_queue import router as control_plane_naomi_queue_router
 from app.control_plane.api.router import router as control_plane_router
 from app.observability.api.router import router as observability_router
 from app.planning.api.router import router as planning_router
@@ -85,4 +86,5 @@ app.include_router(health_router)
 app.include_router(planning_router, prefix="/v1/planning")
 app.include_router(observability_router, prefix="/v1/observability")
 app.include_router(control_plane_router, prefix="/v1/control-plane")
+app.include_router(control_plane_naomi_queue_router, prefix="/v1/control-plane")
 app.include_router(control_plane_dapr_router)
