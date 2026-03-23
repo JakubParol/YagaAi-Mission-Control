@@ -15,7 +15,7 @@ import { SprintBoard } from "@/components/planning/sprint-board";
 import { StoryDetailDialog } from "@/components/planning/story-detail-dialog";
 import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
 import { fetchEpics } from "@/components/planning/story-detail-actions";
-import { apiUrl } from "@/lib/api-client";
+import { moveWorkItemToEpic } from "../story-actions";
 import { type QuickCreateAssigneeOption } from "./quick-create";
 import { subscribeToSprintLifecycleChanged } from "../sprint-lifecycle-events";
 import {
@@ -108,8 +108,7 @@ function BoardPageContent() {
 
   const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
     if (!moveToEpicStoryId) return;
-    const res = await fetch(apiUrl(`/v1/planning/work-items/${moveToEpicStoryId}`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent_id: targetEpicId }) });
-    if (!res.ok) throw new Error(`Failed to move work item. HTTP ${res.status}.`);
+    await moveWorkItemToEpic(moveToEpicStoryId, targetEpicId);
     await refreshCurrentView();
   }, [moveToEpicStoryId, refreshCurrentView]);
 

@@ -21,7 +21,7 @@ import { deleteStory } from "../story-actions";
 import { addStoryToBacklog, removeStoryFromBacklog } from "../backlog/board-actions";
 import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
 import { fetchEpics } from "@/components/planning/story-detail-actions";
-import { apiUrl } from "@/lib/api-client";
+import { moveWorkItemToEpic } from "../story-actions";
 import type { PlanningListRow } from "./list-view-model";
 import { applyPlanningListFilters } from "./list-filters";
 import type { PageState, ScopedFetchResult } from "./list-types";
@@ -141,19 +141,9 @@ function PlanningListPageContent() {
     [pendingStoryIds, refreshCurrentView],
   );
 
-  const handleStoryDelete = useCallback(
-    (storyId: string) => {
-      runWithPending(
-        storyId,
-        async () => {
-          await deleteStory(storyId);
-          if (selectedStoryId === storyId) setSelectedStoryId(null);
-        },
-        "Failed to delete story.",
-      );
-    },
-    [runWithPending, selectedStoryId],
-  );
+  const handleStoryDelete = useCallback((storyId: string) => {
+    runWithPending(storyId, async () => { await deleteStory(storyId); if (selectedStoryId === storyId) setSelectedStoryId(null); }, "Failed to delete story.");
+  }, [runWithPending, selectedStoryId]);
 
   const handleStoryStatusChange = useCallback(
     (storyId: string, status: WorkItemStatus) => runWithPending(storyId, () => patchStoryStatus(storyId, status), "Failed to update story status."),
@@ -165,18 +155,13 @@ function PlanningListPageContent() {
     [runWithPending],
   );
 
-  const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
-    if (!moveToEpicStoryId) return;
-    const res = await fetch(apiUrl(`/v1/planning/work-items/${moveToEpicStoryId}`), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent_id: targetEpicId }) });
-    if (!res.ok) throw new Error(`Failed to move work item. HTTP ${res.status}.`);
-    await refreshCurrentView();
-  }, [moveToEpicStoryId, refreshCurrentView]);
+  const handleMoveToEpicConfirm = useCallback(async (tid: string) => { if (moveToEpicStoryId) { await moveWorkItemToEpic(moveToEpicStoryId, tid); await refreshCurrentView(); } }, [moveToEpicStoryId, refreshCurrentView]);
 
   const handleMoveToBacklog = useCallback(
     (storyId: string, sourceBacklogId: string, targetBacklogId: string) => {
       runWithPending(storyId, async () => {
-        if (sourceBacklogId) await removeStoryFromBacklog(sourceBacklogId, storyId);
         await addStoryToBacklog(targetBacklogId, storyId);
+        if (sourceBacklogId) await removeStoryFromBacklog(sourceBacklogId, storyId);
       }, "Failed to move work item.");
     },
     [runWithPending],
@@ -294,15 +279,7 @@ function PlanningListPageContent() {
         initialLabels={selectedStoryLabels}
         onStoryUpdated={() => { void refreshCurrentView().catch(() => undefined); }}
       />
-      <MoveToEpicDialog
-        open={moveToEpicStoryId !== null}
-        storyKey={null}
-        storyTitle=""
-        currentEpicId=""
-        epicTargets={epicTargets}
-        onMove={handleMoveToEpicConfirm}
-        onOpenChange={(open) => { if (!open) setMoveToEpicStoryId(null); }}
-      />
+      <MoveToEpicDialog open={moveToEpicStoryId !== null} storyKey={null} storyTitle="" currentEpicId="" epicTargets={epicTargets} onMove={handleMoveToEpicConfirm} onOpenChange={(open) => { if (!open) setMoveToEpicStoryId(null); }} />
     </>
   );
 }

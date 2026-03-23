@@ -55,3 +55,17 @@ export async function deleteStory(storyId: string): Promise<void> {
   const message = await toStoryDeleteErrorMessage(response);
   throw new Error(message);
 }
+
+export async function moveWorkItemToEpic(
+  workItemId: string,
+  targetEpicId: string,
+): Promise<void> {
+  const response = await fetch(apiUrl(`/v1/planning/work-items/${workItemId}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ parent_id: targetEpicId }),
+  });
+  if (response.ok) return;
+  const payload = await parseErrorPayload(response);
+  throw new Error(payload.error?.message ?? `Failed to move work item. HTTP ${response.status}.`);
+}

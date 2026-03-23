@@ -121,7 +121,7 @@ export function StoryActionsMenu({
   );
   const enabledStatusIdxs = useMemo(() => statusOptions.flatMap((o, i) => (o.disabled ? [] : [i])), [statusOptions]);
   const backlogTargets = useMemo(() => backlogMembershipActions?.targets ?? [], [backlogMembershipActions?.targets]);
-  const enabledBacklogIdxs = useMemo(() => backlogTargets.map((_, i) => i), [backlogTargets]);
+  const enabledBacklogIdxs = useMemo(() => backlogTargets.flatMap((t, i) => (t.isCurrentBacklog ? [] : [i])), [backlogTargets]);
 
   useEffect(() => { setIsClient(true); }, []);
 

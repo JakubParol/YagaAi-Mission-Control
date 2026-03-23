@@ -38,8 +38,8 @@ export function useBacklogPageCallbacks(deps: BacklogPageDeps) {
     async (storyId: string, sourceBacklogId: string, targetBacklogId: string) => {
       setPendingStoryIds((prev) => ({ ...prev, [storyId]: true }));
       try {
-        await removeStoryFromBacklog(sourceBacklogId, storyId);
         await addStoryToBacklog(targetBacklogId, storyId);
+        await removeStoryFromBacklog(sourceBacklogId, storyId);
         await refreshCurrentView();
       } catch (error) { showErrorToast(error instanceof Error ? error.message : "Failed to move work item."); }
       finally { setPendingStoryIds((prev) => removePendingId(prev, storyId)); }

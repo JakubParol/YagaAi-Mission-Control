@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Radar, ShieldAlert, TimerReset, TrendingUp } from "lucide-react";
 
-import { apiUrl } from "@/lib/api-client";
 import { EmptyState } from "@/components/empty-state";
 import { RefreshControl } from "@/components/refresh-control";
 import { PlanningPageShell } from "@/components/planning/planning-page-shell";
@@ -21,6 +20,7 @@ import {
 
 import { EpicRow, type PreviewState } from "./epic-row";
 import { MoveToEpicDialog, type MoveToEpicTarget } from "@/components/planning/move-to-epic-dialog";
+import { moveWorkItemToEpic } from "../story-actions";
 import { deleteEpic, fetchEpicDetail, fetchOverview, fetchStoriesPreview, parseBlocked, parseEpicStatus, parseSort } from "./epics-page-actions";
 import {
   EPIC_OVERVIEW_DEFAULT_FILTERS,
@@ -203,12 +203,7 @@ function EpicOverviewPageContent() {
 
   const handleMoveToEpicConfirm = useCallback(async (targetEpicId: string) => {
     if (!moveToEpicState) return;
-    const res = await fetch(apiUrl(`/v1/planning/work-items/${moveToEpicState.storyId}`), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parent_id: targetEpicId }),
-    });
-    if (!res.ok) throw new Error(`Failed to move work item. HTTP ${res.status}.`);
+    await moveWorkItemToEpic(moveToEpicState.storyId, targetEpicId);
     await refreshCurrentView();
   }, [moveToEpicState, refreshCurrentView]);
 

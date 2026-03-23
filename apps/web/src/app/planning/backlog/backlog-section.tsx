@@ -20,7 +20,6 @@ import { buildBacklogTargetsForStory } from "./backlog-page-derived";
 
 export interface BacklogSectionProps {
   section: BacklogWithItems;
-  isActiveSprint: boolean;
   hasAnyActiveSprint: boolean;
   siblingBacklogs: ReadonlyArray<BacklogSiblingItem>;
   assigneeOptions: readonly BacklogAssigneeOption[];
@@ -46,7 +45,6 @@ export interface BacklogSectionProps {
 
 export function BacklogSection({
   section,
-  isActiveSprint: _isActiveSprint,
   hasAnyActiveSprint,
   siblingBacklogs,
   allSections,
