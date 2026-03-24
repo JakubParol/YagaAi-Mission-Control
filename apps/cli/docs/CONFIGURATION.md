@@ -2,6 +2,20 @@
 
 Configuration model for Mission Control CLI.
 
+## Execution Profiles
+
+Three wrappers are installed by `install.sh`:
+
+| Wrapper | Target | Write-safe |
+|---|---|---|
+| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | yes |
+| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | yes |
+| `mc` | none (falls back to `http://127.0.0.1:5000` for reads) | **no** — write operations require explicit target |
+
+Bare `mc` blocks POST/PATCH/DELETE unless `MC_API_BASE_URL` or `--api-base` is set. This prevents accidental writes to PROD from unconfigured shells.
+
+For assigned-agent execution, the intended profile is declared per agent in OpenClaw config (`mcProfile` field). The dispatch layer should invoke `mc-dev` or `mc-prod` accordingly.
+
 ## Precedence
 
 1. CLI flags
@@ -18,6 +32,8 @@ Configuration model for Mission Control CLI.
 | `MC_OUTPUT` | no | `table` | Output mode: `table` or `json` |
 | `MC_TIMEOUT_SECONDS` | no | `30` | HTTP request timeout |
 
+When `MC_API_BASE_URL` is unset and `--api-base` is not passed, the CLI treats the API target as **implicit**. Reads still work (using the default), but writes fail with an actionable error.
+
 ## HTTP Contract Alignment
 
 - Response and error handling must follow the envelope documented in:
@@ -31,7 +47,7 @@ Exact auth model is defined in API docs; CLI supports passing actor/auth headers
 ## Output and Exit Codes
 
 - `0`: success
-- `1`: CLI usage/validation error
+- `1`: CLI usage/validation error (including write-guard rejection)
 - `2`: API returned non-2xx response
 - `3`: network/timeout/transport error
 

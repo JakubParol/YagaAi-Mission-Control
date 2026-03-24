@@ -14,6 +14,8 @@ export interface GlobalCliOptions {
 
 export interface RuntimeConfig {
   apiBaseUrl: string;
+  /** True when apiBaseUrl was set via --api-base flag or MC_API_BASE_URL env var. */
+  apiBaseExplicit: boolean;
   actorId?: string;
   actorType?: string;
   output: OutputMode;
@@ -51,9 +53,9 @@ function parseTimeoutSeconds(value: number | string | undefined): number {
 }
 
 export function resolveRuntimeConfig(cli: GlobalCliOptions = {}): RuntimeConfig {
-  const apiBaseUrl = normalizeApiBase(
-    cli.apiBase ?? process.env.MC_API_BASE_URL ?? DEFAULT_API_BASE,
-  );
+  const explicitBase = cli.apiBase ?? process.env.MC_API_BASE_URL;
+  const apiBaseUrl = normalizeApiBase(explicitBase ?? DEFAULT_API_BASE);
+  const apiBaseExplicit = explicitBase !== undefined && explicitBase.trim() !== "";
 
   const actorId = cli.actorId ?? process.env.MC_ACTOR_ID;
   const actorType = cli.actorType ?? process.env.MC_ACTOR_TYPE;
@@ -65,6 +67,7 @@ export function resolveRuntimeConfig(cli: GlobalCliOptions = {}): RuntimeConfig 
 
   return {
     apiBaseUrl,
+    apiBaseExplicit,
     actorId: actorId && actorId.trim() ? actorId.trim() : undefined,
     actorType: actorType && actorType.trim() ? actorType.trim() : undefined,
     output,

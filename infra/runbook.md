@@ -29,16 +29,27 @@ What it does:
 
 - installs Docker + Compose and Node.js when missing
 - creates `infra/dev/.env` and `/etc/mission-control/prod.env` when missing
-- builds and installs a global `mc` wrapper in `/usr/local/bin/mc`
-- configures `mc` to target PROD by default via `MC_API_BASE_URL=http://127.0.0.1:5100`
+- builds and installs CLI wrappers: `mc`, `mc-dev`, `mc-prod` in `/usr/local/bin/`
 - installs and enables `mission-control-dev.service` and `mission-control-prod.service`
 - brings up both DEV and PROD stacks once during bootstrap
 
-For DEV CLI calls after bootstrap, override the target explicitly:
+## CLI execution profiles
+
+| Wrapper | Target | Writes allowed |
+|---|---|---|
+| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | yes |
+| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | yes |
+| `mc` | implicit (defaults to DEV for reads) | **no** — fails unless `MC_API_BASE_URL` or `--api-base` is set |
+
+Examples:
 
 ```bash
-mc --api-base http://127.0.0.1:5000 health
+mc-dev health
+mc-prod project list
+mc --api-base http://127.0.0.1:5000 task update ...
 ```
+
+For assigned-agent execution, the OpenClaw config `mcProfile` field declares which profile each agent should use. The dispatch layer invokes `mc-dev` or `mc-prod` accordingly.
 
 ## DEV workflow (containerized dev runtime)
 
