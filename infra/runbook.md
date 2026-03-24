@@ -92,6 +92,22 @@ This rebuilds the API image, runs PostgreSQL migrations, and then recreates `api
 
 If you want to debug API/Web outside containers, run host processes on different ports (e.g. `5001` / `3001`) to avoid collisions with DEV container ports.
 
+## Control Plane dispatch (OpenClaw Gateway)
+
+Required env vars for agent dispatch from the API:
+
+| Var | Description | Example |
+|---|---|---|
+| `MC_API_CONTROL_PLANE_OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
+| `MC_API_CONTROL_PLANE_OPENCLAW_GATEWAY_TOKEN` | Gateway auth token | from `openclaw.json → gateway.auth.token` |
+| `MC_API_CONTROL_PLANE_OPENCLAW_DEVICE_IDENTITY_PATH` | Device identity JSON (Ed25519 keys) | `/home/kuba/.openclaw/identity/device.json` |
+
+Set these in:
+- DEV: `services/api/.env.local`
+- PROD: `/etc/mission-control/prod.env`
+
+Without these, dispatch will fail with `MISSING_MAIN_SESSION_KEY` or `device identity not configured`.
+
 ## PROD workflow (full containers)
 
 ### One-time systemd install
