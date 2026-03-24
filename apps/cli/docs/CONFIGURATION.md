@@ -14,7 +14,7 @@ Three wrappers are installed by `install.sh`:
 
 Bare `mc` blocks POST/PATCH/DELETE unless `MC_API_BASE_URL` or `--api-base` is set. This prevents accidental writes to PROD from unconfigured shells.
 
-For assigned-agent execution, the intended profile is declared per agent in OpenClaw config (`mcProfile` field). The dispatch layer should invoke `mc-dev` or `mc-prod` accordingly.
+For agent execution, the execution profile (DEV or PROD) is determined per work item by the dispatch/runtime context — not by agent identity. The dispatch layer passes the target environment in the delivery contract, and the assigned agent uses `mc-dev` or `mc-prod` accordingly.
 
 ## Precedence
 

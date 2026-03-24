@@ -49,7 +49,7 @@ mc-prod project list
 mc --api-base http://127.0.0.1:5000 task update ...
 ```
 
-For assigned-agent execution, the OpenClaw config `mcProfile` field declares which profile each agent should use. The dispatch layer invokes `mc-dev` or `mc-prod` accordingly.
+For agent execution, the execution profile (DEV or PROD) is determined per work item by the dispatch/runtime context — not by agent identity. The dispatch layer passes the target environment in the delivery contract, and the assigned agent uses `mc-dev` or `mc-prod` accordingly.
 
 ## DEV workflow (containerized dev runtime)
 
