@@ -162,7 +162,7 @@ class DispatchRecordResponse(BaseModel):
     agent_id: str
     work_item_key: str
     status: str
-    session_id: str | None = None
+    dispatch_session_key: str | None = None
     process_id: int | None = None
     error_message: str | None = None
     dispatched_at: str | None = None

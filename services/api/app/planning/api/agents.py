@@ -24,6 +24,7 @@ async def create_agent(
         avatar=body.avatar,
         is_active=body.is_active,
         source=AgentSource(body.source),
+        main_session_key=body.main_session_key,
         metadata_json=body.metadata_json,
     )
     return Envelope(data=AgentResponse(**agent.__dict__))

@@ -82,6 +82,7 @@ def _row_to_agent(m: RowMapping) -> Agent:
         avatar=avatar,
         is_active=bool(m["is_active"]),
         source=AgentSource(m["source"]),
+        main_session_key=m.get("main_session_key"),
         metadata_json=m["metadata_json"],
         last_synced_at=m["last_synced_at"],
         created_at=m["created_at"],

@@ -71,6 +71,7 @@ class Agent:
     avatar: str | None
     is_active: bool
     source: AgentSource
+    main_session_key: str | None
     metadata_json: str | None
     last_synced_at: str | None
     created_at: str

@@ -26,7 +26,7 @@ class DbDispatchRecordRepository(DispatchRecordRepository):
                 work_item_key=record.work_item_key,
                 status=record.status.value,
                 envelope_json=json.dumps(record.envelope_json),
-                session_id=record.session_id,
+                dispatch_session_key=record.dispatch_session_key,
                 process_id=record.process_id,
                 error_message=record.error_message,
                 dispatched_at=record.dispatched_at,

@@ -153,11 +153,15 @@ control_plane_dispatch_records = Table(
     Column("work_item_key", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("envelope_json", Text, nullable=False),
-    Column("session_id", Text),
+    Column("dispatch_session_key", Text),
     Column("process_id", Integer),
     Column("error_message", Text),
     Column("dispatched_at", Text),
     Column("created_at", Text, nullable=False),
+    Column("execution_session_key", Text),
+    Column("runtime", Text),
+    Column("harness", Text),
+    Column("execution_spawned_at", Text),
 )
 
 Index(

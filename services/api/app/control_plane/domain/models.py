@@ -66,8 +66,7 @@ class AgentQueueStatus(StrEnum):
 QUEUE_ELIGIBLE_WORK_ITEM_TYPES = frozenset({"STORY", "BUG"})
 QUEUE_ELIGIBLE_PLANNING_STATUSES = frozenset({"TODO"})
 
-DISPATCH_CONTRACT_VERSION = "control-plane-naomi-delivery-v1"
-DISPATCH_SUPPORTED_AGENTS = frozenset({"naomi"})
+DISPATCH_CONTRACT_VERSION = "control-plane-delivery-v1"
 
 
 @dataclass
@@ -257,6 +256,8 @@ class DispatchEnvelope:
     correlation_id: str
     causation_id: str
     agent_id: str
+    openclaw_key: str
+    main_session_key: str
     work_item_id: str
     work_item_key: str
     work_item_title: str
@@ -269,9 +270,7 @@ class DispatchEnvelope:
 
 @dataclass
 class OpenClawSessionMetadata:
-    session_id: str
     process_id: int | None = None
-    work_dir: str | None = None
 
 
 @dataclass
@@ -284,8 +283,12 @@ class DispatchRecord:
     work_item_key: str
     status: DispatchRecordStatus
     envelope_json: dict[str, Any]
-    session_id: str | None = None
+    dispatch_session_key: str | None = None
     process_id: int | None = None
     error_message: str | None = None
     dispatched_at: str | None = None
     created_at: str = ""
+    execution_session_key: str | None = None
+    runtime: str | None = None
+    harness: str | None = None
+    execution_spawned_at: str | None = None

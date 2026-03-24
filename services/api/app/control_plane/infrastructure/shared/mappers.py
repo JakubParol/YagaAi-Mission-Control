@@ -164,9 +164,15 @@ def dispatch_record_from_row(row: Row[Any], envelope: dict[str, Any]) -> Dispatc
         work_item_key=str(row.work_item_key),
         status=DispatchRecordStatus(str(row.status)),
         envelope_json=envelope,
-        session_id=(str(row.session_id) if row.session_id else None),
-        process_id=(int(row.process_id) if row.process_id else None),
+        dispatch_session_key=(str(row.dispatch_session_key) if row.dispatch_session_key else None),
+        process_id=(int(row.process_id) if row.process_id is not None else None),
         error_message=(str(row.error_message) if row.error_message else None),
         dispatched_at=(str(row.dispatched_at) if row.dispatched_at else None),
         created_at=str(row.created_at),
+        execution_session_key=(
+            str(row.execution_session_key) if row.execution_session_key else None
+        ),
+        runtime=(str(row.runtime) if row.runtime else None),
+        harness=(str(row.harness) if row.harness else None),
+        execution_spawned_at=(str(row.execution_spawned_at) if row.execution_spawned_at else None),
     )

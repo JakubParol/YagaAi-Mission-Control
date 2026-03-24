@@ -57,6 +57,7 @@ class AgentService:
         avatar: str | None = None,
         is_active: bool = True,
         source: AgentSource = AgentSource.MANUAL,
+        main_session_key: str | None = None,
         metadata_json: str | None = None,
     ) -> Agent:
         now = utc_now()
@@ -71,6 +72,7 @@ class AgentService:
             avatar=avatar,
             is_active=is_active,
             source=source,
+            main_session_key=main_session_key,
             metadata_json=metadata_json,
             last_synced_at=None,
             created_at=now,
@@ -144,6 +146,7 @@ class AgentService:
                     avatar=normalized["avatar"],
                     is_active=normalized["is_active"],
                     source=AgentSource.OPENCLAW_JSON,
+                    main_session_key=None,
                     metadata_json=normalized["metadata_json"],
                     last_synced_at=now,
                     created_at=now,
