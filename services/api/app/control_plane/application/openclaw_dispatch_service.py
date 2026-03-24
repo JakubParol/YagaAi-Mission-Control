@@ -160,13 +160,19 @@ class OpenClawDispatchService:
             created_at=now,
         )
 
-    async def _handle_missing_session_key(
+    async def record_dispatch_failure(
         self,
         *,
         entry: AgentQueueEntry,
+        reason_code: str,
     ) -> ExternalDispatchResult:
+        """Record a dispatch failure and revert queue entry to QUEUED.
+
+        Use for pre-send failures (agent not found, missing session key, etc.)
+        where the adapter was never called.
+        """
         now = utc_now()
-        error = f"MISSING_MAIN_SESSION_KEY for agent '{entry.agent_id}'"
+        error = f"{reason_code} for agent '{entry.agent_id}'"
 
         record = DispatchRecord(
             id=new_uuid(),
@@ -194,16 +200,27 @@ class OpenClawDispatchService:
         log_event(
             logger,
             level=logging.ERROR,
-            event="control_plane.dispatch.missing_session_key",
+            event="control_plane.dispatch.pre_send_failure",
             agent_id=entry.agent_id,
+            reason_code=reason_code,
             work_item_key=entry.work_item_key,
             correlation_id=entry.correlation_id,
         )
 
         return ExternalDispatchResult(
-            action="missing_session_key",
+            action=reason_code.lower(),
             dispatch_record=record,
             error=error,
+        )
+
+    async def _handle_missing_session_key(
+        self,
+        *,
+        entry: AgentQueueEntry,
+    ) -> ExternalDispatchResult:
+        return await self.record_dispatch_failure(
+            entry=entry,
+            reason_code="MISSING_MAIN_SESSION_KEY",
         )
 
     async def _handle_failure(

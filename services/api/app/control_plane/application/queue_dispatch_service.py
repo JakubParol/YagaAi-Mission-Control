@@ -94,13 +94,15 @@ class QueueDispatchService:
 
         agent_info = await self._agent_lookup.get_agent_by_id(selection.entry.agent_id)
         if agent_info is None:
-            # Revert to QUEUED so the entry doesn't leak in ACK_PENDING
-            await self._dispatch.dispatch_to_openclaw(
+            fail = await self._dispatch.record_dispatch_failure(
                 entry=selection.entry,
-                openclaw_key="",
-                main_session_key=None,
+                reason_code="AGENT_NOT_FOUND",
             )
-            return ManualDispatchResult(action="failed", reason="agent_not_found")
+            return ManualDispatchResult(
+                action="failed",
+                dispatch_record=fail.dispatch_record,
+                reason="AGENT_NOT_FOUND",
+            )
 
         send_result = await self._dispatch.dispatch_to_openclaw(
             entry=selection.entry,
@@ -127,17 +129,9 @@ class QueueDispatchService:
                 selection.entry.agent_id,
             )
             if agent_info is None:
-                log_event(
-                    logger,
-                    level=logging.WARNING,
-                    event="control_plane.push_dispatch.agent_not_found",
-                    agent_id=agent_id,
-                )
-                # Revert to QUEUED via dispatch (handles missing key path)
-                await self._dispatch.dispatch_to_openclaw(
+                await self._dispatch.record_dispatch_failure(
                     entry=selection.entry,
-                    openclaw_key="",
-                    main_session_key=None,
+                    reason_code="AGENT_NOT_FOUND",
                 )
                 return
 

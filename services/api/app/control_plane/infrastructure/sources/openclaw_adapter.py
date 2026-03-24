@@ -66,15 +66,25 @@ class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
             msg = f"Failed to launch openclaw subprocess: {exc}"
             raise RuntimeError(msg) from exc
 
-        # Quick-fail: if the process exits with non-zero within the grace
-        # period, treat as a startup error. Exit code 0 is a fast success.
+        # Quick-fail check: only immediate non-zero exit is a startup error.
+        # Exit code 0 = fast successful completion (agent accepted + returned).
+        # Still running = long-running dispatch underway.
         try:
             await asyncio.wait_for(proc.wait(), timeout=_QUICK_FAIL_SECONDS)
             if proc.returncode != 0:
-                msg = f"openclaw agent exited immediately with code {proc.returncode}"
+                msg = f"openclaw agent startup failure (exit code {proc.returncode})"
                 raise RuntimeError(msg)
+            # Exit 0 within grace period — fast success
+            log_event(
+                logger,
+                level=logging.INFO,
+                event="control_plane.dispatch.adapter.fast_success",
+                agent_id=envelope.agent_id,
+                run_id=envelope.run_id,
+                pid=proc.pid,
+            )
         except asyncio.TimeoutError:
-            # Process is still running after grace period — dispatch is underway
+            # Process is still running — dispatch underway (normal for long tasks)
             pass
 
         log_event(
@@ -98,6 +108,12 @@ class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
             f"{envelope.prompt_marker} Implement only this story.\n"
             f"\n"
             f"Work item: {envelope.work_item_key} — {envelope.work_item_title}\n"
+            f"Repo root: {envelope.repo_root}\n"
+            f"Work dir: {envelope.work_dir}\n"
+            f"Contract: {envelope.contract_version}\n"
             f"Run ID: {envelope.run_id}\n"
-            f"Correlation ID: {envelope.correlation_id}"
+            f"Correlation ID: {envelope.correlation_id}\n"
+            f"\n"
+            f"Report progress via runtime callbacks "
+            f"(agent.assignment.accepted, agent.execution.spawned, etc.)."
         )
