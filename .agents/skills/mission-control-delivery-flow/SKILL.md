@@ -1,18 +1,26 @@
 ---
 name: mission-control-delivery-flow
-description: End-to-end execution flow for Mission Control user stories. Use when asked to plan and implement a US/bug from planning through tasks, coding, PR, review, merge, deploy, and story closure using mc CLI + gh.
+description: Delivery flow for Mission Control user stories/bugs. Default autonomous goal is implementation through PR, DEV deploy, and VERIFY handoff. Merge to main, PROD deploy, and full closure require explicit human release instruction after verification.
 ---
 
 # Mission Control Delivery Flow
 
-Execute this flow when the user asks to deliver a story/bug end-to-end.
+Execute this flow when the user asks to deliver a story/bug through the Mission Control workflow.
 
 ## Preconditions
 
-- Work in the Mission Control repo root unless user explicitly says otherwise.
+- Work in the Mission Control repo root unless the user explicitly says otherwise.
 - Read repo/project AGENTS/docs as required by AGENTS policy.
-- For work-items use `mc` CLI only.
-- By work-item we are colling UserStory or Task or Bug
+- For planning work-items, use `mc` CLI only.
+- A work-item here means a User Story, Task, or Bug.
+
+## Core delivery rule (mandatory)
+
+- The default autonomous objective is to reach **VERIFY** safely, not to merge to `main`.
+- A work-item may enter **VERIFY only after a successful DEV deploy** of the implementation branch.
+- **Merge to `main`, PROD deploy, status `DONE`, and branch cleanup are human-gated release actions.**
+- Never assume verification is complete.
+- Never infer release approval from silence, green checks, or the mere fact that a PR exists.
 
 ## Planning operation preflight (mandatory)
 
@@ -20,19 +28,20 @@ Use `mc` CLI for all planning entities (projects, epics, stories, tasks, backlog
 
 Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skills/mc-cli-router/SKILL.md`
 
-1. please read 
+1. Read `/home/kuba/.openclaw/skills/mc-cli-router/SKILL.md` before making planning mutations.
 
 ## Phase 0 - Preparation
 
-0. Set thinking to High!
+0. Set thinking to High.
 1. Read the work-item details using the MC CLI by element code.
 2. If the work-item is not attached to the current sprint in the MC project, attach it.
-3. If it is not attached to an epic, attach the story to an epic – you can get the list of epics and choose the best one.
-4. Add labels to the user story.
-5. Assign UserStory to Naomi.
+3. If it is not attached to an epic, attach it to the best matching epic.
+4. Add labels to the user story/bug.
+5. Assign the user story to Naomi unless the user explicitly directs otherwise.
 6. Checkout `main`.
 7. Pull the latest changes.
 8. Create a new implementation branch using the work-item code and a short description.
+9. Confirm implementation continues on the new branch, not on `main`.
 
 ## Phase 1 — Implementation
 
@@ -40,9 +49,9 @@ Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skil
 
 1. **Design atomic implementation tasks** for the target work-item.
 2. **Record each task in MC** via `mc task create` with `--set parent_id=<WORK_ITEM_ID>`.
-   - Every task MUST have `parent_id` set to the target work-item's UUID. This is how MC links children to parents. Do NOT use `story_id`.
+   - Every task MUST have `parent_id` set to the target work-item UUID. This is how MC links children to parents. Do NOT use `story_id`.
 3. **Verify linkage:** run `mc task list --parent-key <WORK_ITEM_KEY> --output json` and confirm `total` matches the number of tasks you created. If any task has `parent_id: null`, fix it before proceeding.
-4. Set thinking to Medium after planning!
+4. Set thinking to Medium after planning.
 
 ### 1.2 — Execute (task-by-task loop)
 
@@ -57,7 +66,7 @@ Full command reference, recipes, and placement rules: `/home/kuba/.openclaw/skil
 
 ## Phase 2 — Pull Request
 
-1. Create PR to `main` using `gh pr create`.
+1. Create a PR to `main` using `gh pr create`.
 2. Set story status to `CODE_REVIEW` via `mc story update`.
 
 ## Phase 3 — Review and fixes
@@ -68,7 +77,7 @@ Code review is delegated to a sub-agent. Maximum **3 review loops** before escal
 
 Use the `Agent` tool to spawn a sub-agent with the following context in its prompt:
 
-```
+```text
 You are a senior code reviewer for the Mission Control monorepo.
 
 ## Context
@@ -129,48 +138,90 @@ If the review loop has run **3 times** and the sub-agent still returns DIRTY:
 - Post a summary of unresolved findings to the PR.
 - Escalate to the user for manual decision.
 
-## Phase 4 — Verify phase
+## Phase 4 — Deploy candidate to DEV
 
-1. Move the work-item into Verify state via mc cli
-2. Assign story to agent: Amos
+Deploy the reviewed implementation branch to the DEV container runtime.
 
-## Phase 5 — Closure
-1. Assume that the verification is complete.
-2. Merge the PR using `gh pr merge`, checkout `main`, and pull the latest changes.
-3. Set story status to `DONE` via `mc story update`.
-4. Unassign story from the agent.
-5. Delete both local and origin implementation branches.
-
-## Phase 6 — Deploy (DEV)
-
-Deploy the merged changes to the DEV container runtime.
-
-1. Ensure you are on `main` with latest changes pulled (should be done in Phase 5).
+1. Confirm you are still on the implementation branch, not on `main`.
 2. Run the deploy script in non-interactive mode:
    ```bash
    ./infra/deploy.sh dev
    ```
-   This builds Docker images (api + web), runs migrations, starts/updates the DEV stack,
-   and runs smoke checks against `http://127.0.0.1:5000/healthz` and `http://127.0.0.1:3000/dashboard`.
 3. **Verify the output:**
-   - All build steps complete without error.
-   - Smoke checks pass (API healthz + WEB dashboard respond).
-   - `[OK] DEV deploy complete` appears at the end.
+   - the script reports the implementation branch name
+   - all build steps complete without error
+   - smoke checks pass (`http://127.0.0.1:5000/healthz` and `http://127.0.0.1:3000/dashboard`)
+   - `[OK] DEV deploy complete` appears at the end
 4. **If deploy fails:** report `BLOCKER` with the error output and escalate to the user.
-   Do NOT retry automatically — deploy failures may require infrastructure investigation.
+   - Do NOT retry automatically.
+   - Do NOT move the story to `VERIFY`.
+   - Do NOT merge the PR.
 
-> **Note:** PROD deploy (`./infra/deploy.sh prod`) is never run autonomously.
-> Only DEV deploy is in scope for the E2E flow. PROD requires explicit user authorization.
+## Phase 5 — VERIFY handoff (default stop point)
+
+1. Move the work-item into `VERIFY` via MC CLI.
+2. Assign the story to agent: Amos.
+3. Return `VERIFY_READY` with:
+   - story/task keys
+   - PR URL
+   - implementation branch name
+   - deployed commit SHA
+   - DEV URLs checked
+4. Stop.
+
+### VERIFY gate (mandatory)
+
+At this point the autonomous flow is complete.
+
+Do **not** do any of the following unless the human explicitly instructs you to continue after verification:
+- merge the PR
+- checkout/pull `main` for release
+- deploy PROD
+- set the story to `DONE`
+- delete local/origin implementation branches
+- perform full closure
+
+## Phase 6 — Post-VERIFY release and closure (human-gated)
+
+Proceed only after the human explicitly confirms verification is complete and authorizes release/merge.
+
+Examples of explicit authorization:
+- `verified`
+- `verification complete`
+- `merge it`
+- `deploy prod`
+- `close it`
+
+When that explicit instruction is present:
+
+1. Merge the PR using `gh pr merge`.
+2. Checkout `main` and pull the latest changes.
+3. Run the PROD deploy:
+   ```bash
+   ./infra/deploy.sh prod
+   ```
+4. **Verify the output:**
+   - all build/migration steps complete without error
+   - smoke checks pass (`http://127.0.0.1:5100/healthz` and `http://127.0.0.1:3100/dashboard`)
+   - `[OK] PROD deploy complete` appears at the end
+5. Set story status to `DONE` via `mc story update`.
+6. Unassign the story from the agent.
+7. Delete both local and origin implementation branches.
+
+If merge or PROD deploy fails:
+- report `BLOCKER`
+- do not set story `DONE`
+- do not delete branches
 
 ## Quality bar
 
 - Follow zero-warnings policy: fix at source.
-- Do not hide issues with `# noqa`, blanket disables, lint-ignore hacks, or weakened configs unless explicitly approved by user.
+- Do not hide issues with `# noqa`, blanket disables, lint-ignore hacks, or weakened configs unless explicitly approved by the user.
 - Keep fixes senior-level and minimal-risk.
 
 ## Blocker protocol
 
-Stop and report `BLOCKER` only when autonomous resolution is not possible (e.g., unresolved deploy failure, merge conflict requiring user decision, unclear failing tests).
+Stop and report `BLOCKER` only when autonomous resolution is not possible (e.g. unresolved deploy failure, merge conflict requiring user decision, unclear failing tests).
 
 Do not stop for routine fixable issues (lint errors, straightforward test failures, review comments).
 
@@ -178,9 +229,9 @@ Do not stop for routine fixable issues (lint errors, straightforward test failur
 
 Return concise status updates:
 
-1) `DONE` or `BLOCKER`
-2) changed resources (story/task keys, PR URL, commit refs)
-3) follow-up needed (if any)
+1. `VERIFY_READY`, `DONE`, or `BLOCKER`
+2. changed resources (story/task keys, PR URL, commit refs, deploy target)
+3. follow-up needed (if any)
 
 ## Related skills
 
