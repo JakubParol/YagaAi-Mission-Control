@@ -140,7 +140,7 @@ build_global_cli() {
 
   echo "[INFO] Installing mc wrappers: $MC_WRAPPER_PATH, $MC_DEV_WRAPPER_PATH, $MC_PROD_WRAPPER_PATH"
 
-  # Bare mc — no default API target; write operations fail unless explicit
+  # Bare mc — defaults to PROD API (operator default)
   $SUDO tee "$MC_WRAPPER_PATH" >/dev/null <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -248,14 +248,16 @@ print_summary() {
 - PROD service: $PROD_SERVICE_NAME
 
 Execution profiles:
-  mc-dev   → always targets DEV  API (http://127.0.0.1:5000)
-  mc-prod  → always targets PROD API (http://127.0.0.1:5100)
-  mc       → read-only unless MC_API_BASE_URL or --api-base is set
+  mc       → defaults to PROD API (http://127.0.0.1:5100)
+  mc-dev   → convenience wrapper, always targets DEV  API (http://127.0.0.1:5000)
+  mc-prod  → convenience wrapper, always targets PROD API (http://127.0.0.1:5100)
+
+Override with --api-base or MC_API_BASE_URL for any target.
 
 Examples:
-  mc-dev health
-  mc-prod project list
-  mc --api-base http://127.0.0.1:5000 health
+  mc health                                          # hits PROD
+  mc-dev project list                                # hits DEV
+  mc --api-base http://127.0.0.1:5000 task update .. # explicit DEV target
 
 Recommended next step:
 - Review $PROD_ENV_FILE and adjust secrets/integration settings if needed
