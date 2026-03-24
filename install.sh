@@ -7,6 +7,8 @@ DEV_ENV_FILE="$REPO_ROOT/infra/dev/.env"
 PROD_ENV_DIR="/etc/mission-control"
 PROD_ENV_FILE="$PROD_ENV_DIR/prod.env"
 MC_WRAPPER_PATH="/usr/local/bin/mc"
+MC_DEV_WRAPPER_PATH="/usr/local/bin/mc-dev"
+MC_PROD_WRAPPER_PATH="/usr/local/bin/mc-prod"
 DEV_SERVICE_NAME="mission-control-dev.service"
 PROD_SERVICE_NAME="mission-control-prod.service"
 
@@ -134,14 +136,35 @@ build_global_cli() {
   echo "[INFO] Installing CLI dependencies"
   run_as_install_user "cd '$REPO_ROOT/apps/cli' && npm ci && npm run build"
 
-  echo "[INFO] Installing global mc wrapper at $MC_WRAPPER_PATH"
+  local cli_entry="$REPO_ROOT/apps/cli/dist/index.js"
+
+  echo "[INFO] Installing mc wrappers: $MC_WRAPPER_PATH, $MC_DEV_WRAPPER_PATH, $MC_PROD_WRAPPER_PATH"
+
+  # Bare mc — no default API target; write operations fail unless explicit
   $SUDO tee "$MC_WRAPPER_PATH" >/dev/null <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-export MC_API_BASE_URL="\${MC_API_BASE_URL:-http://127.0.0.1:5100}"
-exec node "$REPO_ROOT/apps/cli/dist/index.js" "\$@"
+exec node "$cli_entry" "\$@"
 EOF
   $SUDO chmod 755 "$MC_WRAPPER_PATH"
+
+  # mc-dev — always targets DEV API
+  $SUDO tee "$MC_DEV_WRAPPER_PATH" >/dev/null <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+export MC_API_BASE_URL="http://127.0.0.1:5000"
+exec node "$cli_entry" "\$@"
+EOF
+  $SUDO chmod 755 "$MC_DEV_WRAPPER_PATH"
+
+  # mc-prod — always targets PROD API
+  $SUDO tee "$MC_PROD_WRAPPER_PATH" >/dev/null <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+export MC_API_BASE_URL="http://127.0.0.1:5100"
+exec node "$cli_entry" "\$@"
+EOF
+  $SUDO chmod 755 "$MC_PROD_WRAPPER_PATH"
 }
 
 write_dev_service() {
@@ -220,16 +243,19 @@ print_summary() {
 
 - DEV env: $DEV_ENV_FILE
 - PROD env: $PROD_ENV_FILE
-- Global CLI: $MC_WRAPPER_PATH
+- CLI wrappers: $MC_WRAPPER_PATH, $MC_DEV_WRAPPER_PATH, $MC_PROD_WRAPPER_PATH
 - DEV service: $DEV_SERVICE_NAME
 - PROD service: $PROD_SERVICE_NAME
 
-Default mc target:
-- PROD API via http://127.0.0.1:5100
+Execution profiles:
+  mc-dev   → always targets DEV  API (http://127.0.0.1:5000)
+  mc-prod  → always targets PROD API (http://127.0.0.1:5100)
+  mc       → read-only unless MC_API_BASE_URL or --api-base is set
 
 Examples:
-- mc health
-- mc --api-base http://127.0.0.1:5000 health
+  mc-dev health
+  mc-prod project list
+  mc --api-base http://127.0.0.1:5000 health
 
 Recommended next step:
 - Review $PROD_ENV_FILE and adjust secrets/integration settings if needed
