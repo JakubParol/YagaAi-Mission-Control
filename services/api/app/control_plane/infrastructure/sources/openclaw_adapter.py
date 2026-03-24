@@ -28,6 +28,20 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
     identity, and calls chat.send to deliver the dispatch prompt to the
     assigned agent's main session.
 
+    Auth model: the Gateway requires both a shared token AND an Ed25519
+    device identity to grant operator.write scope (needed for chat.send).
+    Token-only auth is insufficient — it grants read scope only. This is
+    a Gateway-level security policy, not an MC design choice. The API
+    runtime therefore acts as a privileged Gateway client that must have:
+      - MC_API_OPENCLAW_GATEWAY_URL  (WebSocket URL)
+      - MC_API_OPENCLAW_GATEWAY_TOKEN  (shared auth token)
+      - MC_API_OPENCLAW_DEVICE_IDENTITY_PATH  (Ed25519 key pair JSON)
+
+    chat.send semantics: a successful response (ok=true, status=started)
+    means the Gateway accepted the message and injected it into the target
+    agent session. It does NOT mean the agent has processed or acknowledged
+    the message — that happens asynchronously via runtime callbacks.
+
     Production-safe: works from any runtime (container, VM, host) that
     can reach the Gateway WebSocket URL.
     """
@@ -56,7 +70,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata:
         if not self._token:
-            msg = "OpenClaw Gateway token not configured (MC_API_CONTROL_PLANE_OPENCLAW_GATEWAY_TOKEN)"
+            msg = "OpenClaw Gateway token not configured (MC_API_OPENCLAW_GATEWAY_TOKEN)"
             raise RuntimeError(msg)
         self._get_device()  # fail-fast if not configured
         prompt = self._build_prompt(envelope)
@@ -110,7 +124,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         if self._device is not None:
             return self._device
         if not self._device_path:
-            msg = "OpenClaw device identity not configured (MC_API_CONTROL_PLANE_OPENCLAW_DEVICE_IDENTITY_PATH)"
+            msg = "OpenClaw device identity not configured (MC_API_OPENCLAW_DEVICE_IDENTITY_PATH)"
             raise RuntimeError(msg)
         try:
             self._device = self._load_device_identity(self._device_path)

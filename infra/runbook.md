@@ -94,19 +94,38 @@ If you want to debug API/Web outside containers, run host processes on different
 
 ## Control Plane dispatch (OpenClaw Gateway)
 
-Required env vars for agent dispatch from the API:
+### Gateway connection (API env config)
+
+The API acts as a privileged Gateway client to dispatch work. It needs both
+a shared token AND an Ed25519 device identity (token-only auth grants read
+scope only; `chat.send` requires `operator.write` which needs device auth).
 
 | Var | Description | Example |
 |---|---|---|
-| `MC_API_CONTROL_PLANE_OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
-| `MC_API_CONTROL_PLANE_OPENCLAW_GATEWAY_TOKEN` | Gateway auth token | from `openclaw.json → gateway.auth.token` |
-| `MC_API_CONTROL_PLANE_OPENCLAW_DEVICE_IDENTITY_PATH` | Device identity JSON (Ed25519 keys) | `/home/kuba/.openclaw/identity/device.json` |
+| `MC_API_OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
+| `MC_API_OPENCLAW_GATEWAY_TOKEN` | Gateway shared auth token | from `openclaw.json → gateway.auth.token` |
+| `MC_API_OPENCLAW_DEVICE_IDENTITY_PATH` | Ed25519 device identity JSON | `/home/kuba/.openclaw/identity/device.json` |
 
-Set these in:
-- DEV: `services/api/.env.local`
-- PROD: `/etc/mission-control/prod.env`
+Set these in DEV (`services/api/.env.local`) and PROD (`/etc/mission-control/prod.env`).
 
-Without these, dispatch will fail with `MISSING_MAIN_SESSION_KEY` or `device identity not configured`.
+Missing or wrong values → dispatch fails with:
+- empty token → `Gateway token not configured`
+- empty/bad identity path → `Failed to load OpenClaw device identity`
+- wrong token → `Gateway connect failed: AUTH_TOKEN_MISMATCH`
+
+### Agent routing data (Planning DB)
+
+Each agent that should receive dispatched work needs `main_session_key` set
+in the agents table (via `PATCH /v1/planning/agents/:id` or `mc agent update`).
+
+Missing → dispatch fails with `MISSING_MAIN_SESSION_KEY` (entry reverts to QUEUED).
+
+### Dispatch success semantics
+
+A successful `chat.send` (Gateway returns `ok: true, status: started`) means
+the Gateway accepted and injected the message into the target agent session.
+It does NOT mean the agent acknowledged or started work — that arrives later
+via runtime callbacks (`agent.assignment.accepted`, etc.).
 
 ## PROD workflow (full containers)
 

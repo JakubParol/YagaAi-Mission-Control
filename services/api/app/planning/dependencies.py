@@ -64,9 +64,9 @@ def _build_queue_dispatch_service(db: AsyncSession) -> QueueDispatchService:
             queue_repo=queue_repo,
             dispatch_repo=dispatch_repo,
             openclaw_adapter=GatewayWsDispatchAdapter(
-                gateway_url=settings.control_plane_openclaw_gateway_url,
-                gateway_token=settings.control_plane_openclaw_gateway_token,
-                device_identity_path=settings.control_plane_openclaw_device_identity_path,
+                gateway_url=settings.openclaw_gateway_url,
+                gateway_token=settings.openclaw_gateway_token,
+                device_identity_path=settings.openclaw_device_identity_path,
             ),
         ),
         agent_lookup=DbAgentLookupAdapter(db),
