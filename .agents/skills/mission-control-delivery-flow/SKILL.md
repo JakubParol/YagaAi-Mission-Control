@@ -14,6 +14,22 @@ Execute this flow when the user asks to deliver a story/bug through the Mission 
 - For planning work-items, use `mc` CLI only.
 - A work-item here means a User Story, Task, or Bug.
 
+## MC CLI execution context (mandatory)
+
+The agent may receive execution environment context (`DEV` or `PROD`) as part of the dispatch/delivery contract for a work item. This determines which CLI wrapper to use for MC write operations.
+
+| Operation type | Wrapper rule |
+|---|---|
+| Read/list/get | bare `mc` is allowed |
+| Mutating writes (create, update, attach, assign, status) | **must** use `mc-dev` or `mc-prod` matching the received execution context |
+
+Rules:
+1. `DEV` context → use `mc-dev` for all writes.
+2. `PROD` context → use `mc-prod` for all writes.
+3. Bare `mc` is **not allowed** for write operations unless `MC_API_BASE_URL` or `--api-base` is explicitly set.
+4. Read operations may use bare `mc` when safe and unambiguous.
+5. Execution profile is determined **per work item / per dispatch context** — not per agent identity. Any agent can execute DEV or PROD work depending on what it is dispatched to do.
+
 ## Core delivery rule (mandatory)
 
 - The default autonomous objective is to reach **VERIFY** safely, not to merge to `main`.
