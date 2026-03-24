@@ -88,7 +88,6 @@ class OpenClawDispatchService:
             )
 
         record.status = DispatchRecordStatus.SENT
-        record.session_id = session_meta.session_id
         record.process_id = session_meta.process_id
         record.dispatched_at = now
 

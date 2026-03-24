@@ -12,10 +12,7 @@ class FakeOpenClawAdapter(OpenClawDispatchPort):
     async def send_dispatch(self, *, envelope: DispatchEnvelope) -> OpenClawSessionMetadata:
         self.dispatch_count += 1
         self.last_envelope = envelope
-        return OpenClawSessionMetadata(
-            session_id=envelope.main_session_key,
-            process_id=12345,
-        )
+        return OpenClawSessionMetadata(process_id=12345)
 
 
 class FailingOpenClawAdapter(OpenClawDispatchPort):

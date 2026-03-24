@@ -142,7 +142,6 @@ def _to_dispatch_record_response(record: DispatchRecord) -> DispatchRecordRespon
         work_item_key=record.work_item_key,
         status=record.status.value,
         dispatch_session_key=record.dispatch_session_key,
-        session_id=record.session_id,
         process_id=record.process_id,
         error_message=record.error_message,
         dispatched_at=record.dispatched_at,

@@ -270,9 +270,7 @@ class DispatchEnvelope:
 
 @dataclass
 class OpenClawSessionMetadata:
-    session_id: str
     process_id: int | None = None
-    work_dir: str | None = None
 
 
 @dataclass
@@ -286,7 +284,6 @@ class DispatchRecord:
     status: DispatchRecordStatus
     envelope_json: dict[str, Any]
     dispatch_session_key: str | None = None
-    session_id: str | None = None
     process_id: int | None = None
     error_message: str | None = None
     dispatched_at: str | None = None

@@ -97,10 +97,7 @@ class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
             main_session_key=envelope.main_session_key,
         )
 
-        return OpenClawSessionMetadata(
-            session_id=envelope.main_session_key,
-            process_id=proc.pid,
-        )
+        return OpenClawSessionMetadata(process_id=proc.pid)
 
     @staticmethod
     def _build_prompt(envelope: DispatchEnvelope) -> str:

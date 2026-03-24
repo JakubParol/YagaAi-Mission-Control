@@ -154,7 +154,6 @@ control_plane_dispatch_records = Table(
     Column("status", Text, nullable=False),
     Column("envelope_json", Text, nullable=False),
     Column("dispatch_session_key", Text),
-    Column("session_id", Text),
     Column("process_id", Integer),
     Column("error_message", Text),
     Column("dispatched_at", Text),
