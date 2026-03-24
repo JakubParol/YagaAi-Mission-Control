@@ -92,6 +92,41 @@ This rebuilds the API image, runs PostgreSQL migrations, and then recreates `api
 
 If you want to debug API/Web outside containers, run host processes on different ports (e.g. `5001` / `3001`) to avoid collisions with DEV container ports.
 
+## Control Plane dispatch (OpenClaw Gateway)
+
+### Gateway connection (API env config)
+
+The API acts as a privileged Gateway client to dispatch work. It needs both
+a shared token AND an Ed25519 device identity (token-only auth grants read
+scope only; `chat.send` requires `operator.write` which needs device auth).
+
+| Var | Description | Example |
+|---|---|---|
+| `MC_API_OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
+| `MC_API_OPENCLAW_GATEWAY_TOKEN` | Gateway shared auth token | from `openclaw.json → gateway.auth.token` |
+| `MC_API_OPENCLAW_DEVICE_IDENTITY_PATH` | Ed25519 device identity JSON | `/home/kuba/.openclaw/identity/device.json` |
+
+Set these in DEV (`services/api/.env.local`) and PROD (`/etc/mission-control/prod.env`).
+
+Missing or wrong values → dispatch fails with:
+- empty token → `Gateway token not configured`
+- empty/bad identity path → `Failed to load OpenClaw device identity`
+- wrong token → `Gateway connect failed: AUTH_TOKEN_MISMATCH`
+
+### Agent routing data (Planning DB)
+
+Each agent that should receive dispatched work needs `main_session_key` set
+in the agents table (via `PATCH /v1/planning/agents/:id` or `mc agent update`).
+
+Missing → dispatch fails with `MISSING_MAIN_SESSION_KEY` (entry reverts to QUEUED).
+
+### Dispatch success semantics
+
+A successful `chat.send` (Gateway returns `ok: true, status: started`) means
+the Gateway accepted and injected the message into the target agent session.
+It does NOT mean the agent acknowledged or started work — that arrives later
+via runtime callbacks (`agent.assignment.accepted`, etc.).
+
 ## PROD workflow (full containers)
 
 ### One-time systemd install

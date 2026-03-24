@@ -17,7 +17,7 @@ from app.control_plane.infrastructure.repositories.dispatch_record import DbDisp
 from app.control_plane.infrastructure.repositories.read_model import DbReadModelRepository
 from app.control_plane.infrastructure.repositories.run import DbRunRepository
 from app.control_plane.infrastructure.sources.openclaw_adapter import (
-    SubprocessSessionDispatchAdapter,
+    GatewayWsDispatchAdapter,
 )
 from app.planning.infrastructure.shared.agent_lookup_adapter import DbAgentLookupAdapter
 from app.shared.api.deps import get_db
@@ -73,8 +73,10 @@ async def get_queue_dispatch_service(
         dispatch=OpenClawDispatchService(
             queue_repo=queue_repo,
             dispatch_repo=dispatch_repo,
-            openclaw_adapter=SubprocessSessionDispatchAdapter(
-                openclaw_binary=settings.control_plane_openclaw_binary,
+            openclaw_adapter=GatewayWsDispatchAdapter(
+                gateway_url=settings.openclaw_gateway_url,
+                gateway_token=settings.openclaw_gateway_token,
+                device_identity_path=settings.openclaw_device_identity_path,
             ),
         ),
         agent_lookup=DbAgentLookupAdapter(db),
