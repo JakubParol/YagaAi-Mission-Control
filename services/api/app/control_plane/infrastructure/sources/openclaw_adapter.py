@@ -112,7 +112,11 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         if not self._device_path:
             msg = "OpenClaw device identity not configured (MC_API_CONTROL_PLANE_OPENCLAW_DEVICE_IDENTITY_PATH)"
             raise RuntimeError(msg)
-        self._device = self._load_device_identity(self._device_path)
+        try:
+            self._device = self._load_device_identity(self._device_path)
+        except Exception as exc:
+            msg = f"Failed to load OpenClaw device identity from {self._device_path}: {exc}"
+            raise RuntimeError(msg) from exc
         return self._device
 
     async def _authenticate(self, ws: websockets.ClientConnection) -> None:
