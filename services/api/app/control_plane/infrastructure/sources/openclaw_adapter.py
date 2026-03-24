@@ -1,5 +1,12 @@
-import asyncio
+import base64
+import json
 import logging
+import platform
+import time
+import uuid
+
+import websockets
+from cryptography.hazmat.primitives import serialization
 
 from app.control_plane.application.ports import OpenClawDispatchPort
 from app.control_plane.domain.models import DispatchEnvelope, OpenClawSessionMetadata
@@ -7,97 +14,217 @@ from app.shared.logging import log_event
 
 logger = logging.getLogger(__name__)
 
-_QUICK_FAIL_SECONDS = 2
+_CONNECT_TIMEOUT_SECONDS = 10
+_SEND_TIMEOUT_SECONDS = 15
+_PROTOCOL_VERSION = 3
 
 
-class SubprocessSessionDispatchAdapter(OpenClawDispatchPort):
-    """Dispatches work to an agent's main session via `openclaw agent` CLI.
+class GatewayWsDispatchAdapter(OpenClawDispatchPort):
+    """Dispatches work to an agent's main session via OpenClaw Gateway WS RPC.
 
-    Semantics: this is a session-dispatch, not a harness launch.
-    MC sends a structured message to the agent's main session.
-    The agent decides how to execute (ACP, Claude Code, Codex, etc.).
+    Connects to the Gateway WebSocket, authenticates with token + device
+    identity, and calls chat.send to deliver the dispatch prompt to the
+    assigned agent's main session.
 
-    The subprocess is launched detached so it survives API process restarts.
-    A quick-fail check catches immediate startup errors (bad binary, bad args).
+    Production-safe: works from any runtime (container, VM, host) that
+    can reach the Gateway WebSocket URL.
     """
 
-    def __init__(self, *, openclaw_binary: str = "openclaw") -> None:
-        self._binary = openclaw_binary
+    def __init__(
+        self,
+        *,
+        gateway_url: str,
+        gateway_token: str,
+        device_identity_path: str,
+    ) -> None:
+        self._ws_url = gateway_url.replace("http://", "ws://").replace("https://", "wss://")
+        self._token = gateway_token
+        self._device_path = device_identity_path
+        self._device: dict | None = None
 
     async def send_dispatch(
         self,
         *,
         envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata:
+        self._get_device()  # fail-fast if not configured
         prompt = self._build_prompt(envelope)
-        cmd = [
-            self._binary,
-            "agent",
-            "--agent",
-            envelope.openclaw_key,
-            "--session-id",
-            envelope.main_session_key,
-            "--message",
-            prompt,
-            "--json",
-            "--timeout",
-            "3600",
-        ]
+        idempotency_key = f"mc-dispatch-{envelope.run_id}"
 
         log_event(
             logger,
             level=logging.INFO,
-            event="control_plane.dispatch.adapter.launching",
+            event="control_plane.dispatch.adapter.sending",
             agent_id=envelope.agent_id,
-            openclaw_key=envelope.openclaw_key,
             main_session_key=envelope.main_session_key,
             run_id=envelope.run_id,
             work_item_key=envelope.work_item_key,
         )
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-                start_new_session=True,
-            )
-        except (OSError, FileNotFoundError) as exc:
-            msg = f"Failed to launch openclaw subprocess: {exc}"
+            async with websockets.connect(
+                self._ws_url,
+                open_timeout=_CONNECT_TIMEOUT_SECONDS,
+            ) as ws:
+                await self._authenticate(ws)
+
+                result = await self._chat_send(
+                    ws,
+                    session_key=envelope.main_session_key,
+                    message=prompt,
+                    idempotency_key=idempotency_key,
+                )
+        except websockets.exceptions.WebSocketException as exc:
+            msg = f"Gateway WebSocket error: {exc}"
+            raise RuntimeError(msg) from exc
+        except TimeoutError as exc:
+            msg = f"Gateway dispatch timeout: {exc}"
             raise RuntimeError(msg) from exc
 
-        # Quick-fail check: only immediate non-zero exit is a startup error.
-        # Exit code 0 = fast successful completion (agent accepted + returned).
-        # Still running = long-running dispatch underway.
-        try:
-            await asyncio.wait_for(proc.wait(), timeout=_QUICK_FAIL_SECONDS)
-            if proc.returncode != 0:
-                msg = f"openclaw agent startup failure (exit code {proc.returncode})"
-                raise RuntimeError(msg)
-            # Exit 0 within grace period — fast success
-            log_event(
-                logger,
-                level=logging.INFO,
-                event="control_plane.dispatch.adapter.fast_success",
-                agent_id=envelope.agent_id,
-                run_id=envelope.run_id,
-                pid=proc.pid,
-            )
-        except asyncio.TimeoutError:
-            # Process is still running — dispatch underway (normal for long tasks)
-            pass
+        run_id = result.get("runId", envelope.run_id)
 
         log_event(
             logger,
             level=logging.INFO,
             event="control_plane.dispatch.adapter.sent",
             agent_id=envelope.agent_id,
-            run_id=envelope.run_id,
-            pid=proc.pid,
+            run_id=run_id,
             main_session_key=envelope.main_session_key,
+            gateway_status=result.get("status"),
         )
 
-        return OpenClawSessionMetadata(process_id=proc.pid)
+        return OpenClawSessionMetadata(process_id=None)
+
+    def _get_device(self) -> dict:
+        if self._device is not None:
+            return self._device
+        if not self._device_path:
+            msg = "OpenClaw device identity not configured (MC_API_CONTROL_PLANE_OPENCLAW_DEVICE_IDENTITY_PATH)"
+            raise RuntimeError(msg)
+        self._device = self._load_device_identity(self._device_path)
+        return self._device
+
+    async def _authenticate(self, ws: websockets.ClientConnection) -> None:
+        """Complete Gateway connect handshake with device identity auth."""
+        raw = await ws.recv()
+        challenge = json.loads(raw)
+        nonce = challenge["payload"]["nonce"]
+
+        signed_at_ms = int(time.time() * 1000)
+        device_payload = self._build_device_auth_payload(
+            nonce=nonce,
+            signed_at_ms=signed_at_ms,
+        )
+        signature = self._sign_payload(device_payload)
+
+        connect = {
+            "type": "req",
+            "id": str(uuid.uuid4()),
+            "method": "connect",
+            "params": {
+                "auth": {"token": self._token},
+                "role": "operator",
+                "scopes": ["operator.write"],
+                "client": {
+                    "id": "gateway-client",
+                    "mode": "backend",
+                    "version": "1.0.0",
+                    "platform": platform.system().lower(),
+                },
+                "device": {
+                    "id": self._get_device()["deviceId"],
+                    "publicKey": self._get_device()["publicKeyB64"],
+                    "signature": signature,
+                    "signedAt": signed_at_ms,
+                    "nonce": nonce,
+                },
+                "minProtocol": _PROTOCOL_VERSION,
+                "maxProtocol": _PROTOCOL_VERSION,
+            },
+        }
+        await ws.send(json.dumps(connect))
+        resp = json.loads(await ws.recv())
+        if not resp.get("ok"):
+            error = resp.get("error", {})
+            msg = f"Gateway connect failed: {error.get('message', 'unknown')}"
+            raise RuntimeError(msg)
+
+    async def _chat_send(
+        self,
+        ws: websockets.ClientConnection,
+        *,
+        session_key: str,
+        message: str,
+        idempotency_key: str,
+    ) -> dict:
+        """Send chat.send RPC and wait for the response."""
+        req = {
+            "type": "req",
+            "id": idempotency_key,
+            "method": "chat.send",
+            "params": {
+                "sessionKey": session_key,
+                "message": message,
+                "idempotencyKey": idempotency_key,
+            },
+        }
+        await ws.send(json.dumps(req))
+
+        # Read frames until we get the response for our request
+        while True:
+            raw = await ws.recv()
+            frame = json.loads(raw)
+            if frame.get("type") == "res" and frame.get("id") == idempotency_key:
+                if not frame.get("ok"):
+                    error = frame.get("error", {})
+                    msg = f"Gateway chat.send failed: {error.get('message', 'unknown')}"
+                    raise RuntimeError(msg)
+                return frame.get("payload", {})
+
+    def _build_device_auth_payload(
+        self,
+        *,
+        nonce: str,
+        signed_at_ms: int,
+    ) -> str:
+        return "|".join(
+            [
+                "v3",
+                self._get_device()["deviceId"],
+                "gateway-client",
+                "backend",
+                "operator",
+                "operator.write",
+                str(signed_at_ms),
+                self._token,
+                nonce,
+                platform.system().lower(),
+                "",
+            ]
+        )
+
+    def _sign_payload(self, payload: str) -> str:
+        signature = self._get_device()["privateKey"].sign(payload.encode("utf-8"))
+        return base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
+
+    @staticmethod
+    def _load_device_identity(path: str) -> dict:
+        with open(path) as f:
+            data = json.load(f)
+        private_key = serialization.load_pem_private_key(
+            data["privateKeyPem"].encode(),
+            password=None,
+        )
+        public_key = private_key.public_key()
+        pub_raw = public_key.public_bytes(
+            serialization.Encoding.Raw,
+            serialization.PublicFormat.Raw,
+        )
+        return {
+            "deviceId": data["deviceId"],
+            "privateKey": private_key,
+            "publicKeyB64": base64.urlsafe_b64encode(pub_raw).rstrip(b"=").decode(),
+        }
 
     @staticmethod
     def _build_prompt(envelope: DispatchEnvelope) -> str:

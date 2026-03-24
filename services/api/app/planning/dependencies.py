@@ -9,7 +9,7 @@ from app.control_plane.application.queue_ingress_service import QueueIngressServ
 from app.control_plane.infrastructure.repositories.agent_queue import DbAgentQueueRepository
 from app.control_plane.infrastructure.repositories.dispatch_record import DbDispatchRecordRepository
 from app.control_plane.infrastructure.sources.openclaw_adapter import (
-    SubprocessSessionDispatchAdapter,
+    GatewayWsDispatchAdapter,
 )
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
@@ -63,8 +63,10 @@ def _build_queue_dispatch_service(db: AsyncSession) -> QueueDispatchService:
         dispatch=OpenClawDispatchService(
             queue_repo=queue_repo,
             dispatch_repo=dispatch_repo,
-            openclaw_adapter=SubprocessSessionDispatchAdapter(
-                openclaw_binary=settings.control_plane_openclaw_binary,
+            openclaw_adapter=GatewayWsDispatchAdapter(
+                gateway_url=settings.control_plane_openclaw_gateway_url,
+                gateway_token=settings.control_plane_openclaw_gateway_token,
+                device_identity_path=settings.control_plane_openclaw_device_identity_path,
             ),
         ),
         agent_lookup=DbAgentLookupAdapter(db),
