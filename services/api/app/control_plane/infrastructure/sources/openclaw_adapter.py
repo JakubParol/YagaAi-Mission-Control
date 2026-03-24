@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 _CONNECT_TIMEOUT_SECONDS = 10
 _RECV_TIMEOUT_SECONDS = 30
+_MAX_RECV_FRAMES = 50
 _PROTOCOL_VERSION = 3
 
 
@@ -117,8 +118,12 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
     async def _authenticate(self, ws: websockets.ClientConnection) -> None:
         """Complete Gateway connect handshake with device identity auth."""
         raw = await asyncio.wait_for(ws.recv(), timeout=_RECV_TIMEOUT_SECONDS)
-        challenge = json.loads(raw)
-        nonce = challenge["payload"]["nonce"]
+        try:
+            challenge = json.loads(raw)
+            nonce = challenge["payload"]["nonce"]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            msg = f"Malformed gateway challenge frame: {exc}"
+            raise RuntimeError(msg) from exc
 
         signed_at_ms = int(time.time() * 1000)
         device_payload = self._build_device_auth_payload(
@@ -180,8 +185,8 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         }
         await ws.send(json.dumps(req))
 
-        # Read frames until we get the response for our request
-        while True:
+        # Read frames until we get the response (bounded by frame count)
+        for _ in range(_MAX_RECV_FRAMES):
             raw = await asyncio.wait_for(ws.recv(), timeout=_RECV_TIMEOUT_SECONDS)
             frame = json.loads(raw)
             if frame.get("type") == "res" and frame.get("id") == idempotency_key:
@@ -190,6 +195,9 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
                     msg = f"Gateway chat.send failed: {error.get('message', 'unknown')}"
                     raise RuntimeError(msg)
                 return frame.get("payload", {})
+
+        msg = f"Gateway did not respond to chat.send within {_MAX_RECV_FRAMES} frames"
+        raise RuntimeError(msg)
 
     def _build_device_auth_payload(
         self,
