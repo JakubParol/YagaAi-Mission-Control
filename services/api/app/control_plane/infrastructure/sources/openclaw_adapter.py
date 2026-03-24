@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import logging
@@ -15,7 +16,7 @@ from app.shared.logging import log_event
 logger = logging.getLogger(__name__)
 
 _CONNECT_TIMEOUT_SECONDS = 10
-_SEND_TIMEOUT_SECONDS = 15
+_RECV_TIMEOUT_SECONDS = 30
 _PROTOCOL_VERSION = 3
 
 
@@ -37,6 +38,12 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         gateway_token: str,
         device_identity_path: str,
     ) -> None:
+        if not gateway_token:
+            log_event(
+                logger,
+                level=logging.WARNING,
+                event="control_plane.dispatch.adapter.no_token",
+            )
         self._ws_url = gateway_url.replace("http://", "ws://").replace("https://", "wss://")
         self._token = gateway_token
         self._device_path = device_identity_path
@@ -47,6 +54,9 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         *,
         envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata:
+        if not self._token:
+            msg = "OpenClaw Gateway token not configured (MC_API_CONTROL_PLANE_OPENCLAW_GATEWAY_TOKEN)"
+            raise RuntimeError(msg)
         self._get_device()  # fail-fast if not configured
         prompt = self._build_prompt(envelope)
         idempotency_key = f"mc-dispatch-{envelope.run_id}"
@@ -106,7 +116,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
 
     async def _authenticate(self, ws: websockets.ClientConnection) -> None:
         """Complete Gateway connect handshake with device identity auth."""
-        raw = await ws.recv()
+        raw = await asyncio.wait_for(ws.recv(), timeout=_RECV_TIMEOUT_SECONDS)
         challenge = json.loads(raw)
         nonce = challenge["payload"]["nonce"]
 
@@ -143,7 +153,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
             },
         }
         await ws.send(json.dumps(connect))
-        resp = json.loads(await ws.recv())
+        resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=_RECV_TIMEOUT_SECONDS))
         if not resp.get("ok"):
             error = resp.get("error", {})
             msg = f"Gateway connect failed: {error.get('message', 'unknown')}"
@@ -172,7 +182,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
 
         # Read frames until we get the response for our request
         while True:
-            raw = await ws.recv()
+            raw = await asyncio.wait_for(ws.recv(), timeout=_RECV_TIMEOUT_SECONDS)
             frame = json.loads(raw)
             if frame.get("type") == "res" and frame.get("id") == idempotency_key:
                 if not frame.get("ok"):
