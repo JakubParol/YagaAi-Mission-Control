@@ -107,15 +107,27 @@ Read the standards relevant to the changed files BEFORE reviewing.
 ## Output protocol
 - If NO findings: return exactly "REVIEW_RESULT: CLEAR"
 - If findings exist:
-  1. Post EACH finding as a separate PR comment using:
-     gh pr comment <PR_NUMBER> --body "**CR finding (<severity>):** <description>"
-     where severity is one of: P1-blocker, P2-should-fix, P3-nit
+  1. Post EACH finding as a **line-level PR review comment** (resolvable) using the GitHub CLI:
+     ```
+     gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments \
+       --method POST \
+       -f body="**CR finding (<severity>):** <description>" \
+       -f commit_id="$(gh pr view <PR_NUMBER> --json headRefOid -q .headRefOid)" \
+       -f path="<relative-file-path>" \
+       -f line=<line-number> \
+       -f side="RIGHT"
+     ```
+     where severity is one of: P1-blocker, P2-should-fix, P3-nit.
+     If a finding spans a range, use `start_line` + `line` for multi-line comments.
+     Use `gh pr diff <PR_NUMBER>` to determine the correct path and line numbers.
   2. Return exactly "REVIEW_RESULT: DIRTY — <N> findings posted"
 
-Do NOT fix code. Do NOT create commits. Review only.
+Do NOT fix code. Do NOT create commits. Do NOT use `gh pr comment` (issue-level). Review only.
 ```
 
 Fill in `<WORK_ITEM_KEY>`, `<WORK_ITEM_TITLE>`, and `<PR_NUMBER>` from the current session context.
+
+**IMPORTANT:** Do NOT spawn the review agent with `isolation: "worktree"`. Review agents must work on the main repo checkout.
 
 ### 3.2 — Handle review result
 
@@ -125,11 +137,14 @@ Fill in `<WORK_ITEM_KEY>`, `<WORK_ITEM_TITLE>`, and `<PR_NUMBER>` from the curre
 1. Set story status back to `IN_PROGRESS` via `mc story update`.
 2. For each finding posted on the PR:
    - Fix the issue in code.
-   - Resolve the comment on the PR: `gh pr comment <PR_NUMBER> --body "Fixed in <commit-sha>."`
 3. Run quality gates (lint + tests).
 4. Commit and push fixes.
-5. Set story status to `CODE_REVIEW` via `mc story update`.
-6. **Loop back to 3.1** — spawn a fresh review sub-agent.
+5. After push, resolve ALL review comments from the round:
+   - List comments: `gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/comments --jq '.[] | {id, body: .body[:80]}'`
+   - Delete each resolved finding: `gh api -X DELETE repos/{owner}/{repo}/pulls/comments/<COMMENT_ID>`
+   - Also delete any stale issue-level comments: `gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments --jq '.[] | {id, body: .body[:80]}'` → delete each with `gh api -X DELETE repos/{owner}/{repo}/issues/comments/<COMMENT_ID>`
+6. Set story status to `CODE_REVIEW` via `mc story update`.
+7. **Loop back to 3.1** — spawn a fresh review sub-agent.
 
 ### 3.3 — Escalation
 
