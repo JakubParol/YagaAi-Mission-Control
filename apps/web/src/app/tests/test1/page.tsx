@@ -4,7 +4,7 @@ import { FlaskConical } from "lucide-react";
 import { PageShell } from "@/components/page-shell";
 
 export const metadata: Metadata = {
-  title: "Tests — Test1",
+  title: "Test1",
 };
 
 export default function Test1Page() {
