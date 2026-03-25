@@ -22,7 +22,7 @@ Rules:
 1. When dispatch provides an API target, use `mc --api-base <target-url>` for **all** operations (reads and writes).
 2. Bare `mc` (no `--api-base`) defaults to PROD — safe for direct operator usage but agents must always use the explicit target from their dispatch context.
 3. Execution target is a property of the dispatched run, not of the agent identity. Any agent can execute DEV or PROD work depending on what it is dispatched to do.
-4. `mc-dev` and `mc-prod` are convenience wrappers available on the host — agents may use them, but `--api-base` from dispatch context is the authoritative mechanism.
+4. Bare `mc` is the single CLI entrypoint. There are no environment-specific wrappers.
 
 ## Core delivery rule (mandatory)
 
