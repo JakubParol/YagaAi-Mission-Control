@@ -35,21 +35,23 @@ What it does:
 
 ## CLI execution profiles
 
-| Wrapper | Target | Writes allowed |
+| Wrapper | Target | Notes |
 |---|---|---|
-| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | yes |
-| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | yes |
-| `mc` | implicit (defaults to DEV for reads) | **no** — fails unless `MC_API_BASE_URL` or `--api-base` is set |
+| `mc` | PROD API (`http://127.0.0.1:5100`) | default for direct operator usage |
+| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | convenience wrapper |
+| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | convenience wrapper, explicit PROD |
+
+Override with `--api-base <url>` or `MC_API_BASE_URL` for any target.
 
 Examples:
 
 ```bash
-mc-dev health
-mc-prod project list
-mc --api-base http://127.0.0.1:5000 task update ...
+mc health                                          # hits PROD
+mc-dev project list                                # hits DEV
+mc --api-base http://127.0.0.1:5000 task update .. # explicit DEV target
 ```
 
-For agent execution, the execution profile (DEV or PROD) is determined per work item by the dispatch/runtime context — not by agent identity. The dispatch layer passes the target environment in the delivery contract, and the assigned agent uses `mc-dev` or `mc-prod` accordingly.
+For agent execution, the dispatch/delivery context provides an explicit API target via `--api-base`. Execution target is a property of the dispatched run, not of the agent identity.
 
 ## DEV workflow (containerized dev runtime)
 

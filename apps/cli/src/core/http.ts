@@ -1,5 +1,5 @@
 import type { RuntimeConfig } from "./config";
-import { ApiHttpError, CliUsageError, TransportError } from "./errors";
+import { ApiHttpError, TransportError } from "./errors";
 import { extractApiError } from "./envelope";
 
 export interface RequestOptions {
@@ -76,13 +76,6 @@ export class ApiClient {
     path: string,
     options: RequestOptions,
   ): Promise<unknown> {
-    if (!this.cfg.apiBaseExplicit && method !== "GET") {
-      throw new CliUsageError(
-        `Refusing ${method} without an explicit API target.\n` +
-          "Set MC_API_BASE_URL, pass --api-base, or use mc-dev / mc-prod.",
-      );
-    }
-
     const url = `${this.cfg.apiBaseUrl}${path}${toQueryString(options.query)}`;
 
     const headers = new Headers();

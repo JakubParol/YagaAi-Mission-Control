@@ -4,17 +4,17 @@ Configuration model for Mission Control CLI.
 
 ## Execution Profiles
 
-Three wrappers are installed by `install.sh`:
+Bare `mc` defaults to PROD (`http://127.0.0.1:5100`). Two convenience wrappers are also installed by `install.sh`:
 
-| Wrapper | Target | Write-safe |
+| Wrapper | Target | Notes |
 |---|---|---|
-| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | yes |
-| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | yes |
-| `mc` | none (falls back to `http://127.0.0.1:5000` for reads) | **no** — write operations require explicit target |
+| `mc` | PROD API (`http://127.0.0.1:5100`) | default for direct operator usage |
+| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | convenience wrapper, sets `MC_API_BASE_URL` |
+| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | convenience wrapper, explicit PROD |
 
-Bare `mc` blocks POST/PATCH/DELETE unless `MC_API_BASE_URL` or `--api-base` is set. This prevents accidental writes to PROD from unconfigured shells.
+Override with `--api-base <url>` or `MC_API_BASE_URL` env var for any target.
 
-For agent execution, the execution profile (DEV or PROD) is determined per work item by the dispatch/runtime context — not by agent identity. The dispatch layer passes the target environment in the delivery contract, and the assigned agent uses `mc-dev` or `mc-prod` accordingly.
+For agent execution, the dispatch/delivery context provides an explicit API target (e.g. `--api-base http://127.0.0.1:5000`). Agents use that target directly — execution target is a property of the dispatched run, not of the agent identity.
 
 ## Precedence
 
@@ -26,13 +26,13 @@ For agent execution, the execution profile (DEV or PROD) is determined per work 
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `MC_API_BASE_URL` | no | `http://127.0.0.1:5000` | Base URL for Mission Control API |
+| `MC_API_BASE_URL` | no | `http://127.0.0.1:5100` | Base URL for Mission Control API |
 | `MC_ACTOR_ID` | no | — | Actor identity value sent in headers |
 | `MC_ACTOR_TYPE` | no | `user` | Actor type sent in headers |
 | `MC_OUTPUT` | no | `table` | Output mode: `table` or `json` |
 | `MC_TIMEOUT_SECONDS` | no | `30` | HTTP request timeout |
 
-When `MC_API_BASE_URL` is unset and `--api-base` is not passed, the CLI treats the API target as **implicit**. Reads still work (using the default), but writes fail with an actionable error.
+When `MC_API_BASE_URL` is unset and `--api-base` is not passed, the CLI defaults to PROD (`http://127.0.0.1:5100`).
 
 ## HTTP Contract Alignment
 
@@ -47,7 +47,7 @@ Exact auth model is defined in API docs; CLI supports passing actor/auth headers
 ## Output and Exit Codes
 
 - `0`: success
-- `1`: CLI usage/validation error (including write-guard rejection)
+- `1`: CLI usage/validation error
 - `2`: API returned non-2xx response
 - `3`: network/timeout/transport error
 

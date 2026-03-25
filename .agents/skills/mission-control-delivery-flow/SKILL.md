@@ -16,19 +16,13 @@ Execute this flow when the user asks to deliver a story/bug through the Mission 
 
 ## MC CLI execution context (mandatory)
 
-The agent may receive execution environment context (`DEV` or `PROD`) as part of the dispatch/delivery contract for a work item. This determines which CLI wrapper to use for MC write operations.
-
-| Operation type | Wrapper rule |
-|---|---|
-| Read/list/get | bare `mc` is allowed |
-| Mutating writes (create, update, attach, assign, status) | **must** use `mc-dev` or `mc-prod` matching the received execution context |
+The dispatch/delivery contract for a work item provides an explicit API target URL (e.g. `http://127.0.0.1:5000` for DEV, `http://127.0.0.1:5100` for PROD). The assigned agent must use this target for all MC CLI operations via `--api-base`.
 
 Rules:
-1. `DEV` context → use `mc-dev` for all writes.
-2. `PROD` context → use `mc-prod` for all writes.
-3. Bare `mc` is **not allowed** for write operations unless `MC_API_BASE_URL` or `--api-base` is explicitly set.
-4. Read operations may use bare `mc` when safe and unambiguous.
-5. Execution profile is determined **per work item / per dispatch context** — not per agent identity. Any agent can execute DEV or PROD work depending on what it is dispatched to do.
+1. When dispatch provides an API target, use `mc --api-base <target-url>` for **all** operations (reads and writes).
+2. Bare `mc` (no `--api-base`) defaults to PROD — safe for direct operator usage but agents must always use the explicit target from their dispatch context.
+3. Execution target is a property of the dispatched run, not of the agent identity. Any agent can execute DEV or PROD work depending on what it is dispatched to do.
+4. `mc-dev` and `mc-prod` are convenience wrappers available on the host — agents may use them, but `--api-base` from dispatch context is the authoritative mechanism.
 
 ## Core delivery rule (mandatory)
 
