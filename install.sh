@@ -7,8 +7,6 @@ DEV_ENV_FILE="$REPO_ROOT/infra/dev/.env"
 PROD_ENV_DIR="/etc/mission-control"
 PROD_ENV_FILE="$PROD_ENV_DIR/prod.env"
 MC_WRAPPER_PATH="/usr/local/bin/mc"
-MC_DEV_WRAPPER_PATH="/usr/local/bin/mc-dev"
-MC_PROD_WRAPPER_PATH="/usr/local/bin/mc-prod"
 DEV_SERVICE_NAME="mission-control-dev.service"
 PROD_SERVICE_NAME="mission-control-prod.service"
 
@@ -138,33 +136,15 @@ build_global_cli() {
 
   local cli_entry="$REPO_ROOT/apps/cli/dist/index.js"
 
-  echo "[INFO] Installing mc wrappers: $MC_WRAPPER_PATH, $MC_DEV_WRAPPER_PATH, $MC_PROD_WRAPPER_PATH"
+  echo "[INFO] Installing mc wrapper: $MC_WRAPPER_PATH"
 
-  # Bare mc — defaults to PROD API (operator default)
+  # Bare mc — defaults to PROD API (operator default, hardcoded in CLI config.ts)
   $SUDO tee "$MC_WRAPPER_PATH" >/dev/null <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 exec node "$cli_entry" "\$@"
 EOF
   $SUDO chmod 755 "$MC_WRAPPER_PATH"
-
-  # mc-dev — always targets DEV API
-  $SUDO tee "$MC_DEV_WRAPPER_PATH" >/dev/null <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-export MC_API_BASE_URL="http://127.0.0.1:5000"
-exec node "$cli_entry" "\$@"
-EOF
-  $SUDO chmod 755 "$MC_DEV_WRAPPER_PATH"
-
-  # mc-prod — always targets PROD API
-  $SUDO tee "$MC_PROD_WRAPPER_PATH" >/dev/null <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-export MC_API_BASE_URL="http://127.0.0.1:5100"
-exec node "$cli_entry" "\$@"
-EOF
-  $SUDO chmod 755 "$MC_PROD_WRAPPER_PATH"
 }
 
 write_dev_service() {
@@ -243,21 +223,16 @@ print_summary() {
 
 - DEV env: $DEV_ENV_FILE
 - PROD env: $PROD_ENV_FILE
-- CLI wrappers: $MC_WRAPPER_PATH, $MC_DEV_WRAPPER_PATH, $MC_PROD_WRAPPER_PATH
+- CLI wrapper: $MC_WRAPPER_PATH
 - DEV service: $DEV_SERVICE_NAME
 - PROD service: $PROD_SERVICE_NAME
 
-Execution profiles:
-  mc       → defaults to PROD API (http://127.0.0.1:5100)
-  mc-dev   → convenience wrapper, always targets DEV  API (http://127.0.0.1:5000)
-  mc-prod  → convenience wrapper, always targets PROD API (http://127.0.0.1:5100)
+CLI usage:
+  mc health                                          # hits PROD (default)
+  mc --api-base http://127.0.0.1:5000 project list   # explicit DEV target
+  mc --api-base http://127.0.0.1:5100 task update ..  # explicit PROD target
 
-Override with --api-base or MC_API_BASE_URL for any target.
-
-Examples:
-  mc health                                          # hits PROD
-  mc-dev project list                                # hits DEV
-  mc --api-base http://127.0.0.1:5000 task update .. # explicit DEV target
+Override default with --api-base or MC_API_BASE_URL for any target.
 
 Recommended next step:
 - Review $PROD_ENV_FILE and adjust secrets/integration settings if needed
