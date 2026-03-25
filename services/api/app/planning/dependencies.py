@@ -1,16 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.control_plane.application.dispatch_selection_service import DispatchSelectionService
-from app.control_plane.application.openclaw_dispatch_service import OpenClawDispatchService
-from app.control_plane.application.queue_dispatch_service import QueueDispatchService
-from app.control_plane.application.queue_ingress_service import QueueIngressService
-from app.control_plane.infrastructure.repositories.agent_queue import DbAgentQueueRepository
-from app.control_plane.infrastructure.repositories.dispatch_record import DbDispatchRecordRepository
-from app.control_plane.infrastructure.sources.openclaw_adapter import (
-    GatewayWsDispatchAdapter,
-)
+from app.control_plane.dependencies import build_queue_dispatch_service
 from app.planning.application.agent_service import AgentService
 from app.planning.application.backlog_service import BacklogService
 from app.planning.application.label_service import LabelService
@@ -23,11 +19,13 @@ from app.planning.infrastructure.repositories.backlogs.repository import DbBackl
 from app.planning.infrastructure.repositories.labels import DbLabelRepository
 from app.planning.infrastructure.repositories.projects import DbProjectRepository
 from app.planning.infrastructure.repositories.work_items import DbWorkItemRepository
-from app.planning.infrastructure.shared.agent_lookup_adapter import DbAgentLookupAdapter
 from app.planning.infrastructure.sources.openclaw import FileOpenClawAgentSource
 from app.shared.api.deps import get_db
 from app.shared.api.errors import NotFoundError
 from app.shared.ports import OnAssignmentChanged
+
+if TYPE_CHECKING:
+    from app.control_plane.application.queue_dispatch_service import QueueDispatchService
 
 
 async def get_project_service(
@@ -54,29 +52,10 @@ async def get_label_service(
     return LabelService(DbLabelRepository(db))
 
 
-def _build_queue_dispatch_service(db: AsyncSession) -> QueueDispatchService:
-    queue_repo = DbAgentQueueRepository(db)
-    dispatch_repo = DbDispatchRecordRepository(db)
-    return QueueDispatchService(
-        ingress=QueueIngressService(repo=queue_repo),
-        selection=DispatchSelectionService(repo=queue_repo),
-        dispatch=OpenClawDispatchService(
-            queue_repo=queue_repo,
-            dispatch_repo=dispatch_repo,
-            openclaw_adapter=GatewayWsDispatchAdapter(
-                gateway_url=settings.openclaw_gateway_url,
-                device_auth_dir=settings.openclaw_device_auth_dir,
-            ),
-            mc_api_base_url=settings.base_url,
-        ),
-        agent_lookup=DbAgentLookupAdapter(db),
-    )
-
-
 def _make_assignment_hook(
     queue_dispatch_svc: QueueDispatchService,
     project_repo: DbProjectRepository,
-) -> "OnAssignmentChanged":
+) -> OnAssignmentChanged:
     async def on_assignment_changed(
         *,
         work_item_id: str,
@@ -111,7 +90,7 @@ def _make_assignment_hook(
 async def get_work_item_service(
     db: AsyncSession = Depends(get_db),
 ) -> WorkItemService:
-    svc = _build_queue_dispatch_service(db)
+    svc = build_queue_dispatch_service(db)
     hook = _make_assignment_hook(svc, project_repo=DbProjectRepository(db))
     return WorkItemService(DbWorkItemRepository(db), on_assignment_changed=hook)
 
@@ -125,7 +104,7 @@ async def get_backlog_service(
 async def get_work_item_action_service(
     db: AsyncSession = Depends(get_db),
 ) -> WorkItemActionService:
-    svc = _build_queue_dispatch_service(db)
+    svc = build_queue_dispatch_service(db)
     hook = _make_assignment_hook(svc, project_repo=DbProjectRepository(db))
     return WorkItemActionService(
         work_item_service=WorkItemService(DbWorkItemRepository(db), on_assignment_changed=hook),

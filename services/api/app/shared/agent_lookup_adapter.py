@@ -1,15 +1,18 @@
-from sqlalchemy import select
+from sqlalchemy import column, select, table
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.planning.infrastructure.tables import agents
 from app.shared.ports import AgentInfo, AgentLookupPort
+
+# Ad-hoc table reference — avoids importing app.planning.infrastructure.tables
+# so this module stays free of cross-module infrastructure dependencies.
+_agents = table("agents", column("id"), column("openclaw_key"), column("main_session_key"))
 
 
 class DbAgentLookupAdapter(AgentLookupPort):
     """Thin adapter implementing AgentLookupPort via direct DB read.
 
-    Avoids importing the full Planning Agent model into control-plane.
-    Reads only the fields needed for dispatch resolution.
+    Lives in shared/ because both planning and control-plane modules
+    need it in their composition roots.
     """
 
     def __init__(self, db: AsyncSession) -> None:
@@ -19,10 +22,10 @@ class DbAgentLookupAdapter(AgentLookupPort):
         row = (
             await self._db.execute(
                 select(
-                    agents.c.id,
-                    agents.c.openclaw_key,
-                    agents.c.main_session_key,
-                ).where(agents.c.id == agent_id)
+                    _agents.c.id,
+                    _agents.c.openclaw_key,
+                    _agents.c.main_session_key,
+                ).where(_agents.c.id == agent_id)
             )
         ).first()
         if row is None:

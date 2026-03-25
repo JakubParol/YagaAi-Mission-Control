@@ -124,3 +124,22 @@ feature/
 - Domain cannot import from any other layer.
 - No cross-module imports between feature modules (planning ↛ observability).
 - Shared code lives in `shared/` and is importable by all modules.
+
+### NEVER Add import-linter Exceptions
+
+**DO NOT add, extend, or modify `ignore_imports` in import-linter configuration.** This is a hard rule with zero exceptions.
+
+When `lint-imports` fails, it means your code violates the dependency rule. The correct response is:
+
+1. **Fix your imports** — restructure the code so the dependency points the right way.
+2. **Use the composition root correctly** — each module's `dependencies.py` wires only its OWN module's infrastructure. Never build another module's services inline.
+3. **Use ports (ABCs)** — if module A needs a capability from module B, define a port in the application layer and implement it in infrastructure.
+4. **Move shared code** — if multiple modules need the same adapter or helper, it belongs in the shared package.
+
+**Explicitly forbidden:**
+- Adding new lines to `ignore_imports`
+- Widening existing wildcard patterns
+- Importing another module's infrastructure or application layer from your composition root
+- Justifying an exception with "it's just the composition root"
+
+If you believe an exception is genuinely necessary, **STOP and ask the user**. Do not proceed.
