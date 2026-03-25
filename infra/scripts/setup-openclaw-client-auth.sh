@@ -158,49 +158,30 @@ os.chmod(path, 0o600)
 print(f"[INFO] {path} written")
 PYDEVICE
 
-# --- Step 3: Write device-auth.json (native OpenClaw format) ---
-python3 - "$DEVICE_AUTH_JSON" "$DEVICE_ID" "$GATEWAY_TOKEN" "$CREATED_AT_MS" <<'PYAUTH'
-import json, os, sys
-path, device_id, token, created_ms = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
-data = {
-    "version": 1,
-    "deviceId": device_id,
-    "tokens": {
-        "operator": {
-            "token": token,
-            "role": "operator",
-            "scopes": [
-                "operator.read",
-                "operator.write",
-            ],
-            "updatedAtMs": created_ms,
-        },
-    },
-}
-with open(path, "w") as f:
-    json.dump(data, f, indent=2)
-    f.write("\n")
-os.chmod(path, 0o600)
-print(f"[INFO] {path} written")
-PYAUTH
-
 echo "[INFO] Device ID: $DEVICE_ID"
 
-# --- Step 4: Optional Gateway registration (needs cryptography + websockets) ---
+# --- Step 3: Register with Gateway and obtain device-scoped token ---
+#
+# The Gateway issues a real device-scoped token (payload.auth.deviceToken)
+# on successful connect. This token is written into device-auth.json in
+# native OpenClaw format. The shared gateway token is used only for the
+# initial pairing handshake and is NOT persisted.
+
 if [[ "$SKIP_PAIRING" == "true" ]]; then
-  echo "[INFO] Skipping Gateway registration (--skip-pairing)"
-  echo "[INFO] Device will need to be approved before dispatch works"
+  echo "[WARN] Skipping Gateway registration (--skip-pairing)"
+  echo "[WARN] device-auth.json was NOT written — dispatch will not work"
+  echo "[INFO] Run without --skip-pairing when the Gateway is available"
+elif ! python3 -c "import cryptography, websockets" 2>/dev/null; then
+  echo "[WARN] python3 cryptography/websockets not available — skipping Gateway registration"
+  echo "[WARN] device-auth.json was NOT written — dispatch will not work"
+  echo "[INFO] Install them (pip install cryptography websockets) and re-run"
 else
-  if ! python3 -c "import cryptography, websockets" 2>/dev/null; then
-    echo "[WARN] python3 cryptography/websockets not available — skipping Gateway registration"
-    echo "[INFO] Install them and re-run, or approve the device manually"
-  else
-    python3 - "$DEVICE_JSON" "$GATEWAY_TOKEN" "$GATEWAY_URL" <<'PYREGISTER'
-import asyncio, base64, json, platform, sys, time, uuid
+  python3 - "$DEVICE_JSON" "$DEVICE_AUTH_JSON" "$GATEWAY_TOKEN" "$GATEWAY_URL" <<'PYREGISTER'
+import asyncio, base64, json, os, platform, sys, time, uuid
 from cryptography.hazmat.primitives import serialization
 import websockets
 
-device_path, gateway_token, ws_url = sys.argv[1], sys.argv[2], sys.argv[3]
+device_path, auth_path, gateway_token, ws_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 PROTOCOL_VERSION, TIMEOUT = 3, 30
 
 with open(device_path) as f:
@@ -209,7 +190,7 @@ pk = serialization.load_pem_private_key(dev["privateKeyPem"].encode(), password=
 pub_raw = pk.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
 pub_b64 = base64.urlsafe_b64encode(pub_raw).rstrip(b"=").decode()
 
-async def register():
+async def register_and_persist():
     async with websockets.connect(ws_url, open_timeout=10) as ws:
         challenge = json.loads(await asyncio.wait_for(ws.recv(), timeout=TIMEOUT))
         nonce = challenge["payload"]["nonce"]
@@ -234,24 +215,60 @@ async def register():
         }
         await ws.send(json.dumps(msg))
         resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=TIMEOUT))
-        if resp.get("ok"):
-            print("[OK] Device registered and approved by Gateway")
-        else:
+
+        if not resp.get("ok"):
             err = resp.get("error", {})
-            print(f"[WARN] Gateway: {err.get('code', '?')} — {err.get('message', '?')}")
+            print(f"[ERROR] Gateway pairing failed: {err.get('code', '?')} — {err.get('message', '?')}")
             print("[INFO] You may need to approve: openclaw devices approve --latest")
+            print("[WARN] device-auth.json was NOT written — re-run after approval")
+            sys.exit(1)
+
+        auth = resp.get("payload", {}).get("auth", {})
+        device_token = auth.get("deviceToken", "")
+        if not device_token:
+            print("[ERROR] Gateway did not return a device token in payload.auth.deviceToken")
+            print("[WARN] device-auth.json was NOT written")
+            sys.exit(1)
+
+        # Write device-auth.json with the real device-scoped token
+        auth_data = {
+            "version": 1,
+            "deviceId": dev["deviceId"],
+            "tokens": {
+                "operator": {
+                    "token": device_token,
+                    "role": auth.get("role", "operator"),
+                    "scopes": auth.get("scopes", ["operator.write"]),
+                    "updatedAtMs": auth.get("issuedAtMs", ts),
+                },
+            },
+        }
+        with open(auth_path, "w") as f:
+            json.dump(auth_data, f, indent=2)
+            f.write("\n")
+        os.chmod(auth_path, 0o600)
+        print(f"[OK] Device registered — device-scoped token persisted")
+        print(f"[INFO] {auth_path} written")
 
 try:
-    asyncio.run(register())
+    asyncio.run(register_and_persist())
+except SystemExit:
+    raise
 except Exception as exc:
-    print(f"[WARN] Gateway registration failed: {exc}")
-    print("[INFO] Start the Gateway and approve the device when ready")
+    print(f"[ERROR] Gateway registration failed: {exc}")
+    print("[WARN] device-auth.json was NOT written — dispatch will not work")
+    print("[INFO] Start the Gateway and re-run this script")
+    sys.exit(1)
 PYREGISTER
-  fi
 fi
 
 echo ""
-echo "[OK] Mission Control OpenClaw device-auth provisioning complete"
-echo "     Directory: $TARGET_DIR"
-echo "     device.json:      key pair (native OpenClaw format)"
-echo "     device-auth.json: auth tokens (native OpenClaw format)"
+if [[ -f "$DEVICE_AUTH_JSON" ]]; then
+  echo "[OK] Mission Control OpenClaw device-auth provisioning complete"
+  echo "     Directory: $TARGET_DIR"
+  echo "     device.json:      key pair (native OpenClaw format)"
+  echo "     device-auth.json: device-scoped auth token (native OpenClaw format)"
+else
+  echo "[INCOMPLETE] device.json written but device-auth.json is missing"
+  echo "     Re-run this script when the Gateway is available to complete pairing"
+fi
