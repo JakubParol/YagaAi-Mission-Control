@@ -7,13 +7,12 @@ test("planning sub-pages include all views in correct order", () => {
   const planning = navModules.find((module) => module.href === "/planning");
   assert.ok(planning);
 
-  const subPageHrefs = planning.subPages?.map((page) => page.href);
-  assert.deepEqual(subPageHrefs, [
-    "/planning/board",
-    "/planning/backlog",
-    "/planning/list",
-    "/planning/epics-overview",
-    "/planning/settings",
+  assert.deepEqual(planning.subPages, [
+    { href: "/planning/board", label: "Board" },
+    { href: "/planning/backlog", label: "Backlog" },
+    { href: "/planning/list", label: "List" },
+    { href: "/planning/epics-overview", label: "Epics" },
+    { href: "/planning/settings", label: "Settings" },
   ]);
 });
 
@@ -21,10 +20,9 @@ test("control-plane sub-pages include dashboard and timeline", () => {
   const controlPlane = navModules.find((module) => module.href === "/control-plane");
   assert.ok(controlPlane);
 
-  const subPageHrefs = controlPlane.subPages?.map((page) => page.href);
-  assert.deepEqual(subPageHrefs, [
-    "/control-plane/dashboard",
-    "/control-plane/timeline",
+  assert.deepEqual(controlPlane.subPages, [
+    { href: "/control-plane/dashboard", label: "Dashboard" },
+    { href: "/control-plane/timeline", label: "Timeline" },
   ]);
 });
 
