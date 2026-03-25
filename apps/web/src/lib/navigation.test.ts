@@ -27,3 +27,12 @@ test("control-plane sub-pages include dashboard and timeline", () => {
     "/control-plane/timeline",
   ]);
 });
+
+test("tests module exists with test1 as its only sub-page", () => {
+  const tests = navModules.find((module) => module.href === "/tests");
+  assert.ok(tests);
+  assert.equal(tests.label, "Tests");
+
+  const subPageHrefs = tests.subPages?.map((page) => page.href);
+  assert.deepEqual(subPageHrefs, ["/tests/test1"]);
+});
