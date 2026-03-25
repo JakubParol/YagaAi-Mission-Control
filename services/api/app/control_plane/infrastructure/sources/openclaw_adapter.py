@@ -237,7 +237,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
 
     @staticmethod
     def _load_device_auth(path: str) -> dict:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         private_key = serialization.load_pem_private_key(
             data["privateKeyPem"].encode(),
