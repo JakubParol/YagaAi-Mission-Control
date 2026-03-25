@@ -3,8 +3,6 @@ import { FlaskConical } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
   title: "Tests — Test1",
 };
