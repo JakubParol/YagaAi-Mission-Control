@@ -132,7 +132,8 @@ After running, approve the device if needed: `openclaw devices approve --latest`
 Key generation uses `openssl` (no Python packages required on a fresh host).
 Gateway registration is optional and requires `python3` + `cryptography` + `websockets`.
 
-Directory permissions should be `0700`, files `0600`.
+Directory permissions should be `0755`, files `0644` (container appuser reads
+them through a read-only bind mount which prevents writes).
 
 ### Gateway connection (API env config)
 

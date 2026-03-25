@@ -154,7 +154,7 @@ data = {
 with open(path, "w") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
-os.chmod(path, 0o600)
+os.chmod(path, 0o644)
 print(f"[INFO] {path} written")
 PYDEVICE
 
@@ -246,7 +246,7 @@ async def register_and_persist():
         with open(auth_path, "w") as f:
             json.dump(auth_data, f, indent=2)
             f.write("\n")
-        os.chmod(auth_path, 0o600)
+        os.chmod(auth_path, 0o644)
         print(f"[OK] Device registered — device-scoped token persisted")
         print(f"[INFO] {auth_path} written")
 

@@ -18,10 +18,12 @@ provision_openclaw_auth() {
   echo "[INFO] Provisioning OpenClaw device-auth for Mission Control"
 
   # PROD auth — dedicated device identity
+  # Files are world-readable (0644/0755) because the API container runs
+  # as appuser (UID 1001) and the read-only bind mount prevents writes.
   run_as_install_user "bash '$setup_script' --target-dir '$prod_auth_dir'"
   $SUDO chown -R root:root "$prod_auth_dir" 2>/dev/null || true
-  $SUDO chmod 700 "$prod_auth_dir"
-  $SUDO chmod 600 "$prod_auth_dir"/* 2>/dev/null || true
+  $SUDO chmod 755 "$prod_auth_dir"
+  $SUDO chmod 644 "$prod_auth_dir"/* 2>/dev/null || true
 
   # Verify PROD auth is complete
   if [[ ! -f "$prod_auth_dir/device.json" || ! -f "$prod_auth_dir/device-auth.json" ]]; then
@@ -32,8 +34,8 @@ provision_openclaw_auth() {
   # DEV auth — separate dedicated device identity (not a copy of PROD)
   run_as_install_user "bash '$setup_script' --target-dir '$dev_auth_dir'"
   $SUDO chown -R "$INSTALL_USER:$INSTALL_USER" "$dev_auth_dir" 2>/dev/null || true
-  $SUDO chmod 700 "$dev_auth_dir"
-  $SUDO chmod 600 "$dev_auth_dir"/* 2>/dev/null || true
+  $SUDO chmod 755 "$dev_auth_dir"
+  $SUDO chmod 644 "$dev_auth_dir"/* 2>/dev/null || true
 
   # Verify DEV auth is complete
   if [[ ! -f "$dev_auth_dir/device.json" || ! -f "$dev_auth_dir/device-auth.json" ]]; then
