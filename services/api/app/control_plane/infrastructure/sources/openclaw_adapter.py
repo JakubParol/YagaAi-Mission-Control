@@ -268,16 +268,26 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
 
     @staticmethod
     def _build_prompt(envelope: DispatchEnvelope) -> str:
-        return (
-            f"{envelope.prompt_marker} Implement only this story.\n"
-            f"\n"
-            f"Work item: {envelope.work_item_key} — {envelope.work_item_title}\n"
-            f"Repo root: {envelope.repo_root}\n"
-            f"Work dir: {envelope.work_dir}\n"
-            f"Contract: {envelope.contract_version}\n"
-            f"Run ID: {envelope.run_id}\n"
-            f"Correlation ID: {envelope.correlation_id}\n"
-            f"\n"
-            f"Report progress via runtime callbacks "
-            f"(agent.assignment.accepted, agent.execution.spawned, etc.)."
-        )
+        return build_dispatch_prompt(envelope)
+
+
+def build_dispatch_prompt(envelope: DispatchEnvelope) -> str:
+    """Build the text prompt sent to the agent for a dispatch envelope."""
+    return (
+        f"{envelope.prompt_marker} Implement only this story.\n"
+        f"\n"
+        f"Work item: {envelope.work_item_key} — {envelope.work_item_title}\n"
+        f"Repo root: {envelope.repo_root}\n"
+        f"Work dir: {envelope.work_dir}\n"
+        f"MC API target: {envelope.mc_api_base_url}\n"
+        f"Contract: {envelope.contract_version}\n"
+        f"Run ID: {envelope.run_id}\n"
+        f"Correlation ID: {envelope.correlation_id}\n"
+        f"\n"
+        f"IMPORTANT: Use `mc --api-base {envelope.mc_api_base_url}` "
+        f"for ALL mc CLI operations in this run. "
+        f"Do NOT use bare `mc` without --api-base.\n"
+        f"\n"
+        f"Report progress via runtime callbacks "
+        f"(agent.assignment.accepted, agent.execution.spawned, etc.)."
+    )

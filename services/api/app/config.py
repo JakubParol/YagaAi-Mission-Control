@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     control_plane_commands_enabled: bool = True
     control_plane_dapr_ingest_enabled: bool = True
     control_plane_watchdog_enabled: bool = True
+    base_url: str = "http://127.0.0.1:5100"
     openclaw_gateway_url: str = "ws://127.0.0.1:18789"
     openclaw_device_auth_dir: str = "/run/secrets/openclaw-auth"
 
