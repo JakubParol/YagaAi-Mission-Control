@@ -41,10 +41,12 @@ class OpenClawDispatchService:
         queue_repo: AgentQueueRepository,
         dispatch_repo: DispatchRecordRepository,
         openclaw_adapter: OpenClawDispatchPort,
+        mc_api_base_url: str,
     ) -> None:
         self._queue_repo = queue_repo
         self._dispatch_repo = dispatch_repo
         self._adapter = openclaw_adapter
+        self._mc_api_base_url = mc_api_base_url
 
     async def dispatch_to_openclaw(
         self,
@@ -68,6 +70,7 @@ class OpenClawDispatchService:
             run_id=run_id,
             openclaw_key=openclaw_key,
             main_session_key=main_session_key,
+            mc_api_base_url=self._mc_api_base_url,
         )
         record = self._build_record(
             entry=entry,
@@ -115,6 +118,7 @@ class OpenClawDispatchService:
         run_id: str,
         openclaw_key: str,
         main_session_key: str,
+        mc_api_base_url: str,
     ) -> DispatchEnvelope:
         project_key = entry.work_item_key.split("-")[0] if "-" in entry.work_item_key else ""
         prompt_marker = f"[{entry.work_item_key}] [E2E]"
@@ -133,6 +137,7 @@ class OpenClawDispatchService:
             project_key=project_key,
             repo_root=repo_root,
             work_dir=repo_root,
+            mc_api_base_url=mc_api_base_url,
             prompt_marker=prompt_marker,
             contract_version=DISPATCH_CONTRACT_VERSION,
         )
