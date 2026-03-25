@@ -32,10 +32,10 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
     device identity to grant operator.write scope (needed for chat.send).
     Token-only auth is insufficient — it grants read scope only. This is
     a Gateway-level security policy, not an MC design choice. The API
-    runtime therefore acts as a privileged Gateway client that must have:
-      - MC_API_OPENCLAW_GATEWAY_URL  (WebSocket URL)
-      - MC_API_OPENCLAW_GATEWAY_TOKEN  (shared auth token)
-      - MC_API_OPENCLAW_DEVICE_IDENTITY_PATH  (Ed25519 key pair JSON)
+    runtime reads all auth material from a single MC-owned device-auth
+    file provisioned by ``setup-openclaw-client-auth.sh``:
+      - MC_API_OPENCLAW_GATEWAY_URL   (WebSocket URL)
+      - MC_API_OPENCLAW_DEVICE_AUTH_PATH  (combined key pair + gateway token)
 
     chat.send semantics: a successful response (ok=true, status=started)
     means the Gateway accepted the message and injected it into the target
@@ -50,18 +50,10 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         self,
         *,
         gateway_url: str,
-        gateway_token: str,
-        device_identity_path: str,
+        device_auth_path: str,
     ) -> None:
-        if not gateway_token:
-            log_event(
-                logger,
-                level=logging.WARNING,
-                event="control_plane.dispatch.adapter.no_token",
-            )
         self._ws_url = gateway_url.replace("http://", "ws://").replace("https://", "wss://")
-        self._token = gateway_token
-        self._device_path = device_identity_path
+        self._device_auth_path = device_auth_path
         self._device: dict | None = None
 
     async def send_dispatch(
@@ -69,10 +61,10 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         *,
         envelope: DispatchEnvelope,
     ) -> OpenClawSessionMetadata:
-        if not self._token:
-            msg = "OpenClaw Gateway token not configured (MC_API_OPENCLAW_GATEWAY_TOKEN)"
+        device = self._get_device()  # fail-fast if not configured
+        if not device["gatewayToken"]:
+            msg = "OpenClaw Gateway token missing in device-auth file"
             raise RuntimeError(msg)
-        self._get_device()  # fail-fast if not configured
         prompt = self._build_prompt(envelope)
         idempotency_key = f"mc-dispatch-{envelope.run_id}"
 
@@ -123,13 +115,13 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
     def _get_device(self) -> dict:
         if self._device is not None:
             return self._device
-        if not self._device_path:
-            msg = "OpenClaw device identity not configured (MC_API_OPENCLAW_DEVICE_IDENTITY_PATH)"
+        if not self._device_auth_path:
+            msg = "OpenClaw device-auth path not configured (MC_API_OPENCLAW_DEVICE_AUTH_PATH)"
             raise RuntimeError(msg)
         try:
-            self._device = self._load_device_identity(self._device_path)
+            self._device = self._load_device_auth(self._device_auth_path)
         except Exception as exc:
-            msg = f"Failed to load OpenClaw device identity from {self._device_path}: {exc}"
+            msg = f"Failed to load OpenClaw device-auth from {self._device_auth_path}: {exc}"
             raise RuntimeError(msg) from exc
         return self._device
 
@@ -155,7 +147,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
             "id": str(uuid.uuid4()),
             "method": "connect",
             "params": {
-                "auth": {"token": self._token},
+                "auth": {"token": self._get_device()["gatewayToken"]},
                 "role": "operator",
                 "scopes": ["operator.write"],
                 "client": {
@@ -232,7 +224,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
                 "operator",
                 "operator.write",
                 str(signed_at_ms),
-                self._token,
+                self._get_device()["gatewayToken"],
                 nonce,
                 platform.system().lower(),
                 "",
@@ -244,7 +236,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
         return base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
 
     @staticmethod
-    def _load_device_identity(path: str) -> dict:
+    def _load_device_auth(path: str) -> dict:
         with open(path) as f:
             data = json.load(f)
         private_key = serialization.load_pem_private_key(
@@ -260,6 +252,7 @@ class GatewayWsDispatchAdapter(OpenClawDispatchPort):
             "deviceId": data["deviceId"],
             "privateKey": private_key,
             "publicKeyB64": base64.urlsafe_b64encode(pub_raw).rstrip(b"=").decode(),
+            "gatewayToken": data["gatewayToken"],
         }
 
     @staticmethod
