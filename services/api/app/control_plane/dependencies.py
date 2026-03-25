@@ -19,8 +19,28 @@ from app.control_plane.infrastructure.repositories.run import DbRunRepository
 from app.control_plane.infrastructure.sources.openclaw_adapter import (
     GatewayWsDispatchAdapter,
 )
-from app.planning.infrastructure.shared.agent_lookup_adapter import DbAgentLookupAdapter
+from app.shared.agent_lookup_adapter import DbAgentLookupAdapter
 from app.shared.api.deps import get_db
+
+
+def build_queue_dispatch_service(db: AsyncSession) -> QueueDispatchService:
+    """Build QueueDispatchService — plain factory for cross-module reuse."""
+    queue_repo = DbAgentQueueRepository(db)
+    dispatch_repo = DbDispatchRecordRepository(db)
+    return QueueDispatchService(
+        ingress=QueueIngressService(repo=queue_repo),
+        selection=DispatchSelectionService(repo=queue_repo),
+        dispatch=OpenClawDispatchService(
+            queue_repo=queue_repo,
+            dispatch_repo=dispatch_repo,
+            openclaw_adapter=GatewayWsDispatchAdapter(
+                gateway_url=settings.openclaw_gateway_url,
+                device_auth_dir=settings.openclaw_device_auth_dir,
+            ),
+            mc_api_base_url=settings.base_url,
+        ),
+        agent_lookup=DbAgentLookupAdapter(db),
+    )
 
 
 async def get_command_service(
@@ -65,19 +85,4 @@ async def get_dispatch_selection_service(
 async def get_queue_dispatch_service(
     db: AsyncSession = Depends(get_db),
 ) -> QueueDispatchService:
-    queue_repo = DbAgentQueueRepository(db)
-    dispatch_repo = DbDispatchRecordRepository(db)
-    return QueueDispatchService(
-        ingress=QueueIngressService(repo=queue_repo),
-        selection=DispatchSelectionService(repo=queue_repo),
-        dispatch=OpenClawDispatchService(
-            queue_repo=queue_repo,
-            dispatch_repo=dispatch_repo,
-            openclaw_adapter=GatewayWsDispatchAdapter(
-                gateway_url=settings.openclaw_gateway_url,
-                device_auth_dir=settings.openclaw_device_auth_dir,
-            ),
-            mc_api_base_url=settings.base_url,
-        ),
-        agent_lookup=DbAgentLookupAdapter(db),
-    )
+    return build_queue_dispatch_service(db)

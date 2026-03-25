@@ -101,7 +101,7 @@ generated-members = [
 ]
 
 [tool.pylint.design]
-max-public-methods = 30
+max-public-methods = 35
 max-locals = 25
 max-branches = 15
 
@@ -156,6 +156,8 @@ type = "forbidden"
 source_modules = ["app.planning.api", "app.observability.api", "app.control_plane.api"]
 forbidden_modules = ["app.planning.infrastructure", "app.observability.infrastructure", "app.control_plane.infrastructure"]
 ignore_imports = [
+    # Composition roots (dependencies.py) wire their OWN module's infrastructure.
+    # This is the ONLY legitimate exception — see coding-standards-backend.md.
     "app.observability.dependencies -> app.observability.infrastructure.repositories.*",
     "app.observability.dependencies -> app.observability.infrastructure.sources.*",
     "app.control_plane.dependencies -> app.control_plane.infrastructure.repositories.*",
@@ -163,11 +165,6 @@ ignore_imports = [
     "app.planning.dependencies -> app.planning.infrastructure.repositories.*",
     "app.planning.dependencies -> app.planning.infrastructure.repositories.backlogs.*",
     "app.planning.dependencies -> app.planning.infrastructure.sources.*",
-    "app.planning.dependencies -> app.planning.infrastructure.shared.*",
-    "app.planning.dependencies -> app.control_plane.infrastructure.repositories.*",
-    "app.planning.dependencies -> app.control_plane.infrastructure.sources.*",
-    "app.planning.dependencies -> app.control_plane.application.*",
-    "app.control_plane.dependencies -> app.planning.infrastructure.shared.*",
 ]
 
 [[tool.importlinter.contracts]]
