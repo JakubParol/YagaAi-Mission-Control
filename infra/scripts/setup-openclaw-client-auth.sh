@@ -21,7 +21,13 @@ set -euo pipefail
 #   Local: --target-dir ./services/api/.openclaw-auth
 # -------------------------------------------------------------------
 
-DEFAULT_OPENCLAW_CONFIG="$HOME/.openclaw/openclaw.json"
+# Resolve the real user's home even under sudo
+_REAL_HOME="${HOME}"
+if [[ -n "${SUDO_USER:-}" ]]; then
+  _REAL_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+fi
+
+DEFAULT_OPENCLAW_CONFIG="$_REAL_HOME/.openclaw/openclaw.json"
 DEFAULT_GATEWAY_URL="ws://127.0.0.1:18789"
 
 TARGET_DIR=""
@@ -109,7 +115,11 @@ echo "[INFO] Generating Mission Control OpenClaw device-auth material"
 echo "[INFO] Target directory: $TARGET_DIR"
 echo "[INFO] Gateway: $GATEWAY_URL"
 
-mkdir -p "$TARGET_DIR"
+# Create target directory, escalating to sudo only if needed
+if ! mkdir -p "$TARGET_DIR" 2>/dev/null; then
+  sudo mkdir -p "$TARGET_DIR"
+  sudo chown "$(id -u):$(id -g)" "$TARGET_DIR"
+fi
 
 # --- Step 1: Generate Ed25519 key pair using openssl (no Python packages) ---
 TMPKEY="$(mktemp)"
