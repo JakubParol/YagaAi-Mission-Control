@@ -11,44 +11,40 @@ set -euo pipefail
 # -------------------------------------------------------------------
 
 provision_openclaw_auth() {
-  local prod_auth_path="$PROD_ENV_DIR/openclaw-device-auth.json"
-  local dev_auth_path="$REPO_ROOT/infra/dev/secrets/openclaw-device-auth.json"
+  local prod_auth_dir="$PROD_ENV_DIR/openclaw-auth"
+  local dev_auth_dir="$REPO_ROOT/infra/dev/secrets/openclaw-auth"
   local setup_script="$REPO_ROOT/infra/scripts/setup-openclaw-client-auth.sh"
 
   echo "[INFO] Provisioning OpenClaw device-auth for Mission Control"
 
-  # PROD auth file
-  run_as_install_user "bash '$setup_script' --target '$prod_auth_path'"
-  $SUDO chown root:root "$prod_auth_path" 2>/dev/null || true
-  $SUDO chmod 600 "$prod_auth_path"
+  # PROD auth — dedicated device identity
+  run_as_install_user "bash '$setup_script' --target-dir '$prod_auth_dir'"
+  $SUDO chown -R root:root "$prod_auth_dir" 2>/dev/null || true
+  $SUDO chmod 700 "$prod_auth_dir"
+  $SUDO chmod 600 "$prod_auth_dir"/* 2>/dev/null || true
 
-  # DEV auth file (copy from PROD — same host, same gateway)
-  if [[ ! -f "$dev_auth_path" ]]; then
-    mkdir -p "$(dirname "$dev_auth_path")"
-    $SUDO cp "$prod_auth_path" "$dev_auth_path"
-    $SUDO chown "$INSTALL_USER:$INSTALL_USER" "$dev_auth_path" 2>/dev/null || true
-    $SUDO chmod 600 "$dev_auth_path"
-    echo "[INFO] Copied PROD auth to DEV: $dev_auth_path"
-  fi
+  # DEV auth — separate dedicated device identity (not a copy of PROD)
+  run_as_install_user "bash '$setup_script' --target-dir '$dev_auth_dir'"
+  $SUDO chown -R "$INSTALL_USER:$INSTALL_USER" "$dev_auth_dir" 2>/dev/null || true
+  $SUDO chmod 700 "$dev_auth_dir"
+  $SUDO chmod 600 "$dev_auth_dir"/* 2>/dev/null || true
 
   # Update PROD env to point at the container-internal path
-  if ! $SUDO grep -q 'MC_API_OPENCLAW_DEVICE_AUTH_PATH' "$PROD_ENV_FILE" 2>/dev/null; then
+  if ! $SUDO grep -q 'MC_API_OPENCLAW_DEVICE_AUTH_DIR' "$PROD_ENV_FILE" 2>/dev/null; then
     {
       echo ""
       echo "# OpenClaw dispatch (control plane)"
       echo "MC_API_OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789"
-      echo "MC_API_OPENCLAW_DEVICE_AUTH_PATH=/run/secrets/openclaw-device-auth.json"
+      echo "MC_API_OPENCLAW_DEVICE_AUTH_DIR=/run/secrets/openclaw-auth"
     } | $SUDO tee -a "$PROD_ENV_FILE" >/dev/null
     echo "[INFO] Added OpenClaw device-auth config to $PROD_ENV_FILE"
   fi
 
   # Remove legacy OpenClaw env vars from PROD env if present
-  if $SUDO grep -q 'MC_API_OPENCLAW_GATEWAY_TOKEN' "$PROD_ENV_FILE" 2>/dev/null; then
-    $SUDO sed -i '/MC_API_OPENCLAW_GATEWAY_TOKEN/d' "$PROD_ENV_FILE"
-    echo "[INFO] Removed legacy MC_API_OPENCLAW_GATEWAY_TOKEN from $PROD_ENV_FILE"
-  fi
-  if $SUDO grep -q 'MC_API_OPENCLAW_DEVICE_IDENTITY_PATH' "$PROD_ENV_FILE" 2>/dev/null; then
-    $SUDO sed -i '/MC_API_OPENCLAW_DEVICE_IDENTITY_PATH/d' "$PROD_ENV_FILE"
-    echo "[INFO] Removed legacy MC_API_OPENCLAW_DEVICE_IDENTITY_PATH from $PROD_ENV_FILE"
-  fi
+  for legacy_var in MC_API_OPENCLAW_GATEWAY_TOKEN MC_API_OPENCLAW_DEVICE_IDENTITY_PATH MC_API_OPENCLAW_DEVICE_AUTH_PATH; do
+    if $SUDO grep -q "$legacy_var" "$PROD_ENV_FILE" 2>/dev/null; then
+      $SUDO sed -i "/$legacy_var/d" "$PROD_ENV_FILE"
+      echo "[INFO] Removed legacy $legacy_var from $PROD_ENV_FILE"
+    fi
+  done
 }

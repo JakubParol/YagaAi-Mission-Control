@@ -105,53 +105,61 @@ If you want to debug API/Web outside containers, run host processes on different
 
 ### Device-auth provisioning
 
-Mission Control uses its own dedicated OpenClaw device-auth material, stored as
-a single MC-owned file — **not** the host OpenClaw identity directory.
+Mission Control uses its own dedicated OpenClaw device-auth material in the
+native OpenClaw file format — **not** the host OpenClaw identity directory.
+
+Each environment gets its own device identity (PROD and DEV do not share).
+
+The provisioning script outputs two native OpenClaw files:
+- `device.json` — Ed25519 key pair
+- `device-auth.json` — device-scoped auth tokens by role
 
 Provision with:
 
 ```bash
 # PROD (run from repo root, or via install.sh)
-./infra/scripts/setup-openclaw-client-auth.sh --target /etc/mission-control/openclaw-device-auth.json
+./infra/scripts/setup-openclaw-client-auth.sh --target-dir /etc/mission-control/openclaw-auth
 
 # DEV (containerized runtime)
-./infra/scripts/setup-openclaw-client-auth.sh --target ./infra/dev/secrets/openclaw-device-auth.json
+./infra/scripts/setup-openclaw-client-auth.sh --target-dir ./infra/dev/secrets/openclaw-auth
 
 # Local host dev
-./infra/scripts/setup-openclaw-client-auth.sh --target ./services/api/.openclaw-device-auth.json
+./infra/scripts/setup-openclaw-client-auth.sh --target-dir ./services/api/.openclaw-auth
 ```
 
-After running, approve the device: `openclaw devices approve --latest`
+After running, approve the device if needed: `openclaw devices approve --latest`
 
-The auth file contains Ed25519 key pair + gateway token in a single JSON.
-Permissions should be `0600`.
+Key generation uses `openssl` (no Python packages required on a fresh host).
+Gateway registration is optional and requires `python3` + `cryptography` + `websockets`.
+
+Directory permissions should be `0700`, files `0600`.
 
 ### Gateway connection (API env config)
 
 The API acts as a privileged Gateway client to dispatch work. It needs both
-a shared token AND an Ed25519 device identity (token-only auth grants read
-scope only; `chat.send` requires `operator.write` which needs device auth).
+a token AND an Ed25519 device identity (token-only auth grants read scope
+only; `chat.send` requires `operator.write` which needs device auth).
 
-All auth material is read from a single device-auth file:
+Auth material is read from a directory containing native OpenClaw files:
 
 | Var | Description | Example |
 |---|---|---|
 | `MC_API_OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
-| `MC_API_OPENCLAW_DEVICE_AUTH_PATH` | Combined device-auth JSON (key pair + token) | `/run/secrets/openclaw-device-auth.json` |
+| `MC_API_OPENCLAW_DEVICE_AUTH_DIR` | Dir with device.json + device-auth.json | `/run/secrets/openclaw-auth` |
 
 **Environment paths:**
 
-| Environment | Host auth file | Container-internal path |
+| Environment | Host auth dir | Container-internal dir |
 |---|---|---|
-| PROD | `/etc/mission-control/openclaw-device-auth.json` | `/run/secrets/openclaw-device-auth.json` |
-| DEV (containers) | `infra/dev/secrets/openclaw-device-auth.json` | `/run/secrets/openclaw-device-auth.json` |
-| Local host dev | `services/api/.openclaw-device-auth.json` | N/A (direct path) |
+| PROD | `/etc/mission-control/openclaw-auth/` | `/run/secrets/openclaw-auth/` |
+| DEV (containers) | `infra/dev/secrets/openclaw-auth/` | `/run/secrets/openclaw-auth/` |
+| Local host dev | `services/api/.openclaw-auth/` | N/A (direct path) |
 
-Docker compose mounts the host file read-only into the container at `/run/secrets/openclaw-device-auth.json`.
+Docker compose mounts the host directory read-only into the container.
 
 Missing or wrong values → dispatch fails with:
-- missing/bad auth file → `Failed to load OpenClaw device-auth`
-- empty token in file → `Gateway token missing in device-auth file`
+- missing dir/files → `Failed to load OpenClaw device-auth`
+- empty token → `auth token missing in device-auth.json`
 - wrong token → `Gateway connect failed: AUTH_TOKEN_MISMATCH`
 
 ### Agent routing data (Planning DB)

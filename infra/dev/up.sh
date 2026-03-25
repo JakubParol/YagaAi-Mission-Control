@@ -10,10 +10,10 @@ if [ ! -f "$RUNTIME_DIR/.env" ]; then
   echo "Created infra/dev/.env from template"
 fi
 
-DEVICE_AUTH="${MC_OPENCLAW_DEVICE_AUTH_HOST_PATH:-$RUNTIME_DIR/secrets/openclaw-device-auth.json}"
-if [ ! -f "$DEVICE_AUTH" ]; then
-  echo "[ERROR] OpenClaw device-auth file not found: $DEVICE_AUTH" >&2
-  echo "[ERROR] Provision it first: ./infra/scripts/setup-openclaw-client-auth.sh --target $DEVICE_AUTH" >&2
+DEVICE_AUTH_DIR="${MC_OPENCLAW_DEVICE_AUTH_HOST_DIR:-$RUNTIME_DIR/secrets/openclaw-auth}"
+if [ ! -d "$DEVICE_AUTH_DIR" ] || [ ! -f "$DEVICE_AUTH_DIR/device.json" ] || [ ! -f "$DEVICE_AUTH_DIR/device-auth.json" ]; then
+  echo "[ERROR] OpenClaw device-auth not found: $DEVICE_AUTH_DIR" >&2
+  echo "[ERROR] Provision it first: ./infra/scripts/setup-openclaw-client-auth.sh --target-dir $DEVICE_AUTH_DIR" >&2
   exit 1
 fi
 
