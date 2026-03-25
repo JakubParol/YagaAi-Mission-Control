@@ -2,15 +2,9 @@
 
 Configuration model for Mission Control CLI.
 
-## Execution Profiles
+## Execution Model
 
-Bare `mc` defaults to PROD (`http://127.0.0.1:5100`). Two convenience wrappers are also installed by `install.sh`:
-
-| Wrapper | Target | Notes |
-|---|---|---|
-| `mc` | PROD API (`http://127.0.0.1:5100`) | default for direct operator usage |
-| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | convenience wrapper, sets `MC_API_BASE_URL` |
-| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | convenience wrapper, explicit PROD |
+Bare `mc` is the single CLI entrypoint. It defaults to PROD (`http://127.0.0.1:5100`).
 
 Override with `--api-base <url>` or `MC_API_BASE_URL` env var for any target.
 

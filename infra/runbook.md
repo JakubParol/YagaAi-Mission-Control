@@ -29,26 +29,22 @@ What it does:
 
 - installs Docker + Compose and Node.js when missing
 - creates `infra/dev/.env` and `/etc/mission-control/prod.env` when missing
-- builds and installs CLI wrappers: `mc`, `mc-dev`, `mc-prod` in `/usr/local/bin/`
+- builds and installs the `mc` CLI wrapper in `/usr/local/bin/`
 - installs and enables `mission-control-dev.service` and `mission-control-prod.service`
 - brings up both DEV and PROD stacks once during bootstrap
 
-## CLI execution profiles
+## CLI usage
 
-| Wrapper | Target | Notes |
-|---|---|---|
-| `mc` | PROD API (`http://127.0.0.1:5100`) | default for direct operator usage |
-| `mc-dev` | DEV API (`http://127.0.0.1:5000`) | convenience wrapper |
-| `mc-prod` | PROD API (`http://127.0.0.1:5100`) | convenience wrapper, explicit PROD |
+Bare `mc` is the single CLI entrypoint. It defaults to PROD (`http://127.0.0.1:5100`).
 
 Override with `--api-base <url>` or `MC_API_BASE_URL` for any target.
 
 Examples:
 
 ```bash
-mc health                                          # hits PROD
-mc-dev project list                                # hits DEV
-mc --api-base http://127.0.0.1:5000 task update .. # explicit DEV target
+mc health                                          # hits PROD (default)
+mc --api-base http://127.0.0.1:5000 project list   # explicit DEV target
+mc --api-base http://127.0.0.1:5100 task update ..  # explicit PROD target
 ```
 
 For agent execution, the dispatch/delivery context provides an explicit API target via `--api-base`. Execution target is a property of the dispatched run, not of the agent identity.
