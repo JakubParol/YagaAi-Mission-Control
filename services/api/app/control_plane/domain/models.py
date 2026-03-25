@@ -264,6 +264,7 @@ class DispatchEnvelope:
     project_key: str
     repo_root: str
     work_dir: str
+    mc_api_base_url: str
     prompt_marker: str
     contract_version: str
 
