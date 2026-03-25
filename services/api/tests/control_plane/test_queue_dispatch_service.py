@@ -7,13 +7,12 @@ from app.control_plane.application.openclaw_dispatch_service import OpenClawDisp
 from app.control_plane.application.queue_dispatch_service import QueueDispatchService
 from app.control_plane.application.queue_ingress_service import QueueIngressService
 from app.control_plane.domain.models import AgentQueueStatus, DispatchEnvelope
-from app.control_plane.infrastructure.sources.openclaw_adapter import GatewayWsDispatchAdapter
+from app.control_plane.infrastructure.sources.openclaw_adapter import build_dispatch_prompt
 from app.shared.ports import AgentInfo
 from tests.control_plane.fake_agent_lookup import FakeAgentLookup
 from tests.control_plane.fake_agent_queue_repo import FakeAgentQueueRepo
 from tests.control_plane.fake_dispatch_repo import FakeDispatchRecordRepo
 from tests.control_plane.fake_openclaw_adapter import FailingOpenClawAdapter, FakeOpenClawAdapter
-
 
 _TEST_MC_API_BASE_URL = "http://127.0.0.1:5000"
 
@@ -232,7 +231,7 @@ def test_build_prompt_includes_mc_api_base_url() -> None:
         contract_version="control-plane-delivery-v1",
     )
 
-    prompt = GatewayWsDispatchAdapter._build_prompt(envelope)
+    prompt = build_dispatch_prompt(envelope)
 
     assert "MC API target: http://127.0.0.1:5000" in prompt
     assert "mc --api-base http://127.0.0.1:5000" in prompt
