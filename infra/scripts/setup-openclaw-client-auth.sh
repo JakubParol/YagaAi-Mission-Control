@@ -187,7 +187,6 @@ async def register_and_pair(private_key, device_id, pub_raw, gateway_token, ws_u
         return False
 
     pub_b64 = base64.urlsafe_b64encode(pub_raw).rstrip(b"=").decode()
-    http_url = ws_url.replace("ws://", "http://").replace("wss://", "https://")
 
     try:
         async with websockets.connect(ws_url, open_timeout=CONNECT_TIMEOUT) as ws:
