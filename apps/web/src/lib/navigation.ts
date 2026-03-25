@@ -1,4 +1,4 @@
-import { Activity, ClipboardList, Radar } from "lucide-react";
+import { Activity, ClipboardList, FlaskConical, Radar } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface SubPage {
@@ -35,6 +35,12 @@ export const navModules: NavModule[] = [
       { href: "/control-plane/dashboard", label: "Dashboard" },
       { href: "/control-plane/timeline", label: "Timeline" },
     ],
+  },
+  {
+    href: "/tests",
+    label: "Tests",
+    icon: FlaskConical,
+    subPages: [{ href: "/tests/test1", label: "Test1" }],
   },
 ];
 
