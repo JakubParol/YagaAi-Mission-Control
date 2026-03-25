@@ -33,6 +33,5 @@ test("tests module exists with test1 as its only sub-page", () => {
   assert.ok(tests);
   assert.equal(tests.label, "Tests");
 
-  const subPageHrefs = tests.subPages?.map((page) => page.href);
-  assert.deepEqual(subPageHrefs, ["/tests/test1"]);
+  assert.deepEqual(tests.subPages, [{ href: "/tests/test1", label: "Test1" }]);
 });
