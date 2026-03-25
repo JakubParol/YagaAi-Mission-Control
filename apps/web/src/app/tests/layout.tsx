@@ -1,10 +1,12 @@
+import type { ReactNode } from "react";
+
 import { ModuleTopBar } from "@/components/module-top-bar";
 import { PageContent } from "@/components/page-content";
 import { navModules } from "@/lib/navigation";
 
 const testsModule = navModules.find((m) => m.href === "/tests");
 
-export default function TestsLayout({ children }: { children: React.ReactNode }) {
+export default function TestsLayout({ children }: { children: ReactNode }) {
   return (
     <>
       {testsModule?.subPages && (
