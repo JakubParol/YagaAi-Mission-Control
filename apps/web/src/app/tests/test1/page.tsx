@@ -11,8 +11,8 @@ export default function Test1Page() {
   return (
     <PageShell
       icon={FlaskConical}
-      title="Tests"
-      subtitle="Test1"
+      title="Test1"
+      subtitle="Tests module initial view"
     />
   );
 }
