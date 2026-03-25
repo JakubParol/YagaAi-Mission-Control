@@ -107,6 +107,12 @@ echo "[INFO] Gateway: $GATEWAY_URL"
 # Create target directory if needed
 mkdir -p "$(dirname "$TARGET_PATH")"
 
+# Ensure cryptography package is available
+if ! python3 -c "import cryptography" 2>/dev/null; then
+  echo "[INFO] Installing cryptography package"
+  python3 -m pip install --quiet cryptography
+fi
+
 # Generate Ed25519 key pair and write combined auth file
 python3 - "$TARGET_PATH" "$GATEWAY_TOKEN" "$GATEWAY_URL" "$SKIP_PAIRING" <<'PYTHON'
 import asyncio

@@ -60,9 +60,20 @@ show_runtime_status() {
   MC_IMAGE_TAG="$image_tag" docker compose -f "$compose_file" --env-file "$env_file" ps
 }
 
+ensure_device_auth_file() {
+  local auth_file="$1"
+  local env_label="$2"
+  if [[ ! -f "$auth_file" ]]; then
+    log_error "OpenClaw device-auth file not found for $env_label: $auth_file"
+    echo "Provision it first: ./infra/scripts/setup-openclaw-client-auth.sh --target $auth_file" >&2
+    exit 1
+  fi
+}
+
 deploy_prod() {
   local current_sha previous_sha branch_name
   ensure_prod_env
+  ensure_device_auth_file "/etc/mission-control/openclaw-device-auth.json" "PROD"
   cd "$REPO_ROOT"
   branch_name="$(current_branch)"
   current_sha="$(current_sha)"
@@ -110,6 +121,8 @@ deploy_prod() {
 deploy_dev() {
   local current_sha previous_sha branch_name
   ensure_dev_env
+  local dev_auth="${MC_OPENCLAW_DEVICE_AUTH_HOST_PATH:-$REPO_ROOT/infra/dev/secrets/openclaw-device-auth.json}"
+  ensure_device_auth_file "$dev_auth" "DEV"
   cd "$REPO_ROOT"
   branch_name="$(current_branch)"
   require_safe_dev_branch "$branch_name"
