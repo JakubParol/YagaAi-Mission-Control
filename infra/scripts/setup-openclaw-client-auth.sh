@@ -196,7 +196,7 @@ async def register_and_pair(private_key, device_id, pub_raw, gateway_token, ws_u
 
             signed_at_ms = int(time.time() * 1000)
             payload = "|".join([
-                "v3", device_id, "mc-provisioner", "backend", "operator",
+                "v3", device_id, "cli", "cli", "operator",
                 "operator.write", str(signed_at_ms), gateway_token, nonce,
                 platform.system().lower(), "",
             ])
@@ -212,8 +212,8 @@ async def register_and_pair(private_key, device_id, pub_raw, gateway_token, ws_u
                     "role": "operator",
                     "scopes": ["operator.write"],
                     "client": {
-                        "id": "mc-provisioner",
-                        "mode": "backend",
+                        "id": "cli",
+                        "mode": "cli",
                         "version": "1.0.0",
                         "platform": platform.system().lower(),
                     },
