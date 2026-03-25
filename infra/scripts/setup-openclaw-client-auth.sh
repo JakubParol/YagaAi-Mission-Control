@@ -172,9 +172,9 @@ if [[ "$SKIP_PAIRING" == "true" ]]; then
   echo "[WARN] device-auth.json was NOT written — dispatch will not work"
   echo "[INFO] Run without --skip-pairing when the Gateway is available"
 elif ! python3 -c "import cryptography, websockets" 2>/dev/null; then
-  echo "[WARN] python3 cryptography/websockets not available — skipping Gateway registration"
-  echo "[WARN] device-auth.json was NOT written — dispatch will not work"
-  echo "[INFO] Install them (pip install cryptography websockets) and re-run"
+  echo "[ERROR] python3 cryptography/websockets are required for Gateway registration" >&2
+  echo "[ERROR] Install: pip install cryptography websockets" >&2
+  exit 1
 else
   python3 - "$DEVICE_JSON" "$DEVICE_AUTH_JSON" "$GATEWAY_TOKEN" "$GATEWAY_URL" <<'PYREGISTER'
 import asyncio, base64, json, os, platform, sys, time, uuid
@@ -268,7 +268,11 @@ if [[ -f "$DEVICE_AUTH_JSON" ]]; then
   echo "     Directory: $TARGET_DIR"
   echo "     device.json:      key pair (native OpenClaw format)"
   echo "     device-auth.json: device-scoped auth token (native OpenClaw format)"
+elif [[ "$SKIP_PAIRING" == "true" ]]; then
+  # --skip-pairing is an explicit opt-in; exit 0 but warn
+  echo "[INCOMPLETE] device.json written, device-auth.json skipped (--skip-pairing)"
 else
-  echo "[INCOMPLETE] device.json written but device-auth.json is missing"
-  echo "     Re-run this script when the Gateway is available to complete pairing"
+  # Default mode: incomplete is a hard failure
+  echo "[ERROR] Provisioning incomplete — device-auth.json was not created" >&2
+  exit 1
 fi

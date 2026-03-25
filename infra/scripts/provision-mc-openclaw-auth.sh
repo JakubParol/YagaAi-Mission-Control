@@ -23,11 +23,23 @@ provision_openclaw_auth() {
   $SUDO chmod 700 "$prod_auth_dir"
   $SUDO chmod 600 "$prod_auth_dir"/* 2>/dev/null || true
 
+  # Verify PROD auth is complete
+  if [[ ! -f "$prod_auth_dir/device.json" || ! -f "$prod_auth_dir/device-auth.json" ]]; then
+    echo "[ERROR] PROD OpenClaw auth provisioning incomplete — aborting" >&2
+    exit 1
+  fi
+
   # DEV auth — separate dedicated device identity (not a copy of PROD)
   run_as_install_user "bash '$setup_script' --target-dir '$dev_auth_dir'"
   $SUDO chown -R "$INSTALL_USER:$INSTALL_USER" "$dev_auth_dir" 2>/dev/null || true
   $SUDO chmod 700 "$dev_auth_dir"
   $SUDO chmod 600 "$dev_auth_dir"/* 2>/dev/null || true
+
+  # Verify DEV auth is complete
+  if [[ ! -f "$dev_auth_dir/device.json" || ! -f "$dev_auth_dir/device-auth.json" ]]; then
+    echo "[ERROR] DEV OpenClaw auth provisioning incomplete — aborting" >&2
+    exit 1
+  fi
 
   # Update PROD env to point at the container-internal path
   if ! $SUDO grep -q 'MC_API_OPENCLAW_DEVICE_AUTH_DIR' "$PROD_ENV_FILE" 2>/dev/null; then
