@@ -138,6 +138,14 @@ build_global_cli() {
 
   echo "[INFO] Installing mc wrapper: $MC_WRAPPER_PATH"
 
+  # Clean up legacy wrappers from previous installs
+  for legacy in /usr/local/bin/mc-dev /usr/local/bin/mc-prod; do
+    if [[ -f "$legacy" ]]; then
+      $SUDO rm -f "$legacy"
+      echo "[INFO] Removed legacy wrapper: $legacy"
+    fi
+  done
+
   # Bare mc — defaults to PROD API (operator default, hardcoded in CLI config.ts)
   $SUDO tee "$MC_WRAPPER_PATH" >/dev/null <<EOF
 #!/usr/bin/env bash
