@@ -40,7 +40,7 @@ export const navModules: NavModule[] = [
     href: "/tests",
     label: "Tests",
     icon: FlaskConical,
-    subPages: [{ href: "/tests/test1", label: "Test1" }],
+    subPages: [{ href: "/tests/test1", label: "Test 1" }],
   },
 ];
 

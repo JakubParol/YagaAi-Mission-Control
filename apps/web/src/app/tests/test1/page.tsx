@@ -6,7 +6,7 @@ export default function Test1Page() {
   return (
     <PageShell
       icon={FlaskConical}
-      title="Tests"
+      title="Test 1"
       subtitle="Test environment and diagnostic views"
     />
   );
