@@ -251,10 +251,14 @@ Note:
 EOF
 }
 
+# shellcheck source=infra/scripts/provision-mc-openclaw-auth.sh
+source "$REPO_ROOT/infra/scripts/provision-mc-openclaw-auth.sh"
+
 require_ubuntu
 install_docker
 install_nodejs
 bootstrap_env_files
+provision_openclaw_auth
 build_global_cli
 install_systemd_units
 initial_bringup

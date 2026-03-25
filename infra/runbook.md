@@ -103,23 +103,64 @@ If you want to debug API/Web outside containers, run host processes on different
 
 ## Control Plane dispatch (OpenClaw Gateway)
 
+### Device-auth provisioning
+
+Mission Control uses its own dedicated OpenClaw device-auth material in the
+native OpenClaw file format — **not** the host OpenClaw identity directory.
+
+Each environment gets its own device identity (PROD and DEV do not share).
+
+The provisioning script outputs two native OpenClaw files:
+- `device.json` — Ed25519 key pair
+- `device-auth.json` — device-scoped auth tokens by role
+
+Provision with:
+
+```bash
+# PROD (run from repo root, or via install.sh)
+./infra/scripts/setup-openclaw-client-auth.sh --target-dir /etc/mission-control/openclaw-auth
+
+# DEV (containerized runtime)
+./infra/scripts/setup-openclaw-client-auth.sh --target-dir ./infra/dev/secrets/openclaw-auth
+
+# Local host dev
+./infra/scripts/setup-openclaw-client-auth.sh --target-dir ./services/api/.openclaw-auth
+```
+
+After running, approve the device if needed: `openclaw devices approve --latest`
+
+Key generation uses `openssl` (no Python packages required on a fresh host).
+Gateway registration is optional and requires `python3` + `cryptography` + `websockets`.
+
+Directory permissions should be `0755`, files `0644` (container appuser reads
+them through a read-only bind mount which prevents writes).
+
 ### Gateway connection (API env config)
 
 The API acts as a privileged Gateway client to dispatch work. It needs both
-a shared token AND an Ed25519 device identity (token-only auth grants read
-scope only; `chat.send` requires `operator.write` which needs device auth).
+a token AND an Ed25519 device identity (token-only auth grants read scope
+only; `chat.send` requires `operator.write` which needs device auth).
+
+Auth material is read from a directory containing native OpenClaw files:
 
 | Var | Description | Example |
 |---|---|---|
 | `MC_API_OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
-| `MC_API_OPENCLAW_GATEWAY_TOKEN` | Gateway shared auth token | from `openclaw.json → gateway.auth.token` |
-| `MC_API_OPENCLAW_DEVICE_IDENTITY_PATH` | Ed25519 device identity JSON | `/home/kuba/.openclaw/identity/device.json` |
+| `MC_API_OPENCLAW_DEVICE_AUTH_DIR` | Dir with device.json + device-auth.json | `/run/secrets/openclaw-auth` |
 
-Set these in DEV (`services/api/.env.local`) and PROD (`/etc/mission-control/prod.env`).
+**Environment paths:**
+
+| Environment | Host auth dir | Container-internal dir |
+|---|---|---|
+| PROD | `/etc/mission-control/openclaw-auth/` | `/run/secrets/openclaw-auth/` |
+| DEV (containers) | `infra/dev/secrets/openclaw-auth/` | `/run/secrets/openclaw-auth/` |
+| Local host dev | `services/api/.openclaw-auth/` | N/A (direct path) |
+
+Docker compose mounts the host directory read-only into the container.
 
 Missing or wrong values → dispatch fails with:
-- empty token → `Gateway token not configured`
-- empty/bad identity path → `Failed to load OpenClaw device identity`
+- missing dir/files → `Failed to load OpenClaw device-auth`
+- empty token → `auth token missing in device-auth.json`
 - wrong token → `Gateway connect failed: AUTH_TOKEN_MISMATCH`
 
 ### Agent routing data (Planning DB)

@@ -45,6 +45,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - ${MC_OPENCLAW_DEVICE_AUTH_HOST_DIR:-./secrets/openclaw-auth}:/run/secrets/openclaw-auth:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request as r; r.urlopen('http://127.0.0.1:5100/healthz',timeout=2)\""]
       interval: 5s

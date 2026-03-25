@@ -75,8 +75,7 @@ async def get_queue_dispatch_service(
             dispatch_repo=dispatch_repo,
             openclaw_adapter=GatewayWsDispatchAdapter(
                 gateway_url=settings.openclaw_gateway_url,
-                gateway_token=settings.openclaw_gateway_token,
-                device_identity_path=settings.openclaw_device_identity_path,
+                device_auth_dir=settings.openclaw_device_auth_dir,
             ),
         ),
         agent_lookup=DbAgentLookupAdapter(db),
